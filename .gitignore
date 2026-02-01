@@ -17,6 +17,14 @@
 /.next/
 /out/
 
+# remotion render
+.remotion-temp/
+/public/output/
+/public/temp/
+
+# asset uploads (local storage)
+/uploads/
+
 # production
 /build
 
@@ -30,8 +38,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — .env.example is committed; .env.local is not
+.env
+.env.local
+.env.*.local
+!.env.example
 
 # vercel
 .vercel

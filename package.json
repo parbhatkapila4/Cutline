@@ -6,15 +6,30 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint",
+    "remotion:studio": "remotion studio src/remotion/index.tsx",
+    "remotion:render": "remotion render src/remotion/index.tsx CUTLINEComposition output/video.mp4",
+    "worker": "tsx src/worker.ts"
   },
   "dependencies": {
+    "@remotion/bundler": "4.0.414",
+    "@remotion/cli": "4.0.414",
+    "@remotion/renderer": "4.0.414",
+    "bullmq": "^5",
+    "dotenv": "^16",
+    "ioredis": "^5",
     "next": "16.1.6",
+    "rate-limiter-flexible": "^9.0.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "remotion": "4.0.414"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@vitest/coverage-v8": "^2",
+    "vitest": "^2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -22,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4",
     "typescript": "^5"
   }
 }
