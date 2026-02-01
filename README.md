@@ -52,6 +52,10 @@
 | `npm run worker` | BullMQ worker (separate process). Runs pipeline; requires Redis. |
 | `npm run remotion:studio` | Remotion studio for composition preview (optional). |
 | `npm run remotion:render` | Remotion CLI render with default props (optional, for testing). |
+| `npm run test` | Vitest in watch mode (unit + integration). |
+| `npm run test:run` | Vitest single run (CI). |
+
+**Tests:** Unit tests live next to source (`*.test.ts`). The integration test in `src/app/api/generate/generate.integration.test.ts` is skipped when `REDIS_URL` is not set; when run, it POSTs to `/api/generate` and polls until the job completes or fails. It does not start the Next.js server or worker—run `npm run dev` and `npm run worker` separately if you want the integration test to reach completion.
 
 ---
 
