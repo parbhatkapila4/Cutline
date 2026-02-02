@@ -1,6 +1,6 @@
 # CUTLINE
 
-**AI-directed video editing.** One sentence of intent → a 30–45 second edited video. The system decides narrative, shots, pacing, motion, subtitles, voice, and images. No templates, no user config. Images are mandatory; structure first, words later.
+**AI-directed video editing.** One sentence of intent → a 30–45 second edited video. The system decides narrative, shots, pacing, motion, subtitles, voice, and images. No templates, no user config. Images are optional—we fetch from the web (Unsplash/DALL·E/Pexels) using your description, or use a placeholder if APIs fail.
 
 ---
 
@@ -74,7 +74,7 @@ Copy `.env.example` to `.env.local` and set the following. See README sections b
 | **REDIS_URL** | Local: `redis://localhost:6379`. Production: e.g. [Upstash](https://upstash.com) (Redis Connect → ioredis URL). |
 | **AWS_*** | Only if `STORAGE_TYPE=s3`. [AWS Console](https://aws.amazon.com/console/). |
 
-At least one image source (Unsplash or Pexels) is required; DALL·E is used when stock fails.
+Set at least one image source (Unsplash or Pexels) for real images; if none are set or all fail, a placeholder is used so the video still generates.
 
 ---
 
@@ -329,7 +329,7 @@ When a job has `assetIds` or `brandColors`, the orchestrator runs **asset analys
 - **Reference video:** ffmpeg extracts 3–5 keyframes; vision analyzes frames for color palette; optional cuts-per-minute via scene detection.
 - **Reference images:** Vision → color palette (3–5 hex), mood/style description.
 
-Analysis uses the same OpenRouter API key; set `OPENROUTER_VISION_MODEL` in `.env.local` if you want a different model for vision (defaults to `OPENROUTER_MODEL` or `anthropic/claude-3-5-sonnet`). Reference video keyframe extraction requires **ffmpeg** on the path. Keyframes are written to `uploads/_keyframes/[assetId]/`.
+Analysis uses the same OpenRouter API key; set `OPENROUTER_VISION_MODEL` in `.env.local` if you want a different model for vision (defaults to `OPENROUTER_MODEL` or `google/gemini-2.0-flash-lite-001`). Reference video keyframe extraction requires **ffmpeg** on the path. Keyframes are written to `uploads/_keyframes/[assetId]/`.
 
 **Test analysis only:** `POST /api/assets/analyze` with body `{ assetIds: string[], brandColors?: { primary, secondary? } }` returns `AnalyzedAssets` (no pipeline run).
 
@@ -373,7 +373,7 @@ Cleanup only deletes inside the designated dirs; paths are validated so source c
 ### Behavior
 
 - **User uploaded product photos:** Product photos are assigned to shots by matching shot purpose (establish, detail, hero, transition) to analyzed suggested shot types. Remaining shots get images from stock or AI-generated.
-- **No uploads:** Per shot, the system derives a search query and image prompt from shot purpose, script text, and intent (via OpenRouter LLM). It then tries: **Unsplash** (primary stock) → **DALL·E 3** (AI fallback) → **Pexels** (alternate stock) → simplified query retry. Failures are logged; the job only fails if all attempts fail for a shot.
+- **No uploads:** Per shot, the system derives a search query and image prompt from shot purpose, script text, and intent (via OpenRouter LLM). It then tries: **Unsplash** (primary stock) → **DALL·E 3** (AI fallback) → **Pexels** (alternate stock) → simplified query retry. **If all fail**, we use a **placeholder** so the video still generates (no hard failure).
 
 ### Retry order
 
@@ -381,7 +381,7 @@ Cleanup only deletes inside the designated dirs; paths are validated so source c
 2. AI-generated (OpenAI DALL·E 3)
 3. Alternate stock (if Unsplash first, try Pexels, or vice versa)
 4. Simplified query retry
-5. If all fail → throw; job fails (no abstract-only render)
+5. **If all fail → use placeholder** (`/fallback.png`); video still generates.
 
 ### Env and APIs
 
@@ -389,7 +389,18 @@ Cleanup only deletes inside the designated dirs; paths are validated so source c
 - **Pexels (fallback):** [Get API key](https://www.pexels.com/api/), add `PEXELS_API_KEY`.
 - **OpenAI DALL·E 3 (fallback):** [API keys](https://platform.openai.com/api-keys), add `OPENAI_API_KEY`.
 
-At least one image source is required (Unsplash or Pexels); DALL·E is used when stock fails. Query/prompt derivation uses `OPENROUTER_API_KEY` (same as pipeline).
+Set at least one image source (Unsplash or Pexels) for real images; if none are set or all APIs fail, a placeholder is used so the job still completes. Query/prompt derivation uses `OPENROUTER_API_KEY` (same as pipeline).
+
+### “Could not obtain image” / fixing failures
+
+If you see *“Could not obtain image for shot shot-X (query: …). Tried Unsplash, DALL·E, Pexels”*, the pipeline now **uses a placeholder** and the video still generates. To get real images instead:
+
+- Add **UNSPLASH_ACCESS_KEY** and/or **PEXELS_API_KEY** (and optionally **OPENAI_API_KEY** for DALL·E) to `.env.local`.
+- Restart the worker after changing env. Check logs for `[images] No image for shot … Using placeholder` if APIs are missing or failing.
+
+### Future: Google Veo 3 (video-from-text)
+
+[Google Veo 3](https://ai.google.dev/gemini-api/docs/video) (and Veo 3.1 on [Vertex AI](https://cloud.google.com/vertex-ai/generative-ai/docs/video/generate-videos-from-text)) is a **video** generation API (text-to-video, image-to-video), not still images. CUTLINE today composes **still images** + TTS + motion in Remotion. To use Veo 3 you’d either: (1) generate **video clips per shot** with Veo and stitch them (replacing or supplementing stock/DALL·E images), or (2) generate one full video from a prompt and optionally overlay TTS/subtitles. Integration would require a new provider (Gemini/Vertex API keys), clip download and caching, and composition changes; it’s a natural future extension for full AI video.
 
 ### Test in isolation
 
@@ -401,7 +412,7 @@ At least one image source is required (Unsplash or Pexels); DALL·E is used when
 
 The video is built with [Remotion](https://www.remotion.dev/). The composition is **image-aware**: each shot displays the image from **ImageSpec** as the primary visual (no abstract-only fallback). Pipeline outputs (script, shot list, subtitle track, motion spec, **image spec**) plus TTS audio are passed into the composition.
 
-- **Images are mandatory.** Every shot has an image URL or path from ImageSpec. The composition uses `ImageBackground` per shot: image as full-frame background with **motion** (scale, pan, zoom) applied from MotionSpec. If an image fails to load at render time, the composition throws—no fallback to gradient/shapes.
+- **Every shot has an image** from ImageSpec (or a placeholder if sourcing failed). The composition uses `ImageBackground` per shot: image as full-frame background with **motion** (scale, pan, zoom) applied from MotionSpec. If an image fails to load at render time, the composition throws—no fallback to gradient/shapes.
 - **Image sizing:** Images use `object-fit: cover` (scale to fill, crop overflow) for a consistent frame. Motion (zoom, pan) helps hide awkward crops.
 - **Logo overlay:** When the user uploaded a logo and **AnalyzedAssets.logo** exists, the orchestrator passes **logoUrl** and **logoPlacement** (`outro` \| `watermark` \| `hero`) to the composition. `LogoOverlay` shows the logo in the appropriate shot(s): watermark = lower right small; outro = last shot, centered; hero = first shot, top center.
 
@@ -418,8 +429,8 @@ Open the composition `CUTLINEComposition` and provide props (or use default samp
 ### Render video
 
 **Via API (recommended for full pipeline):**  
-For **async** generation (recommended), use the [Generate](http://localhost:3000/generate) page and the worker (`npm run worker`). The pipeline runs image sourcing after visuals; images are mandatory.  
-On the [test page](http://localhost:3000/test), run all stages (Intent → Narrative → Shots → Script → Subtitles → TTS), then call `POST /api/images/source` with intent, shotList, script to get `imageSpec`, then call `POST /api/render` with the pipeline payload plus **imageSpec** and optional `audioBase64`. The response includes `videoUrl` (e.g. `/output/video-xyz.mp4`). The file is written to `public/output/`. Render requires **imageSpec**; images are mandatory.
+For **async** generation (recommended), use the [Generate](http://localhost:3000/generate) page and the worker (`npm run worker`). The pipeline runs image sourcing after visuals; every shot gets an image (from APIs or placeholder).  
+On the [test page](http://localhost:3000/test), run all stages (Intent → Narrative → Shots → Script → Subtitles → TTS), then call `POST /api/images/source` with intent, shotList, script to get `imageSpec`, then call `POST /api/render` with the pipeline payload plus **imageSpec** and optional `audioBase64`. The response includes `videoUrl` (e.g. `/output/video-xyz.mp4`). The file is written to `public/output/`. Render requires **imageSpec**; missing shots use a placeholder.
 
 **Via CLI:**  
 To render from the command line with a props file:
