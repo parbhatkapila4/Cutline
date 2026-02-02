@@ -17,6 +17,7 @@
     "worker": "tsx src/worker.ts"
   },
   "dependencies": {
+    "@google/genai": "^1.39.0",
     "@remotion/bundler": "4.0.414",
     "@remotion/cli": "4.0.414",
     "@remotion/renderer": "4.0.414",
@@ -32,16 +33,16 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@vitest/coverage-v8": "^2",
-    "vitest": "^2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^2",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "tsx": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2"
   }
 }
