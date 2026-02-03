@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAssetFilePath, getAssetMetadata } from "@/lib/assets/storage";
 
-/**
- * GET /api/assets/[assetId]
- * Serves the file for preview or rendering. Local storage only for now.
- */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ assetId: string }> }
@@ -41,7 +37,7 @@ export async function GET(
   headers.set("Content-Type", meta.mimeType);
   headers.set("Content-Disposition", `inline; filename="${meta.originalFilename}"`);
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers,
   });
