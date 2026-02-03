@@ -177,18 +177,18 @@ Output: public/temp/[jobId].mp4
 
 ## Technology Decisions
 
-| Component       | Choice              | Rationale                                                                 |
-| --------------- | ------------------- | ------------------------------------------------------------------------- |
-| Framework       | Next.js 16          | App Router, API routes, Vercel-ready; no server-side render of video       |
-| Language        | TypeScript 5        | Type safety, clear contracts for pipeline stages and API                  |
-| Video composition| Remotion 4          | Programmatic video from React; same stack as app; deterministic render    |
-| Job queue       | BullMQ + Redis      | Reliable async jobs; repeatable cleanup; same Redis for rate limiting     |
-| AI              | OpenRouter          | Single API for multiple models (Gemini, Claude, GPT); intent, narrative, shots, script, image query, asset analysis |
-| TTS             | ElevenLabs / PlayHT | High-quality voice; PCM (ElevenLabs) for silence stitching; configurable  |
-| Images          | Unsplash, Pexels, DALL·E 3 | Stock first, AI fallback; placeholder if all fail so video still completes |
-| Storage         | Local / S3          | Uploads and temp files; no DB for pipeline state—job state in Redis/BullMQ|
-| Rate limiting   | Redis + rate-limiter-flexible | Per-IP limits on generate, upload, status; abuse protection               |
-| Testing         | Vitest              | Unit tests next to source; integration test for POST /api/generate + poll  |
+| Component         | Choice                        | Rationale                                                                                                           |
+| ----------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Framework         | Next.js 16                    | App Router, API routes, Vercel-ready; no server-side render of video                                                |
+| Language          | TypeScript 5                  | Type safety, clear contracts for pipeline stages and API                                                            |
+| Video composition | Remotion 4                    | Programmatic video from React; same stack as app; deterministic render                                              |
+| Job queue         | BullMQ + Redis                | Reliable async jobs; repeatable cleanup; same Redis for rate limiting                                               |
+| AI                | OpenRouter                    | Single API for multiple models (Gemini, Claude, GPT); intent, narrative, shots, script, image query, asset analysis |
+| TTS               | ElevenLabs / PlayHT           | High-quality voice; PCM (ElevenLabs) for silence stitching; configurable                                            |
+| Images            | Unsplash, Pexels, DALL·E 3    | Stock first, AI fallback; placeholder if all fail so video still completes                                          |
+| Storage           | Local / S3                    | Uploads and temp files; no DB for pipeline state—job state in Redis/BullMQ                                          |
+| Rate limiting     | Redis + rate-limiter-flexible | Per-IP limits on generate, upload, status; abuse protection                                                         |
+| Testing           | Vitest                        | Unit tests next to source; integration test for POST /api/generate + poll                                           |
 
 ---
 
@@ -325,40 +325,40 @@ RETRY_RENDER_MAX=2
 
 #### Video generation
 
-| Method | Endpoint                 | Description                                              |
-| ------ | ------------------------ | -------------------------------------------------------- |
-| POST   | `/api/generate`          | Create video job. Body: `{ input, assetIds?, brandColors?, mode? }`. Returns `{ jobId }`. Rate limited (e.g. 5/hour per IP). |
-| GET    | `/api/generate/[jobId]`  | Job status. Returns `{ status, videoUrl?, error? }`. `status`: `pending` \| `processing` \| `completed` \| `failed`. Rate limited (e.g. 60/min per IP). |
+| Method | Endpoint                | Description                                                                                                                                             |
+| ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/generate`         | Create video job. Body: `{ input, assetIds?, brandColors?, mode? }`. Returns `{ jobId }`. Rate limited (e.g. 5/hour per IP).                            |
+| GET    | `/api/generate/[jobId]` | Job status. Returns `{ status, videoUrl?, error? }`. `status`: `pending` \| `processing` \| `completed` \| `failed`. Rate limited (e.g. 60/min per IP). |
 
 #### Pipeline stages (test in isolation)
 
-| Method | Endpoint                   | Description                                                       |
-| ------ | -------------------------- | ----------------------------------------------------------------- |
-| POST   | `/api/intent`              | Intent from one sentence. Body: `{ input }`.                       |
-| POST   | `/api/narrative`           | Narrative plan from intent. Body: `{ intent }`.                   |
-| POST   | `/api/shots`               | Shot list from narrative + intent. Body: `{ narrative, intent }`. |
-| POST   | `/api/script`              | Script from shots + narrative. Body: `{ shots, narrative, intent }`. |
-| POST   | `/api/subtitles`           | Subtitle track from script + shots. Body: `{ script, shotList }`. |
-| POST   | `/api/subtitles/refine`    | Refine subtitles with word timings. Body: `{ subtitleTrack, wordTimings?, script, shotList }`. |
-| POST   | `/api/tts`                 | TTS audio from script + shot list. Body: `{ script, shotList }`. |
-| POST   | `/api/motion`              | Motion spec from shot list. Body: `{ shotList }`.                 |
-| POST   | `/api/visuals`             | Visual spec from intent + optional assets. Body: `{ intent, analyzedAssets? }`. |
-| POST   | `/api/images/source`       | Image spec per shot. Body: `{ intent, shotList, script, analyzedAssets?, assetPaths? }`. |
-| POST   | `/api/render`              | Remotion render to MP4. Body: full pipeline payload + imageSpec, optional audioBase64. |
+| Method | Endpoint                | Description                                                                                    |
+| ------ | ----------------------- | ---------------------------------------------------------------------------------------------- |
+| POST   | `/api/intent`           | Intent from one sentence. Body: `{ input }`.                                                   |
+| POST   | `/api/narrative`        | Narrative plan from intent. Body: `{ intent }`.                                                |
+| POST   | `/api/shots`            | Shot list from narrative + intent. Body: `{ narrative, intent }`.                              |
+| POST   | `/api/script`           | Script from shots + narrative. Body: `{ shots, narrative, intent }`.                           |
+| POST   | `/api/subtitles`        | Subtitle track from script + shots. Body: `{ script, shotList }`.                              |
+| POST   | `/api/subtitles/refine` | Refine subtitles with word timings. Body: `{ subtitleTrack, wordTimings?, script, shotList }`. |
+| POST   | `/api/tts`              | TTS audio from script + shot list. Body: `{ script, shotList }`.                               |
+| POST   | `/api/motion`           | Motion spec from shot list. Body: `{ shotList }`.                                              |
+| POST   | `/api/visuals`          | Visual spec from intent + optional assets. Body: `{ intent, analyzedAssets? }`.                |
+| POST   | `/api/images/source`    | Image spec per shot. Body: `{ intent, shotList, script, analyzedAssets?, assetPaths? }`.       |
+| POST   | `/api/render`           | Remotion render to MP4. Body: full pipeline payload + imageSpec, optional audioBase64.         |
 
 #### Assets
 
-| Method | Endpoint                 | Description                                                       |
-| ------ | ------------------------ | ----------------------------------------------------------------- |
-| POST   | `/api/assets/upload`     | Upload logo, product photos, reference video/images. Returns `{ assetIds, ... }`. Rate limited (e.g. 20/hour per IP). |
-| GET    | `/api/assets/[assetId]`  | Get asset (redirect or URL).                                       |
-| POST   | `/api/assets/analyze`    | Analyze uploaded assets + brand colors. Body: `{ assetIds, brandColors? }`. Returns `AnalyzedAssets`. |
+| Method | Endpoint                | Description                                                                                                           |
+| ------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/assets/upload`    | Upload logo, product photos, reference video/images. Returns `{ assetIds, ... }`. Rate limited (e.g. 20/hour per IP). |
+| GET    | `/api/assets/[assetId]` | Get asset (redirect or URL).                                                                                          |
+| POST   | `/api/assets/analyze`   | Analyze uploaded assets + brand colors. Body: `{ assetIds, brandColors? }`. Returns `AnalyzedAssets`.                 |
 
 #### Operations
 
-| Method | Endpoint           | Description                                                                 |
-| ------ | ------------------ | --------------------------------------------------------------------------- |
-| POST   | `/api/cleanup`     | Manual cleanup (temp videos, uploads, per-job images). Optional header: `X-Cleanup-Secret` if `CLEANUP_SECRET` set. |
+| Method | Endpoint       | Description                                                                                                         |
+| ------ | -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/cleanup` | Manual cleanup (temp videos, uploads, per-job images). Optional header: `X-Cleanup-Secret` if `CLEANUP_SECRET` set. |
 
 ---
 
@@ -431,15 +431,15 @@ curl -X POST "http://localhost:3000/api/intent" \
 
 ### Input validation and errors
 
-| Constraint                | Behavior        | Example message                                                                     |
-| -----------------------   | --------------- | ----------------------------------------------------------------------------------- |
-| Empty input               | 400             | `Input cannot be empty.`                                                            |
-| Too short (< 5 chars)     | 400             | `Input is too short. Please describe what you want in a sentence.`                  |
-| Too long (> 500 chars)    | 400             | `Input is too long. Keep it to one sentence.`                                       |
-| Prompt-injection patterns | 400             | `Input contains invalid instructions. Please describe what you want in a sentence.` |
-| Invalid job ID            | 400             | `Invalid job ID.`                                                                   |
-| Job not found             | 404             | `Job not found.`                                                                    |
-| Rate limit exceeded       | 429             | `Too many requests. Please try again later.` + `Retry-After`                        |
+| Constraint                | Behavior | Example message                                                                     |
+| ------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| Empty input               | 400      | `Input cannot be empty.`                                                            |
+| Too short (< 5 chars)     | 400      | `Input is too short. Please describe what you want in a sentence.`                  |
+| Too long (> 500 chars)    | 400      | `Input is too long. Keep it to one sentence.`                                       |
+| Prompt-injection patterns | 400      | `Input contains invalid instructions. Please describe what you want in a sentence.` |
+| Invalid job ID            | 400      | `Invalid job ID.`                                                                   |
+| Job not found             | 404      | `Job not found.`                                                                    |
+| Rate limit exceeded       | 429      | `Too many requests. Please try again later.` + `Retry-After`                        |
 
 Asset upload validation (file type, size, count) is documented in the existing README sections and implemented in `src/lib/assets/validation.ts`.
 
@@ -505,7 +505,7 @@ src/
 ## Testing
 
 | Command                 | Description                     |
-| ------------------------| --------------------------------|
+| ----------------------- | ------------------------------- |
 | `npm run test`          | Vitest watch mode               |
 | `npm run test:run`      | Unit tests (CI)                 |
 | `npm run test:coverage` | Coverage report (if configured) |
@@ -546,7 +546,7 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 ## Scripts (package.json)
 
 | Script                    | Purpose                                                                    |
-| --------------------------|--------------------------------------------------------------------------- |
+| ------------------------- | -------------------------------------------------------------------------- |
 | `npm run dev`             | Next.js dev server (UI + API).                                             |
 | `npm run build`           | Next.js production build.                                                  |
 | `npm run start`           | Next.js production server.                                                 |
