@@ -104,6 +104,12 @@ Rendered videos are written to `public/temp/[jobId].mp4`. Cleanup (repeatable Bu
 
 ---
 
+### Video duration (10–90 seconds)
+
+You can choose a video length between 10 and 90 seconds on the main page. The value is sent as `durationSeconds` in **POST /api/generate** and used for both **Slideshow** and **Talking object** modes. For **Talking object**, videos longer than 8 seconds are built by generating multiple Veo clips (~8s each) and concatenating them. That concatenation step requires **ffmpeg** (on PATH or set `FFMPEG_PATH` in `.env.local`). If ffmpeg is not available and you request a talking_object video over 8 seconds, the job will fail with a clear message.
+
+---
+
 ## Architecture
 
 ```
