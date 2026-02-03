@@ -5,7 +5,7 @@
   --fg: #fafafa;
   --muted: #71717a;
   --border: #1a1a1a;
-  --card: #0a0a0a;
+  --card: #000000;
   --accent: #3b82f6;
 }
 
@@ -100,4 +100,57 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #444;
+}
+
+
+html:has(.dashboard-root) {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html:has(.dashboard-root)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+
+@keyframes ribbonWaveLeft {
+
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+  }
+
+  25% {
+    transform: translateY(-15px) translateX(10px) rotate(0.5deg);
+  }
+
+  50% {
+    transform: translateY(0) translateX(5px) rotate(0deg);
+  }
+
+  75% {
+    transform: translateY(10px) translateX(-5px) rotate(-0.5deg);
+  }
+}
+
+@keyframes ribbonWaveRight {
+
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+  }
+
+  25% {
+    transform: translateY(10px) translateX(-10px) rotate(-0.5deg);
+  }
+
+  50% {
+    transform: translateY(0) translateX(-5px) rotate(0deg);
+  }
+
+  75% {
+    transform: translateY(-15px) translateX(5px) rotate(0.5deg);
+  }
 }

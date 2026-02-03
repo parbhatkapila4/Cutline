@@ -1,6 +1,6 @@
 # CUTLINE
 
-**AI-directed video editing.** One sentence of intent → a 30–45 second edited video. The system decides narrative, shots, pacing, motion, subtitles, voice, and images. No templates, no user config. Images are optional—we fetch from the web (Unsplash/DALL·E/Pexels) using your description, or use a placeholder if APIs fail.
+**AI-directed video editing.** One sentence of intent → a 30-45 second edited video. The system decides narrative, shots, pacing, motion, subtitles, voice, and images. No templates, no user config. Images are optional, we fetch from the web (Unsplash/DALL·E/Pexels) using your description, or use a placeholder if APIs fail.
 
 **Tech stack:** Next.js, TypeScript, React 19, Remotion, BullMQ, Redis (ioredis), OpenRouter (AI), ElevenLabs/PlayHT (TTS), Unsplash/Pexels/OpenAI (images), Tailwind CSS.
 
@@ -18,11 +18,11 @@
 
 Creating short-form video today means writing scripts, picking templates, sourcing B-roll, and editing by hand. By the time you’re done, the idea has aged and the format feels generic.
 
-CUTLINE adds an **AI director layer**. You give one sentence of intent (e.g. “Explain why coffee makes you feel awake in 30 seconds”). The system infers audience, goal, and tone; plans a narrative arc; breaks it into shots; writes the script; generates voice and subtitles; sources or generates images; and composes a finished MP4. No templates, no storyboards—every video is directed from intent. Optional asset uploads (logo, product photos, brand colors) enrich the pipeline; the system still owns all creative decisions.
+CUTLINE adds an **AI director layer**. You give one sentence of intent (e.g. “Explain why coffee makes you feel awake in 30 seconds”). The system infers audience, goal, and tone; plans a narrative arc; breaks it into shots; writes the script; generates voice and subtitles; sources or generates images; and composes a finished MP4. No templates, no storyboards, every video is directed from intent. Optional asset uploads (logo, product photos, brand colors) enrich the pipeline; the system still owns all creative decisions.
 
 ---
 
-## Core Capabilities
+## Core Capabilities:
 
 ---
 
@@ -36,7 +36,7 @@ The pipeline starts by parsing your single sentence into a structured intent: **
 
 ### Narrative Planning
 
-From the intent, the system produces a **narrative plan**: arc, 3–5 beats, pacing. No user-facing storyboard—this is an internal representation that drives shot and script decisions.
+From the intent, the system produces a **narrative plan**: arc, 3-5 beats, pacing. No user-facing storyboard, this is an internal representation that drives shot and script decisions.
 
 ---
 
@@ -48,7 +48,7 @@ For each narrative beat, the system decides: what the shot represents (concept, 
 
 ### Script and Subtitles
 
-The system generates **spoken copy** aligned to shot boundaries. Script is passed to TTS (ElevenLabs or PlayHT) and to the subtitle stage. Subtitles are chunked and timed; when TTS returns **word-level timings**, the pipeline refines the subtitle track so chunks align to actual spoken words—subtitles appear and disappear in sync with the voice.
+The system generates **spoken copy** aligned to shot boundaries. Script is passed to TTS (ElevenLabs or PlayHT) and to the subtitle stage. Subtitles are chunked and timed; when TTS returns **word-level timings**, the pipeline refines the subtitle track so chunks align to actual spoken words, subtitles appear and disappear in sync with the voice.
 
 **Refinement:** `POST /api/subtitles/refine` with `{ subtitleTrack, wordTimings?, script, shotList }` returns the refined track.
 
