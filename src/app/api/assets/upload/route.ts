@@ -10,13 +10,6 @@ import {
 } from "@/lib/assets/validation";
 import type { AssetMetadata } from "@/lib/assets/types";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
-
-/**
- * POST /api/assets/upload
- * Multipart form: logo, productPhotos[], referenceVideo, referenceImages[]
- * Validates type and size, stores locally, returns assetIds and assets.
- * Rate limited per IP (RATE_LIMIT_UPLOAD per hour).
- */
 export async function POST(request: Request) {
   const identifier = getClientIdentifier(request);
   const limit = await checkRateLimit(identifier, "upload");

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CUTLINE — AI-directed video editing",
+  title: "CUTLINE: AI-directed video editing",
   description:
     "One sentence of intent. CUTLINE decides narrative, pacing, motion, and subtitles—and delivers a finished video. No scripts. No assets.",
 };
