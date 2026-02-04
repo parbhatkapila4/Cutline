@@ -1,9 +1,3 @@
-/**
- * POST /api/assets/analyze
- * Body: { assetIds: string[], brandColors?: { primary: string, secondary?: string } }
- * Returns: AnalyzedAssets (logo, productPhotos, brandColors, referenceVideo, referenceImages)
- * For testing or when analysis is needed without running the full pipeline.
- */
 
 import { NextResponse } from "next/server";
 import { analyzeAssets } from "@/lib/assets/analysis";
