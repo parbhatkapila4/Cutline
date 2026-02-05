@@ -45,4 +45,33 @@ describe.skipIf(!hasRedis)("POST /api/generate integration", () => {
 
     expect.fail("Polling did not reach completed or failed within max wait time");
   }, MAX_WAIT_MS + 10_000);
+
+  it("POST /api/generate accepts captions on and off and returns jobId", async () => {
+    const res = await fetch(`${BASE}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input: "A 15 second test video about the sky.",
+        captions: "off",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const data = (await res.json()) as { jobId?: string; error?: string };
+    expect(data.error).toBeUndefined();
+    expect(data.jobId).toBeDefined();
+    expect(typeof data.jobId).toBe("string");
+
+    const resOn = await fetch(`${BASE}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input: "A 15 second test video about the ocean.",
+        captions: "on",
+      }),
+    });
+    expect(resOn.status).toBe(200);
+    const dataOn = (await resOn.json()) as { jobId?: string; error?: string };
+    expect(dataOn.error).toBeUndefined();
+    expect(dataOn.jobId).toBeDefined();
+  });
 });
