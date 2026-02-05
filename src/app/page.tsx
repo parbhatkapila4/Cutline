@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
 
 type JobStatus = "pending" | "processing" | "completed" | "failed";
 
@@ -78,48 +80,69 @@ const FEATURES = [
     title: "Auto Captions",
     desc: "Perfectly synced subtitles styled to match your video's aesthetic.",
   },
+  {
+    icon: null,
+    title: "1080p HD Export",
+    desc: "Download your finished video in full HD quality, ready for any platform.",
+  },
+  {
+    icon: null,
+    title: "No Watermarks",
+    desc: "Your videos are yours. No branding, no watermarks, no strings attached.",
+  },
 ];
 
 const PRICING = [
   {
     name: "Starter",
+    badge: "FREE",
     price: "Free",
     period: "",
     description: "Get started with AI video generation at no cost.",
     features: ["Up to 3 videos per week", "1080p HD output", "60 sec max length", "Auto captions"],
-    cta: "Get started",
+    cta: "Try For Free",
     href: "#create",
     highlighted: false,
   },
   {
     name: "Pro",
+    badge: "POPULAR",
     price: "$30",
     period: "/month",
-    description: "For creators who need more output.",
+    description: "For creators who need more output and features.",
     features: ["Unlimited videos", "1080p HD output", "60 sec max length", "Priority processing", "Commercial use"],
     cta: "Go Pro",
     href: "#create",
-    highlighted: true,
+    highlighted: false,
   },
   {
     name: "Pro+",
+    badge: "RECOMMENDED",
     price: "$70",
     period: "/month",
     description: "Maximum capacity for teams and power users.",
     features: ["Everything in Pro", "Extended clip length", "API access", "Dedicated support", "Custom branding"],
-    cta: "Get Pro+",
+    cta: "Go Pro+",
     href: "#create",
-    highlighted: false,
+    highlighted: true,
   },
 ];
 
 export default function Home() {
+  const searchParams = useSearchParams();
   const [prompt, setPrompt] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [mode, setMode] = useState<"slideshow" | "talking_object">("slideshow");
   const [captions, setCaptions] = useState<"on" | "off">("on");
   const [durationSeconds, setDurationSeconds] = useState(30);
+
+  useEffect(() => {
+    const captionsParam = searchParams.get("captions");
+    if (captionsParam === "off" || captionsParam === "on") {
+      setCaptions(captionsParam);
+    }
+  }, [searchParams]);
   const [textModel, setTextModel] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<JobStatus | null>(null);
@@ -157,7 +180,7 @@ export default function Home() {
         const res = await fetch(`/api/generate/${encodeURIComponent(id)}`);
         const data = await res.json();
         if (!res.ok) {
-          setError(data.error || "Something went wrong");
+          setError(getUserFriendlyErrorMessage(data.error || "Something went wrong"));
           setStatus("failed");
           stopPolling();
           return;
@@ -169,7 +192,7 @@ export default function Home() {
           stopPolling();
         }
         if (data.status === "failed") {
-          setError(data.error || "Generation failed");
+          setError(getUserFriendlyErrorMessage(data.error || "Generation failed"));
           stopPolling();
         }
       } catch {
@@ -233,13 +256,14 @@ export default function Home() {
           input: prompt.trim(),
           mode: mode,
           durationSeconds: Math.min(60, Math.max(10, durationSeconds)),
+          captions: captions,
           ...(textModel.trim() ? { textModel: textModel.trim() } : {}),
           ...(assetIds.length > 0 ? { assetIds } : {}),
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to start generation");
+        setError(getUserFriendlyErrorMessage(data.error || "Failed to start generation"));
         return;
       }
       setJobId(data.jobId);
@@ -293,8 +317,7 @@ export default function Home() {
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm">
             <a href="#features" className="text-zinc-400 hover:text-white transition-colors">Features</a>
-            <a href="#how" className="text-zinc-400 hover:text-white transition-colors">How it works</a>
-            <a href="#pricing" className="text-zinc-400 hover:text-white transition-colors">Pricing</a>
+            <Link href="/how" className="text-zinc-400 hover:text-white transition-colors">How it works</Link>
             <Link href="/dashboard" className="text-zinc-400 hover:text-white transition-colors">Dashboard</Link>
           </nav>
           <a
@@ -307,7 +330,7 @@ export default function Home() {
       </header>
 
       <main>
-        <section className="pt-28 pb-16 px-6 relative overflow-hidden">
+        <section className="pt-28 pb-40 px-6 relative overflow-hidden">
 
           <div className="absolute inset-0 pointer-events-none select-none overflow-hidden" aria-hidden>
             <svg
@@ -392,7 +415,7 @@ export default function Home() {
               <span className="text-zinc-500">a single sentence</span>
             </h1>
             <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
-              Describe what you want—add images (optional) and we&apos;ll make a video.
+              Describe what you want: add images (optional) and we&apos;ll make a video.
               No images? We&apos;ll find visuals from the web based on your description.
             </p>
           </div>
@@ -437,19 +460,80 @@ export default function Home() {
                 </div>
               </div>
             ) : jobId && (status === "pending" || status === "processing") ? (
-              <div className="rounded-2xl border border-white/10 bg-zinc-950 p-12">
-                <div className="max-w-sm mx-auto text-center">
-                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-blue-500/10 flex items-center justify-center relative">
-                    <div className="absolute inset-0 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin"></div>
-                    <span className="text-2xl">🎬</span>
+              <div className="rounded-2xl border border-white/10 bg-zinc-950 p-10 sm:p-16">
+                <div className="max-w-lg mx-auto">
+
+                  <div className="flex items-center justify-between mb-8">
+                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      Step {stage + 1} of {STAGES.length}
+                    </span>
+                    <span className="text-xs font-mono text-zinc-600">
+                      {Math.round(((stage + 1) / STAGES.length) * 100)}%
+                    </span>
                   </div>
-                  <p className="text-lg font-medium text-white mb-2">{STAGES[stage]}</p>
-                  <div className="flex justify-center gap-1 mb-4">
-                    {STAGES.map((_, i) => (
-                      <div key={i} className={`h-1 w-10 rounded-full ${i <= stage ? "bg-blue-500" : "bg-zinc-800"}`} />
+
+
+                  <h3 key={stage} className="text-2xl sm:text-3xl font-semibold text-white mb-3 animate-fade-in">
+                    {STAGES[stage]}
+                  </h3>
+
+
+                  <p className="text-zinc-500 mb-10">
+                    {stage === 0 && "Analyzing your prompt to understand the story you want to tell."}
+                    {stage === 1 && "Creating a compelling script with the right pacing and tone."}
+                    {stage === 2 && "Selecting the perfect images and footage for each scene."}
+                    {stage === 3 && "Generating natural voiceover that matches your content."}
+                    {stage === 4 && "Rendering your final video in high quality."}
+                  </p>
+
+
+                  <div className="relative h-1 bg-zinc-800 rounded-full overflow-hidden mb-10">
+                    <div
+                      className="absolute inset-y-0 left-0 progress-wave rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${((stage + 1) / STAGES.length) * 100}%` }}
+                    />
+                  </div>
+
+
+                  <div className="space-y-3 mb-8">
+                    {STAGES.map((stageName, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-3 transition-all duration-300 ${i < stage ? "opacity-50" :
+                          i === stage ? "opacity-100" :
+                            "opacity-30"
+                          }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300 ${i < stage ? "bg-white border-white" :
+                          i === stage ? "border-white" :
+                            "border-zinc-700"
+                          }`}>
+                          {i < stage && (
+                            <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          {i === stage && (
+                            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                          )}
+                        </div>
+                        <span className={`text-sm ${i === stage ? "text-white font-medium" : "text-zinc-500"}`}>
+                          {stageName}
+                        </span>
+                      </div>
                     ))}
                   </div>
-                  <p className="text-sm text-zinc-500">This takes about 60 seconds</p>
+
+
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                    <div className="relative flex items-center justify-center">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full" />
+                      <div className="absolute w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+                    </div>
+                    <p className="text-sm text-emerald-400">
+                      Chunking in progress: Please wait, this may take a moment.
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : status === "failed" && error ? (
@@ -462,7 +546,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-medium text-white mb-1">Generation failed</p>
-                    <p className="text-sm text-zinc-400 mb-4">{error}</p>
+                    <p className="text-sm text-zinc-400 mb-4">{error ? getUserFriendlyErrorMessage(error) : "Something went wrong."}</p>
                     <button onClick={reset} className="text-sm text-blue-400 hover:text-blue-300 font-medium">
                       Try again →
                     </button>
@@ -520,7 +604,7 @@ export default function Home() {
                     )}
 
                     <p className="text-xs text-zinc-600 mt-4 leading-relaxed">
-                      No images? We&apos;ll find visuals from the web based on your description. Or add your own—we&apos;ll use them first.
+                      No images? We&apos;ll find visuals from the web based on your description. Or add your own we&apos;ll use them first.
                     </p>
 
                     <div className="mt-8 pt-6 border-t border-white/5">
@@ -1002,26 +1086,58 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="features" className="py-24 px-6 border-t border-white/5">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <section id="features" className="pt-48 pb-48 px-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+                Features
+              </h2>
+              <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+                Everything you need to go from one prompt to a finished 1080p video.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {FEATURES.map((feature, i) => (
                 <div
                   key={i}
-                  className="group p-6 rounded-xl border border-white/5 bg-zinc-950 hover:bg-zinc-900 hover:border-white/10 transition-all"
+                  className="feature-card relative overflow-hidden rounded-3xl bg-linear-to-b from-zinc-900 to-zinc-950 p-6 cursor-pointer"
                 >
-                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 mb-4 group-hover:bg-blue-500/20 transition-colors">
-                    {feature.icon}
+
+                  <div
+                    className="feature-grid-overlay pointer-events-none absolute left-[-50%] top-0 -mt-2 h-full w-[200%] opacity-50"
+                    style={{
+                      maskImage: "linear-gradient(white, transparent)",
+                      WebkitMaskImage: "linear-gradient(white, transparent)",
+                    }}
+                  >
+                    <svg
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full fill-white/5 stroke-white/10"
+                    >
+                      <defs>
+                        <pattern
+                          id={`grid-pattern-${i}`}
+                          width="20"
+                          height="20"
+                          patternUnits="userSpaceOnUse"
+                          x="-12"
+                          y="4"
+                        >
+                          <path d="M.5 20V.5H20" fill="none" />
+                        </pattern>
+                      </defs>
+                      <rect width="100%" height="100%" strokeWidth="0" fill={`url(#grid-pattern-${i})`} />
+                    </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-sm text-zinc-500 leading-relaxed">{feature.desc}</p>
+                  <p className="relative z-20 text-base font-bold text-white">{feature.title}</p>
+                  <p className="relative z-20 mt-4 text-base font-normal text-zinc-400">{feature.desc}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="how" className="py-24 px-6 bg-black">
+        <section id="how" className="pt-48 pb-48 px-6 bg-black">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
@@ -1060,7 +1176,70 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="pricing" className="py-24 px-6 border-t border-white/5">
+        <section id="quality" className="pt-48 pb-48 px-6 bg-black">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-12">
+              Quality, built in
+            </h2>
+
+            <div className="grid md:grid-cols-3 gap-6">
+
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/80 p-6 pt-8 flex flex-col">
+                <div className="w-full h-48 flex items-center justify-center mb-8">
+                  <div className="inline-flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="203" height="202" fill="none" viewBox="0 0 203 202" className="w-48 h-48">
+                      <path stroke="white" strokeWidth=".75" d="M162.301 5.375c3.19 0 6.327 2.464 9.254 7.167 2.913 4.683 5.552 11.485 7.772 19.923 4.44 16.871 7.19 40.2 7.19 65.981 0 25.782-2.75 49.11-7.19 65.981-2.22 8.438-4.858 15.24-7.772 19.924-2.927 4.703-6.064 7.166-9.254 7.166-3.19-.001-6.327-2.463-9.253-7.166-2.914-4.684-5.552-11.486-7.773-19.924-4.439-16.871-7.19-40.199-7.19-65.981 0-25.782 2.751-49.11 7.19-65.982 2.221-8.438 4.859-15.24 7.773-19.923 2.926-4.703 6.063-7.167 9.253-7.167ZM91.479 154.022 149.022 21.23M91.479 154.022l67.379 36.394M47.707 62.426c-1.981 0-3.81 1.46-5.617 4.346-1.796 2.866-3.427 7.04-4.802 12.23-2.748 10.373-4.453 24.725-4.453 40.593s1.704 30.219 4.453 40.593c1.375 5.19 3.006 9.363 4.802 12.229 1.808 2.886 3.636 4.346 5.617 4.346 1.981 0 3.809-1.46 5.616-4.346 1.796-2.866 3.427-7.039 4.802-12.229 2.749-10.374 4.453-24.726 4.453-40.593s-1.704-30.22-4.453-40.593c-1.375-5.19-3.006-9.364-4.802-12.23-1.807-2.885-3.635-4.346-5.616-4.346ZM91.479 154.022l-35.903-82.626M91.479 154.022l-41.805 22.131" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Consistency</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  One pipeline, every time: AI script, shot planning, visuals, and voiceover tuned to the same high bar.
+                </p>
+              </div>
+
+
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/80 p-6 pt-8 flex flex-col">
+                <div className="w-full h-48 flex items-center justify-center mb-8 [perspective:320px]">
+                  <div className="diagram-3d-tumble inline-flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="202" height="202" fill="none" viewBox="0 0 202 202" className="w-48 h-48" style={{ backfaceVisibility: "hidden" }}>
+                      <path stroke="white" strokeLinejoin="bevel" strokeWidth=".75" d="M5.919 43.791h143.957v143.957H5.919zM51.266 15h143.957l-45.347 28.791H5.919z" />
+                      <path stroke="white" strokeLinejoin="bevel" strokeWidth=".75" d="M51.266 86.979h143.957l-45.347 28.791H5.919zM51.266 158.957h143.957l-45.347 28.791H5.919z" />
+                      <path stroke="white" strokeLinejoin="bevel" strokeWidth=".75" d="M149.876 43.791L195.222 15v143.957l-45.346 28.791zM5.92 43.791L51.265 15v143.957L5.919 187.748zM77.178 43.791L122.525 15v143.957l-45.347 28.791z" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Transparency</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  See each stage: Intent, script, shots, and voiceover. So you stay in control from prompt to download.
+                </p>
+              </div>
+
+
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/80 p-6 pt-8 flex flex-col">
+                <div className="w-full h-48 flex items-center justify-center mb-8">
+                  <div className="diagram-rotate-reverse inline-flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="202" height="202" viewBox="0 0 202 202" fill="none" className="w-48 h-48">
+                      <circle cx="71.4829" cy="101.5" r="70.0092" stroke="white" strokeWidth="0.75" />
+                      <circle cx="63.7054" cy="101.127" r="62.2317" stroke="white" strokeWidth="0.75" />
+                      <circle cx="56.2522" cy="101.154" r="54.7786" stroke="white" strokeWidth="0.75" />
+                      <circle cx="79.0783" cy="101.5" r="77.6046" stroke="white" strokeWidth="0.75" />
+                      <circle cx="86.4205" cy="101.5" r="84.9469" stroke="white" strokeWidth="0.75" />
+                      <circle cx="93.5096" cy="101.5" r="92.0359" stroke="white" strokeWidth="0.75" />
+                      <circle cx="100.599" cy="101.5" r="99.5" stroke="white" strokeWidth="1.25" strokeLinecap="round" strokeDasharray="0.01 4.01" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Ownership</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Your prompt, your video. Download 1080p with no lock-in use it anywhere, no watermarks.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="pricing" className="pt-48 pb-48 px-6">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
@@ -1075,20 +1254,35 @@ export default function Home() {
               {PRICING.map((plan) => (
                 <div
                   key={plan.name}
-                  className={`rounded-2xl border p-6 flex flex-col ${plan.highlighted
-                    ? "border-blue-500/50 bg-blue-500/5 shadow-lg shadow-blue-500/10"
-                    : "border-white/10 bg-zinc-950"
+                  className={`relative rounded-2xl border p-6 pt-10 flex flex-col overflow-hidden ${plan.highlighted
+                    ? "border-blue-500 bg-linear-to-b from-black via-black to-blue-950/40"
+                    : "border-white/15 bg-black"
                     }`}
+                  style={plan.highlighted ? {
+                    boxShadow: "0 0 60px -15px rgba(59, 130, 246, 0.5), 0 0 30px -10px rgba(59, 130, 246, 0.3), inset 0 -80px 60px -60px rgba(59, 130, 246, 0.15)"
+                  } : undefined}
                 >
-                  <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider">{plan.name}</p>
-                  <div className="mt-2 flex items-baseline gap-1">
+
+                  <span
+                    className={`absolute top-4 right-4 text-[10px] font-semibold tracking-wider px-3 py-1 rounded-full ${plan.highlighted
+                      ? "bg-blue-500 text-white shadow-lg shadow-blue-500/50"
+                      : "border border-white/20 text-zinc-400"
+                      }`}
+                  >
+                    {plan.badge}
+                  </span>
+
+                  <h3 className="text-2xl font-semibold italic text-white">{plan.name}</h3>
+                  <p className="mt-2 text-sm text-zinc-400 leading-relaxed">{plan.description}</p>
+
+                  <div className="mt-5 flex items-baseline gap-1.5">
                     <span className="text-3xl font-bold text-white">{plan.price}</span>
-                    {plan.period && <span className="text-zinc-500">{plan.period}</span>}
+                    {plan.period && <span className="text-sm text-zinc-500">{plan.period}</span>}
                   </div>
-                  <p className="mt-3 text-sm text-zinc-400 leading-relaxed">{plan.description}</p>
+
                   <ul className="mt-6 space-y-3 flex-1">
                     {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-zinc-300">
+                      <li key={i} className="flex items-center gap-2.5 text-sm text-zinc-300">
                         <svg className="w-4 h-4 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
@@ -1096,11 +1290,12 @@ export default function Home() {
                       </li>
                     ))}
                   </ul>
+
                   <a
                     href={plan.href}
-                    className={`mt-6 block text-center font-semibold py-3 px-4 rounded-xl transition-colors ${plan.highlighted
-                      ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-white/10 text-white hover:bg-white/15 border border-white/10"
+                    className={`mt-8 block text-center font-semibold py-3.5 px-4 rounded-lg transition-all ${plan.highlighted
+                      ? "bg-blue-500 text-white hover:bg-blue-400 shadow-lg shadow-blue-500/40"
+                      : "border border-white/20 text-white hover:bg-white/5"
                       }`}
                   >
                     {plan.cta}
@@ -1111,34 +1306,91 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="py-32 px-6 bg-black">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">
-              Ready to create your first video?
+        <section className="pt-40 pb-40 px-6 bg-black">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-8 text-center">
+              What you get
             </h2>
-            <p className="text-lg text-zinc-400 mb-10">
-              No account needed. Just scroll up and start creating.
+            <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-zinc-400 text-sm sm:text-base mb-10">
+              <li className="flex items-start gap-3 min-h-[1.5em]">
+                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
+                <span className="pt-0.5">One MP4, 10–60 seconds, ready to download or share</span>
+              </li>
+              <li className="flex items-start gap-3 min-h-[1.5em]">
+                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
+                <span className="pt-0.5">AI voiceover + synced subtitles</span>
+              </li>
+              <li className="flex items-start gap-3 min-h-[1.5em]">
+                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
+                <span className="pt-0.5">Images per shot (sourced or generated; we pick)</span>
+              </li>
+              <li className="flex items-start gap-3 min-h-[1.5em]">
+                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
+                <span className="pt-0.5">Motion and pacing decided by the pipeline</span>
+              </li>
+              <li className="flex items-start gap-3 min-h-[1.5em]">
+                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
+                <span className="pt-0.5">No watermarks, no account required</span>
+              </li>
+              <li className="flex items-start gap-3 min-h-[1.5em]">
+                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
+                <span className="pt-0.5">Optional: add logo or product photos; we fold them in</span>
+              </li>
+            </ul>
+            <p className="text-zinc-500 text-center text-sm mb-8">
+              Not a template. Every run is a new cut,directed and edited from your prompt. <Link href="/how" className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors">See how the pipeline works</Link>.
             </p>
-            <a
-              href="#create"
-              className="inline-flex items-center gap-2 bg-white text-black font-semibold px-8 py-4 rounded-xl hover:bg-zinc-200 transition-colors text-lg"
-            >
-              Start creating
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-              </svg>
-            </a>
+            <div className="flex justify-center">
+              <a
+                href="#create"
+                className="inline-flex items-center gap-2 bg-white text-black font-semibold px-6 py-3 rounded-xl hover:bg-zinc-200 transition-colors"
+              >
+                Create your first video
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </a>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-white/5 py-12 px-6 bg-black">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-600">
-          <span className="font-medium text-white">cutline</span>
-          <span>AI-powered video generation</span>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms</a>
+      <footer className="relative pt-16 pb-12 overflow-hidden">
+
+        <div className="absolute bottom-0 left-0 right-0 h-80 pointer-events-none">
+          <div className="absolute bottom-0 left-0 w-80 h-64 bg-purple-700/25 rounded-full blur-[100px]" />
+          <div className="absolute bottom-0 left-1/4 w-96 h-72 bg-purple-600/30 rounded-full blur-[120px]" />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-80 h-56 bg-pink-500/20 rounded-full blur-[100px]" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-72 bg-rose-500/20 rounded-full blur-[120px]" />
+          <div className="absolute bottom-0 right-0 w-80 h-64 bg-indigo-600/20 rounded-full blur-[100px]" />
+        </div>
+
+        <div className="relative max-w-6xl mx-auto px-6">
+
+          <nav className="flex flex-wrap items-center justify-center gap-8 sm:gap-12 text-sm font-medium text-white/90 mb-20">
+            <Link href="/how" className="hover:text-white transition-colors">How It Works</Link>
+            <Link href="/benefits" className="hover:text-white transition-colors">Benefits</Link>
+            <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
+            <Link href="/suggestions" className="hover:text-white transition-colors">Suggestion</Link>
+          </nav>
+
+          <div className="flex items-center justify-center mb-20">
+            <Link
+              href="/"
+              className="text-6xl sm:text-8xl lg:text-[9rem] font-bold text-white tracking-tighter hover:opacity-90 transition-opacity leading-none"
+            >
+              cutline
+            </Link>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
+            <p>© {new Date().getFullYear()} cutline. All rights reserved.</p>
+            <div className="flex items-center gap-6">
+              <a href="https://www.linkedin.com/in/parbhat-kapila-a14264202/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">LinkedIn</a>
+              <a href="https://github.com/parbhatkapila4" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
+              <a href="https://x.com/Parbhat03" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Twitter</a>
+              <a href="mailto:parbhat@parbhat.dev" className="hover:text-white transition-colors">Mail</a>
+            </div>
           </div>
         </div>
       </footer>
