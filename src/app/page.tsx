@@ -1042,6 +1042,7 @@ export default function Home() {
                         <span className="text-blue-400">Free</span>
                       </div>
                       <button
+                        type="button"
                         onClick={handleSubmit}
                         disabled={!prompt.trim() || prompt.trim().length < 5 || submitting}
                         className="inline-flex items-center gap-2 bg-white text-black font-semibold px-6 py-3 rounded-xl hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
