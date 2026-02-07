@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, Fragment } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
@@ -92,39 +92,87 @@ const FEATURES = [
   },
 ];
 
+const FEATURE_TABS = [
+  "Content Creators",
+  "Marketers",
+  "Educators",
+  "E\u2011commerce",
+  "Social Media",
+  "Agencies",
+];
+
+const FEATURE_TAB_DATA = [
+
+  {
+    card1: { title: "AI Script Engine", desc: "A fast, intelligent script engine built for content speed\u00a0\u2014 auto-generate narratives, structure, and pacing with zero friction.", statValue: "30%", statLabel: "vs Last Week", mainLabel: "Script Length", mainValue: "247 words" },
+    card2: { title: "Visual\nIntelligence", desc: "Smart image sourcing from the web, AI generation, or your uploads\u00a0\u2014 matched to each scene automatically.", list: [{ name: "Web Search", count: "12", active: true }, { name: "AI Generated", count: "5", active: false }, { name: "Uploads", count: "", active: false }], product: { name: "Mountain Scene", detail: "Matched to your narrative, sourced in HD quality.", badge: "HD 1080p" } },
+    card3: { title: "Video Studio", desc: "Full control from resolution to captions\u00a0\u2014 preview, export, and download your HD video instantly.", dd1: "1080p Resolution", dd2: "MP4 Format", infoTitle: "Render Time", infoDesc: "Track your render speed across all videos\u00a0\u2014 average 60\u00a0seconds for a complete HD export.", btn: "Export MP4" },
+  },
+
+  {
+    card1: { title: "Campaign Script", desc: "Generate ad copy, landing page scripts, and marketing narratives tuned for conversion\u00a0\u2014 on brand, on message.", statValue: "45%", statLabel: "vs Last Month", mainLabel: "Ad Copy", mainValue: "180 words" },
+    card2: { title: "Brand\nVisuals", desc: "Pull from your brand kit, stock libraries, or let AI generate on-brand imagery for every campaign touchpoint.", list: [{ name: "Stock Library", count: "24", active: true }, { name: "AI Enhanced", count: "8", active: false }, { name: "Brand Assets", count: "", active: false }], product: { name: "Product Shot", detail: "On-brand hero image, color-matched to your palette.", badge: "4K Ready" } },
+    card3: { title: "Multi-Format", desc: "Export for every channel\u00a0\u2014 Instagram, YouTube, LinkedIn, TikTok\u00a0\u2014 in one click.", dd1: "4K Resolution", dd2: "All Platforms", infoTitle: "Campaign ROI", infoDesc: "Track engagement and conversion across every video asset you publish.", btn: "Export All" },
+  },
+
+  {
+    card1: { title: "Lesson Builder", desc: "Turn lesson plans into engaging video lectures with clear structure, pacing, and visual cues\u00a0\u2014 automatically.", statValue: "52%", statLabel: "Engagement Up", mainLabel: "Lesson Plan", mainValue: "320 words" },
+    card2: { title: "Visual\nAids", desc: "Auto-generate diagrams, illustrations, and slide visuals that reinforce key concepts in every lesson.", list: [{ name: "Diagrams", count: "15", active: true }, { name: "Illustrations", count: "7", active: false }, { name: "Slides", count: "", active: false }], product: { name: "Concept Map", detail: "Visual breakdown of complex topics for better retention.", badge: "HD 1080p" } },
+    card3: { title: "Course Studio", desc: "Optimized exports for LMS platforms, YouTube, and classroom presentations\u00a0\u2014 captioned and accessible.", dd1: "720p Optimized", dd2: "WebM Format", infoTitle: "Student Retention", infoDesc: "Average 3x higher completion rate with video-first lesson delivery.", btn: "Export Lesson" },
+  },
+
+  {
+    card1: { title: "Product Script", desc: "Auto-generate product demos, unboxing scripts, and feature highlights that sell\u00a0\u2014 no copywriter needed.", statValue: "38%", statLabel: "Conv. Boost", mainLabel: "Product Copy", mainValue: "156 words" },
+    card2: { title: "Product\nImagery", desc: "Source lifestyle shots, catalog images, and AI-enhanced product visuals matched to your store\u2019s look.", list: [{ name: "Catalog", count: "18", active: true }, { name: "Lifestyle", count: "6", active: false }, { name: "User Photos", count: "", active: false }], product: { name: "Hero Banner", detail: "High-converting product imagery for storefronts and ads.", badge: "4K Ready" } },
+    card3: { title: "Store Export", desc: "Sized and formatted for Shopify, Amazon, Instagram Shopping, and every major storefront.", dd1: "Square 1:1", dd2: "Shopify Format", infoTitle: "Ad Spend ROAS", infoDesc: "Track return on ad spend with video vs static across every channel.", btn: "Export Listing" },
+  },
+
+  {
+    card1: { title: "Viral Script", desc: "Craft scroll-stopping hooks, punchy narratives, and platform-native scripts optimized for shares and saves.", statValue: "62%", statLabel: "Share Rate", mainLabel: "Caption", mainValue: "89 words" },
+    card2: { title: "Trend\nVisuals", desc: "Auto-source trending templates, effects, and visual styles that match what\u2019s performing right now.", list: [{ name: "Trending", count: "20", active: true }, { name: "Templates", count: "9", active: false }, { name: "Custom", count: "", active: false }], product: { name: "Reel Cover", detail: "Thumb-stopping cover frames optimized for the feed.", badge: "HD 1080p" } },
+    card3: { title: "Platform Export", desc: "One-click export sized for Reels, TikTok, Shorts, and Stories\u00a0\u2014 no manual cropping.", dd1: "9:16 Portrait", dd2: "Reel Format", infoTitle: "Reach Analytics", infoDesc: "Average 4.2x more reach with AI-generated Reels vs static posts.", btn: "Export Reel" },
+  },
+
+  {
+    card1: { title: "Client Scripts", desc: "Turn client briefs into polished video scripts at scale\u00a0\u2014 consistent tone, fast turnaround, zero rewrites.", statValue: "28%", statLabel: "Faster Delivery", mainLabel: "Brief", mainValue: "412 words" },
+    card2: { title: "Asset\nLibrary", desc: "Centralize client assets, licensed footage, and AI-generated visuals in one searchable workspace.", list: [{ name: "Client Assets", count: "32", active: true }, { name: "Licensed", count: "14", active: false }, { name: "Generated", count: "", active: false }], product: { name: "Brand Intro", detail: "White-label intro sequences ready for any client.", badge: "4K Master" } },
+    card3: { title: "Batch Export", desc: "Deliver multiple formats and resolutions in a single run\u00a0\u2014 built for agency-scale output.", dd1: "4K Master", dd2: "Multi-Format", infoTitle: "Delivery Time", infoDesc: "Cut average project delivery from 5 days to under 2 hours.", btn: "Export Batch" },
+  },
+];
+
 const PRICING = [
   {
-    name: "Starter",
-    badge: "FREE",
-    price: "Free",
-    period: "",
-    description: "Get started with AI video generation at no cost.",
-    features: ["Up to 3 videos per week", "1080p HD output", "60 sec max length", "Auto captions"],
-    cta: "Try For Free",
+    name: "Beginner",
+    monthlyPrice: "$29",
+    yearlyPrice: "$19",
+    description: "Perfect for solo creators and hobbyists looking to explore AI video generation.",
+    features: ["Up to 10 videos per month", "1080p HD output", "Standard AI voiceover", "Auto captions & subtitles", "Basic template library", "Email support"],
+    cta: "Get Started",
     href: "#create",
     highlighted: false,
+    icon: "beginner",
   },
   {
-    name: "Pro",
-    badge: "POPULAR",
-    price: "$30",
-    period: "/month",
-    description: "For creators who need more output and features.",
-    features: ["Unlimited videos", "1080p HD output", "60 sec max length", "Priority processing", "Commercial use"],
-    cta: "Go Pro",
-    href: "#create",
-    highlighted: false,
-  },
-  {
-    name: "Pro+",
-    badge: "RECOMMENDED",
-    price: "$70",
-    period: "/month",
-    description: "Maximum capacity for teams and power users.",
-    features: ["Everything in Pro", "Extended clip length", "API access", "Dedicated support", "Custom branding"],
-    cta: "Go Pro+",
+    name: "Professional",
+    monthlyPrice: "$59",
+    yearlyPrice: "$39",
+    description: "Ideal for growing creators who need more advanced tools to enhance productivity.",
+    features: ["Unlimited video generation", "4K Ultra HD output", "Premium AI voices", "Advanced motion & pacing", "Priority render queue", "Priority email support"],
+    cta: "Get Started",
     href: "#create",
     highlighted: true,
+    icon: "professional",
+  },
+  {
+    name: "Enterprise",
+    monthlyPrice: "$89",
+    yearlyPrice: "$59",
+    description: "Designed for teams and agencies requiring comprehensive AI video solutions.",
+    features: ["Everything in Professional", "Custom branding & logos", "API access & integrations", "Batch video generation", "Dedicated account manager", "24/7 dedicated support"],
+    cta: "Get Started",
+    href: "#create",
+    highlighted: false,
+    icon: "enterprise",
   },
 ];
 
@@ -153,6 +201,9 @@ export default function Home() {
   const [stage, setStage] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [activeFeatureTab, setActiveFeatureTab] = useState(0);
+  const [pricingPeriod, setPricingPeriod] = useState<"monthly" | "yearly">("monthly");
+  const [activePainPoint, setActivePainPoint] = useState(0);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -160,6 +211,19 @@ export default function Home() {
   const promptRef = useRef(prompt);
   promptRef.current = prompt;
   const promptFromSuggestionRef = useRef(false);
+  const howSectionRef = useRef<HTMLElement | null>(null);
+  const [howInView, setHowInView] = useState(false);
+
+  useEffect(() => {
+    const el = howSectionRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => setHowInView(e.isIntersecting),
+      { threshold: 0.2, rootMargin: "0px 0px -80px 0px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     const urls = images.map((f) => URL.createObjectURL(f));
@@ -1087,90 +1151,210 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="features" className="pt-48 pb-48 px-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-                Features
-              </h2>
-              <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-                Everything you need to go from one prompt to a finished 1080p video.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {FEATURES.map((feature, i) => (
-                <div
-                  key={i}
-                  className="feature-card relative overflow-hidden rounded-3xl bg-linear-to-b from-zinc-900 to-zinc-950 p-6 cursor-pointer"
-                >
+        <section id="features" className="pt-32 pb-32 px-6">
+          <div className="max-w-6xl mx-auto">
 
-                  <div
-                    className="feature-grid-overlay pointer-events-none absolute left-[-50%] top-0 -mt-2 h-full w-[200%] opacity-50"
-                    style={{
-                      maskImage: "linear-gradient(white, transparent)",
-                      WebkitMaskImage: "linear-gradient(white, transparent)",
-                    }}
-                  >
-                    <svg
-                      aria-hidden="true"
-                      className="absolute inset-0 h-full w-full fill-white/5 stroke-white/10"
-                    >
-                      <defs>
-                        <pattern
-                          id={`grid-pattern-${i}`}
-                          width="20"
-                          height="20"
-                          patternUnits="userSpaceOnUse"
-                          x="-12"
-                          y="4"
-                        >
-                          <path d="M.5 20V.5H20" fill="none" />
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" strokeWidth="0" fill={`url(#grid-pattern-${i})`} />
-                    </svg>
-                  </div>
-                  <p className="relative z-20 text-base font-bold text-white">{feature.title}</p>
-                  <p className="relative z-20 mt-4 text-base font-normal text-zinc-400">{feature.desc}</p>
-                </div>
+
+            <div className="flex justify-center mb-8">
+              <div className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full border border-white/10 bg-zinc-900/80 text-[13px] font-semibold tracking-wider text-zinc-300 uppercase">
+                <svg className="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Built In Features
+              </div>
+            </div>
+
+
+            <h2
+              className="text-center text-3xl sm:text-4xl md:text-[46px] italic font-normal text-white leading-tight max-w-3xl mx-auto mb-12"
+              style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+            >
+              An entire stack of tools that turn{" "}
+              your <span className="not-italic inline-flex items-center justify-center p-2 rounded-lg border border-purple-400/30 bg-purple-500/10 shadow-[0_0_15px_rgba(168,85,247,0.4),0_0_30px_rgba(168,85,247,0.15)] align-middle mx-1">🎬</span> ideas into videos
+            </h2>
+
+
+            <div className="flex flex-wrap justify-center gap-2 mb-14">
+              {FEATURE_TABS.map((tab, i) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveFeatureTab(i)}
+                  className={`px-5 py-2.5 rounded-full text-sm transition-all duration-200 ${activeFeatureTab === i
+                      ? "bg-white text-black font-semibold"
+                      : "text-zinc-400 hover:text-white"
+                    }`}
+                >
+                  {tab}
+                </button>
               ))}
             </div>
+
+            {(() => {
+              const d = FEATURE_TAB_DATA[activeFeatureTab];
+              return (
+                <div key={activeFeatureTab} className="grid md:grid-cols-3 gap-5 animate-fade-in">
+
+                  <div className="rounded-3xl border border-white/8 bg-zinc-900/40 p-8 pb-6 flex flex-col min-h-[540px]">
+                    <span className="text-[40px] font-extralight leading-none text-zinc-600 mb-5">1</span>
+                    <h3 className="text-[22px] font-bold text-white mb-3 leading-snug">{d.card1.title}</h3>
+                    <p className="text-[14px] text-zinc-400 leading-relaxed">{d.card1.desc}</p>
+
+                    <div className="mt-auto pt-10 relative h-[260px]">
+                      <div className="absolute left-0 bottom-0 w-[82%] min-h-[140px] bg-zinc-800 border border-white/6 rounded-2xl p-5 shadow-2xl shadow-black/50 flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-zinc-700/80 flex items-center justify-center shrink-0">
+                          <svg className="w-6 h-6 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-zinc-500">{d.card1.mainLabel}</p>
+                          <p className="text-[22px] font-bold text-white tracking-tight leading-none mt-0.5">{d.card1.mainValue}</p>
+                        </div>
+                      </div>
+
+                    
+                      <div className="absolute right-2 bottom-[100px] z-10 bg-zinc-800 border border-white/6 rounded-2xl px-4 py-3 shadow-2xl shadow-black/50 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                          <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-[17px] font-bold text-white leading-none">{d.card1.statValue}</p>
+                          <p className="text-[11px] text-zinc-500 mt-0.5">{d.card1.statLabel}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-white/8 bg-zinc-900/40 p-8 pb-6 flex flex-col min-h-[540px]">
+                    <span className="text-[40px] font-extralight leading-none text-zinc-600 mb-5">2</span>
+                    <h3 className="text-[22px] font-bold text-white mb-3 leading-snug whitespace-pre-line">{d.card2.title}</h3>
+                    <p className="text-[14px] text-zinc-400 leading-relaxed">{d.card2.desc}</p>
+
+                    <div className="mt-auto pt-10 relative h-[200px]">
+                      <div className="absolute left-0 top-0 w-[62%] bg-zinc-800 border border-white/6 rounded-2xl overflow-hidden shadow-2xl shadow-black/50 z-10">
+                        {d.card2.list.map((item, li) => (
+                          <div key={li} className={`flex items-center justify-between px-4 py-2.5 ${li < d.card2.list.length - 1 ? "border-b border-white/5" : ""}`}>
+                            <span className={`text-[13px] ${li === 0 ? "font-medium text-white" : item.count ? "text-zinc-400" : "text-zinc-500"}`}>{item.name}</span>
+                            {item.count && (
+                              <span className={`w-[22px] h-[22px] rounded-full text-[10px] font-bold flex items-center justify-center ${item.active ? "bg-emerald-500/20 text-emerald-400" : "bg-zinc-700 text-zinc-300"}`}>
+                                {item.count}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="absolute right-0 bottom-0 w-[72%] bg-zinc-800 border border-white/6 rounded-2xl p-3.5 shadow-2xl shadow-black/50">
+                        <div className="flex items-start gap-3">
+                          <div className="w-11 h-11 rounded-xl bg-linear-to-br from-blue-500/20 to-purple-500/20 border border-white/5 flex items-center justify-center shrink-0 mt-0.5">
+                            <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-semibold text-white leading-tight">{d.card2.product.name}</p>
+                            <p className="text-[11px] text-zinc-500 leading-snug mt-1">{d.card2.product.detail}</p>
+                            <p className="text-[14px] font-bold text-white mt-2">{d.card2.product.badge}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-white/8 bg-zinc-900/40 p-8 pb-6 flex flex-col min-h-[540px]">
+                    <span className="text-[40px] font-extralight leading-none text-zinc-600 mb-5">3</span>
+                    <h3 className="text-[22px] font-bold text-white mb-3 leading-snug">{d.card3.title}</h3>
+                    <p className="text-[14px] text-zinc-400 leading-relaxed">{d.card3.desc}</p>
+
+                    <div className="mt-auto pt-10 flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between bg-zinc-800 border border-white/6 rounded-xl px-4 py-2.5 shadow-lg shadow-black/30">
+                        <span className="text-[13px] text-white">{d.card3.dd1}</span>
+                        <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                      <div className="flex items-center justify-between bg-zinc-800 border border-white/6 rounded-xl px-4 py-2.5 shadow-lg shadow-black/30">
+                        <span className="text-[13px] text-white">{d.card3.dd2}</span>
+                        <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+
+                      <div className="mt-1">
+                        <p className="text-[15px] font-bold text-white mb-1">{d.card3.infoTitle}</p>
+                        <p className="text-[12px] text-zinc-500 leading-relaxed">{d.card3.infoDesc}</p>
+                      </div>
+
+                      <div className="flex justify-end mt-1">
+                        <div className="inline-flex items-center gap-2 bg-zinc-800 border border-white/10 rounded-xl px-4 py-2 text-[13px] text-white font-medium shadow-xl shadow-black/40">
+                          <svg className="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                          </svg>
+                          {d.card3.btn}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })()}
           </div>
         </section>
 
-        <section id="how" className="pt-48 pb-48 px-6 bg-black">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-                Three steps. Two minutes.
-              </h2>
-              <p className="text-zinc-400 text-lg">
-                No learning curve. Just describe and download.
-              </p>
-            </div>
+        <section ref={howSectionRef} id="how" className="pt-48 pb-48 px-6 bg-black">
+          <div className="max-w-4xl mx-auto">
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest mb-3">How it works</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-2">
+              Three steps. Two minutes.
+            </h2>
+            <p className="text-zinc-500 text-lg mb-16">
+              No learning curve. Just describe and download.
+            </p>
 
-            <div className="grid md:grid-cols-3 gap-8">
+
+            <div className="relative">
+              <div className="absolute left-[11px] top-0 bottom-0 w-px overflow-hidden" aria-hidden="true">
+                <div
+                  className={`h-full w-px bg-gradient-to-b from-teal-500/80 via-zinc-600 to-orange-500/80 origin-top transition-transform duration-700 ease-out ${howInView ? "scale-y-100" : "scale-y-0"}`}
+                />
+              </div>
               {[
                 {
-                  num: "01",
+                  num: 1,
                   title: "Upload & describe",
                   desc: "Add your images (optional) and write a sentence describing your video idea.",
                 },
                 {
-                  num: "02",
+                  num: 2,
                   title: "AI generates",
                   desc: "Our pipeline writes the script, sources visuals, generates voiceover, and edits everything.",
                 },
                 {
-                  num: "03",
+                  num: 3,
                   title: "Download & share",
                   desc: "Get your finished video in 1080p HD. Ready for social media or presentations.",
                 },
               ].map((step, i) => (
-                <div key={i}>
-                  <div className="text-5xl font-bold text-zinc-800 mb-4">{step.num}</div>
-                  <h3 className="text-xl font-semibold text-white mb-2">{step.title}</h3>
-                  <p className="text-zinc-500">{step.desc}</p>
+                <div
+                  key={i}
+                  className="relative flex gap-8 pb-14 last:pb-0 transition-all duration-500 ease-out"
+                  style={{
+                    opacity: howInView ? 1 : 0,
+                    transform: howInView ? "translateY(0)" : "translateY(16px)",
+                    transitionDelay: howInView ? `${280 + i * 140}ms` : "0ms",
+                  }}
+                >
+                  <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black ring-4 ring-teal-500/50 text-sm font-bold text-teal-400">
+                    {step.num}
+                  </div>
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <h3 className="text-lg font-semibold text-white mb-1.5">{step.title}</h3>
+                    <p className="text-zinc-400 text-base leading-relaxed">{step.desc}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1240,117 +1424,267 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="pricing" className="pt-48 pb-48 px-6">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-                Pricing
-              </h2>
-              <p className="text-zinc-400 text-lg max-w-xl mx-auto">
-                Choose the plan that fits your needs. Start free, upgrade when you’re ready.
-              </p>
+        <section id="pricing" className="pt-32 pb-32 px-6 relative overflow-hidden">
+
+        
+          <div className="absolute inset-0 flex items-start justify-center pointer-events-none select-none" aria-hidden>
+            <span
+              className="text-[12rem] sm:text-[16rem] md:text-[20rem] font-black uppercase tracking-wider text-white/3 leading-none mt-8"
+              style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            >
+              PRICING
+            </span>
+          </div>
+
+          <div className="max-w-6xl mx-auto relative z-10">
+
+           
+            <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-8 items-start mb-16">
+
+       
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-bold text-white leading-tight">
+                  Our pricing plans
+                </h2>
+              </div>
+
+              <div className="flex items-end lg:items-center lg:pt-8">
+                <div className="inline-flex rounded-full border border-white/10 bg-zinc-900/80 p-1">
+                  <button
+                    onClick={() => setPricingPeriod("monthly")}
+                    className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${pricingPeriod === "monthly" ? "bg-white text-black" : "text-zinc-400 hover:text-white"}`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setPricingPeriod("yearly")}
+                    className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${pricingPeriod === "yearly" ? "bg-white text-black" : "text-zinc-400 hover:text-white"}`}
+                  >
+                    Yearly
+                  </button>
+                </div>
+              </div>
+
+             
+              <div className="flex items-end lg:items-center lg:pt-8">
+                <p className="text-sm text-zinc-400 leading-relaxed max-w-xs">
+                  Here are three different plans tailored to Beginner, Professional, and Enterprise levels for your AI video solution:
+                </p>
+              </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
-              {PRICING.map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`relative rounded-2xl border p-6 pt-10 flex flex-col overflow-hidden ${plan.highlighted
-                    ? "border-blue-500 bg-linear-to-b from-black via-black to-blue-950/40"
-                    : "border-white/15 bg-black"
-                    }`}
-                  style={plan.highlighted ? {
-                    boxShadow: "0 0 60px -15px rgba(59, 130, 246, 0.5), 0 0 30px -10px rgba(59, 130, 246, 0.3), inset 0 -80px 60px -60px rgba(59, 130, 246, 0.15)"
-                  } : undefined}
-                >
-
-                  <span
-                    className={`absolute top-4 right-4 text-[10px] font-semibold tracking-wider px-3 py-1 rounded-full ${plan.highlighted
-                      ? "bg-blue-500 text-white shadow-lg shadow-blue-500/50"
-                      : "border border-white/20 text-zinc-400"
+          
+            <div className="grid md:grid-cols-3 gap-5">
+              {PRICING.map((plan) => {
+                const price = pricingPeriod === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+                return (
+                  <div
+                    key={plan.name}
+                    className={`relative rounded-2xl border p-6 flex flex-col ${plan.highlighted
+                      ? "border-white/15 bg-zinc-900/60"
+                      : "border-white/8 bg-zinc-950/80"
                       }`}
                   >
-                    {plan.badge}
-                  </span>
+                  
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="w-11 h-11 rounded-xl border border-white/10 bg-zinc-900 flex items-center justify-center">
+                        {plan.icon === "beginner" && (
+                          <svg className="w-5 h-5 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
+                          </svg>
+                        )}
+                        {plan.icon === "professional" && (
+                          <svg className="w-5 h-5 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0016.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.04 6.04 0 01-4.27 1.772 6.04 6.04 0 01-4.27-1.772" />
+                          </svg>
+                        )}
+                        {plan.icon === "enterprise" && (
+                          <svg className="w-5 h-5 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-bold text-white">{price}</span>
+                        <span className="text-sm text-zinc-500">/ Per {pricingPeriod === "monthly" ? "Month" : "Year"}</span>
+                      </div>
+                    </div>
 
-                  <h3 className="text-2xl font-semibold italic text-white">{plan.name}</h3>
-                  <p className="mt-2 text-sm text-zinc-400 leading-relaxed">{plan.description}</p>
+                
+                    <h3 className="text-lg font-bold text-white mb-1.5">{plan.name}</h3>
+                    <p className="text-sm text-zinc-500 leading-relaxed mb-6">{plan.description}</p>
 
-                  <div className="mt-5 flex items-baseline gap-1.5">
-                    <span className="text-3xl font-bold text-white">{plan.price}</span>
-                    {plan.period && <span className="text-sm text-zinc-500">{plan.period}</span>}
+                    
+                    <a
+                      href={plan.href}
+                      className={`flex items-center justify-center gap-2 font-semibold py-3 px-4 rounded-xl transition-all text-sm mb-6 ${plan.highlighted
+                        ? "bg-white text-black hover:bg-zinc-200"
+                        : "border border-white/15 text-white hover:bg-white/5"
+                        }`}
+                    >
+                      {plan.cta}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </a>
+
+                   
+                    <div className="border-t border-white/8 pt-5">
+                      <p className="text-sm font-bold text-white mb-4">Features:</p>
+                      <ul className="space-y-3">
+                        {plan.features.map((feature, fi) => (
+                          <li key={fi} className="flex items-center gap-3 text-sm text-zinc-300">
+                            <div className="w-5 h-5 rounded-full border border-white/15 flex items-center justify-center shrink-0">
+                              <svg className="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
-
-                  <ul className="mt-6 space-y-3 flex-1">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2.5 text-sm text-zinc-300">
-                        <svg className="w-4 h-4 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <a
-                    href={plan.href}
-                    className={`mt-8 block text-center font-semibold py-3.5 px-4 rounded-lg transition-all ${plan.highlighted
-                      ? "bg-blue-500 text-white hover:bg-blue-400 shadow-lg shadow-blue-500/40"
-                      : "border border-white/20 text-white hover:bg-white/5"
-                      }`}
-                  >
-                    {plan.cta}
-                  </a>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
 
-        <section className="pt-40 pb-40 px-6 bg-black">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-8 text-center">
-              What you get
-            </h2>
-            <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-zinc-400 text-sm sm:text-base mb-10">
-              <li className="flex items-start gap-3 min-h-[1.5em]">
-                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
-                <span className="pt-0.5">One MP4, 10–60 seconds, ready to download or share</span>
-              </li>
-              <li className="flex items-start gap-3 min-h-[1.5em]">
-                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
-                <span className="pt-0.5">AI voiceover + synced subtitles</span>
-              </li>
-              <li className="flex items-start gap-3 min-h-[1.5em]">
-                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
-                <span className="pt-0.5">Images per shot (sourced or generated; we pick)</span>
-              </li>
-              <li className="flex items-start gap-3 min-h-[1.5em]">
-                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
-                <span className="pt-0.5">Motion and pacing decided by the pipeline</span>
-              </li>
-              <li className="flex items-start gap-3 min-h-[1.5em]">
-                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
-                <span className="pt-0.5">No watermarks, no account required</span>
-              </li>
-              <li className="flex items-start gap-3 min-h-[1.5em]">
-                <span className="text-emerald-400 shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">✓</span>
-                <span className="pt-0.5">Optional: add logo or product photos; we fold them in</span>
-              </li>
-            </ul>
-            <p className="text-zinc-500 text-center text-sm mb-8">
-              Not a template. Every run is a new cut,directed and edited from your prompt. <Link href="/how" className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors">See how the pipeline works</Link>.
-            </p>
-            <div className="flex justify-center">
-              <a
-                href="#create"
-                className="inline-flex items-center gap-2 bg-white text-black font-semibold px-6 py-3 rounded-xl hover:bg-zinc-200 transition-colors"
-              >
-                Create your first video
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </a>
+
+        <section className="pt-32 pb-32 px-6">
+          <div className="max-w-6xl mx-auto">
+
+            
+            <div className="rounded-3xl bg-zinc-950 border border-white/5 overflow-hidden px-6 sm:px-12 lg:px-20 py-16 sm:py-20">
+
+           
+              <div className="text-center mb-14">
+                <div className="inline-flex items-center gap-2 text-teal-400 text-sm font-semibold tracking-wider uppercase mb-5">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  PAIN POINT
+                </div>
+                <h2 className="text-3xl sm:text-4xl md:text-[42px] font-bold text-white leading-tight">
+                  Video Creation Is Slower<br />Than It Should Be
+                </h2>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start">
+
+               
+                <div className="relative">
+                  <div className="rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 30%, #2dd4bf 60%, #5eead4 100%)" }}>
+                    <div className="p-6 pt-5 pb-0 relative">
+
+                  
+                      <div className="flex justify-center mb-5">
+                        <div className="inline-flex items-center gap-2 bg-zinc-900/90 backdrop-blur-sm text-white text-xs font-semibold px-4 py-2 rounded-full">
+                          <span className="text-base">🎬</span>
+                          Speed up workflow
+                        </div>
+                      </div>
+
+                   
+                      <div className="bg-white rounded-t-xl shadow-2xl shadow-black/30 mx-auto max-w-sm">
+                   
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">✦</span>
+                            <span className="text-sm font-bold text-zinc-900">AI Director</span>
+                          </div>
+                          <button className="text-zinc-400 hover:text-zinc-600 text-lg leading-none">&times;</button>
+                        </div>
+
+                    
+                        <div className="px-4 py-4 space-y-4">
+                       
+                          <p className="text-xs font-semibold text-zinc-500">You</p>
+                      
+                          <div className="flex items-start gap-2 justify-end">
+                            <div className="bg-zinc-100 rounded-xl rounded-tr-sm px-3.5 py-2.5 max-w-[220px]">
+                              <p className="text-sm text-zinc-800 leading-snug">Create a product demo for our new SaaS platform.</p>
+                            </div>
+                            <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0 text-xs">🎥</div>
+                          </div>
+
+                        
+                          <p className="text-xs font-semibold text-zinc-500">AI Director</p>
+                    
+                          <div className="flex items-start gap-2">
+                            <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
+                              <span className="text-white text-xs">✦</span>
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3">
+                                <div className="h-1.5 bg-teal-200 rounded-full w-16"></div>
+                                <div className="h-1.5 bg-teal-100 rounded-full w-10"></div>
+                                <span className="text-xs text-teal-600 italic">writing...</span>
+                              </div>
+                            </div>
+                          </div>
+
+                        
+                          <div className="flex items-center gap-3 text-zinc-400 pt-1 pb-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 01-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 10.203 4.167 9.75 5 9.75h1.053c.472 0 .745.556.5.96a8.958 8.958 0 00-1.302 4.665c0 1.194.232 2.333.654 3.375z" /></svg>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 15h2.25m8.024-9.75c.011.05.028.1.052.148.591 1.2.924 2.55.924 3.977a8.96 8.96 0 01-.999 4.125m.023-8.25c-.076-.365.183-.75.575-.75h.908c.889 0 1.713.518 1.972 1.368.339 1.11.521 2.287.521 3.507 0 1.553-.295 3.036-.831 4.398C20.613 14.547 19.833 15 19 15h-1.053c-.472 0-.745-.556-.5-.96a8.95 8.95 0 001.302-4.665c0-1.194-.232-2.333-.654-3.375z" /></svg>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" /></svg>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  {[
+                    {
+                      icon: "M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.047 8.287 8.287 0 009 9.601a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z",
+                      iconBg: "bg-orange-500/20 text-orange-400",
+                      title: "Manual video editing eats up hours",
+                      desc: "Writing scripts, sourcing visuals, and editing timelines is time-consuming. Our AI generates polished, ready-to-share videos instantly from a single prompt.",
+                    },
+                    {
+                      icon: "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z",
+                      iconBg: "bg-zinc-700/50 text-zinc-400",
+                      title: "Multi-format output is confusing",
+                      desc: "Different platforms need different sizes, lengths, and formats. Cutline auto-exports for every channel in one click — no manual cropping needed.",
+                    },
+                    {
+                      icon: "M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418",
+                      iconBg: "bg-zinc-700/50 text-zinc-400",
+                      title: "Scaling content requires extra resources",
+                      desc: "Hiring editors, voiceover artists, and motion designers is expensive. Cutline replaces the entire production team with a single AI pipeline.",
+                    },
+                  ].map((point, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActivePainPoint(i)}
+                      className={`w-full text-left rounded-xl border transition-all duration-300 ${activePainPoint === i
+                        ? "border-white/10 bg-zinc-900/80 p-5"
+                        : "border-transparent bg-transparent px-5 py-4 hover:bg-zinc-900/30"
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${activePainPoint === i ? point.iconBg : "bg-zinc-800/50 text-zinc-500"}`}>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d={point.icon} />
+                          </svg>
+                        </div>
+                        <span className={`font-semibold text-[15px] ${activePainPoint === i ? "text-white" : "text-zinc-400"}`}>
+                          {point.title}
+                        </span>
+                      </div>
+                      {activePainPoint === i && (
+                        <p className="text-sm text-zinc-400 leading-relaxed mt-3 ml-11 animate-fade-in">
+                          {point.desc}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>
