@@ -466,12 +466,16 @@ export default function Home() {
           </div>
 
           <div className="max-w-4xl mx-auto text-center mb-12 relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm mb-6">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            <div className="group relative inline-flex items-center gap-2.5 px-5 py-2 rounded-full text-sm font-medium mb-6 overflow-hidden bg-white/4 border border-white/10 text-zinc-200 backdrop-blur-sm hover:border-white/20 transition-all duration-300">
+              <span className="absolute inset-0 rounded-full bg-linear-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
               </span>
-              AI Video Generation
+              <span className="relative tracking-wide">AI Video Generation</span>
+              <svg className="relative w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white leading-[1.1] tracking-tight mb-6">
               Create videos from
@@ -1136,16 +1140,16 @@ export default function Home() {
 
             <div className="max-w-4xl mx-auto mt-12 flex flex-wrap justify-center gap-8 sm:gap-16 text-center relative z-10">
               <div>
-                <div className="text-2xl font-bold text-white">2,400+</div>
-                <div className="text-sm text-zinc-500">Videos this week</div>
+                <div className="text-2xl font-bold text-white">No credit card</div>
+                <div className="text-sm text-zinc-500">To get started</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-white">60 sec</div>
-                <div className="text-sm text-zinc-500">Avg. render time</div>
+                <div className="text-2xl font-bold text-white">Up to 60 sec</div>
+                <div className="text-sm text-zinc-500">Per video</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-white">1080p</div>
-                <div className="text-sm text-zinc-500">HD output</div>
+                <div className="text-2xl font-bold text-white">No watermarks</div>
+                <div className="text-sm text-zinc-500">Use anywhere</div>
               </div>
             </div>
           </div>
@@ -1181,8 +1185,8 @@ export default function Home() {
                   key={tab}
                   onClick={() => setActiveFeatureTab(i)}
                   className={`px-5 py-2.5 rounded-full text-sm transition-all duration-200 ${activeFeatureTab === i
-                      ? "bg-white text-black font-semibold"
-                      : "text-zinc-400 hover:text-white"
+                    ? "bg-white text-black font-semibold"
+                    : "text-zinc-400 hover:text-white"
                     }`}
                 >
                   {tab}
@@ -1213,7 +1217,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                    
+
                       <div className="absolute right-2 bottom-[100px] z-10 bg-zinc-800 border border-white/6 rounded-2xl px-4 py-3 shadow-2xl shadow-black/50 flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
                           <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1426,10 +1430,10 @@ export default function Home() {
 
         <section id="pricing" className="pt-32 pb-32 px-6 relative overflow-hidden">
 
-        
+
           <div className="absolute inset-0 flex items-start justify-center pointer-events-none select-none" aria-hidden>
             <span
-              className="text-[12rem] sm:text-[16rem] md:text-[20rem] font-black uppercase tracking-wider text-white/3 leading-none mt-8"
+              className="text-[12rem] sm:text-[16rem] md:text-[20rem] font-black uppercase tracking-wider text-white/15 leading-none mt-8"
               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
             >
               PRICING
@@ -1438,10 +1442,10 @@ export default function Home() {
 
           <div className="max-w-6xl mx-auto relative z-10">
 
-           
+
             <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-8 items-start mb-16">
 
-       
+
               <div>
                 <h2 className="text-3xl sm:text-4xl font-bold text-white leading-tight">
                   Our pricing plans
@@ -1465,7 +1469,7 @@ export default function Home() {
                 </div>
               </div>
 
-             
+
               <div className="flex items-end lg:items-center lg:pt-8">
                 <p className="text-sm text-zinc-400 leading-relaxed max-w-xs">
                   Here are three different plans tailored to Beginner, Professional, and Enterprise levels for your AI video solution:
@@ -1473,7 +1477,7 @@ export default function Home() {
               </div>
             </div>
 
-          
+
             <div className="grid md:grid-cols-3 gap-5">
               {PRICING.map((plan) => {
                 const price = pricingPeriod === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
@@ -1485,9 +1489,9 @@ export default function Home() {
                       : "border-white/8 bg-zinc-950/80"
                       }`}
                   >
-                  
+
                     <div className="flex items-center justify-between mb-5">
-                      <div className="w-11 h-11 rounded-xl border border-white/10 bg-zinc-900 flex items-center justify-center">
+                      <div className={`w-11 h-11 rounded-xl border flex items-center justify-center ${plan.highlighted ? "border-amber-500/40 bg-amber-500/10" : "border-white/10 bg-zinc-900"}`}>
                         {plan.icon === "beginner" && (
                           <svg className="w-5 h-5 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
@@ -1510,39 +1514,40 @@ export default function Home() {
                       </div>
                     </div>
 
-                
+
                     <h3 className="text-lg font-bold text-white mb-1.5">{plan.name}</h3>
                     <p className="text-sm text-zinc-500 leading-relaxed mb-6">{plan.description}</p>
 
-                    
-                    <a
-                      href={plan.href}
-                      className={`flex items-center justify-center gap-2 font-semibold py-3 px-4 rounded-xl transition-all text-sm mb-6 ${plan.highlighted
-                        ? "bg-white text-black hover:bg-zinc-200"
-                        : "border border-white/15 text-white hover:bg-white/5"
-                        }`}
-                    >
-                      {plan.cta}
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                      </svg>
-                    </a>
 
-                   
-                    <div className="border-t border-white/8 pt-5">
-                      <p className="text-sm font-bold text-white mb-4">Features:</p>
-                      <ul className="space-y-3">
-                        {plan.features.map((feature, fi) => (
-                          <li key={fi} className="flex items-center gap-3 text-sm text-zinc-300">
-                            <div className="w-5 h-5 rounded-full border border-white/15 flex items-center justify-center shrink-0">
-                              <svg className="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            </div>
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
+                    <div className={`rounded-xl border p-5 mt-auto ${plan.highlighted ? "border-amber-500/40 bg-white/3" : "border-white/8 bg-white/2"}`}>
+                      <a
+                        href={plan.href}
+                        className={`flex items-center justify-center gap-2 font-semibold py-3 px-4 rounded-xl transition-all text-sm mb-5 ${plan.highlighted
+                          ? "bg-white text-black hover:bg-zinc-200"
+                          : "border border-white/15 text-white hover:bg-white/5"
+                          }`}
+                      >
+                        {plan.cta}
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </a>
+
+                      <div className="border-t border-white/8 pt-5">
+                        <p className="text-sm font-bold text-white mb-4">Features:</p>
+                        <ul className="space-y-3">
+                          {plan.features.map((feature, fi) => (
+                            <li key={fi} className="flex items-center gap-3 text-sm text-zinc-300">
+                              <div className="w-5 h-5 rounded-full border border-white/15 flex items-center justify-center shrink-0">
+                                <svg className="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                              {feature}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1555,10 +1560,10 @@ export default function Home() {
         <section className="pt-32 pb-32 px-6">
           <div className="max-w-6xl mx-auto">
 
-            
+
             <div className="rounded-3xl bg-zinc-950 border border-white/5 overflow-hidden px-6 sm:px-12 lg:px-20 py-16 sm:py-20">
 
-           
+
               <div className="text-center mb-14">
                 <div className="inline-flex items-center gap-2 text-teal-400 text-sm font-semibold tracking-wider uppercase mb-5">
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -1573,12 +1578,12 @@ export default function Home() {
 
               <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start">
 
-               
+
                 <div className="relative">
                   <div className="rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 30%, #2dd4bf 60%, #5eead4 100%)" }}>
                     <div className="p-6 pt-5 pb-0 relative">
 
-                  
+
                       <div className="flex justify-center mb-5">
                         <div className="inline-flex items-center gap-2 bg-zinc-900/90 backdrop-blur-sm text-white text-xs font-semibold px-4 py-2 rounded-full">
                           <span className="text-base">🎬</span>
@@ -1586,9 +1591,9 @@ export default function Home() {
                         </div>
                       </div>
 
-                   
+
                       <div className="bg-white rounded-t-xl shadow-2xl shadow-black/30 mx-auto max-w-sm">
-                   
+
                         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100">
                           <div className="flex items-center gap-2">
                             <span className="text-sm">✦</span>
@@ -1597,11 +1602,11 @@ export default function Home() {
                           <button className="text-zinc-400 hover:text-zinc-600 text-lg leading-none">&times;</button>
                         </div>
 
-                    
+
                         <div className="px-4 py-4 space-y-4">
-                       
+
                           <p className="text-xs font-semibold text-zinc-500">You</p>
-                      
+
                           <div className="flex items-start gap-2 justify-end">
                             <div className="bg-zinc-100 rounded-xl rounded-tr-sm px-3.5 py-2.5 max-w-[220px]">
                               <p className="text-sm text-zinc-800 leading-snug">Create a product demo for our new SaaS platform.</p>
@@ -1609,9 +1614,9 @@ export default function Home() {
                             <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0 text-xs">🎥</div>
                           </div>
 
-                        
+
                           <p className="text-xs font-semibold text-zinc-500">AI Director</p>
-                    
+
                           <div className="flex items-start gap-2">
                             <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
                               <span className="text-white text-xs">✦</span>
@@ -1625,7 +1630,7 @@ export default function Home() {
                             </div>
                           </div>
 
-                        
+
                           <div className="flex items-center gap-3 text-zinc-400 pt-1 pb-2">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 01-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 10.203 4.167 9.75 5 9.75h1.053c.472 0 .745.556.5.96a8.958 8.958 0 00-1.302 4.665c0 1.194.232 2.333.654 3.375z" /></svg>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 15h2.25m8.024-9.75c.011.05.028.1.052.148.591 1.2.924 2.55.924 3.977a8.96 8.96 0 01-.999 4.125m.023-8.25c-.076-.365.183-.75.575-.75h.908c.889 0 1.713.518 1.972 1.368.339 1.11.521 2.287.521 3.507 0 1.553-.295 3.036-.831 4.398C20.613 14.547 19.833 15 19 15h-1.053c-.472 0-.745-.556-.5-.96a8.95 8.95 0 001.302-4.665c0-1.194-.232-2.333-.654-3.375z" /></svg>
