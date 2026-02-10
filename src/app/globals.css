@@ -115,23 +115,20 @@ html:has(.dashboard-root)::-webkit-scrollbar {
 }
 
 
+
 @keyframes ribbonWaveLeft {
 
   0%,
   100% {
-    transform: translateY(0) translateX(0) rotate(0deg);
+    translate: 0 0;
   }
 
-  25% {
-    transform: translateY(-15px) translateX(10px) rotate(0.5deg);
+  30% {
+    translate: 15px -20px;
   }
 
-  50% {
-    transform: translateY(0) translateX(5px) rotate(0deg);
-  }
-
-  75% {
-    transform: translateY(10px) translateX(-5px) rotate(-0.5deg);
+  60% {
+    translate: 5px 10px;
   }
 }
 
@@ -139,19 +136,85 @@ html:has(.dashboard-root)::-webkit-scrollbar {
 
   0%,
   100% {
-    transform: translateY(0) translateX(0) rotate(0deg);
+    translate: 0 0;
+  }
+
+  30% {
+    translate: -15px -20px;
+  }
+
+  60% {
+    translate: -5px 10px;
+  }
+}
+
+
+@keyframes ribbonFlowLeft {
+
+  0%,
+  100% {
+    translate: 0 0;
   }
 
   25% {
-    transform: translateY(10px) translateX(-10px) rotate(-0.5deg);
+    translate: 20px -12px;
   }
 
   50% {
-    transform: translateY(0) translateX(-5px) rotate(0deg);
+    translate: 8px 8px;
   }
 
   75% {
-    transform: translateY(-15px) translateX(5px) rotate(0.5deg);
+    translate: -6px 14px;
+  }
+}
+
+@keyframes ribbonFlowRight {
+
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  25% {
+    translate: -20px -12px;
+  }
+
+  50% {
+    translate: -8px 8px;
+  }
+
+  75% {
+    translate: 6px 14px;
+  }
+}
+
+
+@keyframes ribbonDriftLeft {
+
+  0%,
+  100% {
+    translate: 0 0;
+    scale: 1;
+  }
+
+  50% {
+    translate: 25px -15px;
+    scale: 1.05;
+  }
+}
+
+@keyframes ribbonDriftRight {
+
+  0%,
+  100% {
+    translate: 0 0;
+    scale: 1;
+  }
+
+  50% {
+    translate: -25px -15px;
+    scale: 1.05;
   }
 }
 

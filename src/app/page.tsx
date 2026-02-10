@@ -9,12 +9,12 @@ type JobStatus = "pending" | "processing" | "completed" | "failed";
 
 const POLL_INTERVAL_MS = 2500;
 
-const TEXT_MODEL_OPTIONS = [
-  { value: "", label: "Default (from env)" },
-  { value: "google/gemini-2.0-flash-exp", label: "Gemini 2 Flash Exp (~500/day)" },
-  { value: "google/gemini-2.5-flash-preview-05-20", label: "Gemini 2.5 Flash (~10K/day)" },
-  { value: "google/gemini-2.5-flash-image", label: "Nano Banana / 2.5 Flash Image (~2K/day)" },
-  { value: "google/gemini-2.0-flash-lite-001", label: "Gemini 2 Flash Lite (default)" },
+const TEXT_MODEL_OPTIONS: { value: string; label: string; desc: string }[] = [
+  { value: "", label: "Default (from env)", desc: "Uses the model configured on the server" },
+  { value: "google/gemini-2.0-flash-exp", label: "Gemini 2 Flash Exp", desc: "Experimental: ~500 req/day" },
+  { value: "google/gemini-2.5-flash-preview-05-20", label: "Gemini 2.5 Flash", desc: "Latest: ~10K req/day" },
+  { value: "google/gemini-2.5-flash-image", label: "Nano Banana / 2.5 Flash Image", desc: "Vision model: ~2K req/day" },
+  { value: "google/gemini-2.0-flash-lite-001", label: "Gemini 2 Flash Lite", desc: "Lightweight & fast" },
 ];
 
 const STAGES = [
@@ -182,6 +182,7 @@ export default function Home() {
   const [images, setImages] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [mode, setMode] = useState<"slideshow" | "talking_object">("slideshow");
+  const [talkingObjectStyle, setTalkingObjectStyle] = useState<"cartoon" | "real">("cartoon");
   const [captions, setCaptions] = useState<"on" | "off">("on");
   const [durationSeconds, setDurationSeconds] = useState(30);
 
@@ -204,6 +205,8 @@ export default function Home() {
   const [activeFeatureTab, setActiveFeatureTab] = useState(0);
   const [pricingPeriod, setPricingPeriod] = useState<"monthly" | "yearly">("monthly");
   const [activePainPoint, setActivePainPoint] = useState(0);
+  const [defaultScriptModel, setDefaultScriptModel] = useState<string | null>(null);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -211,6 +214,7 @@ export default function Home() {
   const promptRef = useRef(prompt);
   promptRef.current = prompt;
   const promptFromSuggestionRef = useRef(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
   const howSectionRef = useRef<HTMLElement | null>(null);
   const [howInView, setHowInView] = useState(false);
 
@@ -230,6 +234,24 @@ export default function Home() {
     setImageUrls(urls);
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [images]);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data?.defaultScriptModel && setDefaultScriptModel(data.defaultScriptModel))
+      .catch(() => { });
+  }, []);
+
+  useEffect(() => {
+    if (!modelDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [modelDropdownOpen]);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -323,6 +345,7 @@ export default function Home() {
           captions: captions,
           ...(textModel.trim() ? { textModel: textModel.trim() } : {}),
           ...(assetIds.length > 0 ? { assetIds } : {}),
+          ...(mode === "talking_object" ? { talkingObjectStyle } : {}),
         }),
       });
       const data = await res.json();
@@ -349,6 +372,7 @@ export default function Home() {
     setPrompt("");
     setImages([]);
     setMode("slideshow");
+    setTalkingObjectStyle("cartoon");
     setCaptions("on");
     setDurationSeconds(30);
     setTextModel("");
@@ -372,98 +396,220 @@ export default function Home() {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const isGenerating = submitting || (jobId != null && (status === "pending" || status === "processing"));
+
   return (
-    <div className="min-h-screen bg-black text-white">
-      <header className="fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-md border-b border-white/5">
-        <div className="max-w-6xl mx-auto h-14 px-6 flex items-center justify-between">
-          <Link href="/" className="font-semibold text-white tracking-tight text-lg">
-            cutline
-          </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm">
-            <a href="#features" className="text-zinc-400 hover:text-white transition-colors">Features</a>
-            <Link href="/how" className="text-zinc-400 hover:text-white transition-colors">How it works</Link>
-            <Link href="/dashboard" className="text-zinc-400 hover:text-white transition-colors">Dashboard</Link>
-          </nav>
-          <a
-            href="#create"
-            className="text-sm font-medium text-black bg-white hover:bg-zinc-200 px-4 py-2 rounded-lg transition-colors"
+    <div className="min-h-screen bg-black text-white relative overflow-x-clip">
+
+
+      <div className="absolute inset-x-0 top-0 h-[1000px] pointer-events-none select-none overflow-hidden z-0" aria-hidden="true">
+
+
+
+
+
+        <div
+          className="absolute w-[600px] h-[900px] -left-[120px] -top-[80px] rounded-full opacity-40 animate-[ribbonDriftLeft_14s_ease-in-out_infinite]"
+          style={{ background: 'radial-gradient(ellipse at 60% 50%, #9f1239 0%, #500724 40%, transparent 70%)', filter: 'blur(80px)' }}
+        />
+
+
+        <div
+          className="absolute w-[140px] h-[1300px] -left-[20px] -top-[200px] rounded-[60px] animate-[ribbonWaveLeft_8s_ease-in-out_infinite]"
+          style={{
+            background: 'linear-gradient(180deg, #450a0a 0%, #7f1d1d 18%, #991b1b 35%, #b91c1c 50%, #e11d48 70%, #f43f5e 85%, #fb7185 100%)',
+            transform: 'rotate(-22deg)',
+            transformOrigin: 'top center',
+          }}
+        />
+
+
+        <div
+          className="absolute w-[90px] h-[1200px] left-[60px] -top-[150px] rounded-[50px] opacity-70 animate-[ribbonFlowLeft_10s_ease-in-out_infinite]"
+          style={{
+            background: 'linear-gradient(180deg, #881337 0%, #be123c 28%, #e11d48 52%, #f43f5e 75%, #fda4af 100%)',
+            transform: 'rotate(-18deg)',
+            transformOrigin: 'top center',
+          }}
+        />
+
+
+        <div
+          className="absolute w-[30px] h-[1100px] left-[160px] -top-[100px] rounded-full opacity-40 animate-[ribbonWaveLeft_7s_ease-in-out_infinite]"
+          style={{
+            background: 'linear-gradient(180deg, #fecdd3 0%, #fda4af 35%, #fb7185 65%, #f43f5e 100%)',
+            transform: 'rotate(-15deg)',
+            transformOrigin: 'top center',
+          }}
+        />
+
+
+
+
+
+
+        <div
+          className="absolute w-[600px] h-[900px] -right-[120px] -top-[80px] rounded-full opacity-40 animate-[ribbonDriftRight_14s_ease-in-out_infinite]"
+          style={{ background: 'radial-gradient(ellipse at 40% 50%, #7c3aed 0%, #4f46e5 40%, transparent 70%)', filter: 'blur(80px)' }}
+        />
+
+
+        <div
+          className="absolute w-[140px] h-[1300px] -right-[20px] -top-[200px] rounded-[60px] animate-[ribbonWaveRight_8s_ease-in-out_infinite]"
+          style={{
+            background: 'linear-gradient(180deg, #6366f1 0%, #7c3aed 20%, #a855f7 40%, #c026d3 60%, #ec4899 80%, #f472b6 100%)',
+            transform: 'rotate(22deg)',
+            transformOrigin: 'top center',
+          }}
+        />
+
+
+        <div
+          className="absolute w-[90px] h-[1200px] right-[60px] -top-[150px] rounded-[50px] opacity-70 animate-[ribbonFlowRight_10s_ease-in-out_infinite]"
+          style={{
+            background: 'linear-gradient(180deg, #818cf8 0%, #a78bfa 30%, #c084fc 55%, #e879f9 80%, #f0abfc 100%)',
+            transform: 'rotate(18deg)',
+            transformOrigin: 'top center',
+          }}
+        />
+
+
+        <div
+          className="absolute w-[30px] h-[1100px] right-[160px] -top-[100px] rounded-full opacity-40 animate-[ribbonWaveRight_7s_ease-in-out_infinite]"
+          style={{
+            background: 'linear-gradient(180deg, #c7d2fe 0%, #e9d5ff 40%, #f5d0fe 70%, #fecdd3 100%)',
+            transform: 'rotate(15deg)',
+            transformOrigin: 'top center',
+          }}
+        />
+
+      </div>
+
+      <header className="fixed top-5 left-0 right-0 z-50 flex justify-center px-6 pointer-events-none">
+        <div className="relative pointer-events-auto">
+
+          <div
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[90%] h-24 pointer-events-none"
+            style={{
+              background: 'radial-gradient(ellipse 70% 100% at center top, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.02) 60%, transparent 100%)',
+              filter: 'blur(16px)',
+            }}
+          />
+
+          <nav
+            className="relative z-10 flex items-center gap-6 bg-[#0c0c0c]/90 backdrop-blur-2xl border border-white/[0.07] rounded-[22px] px-8 py-3 min-w-[560px] max-w-[90vw]"
+            style={{ boxShadow: '0 8px 40px -8px rgba(0,0,0,0.85), 0 1px 0 rgba(255,255,255,0.04) inset, 0 25px 60px -15px rgba(0,0,0,0.7)' }}
           >
-            Try free
-          </a>
+            <Link
+              href="/"
+              className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-white/85 hover:text-white hover:bg-white/6 transition-all duration-200"
+            >
+
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="nav-ic-home" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#a1a1aa" /><stop offset="1" stopColor="#52525b" />
+                  </linearGradient>
+                </defs>
+                <path d="M3.5 20.5l11-11m0 0l1.5-1.5 3 3-1.5 1.5m-3-3l3 3" stroke="url(#nav-ic-home)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M9.5 2.5v2m0-2l1 1m-1-1l-1 1m5.5 1.5l1.5 1m-1.5-1l.75-.75m-.75.75l-.75-.75M5 7.5l1.5 1M5 7.5l.75-.75M5 7.5l-.75-.75" stroke="url(#nav-ic-home)" strokeWidth="1.4" strokeLinecap="round" />
+                <circle cx="9.5" cy="3.5" r="0.6" fill="#d4d4d8" />
+                <circle cx="15" cy="5" r="0.5" fill="#d4d4d8" />
+                <circle cx="5" cy="8.5" r="0.5" fill="#d4d4d8" />
+              </svg>
+              Home
+            </Link>
+            <a
+              href="#features"
+              className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-white/85 hover:text-white hover:bg-white/6 transition-all duration-200"
+            >
+
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="nav-ic-cube-top" x1="6" y1="3" x2="18" y2="10" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#a1a1aa" /><stop offset="1" stopColor="#71717a" />
+                  </linearGradient>
+                  <linearGradient id="nav-ic-cube-left" x1="3" y1="9" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#71717a" /><stop offset="1" stopColor="#3f3f46" />
+                  </linearGradient>
+                  <linearGradient id="nav-ic-cube-right" x1="12" y1="9" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#52525b" /><stop offset="1" stopColor="#27272a" />
+                  </linearGradient>
+                </defs>
+
+                <path d="M12 3L4.5 7.5 12 12l7.5-4.5L12 3z" fill="url(#nav-ic-cube-top)" />
+
+                <path d="M4.5 7.5L12 12v9l-7.5-4.5V7.5z" fill="url(#nav-ic-cube-left)" />
+
+                <path d="M19.5 7.5L12 12v9l7.5-4.5V7.5z" fill="url(#nav-ic-cube-right)" />
+
+                <path d="M12 3L4.5 7.5 12 12l7.5-4.5L12 3z" stroke="#a1a1aa" strokeWidth="0.3" opacity="0.5" />
+                <path d="M12 12v9" stroke="#71717a" strokeWidth="0.4" opacity="0.4" />
+              </svg>
+              Features
+            </a>
+            <Link
+              href="/how"
+              className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-white/85 hover:text-white hover:bg-white/6 transition-all duration-200"
+            >
+
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="nav-ic-shield-l" x1="4" y1="3" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#a1a1aa" /><stop offset="1" stopColor="#52525b" />
+                  </linearGradient>
+                  <linearGradient id="nav-ic-shield-r" x1="12" y1="3" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#71717a" /><stop offset="1" stopColor="#3f3f46" />
+                  </linearGradient>
+                </defs>
+
+                <path d="M12 3L4 7v5c0 4.5 3.5 8.5 8 10V3z" fill="url(#nav-ic-shield-l)" />
+
+                <path d="M12 3l8 4v5c0 4.5-3.5 8.5-8 10V3z" fill="url(#nav-ic-shield-r)" />
+
+                <path d="M12 3L4 7v5c0 4.5 3.5 8.5 8 10 4.5-1.5 8-5.5 8-10V7l-8-4z" stroke="#a1a1aa" strokeWidth="0.4" opacity="0.35" />
+              </svg>
+              How it works
+            </Link>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-white/85 hover:text-white hover:bg-white/6 transition-all duration-200"
+            >
+
+
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="nav-ic-grid1" x1="3" y1="3" x2="11" y2="11" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#a1a1aa" /><stop offset="1" stopColor="#52525b" />
+                  </linearGradient>
+                  <linearGradient id="nav-ic-grid2" x1="13" y1="3" x2="21" y2="11" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#71717a" /><stop offset="1" stopColor="#3f3f46" />
+                  </linearGradient>
+                  <linearGradient id="nav-ic-grid3" x1="3" y1="13" x2="11" y2="21" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#71717a" /><stop offset="1" stopColor="#3f3f46" />
+                  </linearGradient>
+                  <linearGradient id="nav-ic-grid4" x1="13" y1="13" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#a1a1aa" /><stop offset="1" stopColor="#52525b" />
+                  </linearGradient>
+                </defs>
+                <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-grid1)" />
+                <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-grid2)" />
+                <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-grid3)" />
+                <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-grid4)" />
+
+                <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" stroke="#a1a1aa" strokeWidth="0.3" opacity="0.3" />
+                <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" stroke="#a1a1aa" strokeWidth="0.3" opacity="0.3" />
+                <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" stroke="#a1a1aa" strokeWidth="0.3" opacity="0.3" />
+                <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" stroke="#a1a1aa" strokeWidth="0.3" opacity="0.3" />
+              </svg>
+              Dashboard
+            </Link>
+          </nav>
         </div>
       </header>
 
       <main>
-        <section className="pt-28 pb-40 px-6 relative overflow-hidden">
-
-          <div className="absolute inset-0 pointer-events-none select-none overflow-hidden" aria-hidden>
-            <svg
-              className="absolute w-[1200px] h-[1000px] left-[-200px] top-[100px] md:left-[-150px] animate-[ribbonWaveLeft_8s_ease-in-out_infinite]"
-              viewBox="0 0 1000 800"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              preserveAspectRatio="xMidYMid slice"
-            >
-              <defs>
-                <linearGradient id="ribbon-grad-left" gradientUnits="userSpaceOnUse" x1="280" y1="50" x2="420" y2="750">
-                  <stop offset="0%" stopColor="#6366f1" />
-                  <stop offset="18%" stopColor="#8b5cf6" />
-                  <stop offset="36%" stopColor="#c026d3" />
-                  <stop offset="52%" stopColor="#ec4899" />
-                  <stop offset="68%" stopColor="#f472b6" />
-                  <stop offset="80%" stopColor="#fb923c" />
-                  <stop offset="92%" stopColor="#facc15" />
-                  <stop offset="100%" stopColor="#fde047" />
-                </linearGradient>
-              </defs>
-
-              <path
-                d="M 50 -80
-                   C 150 100, 250 250, 320 400
-                   C 400 580, 520 700, 700 850
-                   L 820 850
-                   C 620 680, 500 550, 420 380
-                   C 330 200, 220 50, 100 -80
-                   Z"
-                fill="url(#ribbon-grad-left)"
-              />
-            </svg>
-          </div>
-
-
-          <div className="absolute inset-0 pointer-events-none select-none overflow-hidden" aria-hidden>
-            <svg
-              className="absolute w-[1200px] h-[1000px] right-[-200px] top-[50px] md:right-[-100px] animate-[ribbonWaveRight_8s_ease-in-out_infinite]"
-              viewBox="0 0 1000 800"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              preserveAspectRatio="xMidYMid slice"
-            >
-              <defs>
-                <linearGradient id="ribbon-grad-right" gradientUnits="userSpaceOnUse" x1="580" y1="50" x2="720" y2="750">
-                  <stop offset="0%" stopColor="#6366f1" />
-                  <stop offset="18%" stopColor="#8b5cf6" />
-                  <stop offset="36%" stopColor="#c026d3" />
-                  <stop offset="52%" stopColor="#ec4899" />
-                  <stop offset="68%" stopColor="#f472b6" />
-                  <stop offset="80%" stopColor="#fb923c" />
-                  <stop offset="92%" stopColor="#facc15" />
-                  <stop offset="100%" stopColor="#fde047" />
-                </linearGradient>
-              </defs>
-
-              <path
-                d="M 950 -80
-                   C 850 100, 750 250, 680 400
-                   C 600 580, 480 700, 300 850
-                   L 180 850
-                   C 380 680, 500 550, 580 380
-                   C 670 200, 780 50, 900 -80
-                   Z"
-                fill="url(#ribbon-grad-right)"
-              />
-            </svg>
-          </div>
+        <section className="pt-28 pb-40 px-6 relative">
 
           <div className="max-w-4xl mx-auto text-center mb-12 relative z-10">
             <div className="group relative inline-flex items-center gap-2.5 px-5 py-2 rounded-full text-sm font-medium mb-6 overflow-hidden bg-white/4 border border-white/10 text-zinc-200 backdrop-blur-sm hover:border-white/20 transition-all duration-300">
@@ -679,21 +825,77 @@ export default function Home() {
                       <label className="block text-sm font-medium text-white mb-3">
                         Script model
                       </label>
-                      <div className="relative">
-                        <select
-                          value={textModel}
-                          onChange={(e) => setTextModel(e.target.value)}
-                          className="w-full min-h-[44px] bg-zinc-900 border border-zinc-800 rounded-xl pl-3 pr-12 py-3 text-white text-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/30 focus:outline-none transition-shadow cursor-pointer appearance-none bg-no-repeat bg-position-[right_1rem_center] bg-size-[1.25rem_1.25rem]"
-                          style={{
-                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
-                          }}
+                      <div className="relative" ref={modelDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => setModelDropdownOpen((o) => !o)}
+                          className="w-full min-h-[44px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-3 text-left text-sm text-white flex items-center justify-between gap-2 hover:border-zinc-700 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/30 focus:outline-none transition-all cursor-pointer"
                         >
-                          {TEXT_MODEL_OPTIONS.map((opt) => (
-                            <option key={opt.value || "default"} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                          <span className="truncate">
+                            {(() => {
+                              const selected = TEXT_MODEL_OPTIONS.find((o) => o.value === textModel);
+                              if (!selected) return "Select model";
+                              if (selected.value === "" && defaultScriptModel) {
+                                return TEXT_MODEL_OPTIONS.find((o) => o.value === defaultScriptModel)?.label ?? defaultScriptModel;
+                              }
+                              return selected.label;
+                            })()}
+                          </span>
+                          <svg
+                            className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${modelDropdownOpen ? "rotate-180" : ""}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {modelDropdownOpen && (
+                          <div className="absolute z-50 mt-2 w-full rounded-xl border border-zinc-700/60 bg-zinc-900/95 backdrop-blur-xl shadow-2xl shadow-black/50 overflow-hidden animate-fade-in">
+                            <div className="py-1.5 max-h-[260px] overflow-y-auto">
+                              {TEXT_MODEL_OPTIONS.map((opt) => {
+                                const isActive = textModel === opt.value;
+                                const isDefault = opt.value === "" && defaultScriptModel;
+                                const displayLabel = opt.value === "" && defaultScriptModel
+                                  ? (TEXT_MODEL_OPTIONS.find((o) => o.value === defaultScriptModel)?.label ?? defaultScriptModel)
+                                  : opt.label;
+                                return (
+                                  <button
+                                    key={opt.value || "default"}
+                                    type="button"
+                                    onClick={() => { setTextModel(opt.value); setModelDropdownOpen(false); }}
+                                    className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition-colors ${isActive
+                                      ? "bg-white/[0.07]"
+                                      : "hover:bg-white/[0.04]"
+                                      }`}
+                                  >
+                                    <div className={`mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${isActive ? "border-blue-400 bg-blue-500/20" : "border-zinc-600"
+                                      }`}>
+                                      {isActive && <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`text-sm truncate ${isActive ? "text-white font-medium" : "text-zinc-300"}`}>
+                                          {displayLabel}
+                                        </span>
+                                        {isDefault && (
+                                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                                            env
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className={`text-xs mt-0.5 ${isActive ? "text-zinc-400" : "text-zinc-500"}`}>
+                                        {opt.desc}
+                                      </p>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <p className="text-xs text-zinc-500 mt-2.5 leading-relaxed">Uses this model for intent, script, and planning.</p>
                     </div>
@@ -1057,6 +1259,41 @@ export default function Home() {
                             </p>
                           </button>
                         </div>
+
+                        {mode === "talking_object" && (
+                          <div className="mt-3 pl-1">
+                            <p className="text-xs font-medium text-zinc-400 mb-2">Talking style</p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setTalkingObjectStyle("cartoon")}
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${talkingObjectStyle === "cartoon"
+                                  ? "border-amber-500/50 bg-amber-500/10 text-amber-200"
+                                  : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                                  }`}
+                              >
+                                {talkingObjectStyle === "cartoon" && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                )}
+                                Cartoon
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTalkingObjectStyle("real")}
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${talkingObjectStyle === "real"
+                                  ? "border-amber-500/50 bg-amber-500/10 text-amber-200"
+                                  : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                                  }`}
+                              >
+                                {talkingObjectStyle === "real" && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                )}
+                                Real person
+                              </button>
+                            </div>
+                            <p className="text-xs text-zinc-500 mt-1.5">Choose cartoon character or realistic human for the talking avatar.</p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="mt-4">
@@ -1138,20 +1375,22 @@ export default function Home() {
               </div>
             )}
 
-            <div className="max-w-4xl mx-auto mt-12 flex flex-wrap justify-center gap-8 sm:gap-16 text-center relative z-10">
-              <div>
-                <div className="text-2xl font-bold text-white">No credit card</div>
-                <div className="text-sm text-zinc-500">To get started</div>
+            {!isGenerating && (
+              <div className="max-w-4xl mx-auto mt-12 flex flex-wrap justify-center gap-8 sm:gap-16 text-center relative z-10">
+                <div>
+                  <div className="text-2xl font-bold text-white">No credit card</div>
+                  <div className="text-sm text-zinc-500">To get started</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-white">Up to 60 sec</div>
+                  <div className="text-sm text-zinc-500">Per video</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-white">No watermarks</div>
+                  <div className="text-sm text-zinc-500">Use anywhere</div>
+                </div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-white">Up to 60 sec</div>
-                <div className="text-sm text-zinc-500">Per video</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-white">No watermarks</div>
-                <div className="text-sm text-zinc-500">Use anywhere</div>
-              </div>
-            </div>
+            )}
           </div>
         </section>
 
