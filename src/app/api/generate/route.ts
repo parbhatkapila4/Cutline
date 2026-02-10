@@ -19,6 +19,7 @@ type GenerateBody = {
   durationSeconds?: unknown;
   textModel?: unknown;
   captions?: unknown;
+  talkingObjectStyle?: unknown;
 };
 
 function isBrandColors(v: unknown): v is BrandColors {
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { input, assetIds, brandColors, mode, durationSeconds: bodyDuration, textModel: bodyTextModel, captions: bodyCaptions } = body as GenerateBody;
+  const { input, assetIds, brandColors, mode, durationSeconds: bodyDuration, textModel: bodyTextModel, captions: bodyCaptions, talkingObjectStyle: bodyTalkingObjectStyle } = body as GenerateBody;
 
   const inputValidation = validateInput(input);
   if (!inputValidation.valid) {
@@ -120,6 +121,11 @@ export async function POST(request: Request) {
       ? (bodyCaptions as "on" | "off")
       : ("on" as const);
 
+  const talkingObjectStyleValid =
+    bodyTalkingObjectStyle === "cartoon" || bodyTalkingObjectStyle === "real"
+      ? (bodyTalkingObjectStyle as "cartoon" | "real")
+      : undefined;
+
   try {
     const queue = getVideoQueue();
     const job = await queue.add("video", {
@@ -130,6 +136,7 @@ export async function POST(request: Request) {
       ...(durationSeconds !== undefined ? { durationSeconds } : {}),
       ...(textModel ? { textModel } : {}),
       captions: captionsValid,
+      ...(talkingObjectStyleValid ? { talkingObjectStyle: talkingObjectStyleValid } : {}),
     });
     const jobId = String(job.id);
     console.log("[api] POST /api/generate jobId=" + jobId);
