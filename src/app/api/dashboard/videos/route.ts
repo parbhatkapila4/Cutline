@@ -8,7 +8,7 @@ export type DashboardVideoItem = {
   prompt: string;
   date: string;
   duration: string;
-  status: "completed";
+  status: "completed" | "processing" | "failed";
   videoUrl: string;
 };
 
@@ -53,29 +53,59 @@ export async function GET(request: Request) {
 
   try {
     const queue = getVideoQueue();
-    const jobs = await queue.getCompleted(0, 99);
+    const [completed, failed, waiting, active] = await Promise.all([
+      queue.getCompleted(0, 199),
+      queue.getFailed(0, 199),
+      queue.getWaiting(0, 199),
+      queue.getActive(),
+    ]);
     const items: DashboardVideoItem[] = [];
 
-    for (const job of jobs) {
-      if (job.name === CLEANUP_JOB_NAME) continue;
+    const forClient = (job: { data?: unknown }) => {
       const data = job.data as VideoJobData | undefined;
-      const result = job.returnvalue as VideoJobResult | undefined;
-      const videoPath = result?.videoPath;
-      if (!videoPath || typeof videoPath !== "string") continue;
+      if (data?.clientId !== undefined && data.clientId !== identifier) return false;
+      return true;
+    };
 
+    const toItem = (
+      job: { id?: string; data?: unknown; finishedOn?: number; processedOn?: number; timestamp?: number },
+      status: "completed" | "processing" | "failed",
+      videoUrl: string
+    ): DashboardVideoItem => {
+      const data = job.data as VideoJobData | undefined;
       const input = data?.input;
-      const ts = job.finishedOn ?? job.processedOn;
-
-      items.push({
+      const ts = job.finishedOn ?? job.processedOn ?? job.timestamp;
+      return {
         id: String(job.id ?? ""),
         title: titleFromInput(input),
         prompt: typeof input === "string" ? input : "",
         date: formatDate(ts),
         duration: formatDuration(data?.durationSeconds),
-        status: "completed",
-        videoUrl: videoPath,
-      });
+        status,
+        videoUrl,
+      };
+    };
+
+    for (const job of completed) {
+      if (job.name === CLEANUP_JOB_NAME) continue;
+      if (!forClient(job)) continue;
+      const result = job.returnvalue as VideoJobResult | undefined;
+      const videoPath = result?.videoPath;
+      if (!videoPath || typeof videoPath !== "string") continue;
+      items.push(toItem(job, "completed", videoPath));
     }
+    for (const job of failed) {
+      if (job.name === CLEANUP_JOB_NAME) continue;
+      if (!forClient(job)) continue;
+      items.push(toItem(job, "failed", ""));
+    }
+    const processingJobs = [...waiting.filter((j) => forClient(j)), ...active.filter((j) => forClient(j))];
+    for (const job of processingJobs) {
+      if (job.name === CLEANUP_JOB_NAME) continue;
+      items.push(toItem(job, "processing", ""));
+    }
+
+    items.sort((a, b) => b.date.localeCompare(a.date));
 
     return NextResponse.json(items);
   } catch {
