@@ -101,6 +101,7 @@ export async function POST(
 
     const jobData: VideoJobData = {
       input: newInput,
+      ...(data?.clientId ? { clientId: data.clientId } : {}),
       ...(data?.mode ? { mode: data.mode } : {}),
       ...(data?.durationSeconds !== undefined ? { durationSeconds: data.durationSeconds } : {}),
       ...(Array.isArray(data?.assetIds) && data.assetIds.length > 0 ? { assetIds: data.assetIds } : {}),
