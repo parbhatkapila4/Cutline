@@ -128,8 +128,11 @@ export async function POST(request: Request) {
 
   try {
     const queue = getVideoQueue();
+    const { incrementApiCallsThisMonth, getTokens } = await import("@/lib/usage");
+    await getTokens(identifier);
     const job = await queue.add("video", {
       input: sanitizeInput(String(input)),
+      clientId: identifier,
       ...(assetIdsArray?.length ? { assetIds: assetIdsArray } : {}),
       ...(brandColorsValid ? { brandColors: brandColorsValid } : {}),
       ...(validMode ? { mode: validMode } : {}),
@@ -138,6 +141,7 @@ export async function POST(request: Request) {
       captions: captionsValid,
       ...(talkingObjectStyleValid ? { talkingObjectStyle: talkingObjectStyleValid } : {}),
     });
+    await incrementApiCallsThisMonth(identifier);
     const jobId = String(job.id);
     console.log("[api] POST /api/generate jobId=" + jobId);
     return NextResponse.json({ jobId });
