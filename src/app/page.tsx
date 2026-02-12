@@ -751,18 +751,40 @@ export default function Home() {
                 </div>
               </div>
             ) : status === "failed" && error ? (
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white mb-1">Generation failed</p>
-                    <p className="text-sm text-zinc-400 mb-4">{error ? getUserFriendlyErrorMessage(error) : "Something went wrong."}</p>
-                    <button onClick={reset} className="text-sm text-blue-400 hover:text-blue-300 font-medium">
-                      Try again →
+              <div className="relative rounded-2xl overflow-hidden">
+                <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-red-500/60 via-orange-500/40 to-red-500/60 animate-[shimmer_3s_ease-in-out_infinite]" />
+
+                <div className="relative rounded-2xl bg-zinc-950 p-8 md:p-10">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-red-500/10 blur-3xl rounded-full pointer-events-none" />
+
+                  <div className="relative flex flex-col items-center text-center">
+                    <div className="relative mb-6">
+                      <div className="absolute inset-0 w-16 h-16 rounded-full bg-red-500/20 animate-ping" style={{ animationDuration: '2s' }} />
+                      <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-red-500/30 to-orange-500/20 border border-red-500/30 flex items-center justify-center backdrop-blur-sm">
+                        <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    <h3 className="text-xl font-semibold bg-gradient-to-r from-red-300 via-orange-200 to-red-300 bg-clip-text text-transparent mb-2">
+                      Generation Failed
+                    </h3>
+
+                    <p className="text-sm text-zinc-400 max-w-md mb-6 leading-relaxed">
+                      {error ? getUserFriendlyErrorMessage(error) : "Something went wrong."}
+                    </p>
+
+                    <div className="w-16 h-px bg-gradient-to-r from-transparent via-zinc-700 to-transparent mb-6" />
+
+                    <button
+                      onClick={reset}
+                      className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/20 hover:border-red-500/40 text-sm font-medium text-red-300 hover:text-white transition-all duration-300 hover:shadow-[0_0_24px_rgba(239,68,68,0.15)]"
+                    >
+                      <svg className="w-4 h-4 transition-transform duration-300 group-hover:-rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                      </svg>
+                      Try again
                     </button>
                   </div>
                 </div>
@@ -1126,7 +1148,11 @@ export default function Home() {
                                     const res = await fetch("/api/suggest-prompt", {
                                       method: "POST",
                                       headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ prompt: currentPrompt, refine: isRefine }),
+                                      body: JSON.stringify({
+                                        prompt: currentPrompt,
+                                        refine: isRefine,
+                                        durationSeconds: durationSeconds,
+                                      }),
                                     });
                                     const data = await res.json();
                                     if (!res.ok) throw new Error(data.error || "Suggestion failed");
