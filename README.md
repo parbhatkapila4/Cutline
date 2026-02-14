@@ -565,6 +565,7 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 - **[docs/FEATURE_SPEC.md](docs/FEATURE_SPEC.md)** — Core principle, user experience, capabilities, non-goals, future extensions.
 - **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** — Env, worker, Redis, API keys, rate limiting, cleanup, smoke test.
 - **[docs/IMAGE_API_KEYS.md](docs/IMAGE_API_KEYS.md)** — Image API keys and setup (if present).
+- **[docs/AUTH_AND_BILLING.md](docs/AUTH_AND_BILLING.md)** — Current identity (IP-based), usage, and roadmap for auth and billing.
 
 ---
 
