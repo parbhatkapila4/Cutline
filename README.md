@@ -104,9 +104,9 @@ Rendered videos are written to `public/temp/[jobId].mp4`. Cleanup (repeatable Bu
 
 ---
 
-### Video duration (10–90 seconds)
+### Video duration (10–60 seconds)
 
-You can choose a video length between 10 and 90 seconds on the main page. The value is sent as `durationSeconds` in **POST /api/generate** and used for both **Slideshow** and **Talking object** modes. For **Talking object**, videos longer than 8 seconds are built by generating multiple Veo clips (~8s each) and concatenating them. That concatenation step requires **ffmpeg** (on PATH or set `FFMPEG_PATH` in `.env.local`). If ffmpeg is not available and you request a talking_object video over 8 seconds, the job will fail with a clear message.
+You can choose a video length between 10 and 60 seconds on the main page. The value is sent as `durationSeconds` in **POST /api/generate** and used for both **Slideshow** and **Talking object** modes. For **Talking object**, videos longer than 8 seconds are built by generating multiple Veo clips (~8s each) and concatenating them. That concatenation step requires **ffmpeg** (on PATH or set `FFMPEG_PATH` in `.env.local`). If ffmpeg is not available and you request a talking_object video over 8 seconds, the job will fail with a clear message.
 
 ---
 
@@ -313,6 +313,12 @@ RETRY_LLM_MAX=3
 RETRY_TTS_MAX=3
 RETRY_IMAGE_MAX=2
 RETRY_RENDER_MAX=2
+
+# Usage / plan limits (credits and dashboard)
+# DEFAULT_TOKENS=100 — initial token balance per client
+# TOKENS_PER_VIDEO=10 — tokens per completed video
+# FREE_PLAN_VIDEOS_PER_MONTH=10 — free plan videos limit
+# FREE_PLAN_API_CALLS_PER_MONTH=10000 — free plan API calls limit
 ```
 
 **Note:** At least one image source (Unsplash or Pexels) is required for real images; if none are set or all fail, a placeholder is used so the video still generates.

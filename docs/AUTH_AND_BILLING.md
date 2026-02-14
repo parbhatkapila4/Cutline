@@ -21,7 +21,7 @@ This document describes the current identity and usage model, and the plan to ad
    Add auth (e.g. Clerk, NextAuth). Users sign up and log in. The server obtains a stable user id (e.g. `userId` or `sub`) from the auth provider.
 
 2. **Phase 2 – User-scoped data**  
-   Attach `userId` to every job and asset. Dashboard, usage, and tokens keyed by `userId` instead of (or in addition to) IP. Pre-auth jobs remain tied to IP or a "legacy" bucket; new jobs tied to `userId`.
+   Attach `userId` to every job and asset. Dashboard, usage, and tokens keyed by `userId` instead of (or in addition to) IP. Pre-auth jobs remain tied to IP or a "legacy" bucket; new jobs tied to `userId`. Job payloads already include an optional `userId` field; once auth is in place, the generate route will set it from the authenticated user so jobs and usage can be keyed by `userId`.
 
 3. **Phase 3 – Billing and limits**  
    Gate usage and limits by `userId`. Enforce token/credit balance and optional plan limits (e.g. videos per month) per user. Integrate a payment provider (e.g. Stripe) for paid plans when needed.

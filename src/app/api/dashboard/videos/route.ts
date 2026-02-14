@@ -63,8 +63,9 @@ export async function GET(request: Request) {
 
     const forClient = (job: { data?: unknown }) => {
       const data = job.data as VideoJobData | undefined;
-      if (data?.clientId !== undefined && data.clientId !== identifier) return false;
-      return true;
+      const clientId = data?.clientId;
+      if (clientId === undefined || clientId === null) return false;
+      return clientId === identifier;
     };
 
     const toItem = (
@@ -108,7 +109,8 @@ export async function GET(request: Request) {
     items.sort((a, b) => b.date.localeCompare(a.date));
 
     return NextResponse.json(items);
-  } catch {
-    return NextResponse.json([]);
+  } catch (e) {
+    console.error("[api] GET /api/dashboard/videos", e);
+    return NextResponse.json({ error: "Failed to load videos." }, { status: 500 });
   }
 }

@@ -210,11 +210,20 @@ function HomeContent() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(
-          getUserFriendlyErrorMessage(
-            data.error || "Failed to start generation",
-          ),
-        );
+        let msg = getUserFriendlyErrorMessage(data.error || "Failed to start generation");
+        if (res.status === 402) {
+          const parts: string[] = [];
+          if (data.tokensRemaining != null && data.tokensRequired != null) {
+            parts.push(`You have ${data.tokensRemaining} credits, need ${data.tokensRequired} per video.`);
+          }
+          if (data.videosUsed != null && data.videosLimit != null) {
+            parts.push(`You've used ${data.videosUsed} of ${data.videosLimit} videos this month.`);
+          }
+          if (parts.length > 0) {
+            msg = msg + " " + parts.join(" ");
+          }
+        }
+        setError(msg);
         return;
       }
       setJobId(data.jobId);

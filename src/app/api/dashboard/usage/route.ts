@@ -5,11 +5,10 @@ import {
   getTokens,
   getApiCallsThisMonth,
   getResetDate,
+  DEFAULT_TOKENS,
   FREE_PLAN_VIDEOS_PER_MONTH,
   FREE_PLAN_API_CALLS_PER_MONTH,
 } from "@/lib/usage";
-
-const DEFAULT_TOKENS = 100;
 
 function titleFromInput(input: string | undefined): string {
   if (input == null || typeof input !== "string") return "";
@@ -57,8 +56,9 @@ export async function GET(request: Request) {
 
     const forClient = (job: { data?: unknown; finishedOn?: number; processedOn?: number; id?: string; failedReason?: string }) => {
       const data = job.data as VideoJobData | undefined;
-      if (data?.clientId !== undefined && data.clientId !== identifier) return false;
-      return true;
+      const clientId = data?.clientId;
+      if (clientId === undefined || clientId === null) return false;
+      return clientId === identifier;
     };
 
     const completedForClient = completed.filter((j) => forClient(j));
@@ -135,27 +135,8 @@ export async function GET(request: Request) {
   } catch (e) {
     console.error("[api] GET /api/dashboard/usage", e);
     return NextResponse.json(
-      {
-        plan: "free",
-        planLabel: "Free",
-        videosLimit: FREE_PLAN_VIDEOS_PER_MONTH,
-        apiCallsLimit: FREE_PLAN_API_CALLS_PER_MONTH,
-        videosUsed: 0,
-        apiCallsUsed: 0,
-        resetDate: getResetDate(),
-        tokens: { initialBalance: DEFAULT_TOKENS, remaining: DEFAULT_TOKENS, used: 0 },
-        recentActivity: [],
-        overview: {
-          totalVideos: 0,
-          thisWeek: 0,
-          thisMonth: 0,
-          totalDurationMin: 0,
-          inProgress: 0,
-          storageUsed: null,
-          avgRenderSec: null,
-        },
-      },
-      { status: 200 }
+      { error: "Failed to load usage." },
+      { status: 500 }
     );
   }
 }
