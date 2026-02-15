@@ -100,6 +100,14 @@ export async function GET(
       );
     }
 
+    const clientId = data?.clientId;
+    if (clientId === undefined || clientId === null || clientId !== identifier) {
+      return NextResponse.json(
+        { error: "Video not found" },
+        { status: 404 }
+      );
+    }
+
     const input = data?.input;
     const ts = job.finishedOn ?? job.processedOn;
 
