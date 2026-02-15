@@ -73,6 +73,14 @@ export async function POST(
     }
 
     const data = job.data as VideoJobData | undefined;
+    const clientId = data?.clientId;
+    if (clientId === undefined || clientId === null || clientId !== identifier) {
+      return NextResponse.json(
+        { error: "Video not found" },
+        { status: 404 }
+      );
+    }
+
     const originalInput = typeof data?.input === "string" && data.input.trim() !== ""
       ? data.input.trim()
       : "";
