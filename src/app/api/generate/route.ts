@@ -7,9 +7,7 @@ import {
   validateBrandColors,
   sanitizeInput,
 } from "@/lib/validation/input";
-
-const DURATION_MIN = 10;
-const DURATION_MAX = 60;
+import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 
 type GenerateBody = {
   input: unknown;
@@ -128,11 +126,35 @@ export async function POST(request: Request) {
 
   try {
     const queue = getVideoQueue();
-    const { incrementApiCallsThisMonth, getTokens } = await import("@/lib/usage");
-    await getTokens(identifier);
+    const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth, TOKENS_PER_VIDEO, FREE_PLAN_VIDEOS_PER_MONTH } = await import("@/lib/usage");
+    const tokensRemaining = await getTokens(identifier);
+    if (tokensRemaining < TOKENS_PER_VIDEO) {
+      return NextResponse.json(
+        {
+          error: `Not enough credits. You have ${tokensRemaining} credits, need ${TOKENS_PER_VIDEO} per video.`,
+          tokensRemaining,
+          tokensRequired: TOKENS_PER_VIDEO,
+        },
+        { status: 402 }
+      );
+    }
+    const videosCompletedThisMonth = await getVideosCompletedThisMonth(identifier);
+    if (videosCompletedThisMonth >= FREE_PLAN_VIDEOS_PER_MONTH) {
+      return NextResponse.json(
+        {
+          error: `Monthly video limit reached. You've used ${videosCompletedThisMonth} of ${FREE_PLAN_VIDEOS_PER_MONTH} videos this month.`,
+          videosUsed: videosCompletedThisMonth,
+          videosLimit: FREE_PLAN_VIDEOS_PER_MONTH,
+        },
+        { status: 402 }
+      );
+    }
+    // When auth is added, set userId from the authenticated user and include it in the payload.
+    const userId: string | undefined = undefined;
     const job = await queue.add("video", {
       input: sanitizeInput(String(input)),
       clientId: identifier,
+      ...(userId ? { userId } : {}),
       ...(assetIdsArray?.length ? { assetIds: assetIdsArray } : {}),
       ...(brandColorsValid ? { brandColors: brandColorsValid } : {}),
       ...(validMode ? { mode: validMode } : {}),
