@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const partial = typeof body.prompt === "string" ? body.prompt.trim() : "";
     const refine = Boolean(body.refine);
-    const durationSeconds = typeof body.durationSeconds === "number" && body.durationSeconds >= 10 && body.durationSeconds <= 60
+    const durationSeconds = typeof body.durationSeconds === "number" && body.durationSeconds >= DURATION_MIN && body.durationSeconds <= DURATION_MAX
       ? Math.round(body.durationSeconds)
       : 30;
     const isLongVideo = durationSeconds >= 45;
