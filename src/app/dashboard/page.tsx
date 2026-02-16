@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [videosLoading, setVideosLoading] = useState(true);
   const [usage, setUsage] = useState<UsageData>(DEFAULT_USAGE);
   const [usageLoading, setUsageLoading] = useState(true);
+  const [usageError, setUsageError] = useState<string | null>(null);
   const [videoFilter, setVideoFilter] = useState<VideoStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -84,11 +85,27 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     fetch("/api/dashboard/usage")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: UsageData | null) => {
-        if (!cancelled && data) setUsage(data);
+      .then(async (res) => {
+        if (res.ok) {
+          const data = (await res.json()) as UsageData;
+          if (!cancelled) {
+            setUsageError(null);
+            setUsage(data);
+          }
+        } else {
+          let msg = "Failed to load usage. Please try again.";
+          try {
+            const body = (await res.json()) as { error?: string };
+            if (typeof body?.error === "string" && body.error.trim()) msg = body.error;
+          } catch {
+            /* use default msg */
+          }
+          if (!cancelled) setUsageError(msg);
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) setUsageError("Failed to load usage. Please try again.");
+      })
       .finally(() => {
         if (!cancelled) setUsageLoading(false);
       });
@@ -115,6 +132,8 @@ export default function DashboardPage() {
               <h2 className="text-sm font-semibold text-white mb-3">Usage</h2>
               {usageLoading ? (
                 <div className="space-y-3 text-xs text-zinc-500">Loading…</div>
+              ) : usageError ? (
+                <p className="text-xs text-red-400">{usageError}</p>
               ) : (
                 <>
                   <div className="space-y-4">
@@ -145,6 +164,8 @@ export default function DashboardPage() {
               <h2 className="text-sm font-semibold text-white mb-3">Recent activity</h2>
               {usageLoading ? (
                 <p className="text-xs text-zinc-500">Loading…</p>
+              ) : usageError ? (
+                <p className="text-xs text-red-400">{usageError}</p>
               ) : usage.recentActivity.length === 0 ? (
                 <p className="text-xs text-zinc-500">No recent activity</p>
               ) : (
@@ -165,6 +186,8 @@ export default function DashboardPage() {
               <h2 className="text-sm font-semibold text-white mb-3">Tokens</h2>
               {usageLoading ? (
                 <p className="text-xs text-zinc-500">Loading…</p>
+              ) : usageError ? (
+                <p className="text-xs text-red-400">{usageError}</p>
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-baseline justify-between gap-2">
@@ -196,6 +219,8 @@ export default function DashboardPage() {
               <h2 className="text-sm font-semibold text-white mb-3">Plan</h2>
               {usageLoading ? (
                 <p className="text-xs text-zinc-500">Loading…</p>
+              ) : usageError ? (
+                <p className="text-xs text-red-400">{usageError}</p>
               ) : (
                 <>
                   <p className="text-sm font-medium text-white">{usage.planLabel}</p>
