@@ -72,12 +72,13 @@ No fixes were required for wiring; tests were added to lock behavior.
 
 ## Quick smoke test
 
-1. Open production Generate page.
-2. Enter one sentence (e.g. “Explain why coffee wakes you up in 30 seconds”).
-3. Click Generate video.
-4. Wait for status to become “Completed” (or “Failed” with a clear message).
-5. If completed, play the video and confirm it’s correct.
-6. If failed, check worker logs and fix env or code.
+1. Hit **GET /api/health** (or your production base URL + `/api/health`) and confirm it returns 200 with a body like `{ status: "ok" }`. Use this URL as the health check in your host (Vercel, Railway, etc.) if supported.
+2. Open production Generate page.
+3. Enter one sentence (e.g. “Explain why coffee wakes you up in 30 seconds”).
+4. Click Generate video.
+5. Wait for status to become “Completed” (or “Failed” with a clear message).
+6. If completed, play the video and confirm it’s correct.
+7. If failed, check worker logs and fix env or code.
 
 ---
 

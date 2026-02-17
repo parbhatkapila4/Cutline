@@ -104,9 +104,42 @@ Rendered videos are written to `public/temp/[jobId].mp4`. Cleanup (repeatable Bu
 
 ---
 
+### Job cancellation
+
+You can cancel a pending or running job. Cancellation is **best-effort**: if the pipeline is mid-stage (e.g. LLM or render call), it finishes that step before exiting. The pipeline checks a cancelled flag between stages.
+
+- **POST /api/generate/[jobId]/cancel** — Cancel the job. Returns `200 { cancelled: true, jobId }` if cancelled; `409 { error, reason }` if already completed/failed; `404` if job not found.
+- **Source of truth:** Redis SET `cutline:job:cancelled`; worker and API both read/write this.
+- **Cleanup:** When cancelled, the pipeline runs the same temp-artifact cleanup as on failure (`cleanupJobArtifacts`).
+- **Effect delay:** Cancellation may take up to one stage duration to take effect (checks are between stages only).
+
+**Edge cases:** Cancel twice → second call returns 409. Job not found → 404. Pending job cancelled before worker starts → worker picks up, checks status, skips pipeline and cleans up.
+
+In production you may want to restrict who can cancel (e.g. same client that started the job).
+
+---
+
 ### Video duration (10–60 seconds)
 
 You can choose a video length between 10 and 60 seconds on the main page. The value is sent as `durationSeconds` in **POST /api/generate** and used for both **Slideshow** and **Talking object** modes. For **Talking object**, videos longer than 8 seconds are built by generating multiple Veo clips (~8s each) and concatenating them. That concatenation step requires **ffmpeg** (on PATH or set `FFMPEG_PATH` in `.env.local`). If ffmpeg is not available and you request a talking_object video over 8 seconds, the job will fail with a clear message.
+
+---
+
+### Telemetry
+
+Job and stage timings are recorded in memory for admin visibility. The telemetry store keeps up to 500 recent jobs; older entries are evicted by `startedAt`. Data resets when the server restarts unless **file persistence** is enabled: set `TELEMETRY_FILE` or `TELEMETRY_PERSIST_PATH` (e.g. `.data/telemetry.json`). When set, telemetry is loaded from the file on first use and saved after each job completes; the file is capped to the last 500 jobs. Single-process only—multi-instance deployments that share the file will overwrite each other.
+
+- **GET /api/telemetry** — List recent jobs (query param `?limit=50`, max 500)
+- **GET /api/telemetry/[jobId]** — Single job with stage timings
+- **GET /api/telemetry/stats** — Aggregate stats (totalJobs, completed, failed, avgDurationMs)
+
+An admin page at **/admin** shows a table of jobs with status, duration, and expandable stage timings. **Admin auth is required:** set `ADMIN_SECRET` (or `ADMIN_API_SECRET`) in your environment. Without it, all admin/telemetry routes return 401 and the admin page shows "Admin not configured." Login uses a cookie-based session (POST /api/admin/auth with `{ secret }`); logout clears the cookie (GET /api/admin/logout).
+
+---
+
+### Platform-aware generation
+
+You can target a specific platform (**General**, **LinkedIn**, **Twitter**, **YouTube Shorts**) when generating a video. The platform influences intent, narrative, shots, and script so output is tuned for that channel (length, tone, hooks, pacing). Send `platform` in **POST /api/generate** as one of `"general"`, `"linkedin"`, `"twitter"`, or `"youtube_shorts"`. **General** is the default and preserves previous behavior when platform is omitted. All platform-specific logic lives in `src/lib/platform/platformStrategy.ts`; the pipeline stages read from it and append prompt snippets accordingly.
 
 ---
 
@@ -216,9 +249,11 @@ Output: public/temp/[jobId].mp4
 
 **Rate limits and cost.** OpenRouter, TTS, and image APIs have rate limits and cost. We rate-limit per IP (e.g. 5 generate/hour, 20 upload/hour) to protect against abuse. Tuning is env-configurable.
 
+**Retries.** Transient failures (LLM timeout, TTS rate limit, external API 5xx, network errors) are retried up to 3 times with exponential backoff before marking the job failed. Retryable errors: HTTP 429, 5xx, network (ECONNRESET, ETIMEDOUT), timeout, "rate limit" in message. Non-retryable: 4xx (except 429), validation errors. Tune via `RETRY_LLM_MAX`, `RETRY_TTS_MAX`, `RETRY_IMAGE_MAX`, `RETRY_RENDER_MAX` in env.
+
 **Redis required for async.** The job queue and rate limiting use Redis. Without Redis, you can’t run the async generate flow or rate limiting. There is no in-memory fallback for the queue.
 
-**Cleanup and retention.** Temp videos, uploads, and per-job images are deleted automatically (e.g. 24h retention, hourly cleanup job). That keeps disk bounded. For long-term storage, you’d need to copy outputs to durable storage (S3, CDN) outside CUTLINE.
+**Cleanup and retention.** Temp videos, uploads, and per-job images are deleted automatically (e.g. 24h retention, hourly cleanup job). Job temp dirs (images, veo chunks, preview-artifacts) are deleted when the pipeline finishes (success or failure). Final MP4s are retained until periodic cleanup removes them by age. Set CLEANUP_EXPIRED_HOURS for orphan cleanup (dirs older than N hours). That keeps disk bounded. For long-term storage, you’d need to copy outputs to durable storage (S3, CDN) outside CUTLINE.
 
 **No DB.** Pipeline state lives in BullMQ (Redis). There is no PostgreSQL or Prisma. User identity, billing, or project history would require adding a DB and auth in a future iteration.
 
@@ -299,6 +334,9 @@ VIDEO_RETENTION_HOURS=24
 UPLOAD_RETENTION_HOURS=24
 CLEANUP_INTERVAL_HOURS=1
 CLEANUP_SECRET=...
+# Optional: periodic orphan cleanup — delete temp dirs older than N hours (e.g. from crashed jobs)
+# CLEANUP_EXPIRED_HOURS=24
+# TEMP_DIR — override temp root (default: public/temp)
 
 # Rate limiting
 RATE_LIMIT_ENABLED=true
@@ -306,6 +344,10 @@ RATE_LIMIT_GENERATE=5
 RATE_LIMIT_UPLOAD=20
 RATE_LIMIT_STATUS=60
 RATE_LIMIT_GENERAL=100
+# POST /api/generate: RATE_LIMIT_MAX and RATE_LIMIT_WINDOW_SECONDS override generate limit when both set.
+# If RATE_LIMIT_MAX unset, RATE_LIMIT_GENERATE (5) per 3600s (1h) applies. Example: 10 per 60s:
+# RATE_LIMIT_MAX=10
+# RATE_LIMIT_WINDOW_SECONDS=60
 
 # Retry (LLM, TTS, image, render)
 RETRY_ENABLED=true
@@ -313,6 +355,12 @@ RETRY_LLM_MAX=3
 RETRY_TTS_MAX=3
 RETRY_IMAGE_MAX=2
 RETRY_RENDER_MAX=2
+
+# Cost estimation (optional; defaults to 0)
+# COST_PER_1K_TOKENS — USD per 1k LLM tokens (OpenRouter)
+# COST_PER_TTS_SECOND — USD per second of TTS audio
+# COST_PER_VIDEO_SECOND — USD per second of Veo/video output
+# COST_PER_IMAGE_CALL — USD per image API call (Unsplash, DALL·E, etc.)
 
 # Usage / plan limits (credits and dashboard)
 # DEFAULT_TOKENS=100 — initial token balance per client
@@ -322,6 +370,8 @@ RETRY_RENDER_MAX=2
 ```
 
 **Note:** At least one image source (Unsplash or Pexels) is required for real images; if none are set or all fail, a placeholder is used so the video still generates.
+
+**Temp file cleanup.** Job temp dirs (`public/temp/{jobId}/`) contain intermediates (images, veo chunks, preview-artifacts). These are deleted when the pipeline finishes (success or failure). Final MP4s stay until periodic `runCleanup` (VIDEO_RETENTION_HOURS). If `CLEANUP_EXPIRED_HOURS` is set, the worker runs `cleanupExpiredTempDirs` every 60 minutes to remove orphaned dirs from crashed processes.
 
 ---
 
@@ -333,8 +383,14 @@ RETRY_RENDER_MAX=2
 
 | Method | Endpoint                | Description                                                                                                                                             |
 | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/generate`         | Create video job. Body: `{ input, assetIds?, brandColors?, mode? }`. Returns `{ jobId }`. Rate limited (e.g. 5/hour per IP).                            |
+| POST   | `/api/generate`         | Create video job. Body: `{ input, assetIds?, brandColors?, mode? }`. Returns `{ jobId }`. Rate limited per client (IP or X-Forwarded-For). Use `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_SECONDS` when set; otherwise `RATE_LIMIT_GENERATE` per hour. Returns 429 when exceeded. |
 | GET    | `/api/generate/[jobId]` | Job status. Returns `{ status, videoUrl?, error? }`. `status`: `pending` \| `processing` \| `completed` \| `failed`. Rate limited (e.g. 60/min per IP). |
+
+#### Prompt suggestions
+
+| Method | Endpoint             | Description                                                                                                                                                                               |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/suggest-prompt` | Expand or refine a video prompt. Body: `{ prompt?: string, refine?: boolean, durationSeconds?: number }`. Returns `{ suggestion: string }`. Rate limited (general limit, e.g. 100/min per IP). Optional prompt; if empty, returns a suggested example. `refine=true` improves an existing prompt; `refine=false` expands a fragment. |
 
 #### Pipeline stages (test in isolation)
 
@@ -364,7 +420,42 @@ RETRY_RENDER_MAX=2
 
 | Method | Endpoint       | Description                                                                                                         |
 | ------ | -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/health`  | Health and readiness. Returns 200 + `{ status: "ok" }` when ready. On dependency failure: 503 + `{ status: "unhealthy", checks }`. No auth, no rate limit. Safe for LB/k8s probes. |
 | POST   | `/api/cleanup` | Manual cleanup (temp videos, uploads, per-job images). Optional header: `X-Cleanup-Secret` if `CLEANUP_SECRET` set. |
+
+#### Health check
+
+**GET /api/health** — Idempotent, no side effects. Use for load balancers and Kubernetes liveness/readiness probes.
+
+- **200 OK** — `{ status: "ok" }` — App and critical dependencies (required env vars, Redis) are ready.
+- **503 Service Unavailable** — `{ status: "unhealthy", checks: { env?: string, redis?: string } }` — A readiness check failed (e.g. missing `OPENROUTER_API_KEY` or `REDIS_URL`, Redis unreachable). `checks` indicates which dependency failed.
+
+---
+
+### Generate request (POST /api/generate)
+
+All inputs are validated in one place (`validateGenerateInput`). On failure, the API returns **400** with `{ error: string, errors: Array<{ field: string, message: string }> }` so the UI can show field-level errors.
+
+| Field            | Required | Type    | Limits / values                                                                          |
+| ---------------- | -------- | ------- | ---------------------------------------------------------------------------------------- |
+| `input`          | yes      | string  | Non-empty topic, 5–2000 chars. Trimmed. Prompt-injection patterns rejected.              |
+| `durationSeconds`| yes      | number  | Integer 10–60. Coerced from string (e.g. `"60"` → 60).                                    |
+| `assetIds`       | no       | string[]| Array of asset IDs from upload.                                                          |
+| `brandColors`    | no       | object  | `{ primary?: string, secondary?: string }` — hex colors (e.g. `#FF0000`).                 |
+| `mode`           | no       | string  | `"slideshow"` \| `"talking_object"`.                                                      |
+| `platform`       | no       | string  | `"general"` \| `"linkedin"` \| `"twitter"` \| `"youtube_shorts"`.                         |
+| `variationCount` | no       | number  | Integer 1–5. Default 1.                                                                   |
+| `textModel`      | no       | string  | OpenRouter model override.                                                                |
+| `captions`       | no       | string  | `"on"` \| `"off"`. Default `"on"`.                                                        |
+| `talkingObjectStyle` | no   | string  | `"cartoon"` \| `"real"`.                                                                  |
+| `renderMode`     | no       | string  | `"preview"` \| `"final"`.                                                                 |
+| `previewJobId`   | no       | string  | Required when `renderMode` is `"final"` (final render from preview).                      |
+
+**400 response shape** — `{ error: "Invalid JSON" | "Validation failed", errors: [{ field, message }] }`. Unknown fields are ignored.
+
+#### Request ID
+
+Every `POST /api/generate` request gets a **request ID** for log correlation and support. The API reads `X-Request-ID` or `X-Correlation-ID` from the request header; if present and non-empty (max 128 chars), that value is used. Otherwise a UUID is generated. The response always echoes the ID in the `X-Request-ID` header so the client can reference it (e.g. in support requests). The request ID is stored on the job, passed through the pipeline, and included in pipeline logs and telemetry.
 
 ---
 
@@ -375,7 +466,7 @@ RETRY_RENDER_MAX=2
 ```bash
 curl -X POST "http://localhost:3000/api/generate" \
   -H "Content-Type: application/json" \
-  -d '{"input": "Explain why coffee makes you feel awake in 30 seconds"}'
+  -d '{"input": "Explain why coffee makes you feel awake in 30 seconds", "durationSeconds": 30}'
 ```
 
 **Response:**
@@ -437,17 +528,31 @@ curl -X POST "http://localhost:3000/api/intent" \
 
 ### Input validation and errors
 
+`POST /api/generate` validates all fields in one pass and returns all errors: `{ error: "Validation failed", errors: [{ field, message }] }`. Field-level errors let the UI highlight the failing field.
+
 | Constraint                | Behavior | Example message                                                                     |
 | ------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| Empty input               | 400      | `Input cannot be empty.`                                                            |
-| Too short (< 5 chars)     | 400      | `Input is too short. Please describe what you want in a sentence.`                  |
-| Too long (> 500 chars)    | 400      | `Input is too long. Keep it to one sentence.`                                       |
-| Prompt-injection patterns | 400      | `Input contains invalid instructions. Please describe what you want in a sentence.` |
+| Invalid JSON body         | 400      | `{ error: "Invalid JSON", errors: [{ field: "body", message: "Invalid JSON" }] }`   |
+| Empty input / whitespace  | 400      | `{ field: "input", message: "Topic is required" }`                                  |
+| Too short (< 5 chars)     | 400      | `{ field: "input", message: "Topic is too short. Please describe what you want in a sentence." }` |
+| Too long (> 2000 chars)   | 400      | `{ field: "input", message: "Topic must be at most 2000 characters" }`              |
+| Prompt-injection patterns | 400      | `{ field: "input", message: "Input contains invalid instructions..." }`             |
+| Missing durationSeconds   | 400      | `{ field: "durationSeconds", message: "durationSeconds is required" }`              |
+| Invalid durationSeconds   | 400      | `{ field: "durationSeconds", message: "durationSeconds must be between 10 and 60" }`|
+| Invalid platform          | 400      | `{ field: "platform", message: "platform must be one of \"general\", \"linkedin\", \"twitter\", \"youtube_shorts\"" }` |
 | Invalid job ID            | 400      | `Invalid job ID.`                                                                   |
 | Job not found             | 404      | `Job not found.`                                                                    |
-| Rate limit exceeded       | 429      | `Too many requests. Please try again later.` + `Retry-After`                        |
+| Rate limit exceeded       | 429      | JSON: `{ error: "Too Many Requests", retryAfter?: number }` for `/api/generate`. `Retry-After` header (seconds). Other endpoints: `Too many requests. Please try again later.` |
 
 Asset upload validation (file type, size, count) is documented in the existing README sections and implemented in `src/lib/assets/validation.ts`.
+
+---
+
+## Troubleshooting
+
+- **402 Payment Required / Not enough credits** — The app returned this because your token balance is below the cost per video, or you've hit the monthly video limit. Wait for reset, or check your usage on the dashboard.
+- **429 Too many requests** — You're rate limited (e.g. too many generate or suggest-prompt requests). For `POST /api/generate`, the body is `{ error: "Too Many Requests", retryAfter?: number }`. Wait for the time indicated in the `Retry-After` header or the response body, then try again.
+- **500 Server error** — Something failed on the server. Check worker and app logs; ensure env vars and Redis are correct. For generate jobs, check the job status endpoint for a failed reason.
 
 ---
 
