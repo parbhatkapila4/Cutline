@@ -57,6 +57,7 @@ const DEFAULT_USAGE: UsageData = {
 export default function DashboardPage() {
   const [videos, setVideos] = useState<DashboardVideoItem[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
+  const [videosError, setVideosError] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageData>(DEFAULT_USAGE);
   const [usageLoading, setUsageLoading] = useState(true);
   const [usageError, setUsageError] = useState<string | null>(null);
@@ -67,12 +68,31 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     fetch("/api/dashboard/videos")
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: DashboardVideoItem[]) => {
-        if (!cancelled && Array.isArray(data)) setVideos(data);
+      .then(async (res) => {
+        if (res.ok) {
+          const data = (await res.json()) as DashboardVideoItem[] | unknown;
+          if (!cancelled) {
+            setVideosError(null);
+            if (Array.isArray(data)) setVideos(data);
+          }
+        } else {
+          let msg = "Failed to load videos. Please try again.";
+          try {
+            const body = (await res.json()) as { error?: string };
+            if (typeof body?.error === "string" && body.error.trim()) msg = body.error;
+          } catch {
+            /* use default msg */
+          }
+          if (!cancelled) {
+            setVideosError(msg);
+          }
+        }
       })
       .catch(() => {
-        if (!cancelled) setVideos([]);
+        if (!cancelled) {
+          setVideosError("Failed to load videos. Please try again.");
+          setVideos([]);
+        }
       })
       .finally(() => {
         if (!cancelled) setVideosLoading(false);
@@ -462,6 +482,10 @@ export default function DashboardPage() {
               <div className="rounded-xl border border-white/10 bg-zinc-950 p-12 text-center">
                 <div className="w-10 h-10 mx-auto rounded-full border-2 border-white/20 border-t-white animate-spin mb-4" />
                 <p className="text-zinc-400 font-medium">Loading videos...</p>
+              </div>
+            ) : videosError ? (
+              <div className="rounded-xl border border-white/10 bg-zinc-950 p-8 text-center">
+                <p className="text-red-400 font-medium">{videosError}</p>
               </div>
             ) : filteredVideos.length === 0 ? (
               <div className="rounded-xl border border-white/10 bg-zinc-950 border-dashed p-12 text-center">
