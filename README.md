@@ -98,9 +98,11 @@ Video generation runs in the background so the UI doesn’t block. **Redis is re
 
 1. **Submit:** User enters one sentence (and optional assets) on `/generate` → **POST /api/generate** creates a BullMQ job, returns `jobId`.
 2. **Worker:** A separate process (`npm run worker`) picks up the job and runs the full pipeline (Intent → Narrative → Shots → Script → Subtitles → TTS → Subtitle refine → Motion → Asset analysis → Visuals → Image sourcing → Remotion render).
-3. **Poll:** UI calls **GET /api/generate/[jobId]** until `status` is `completed` or `failed`; then shows video or error.
+3. **Poll:** UI calls **GET /api/generate/[jobId]** until `status` is `completed`, `failed`, or `cancelled`; then shows video or error. The generate flow uses exponential backoff for status polling (2s → 4s → 8s → 15s capped → …) to reduce API load; polling stops after 30 minutes with a user message.
 
 Rendered videos are written to `public/temp/[jobId].mp4`. Cleanup (repeatable BullMQ job when worker is running) deletes old temp videos, uploads, and per-job images.
+
+**Download and share:** When a job completes, the generate flow shows a **Download** button that uses `GET /api/generate/[jobId]/download` (with optional `?variant=N` for multi-variant jobs). The endpoint streams the file with `Content-Disposition: attachment` so browsers save it (e.g. `cutline-[jobId].mp4`). A **Copy link** button copies the full video URL to the clipboard for sharing. For jobs with multiple variations, Download and Copy link apply to the currently selected variant.
 
 ---
 
@@ -116,6 +118,34 @@ You can cancel a pending or running job. Cancellation is **best-effort**: if the
 **Edge cases:** Cancel twice → second call returns 409. Job not found → 404. Pending job cancelled before worker starts → worker picks up, checks status, skips pipeline and cleans up.
 
 In production you may want to restrict who can cancel (e.g. same client that started the job).
+
+---
+
+### Webhook
+
+When starting a job, you can optionally pass `callbackUrl` in **POST /api/generate**. When the job reaches a terminal state (completed, failed, or cancelled), the server sends a **POST** request to that URL with a JSON body. Best-effort, fire-and-forget; no retries, no auth/signing.
+
+**Payload shape:** `{ jobId, status, videoUrl?, variations?, completedAt, error? }`
+- `jobId` (string) — Job ID
+- `status` — `"completed"` | `"failed"` | `"cancelled"`
+- `videoUrl` (string, optional) — When completed, the primary video URL (e.g. `/temp/[jobId].mp4`)
+- `variations` (array, optional) — When completed with multiple variants: `[{ videoUrl }, ...]`
+- `completedAt` (string) — ISO timestamp when the job reached terminal state
+- `error` (string, optional) — When failed/cancelled, the error message
+
+**Validation:** Only `http://` and `https://` URLs are allowed. Localhost is rejected in production; set `ALLOW_LOCALHOST_WEBHOOK=true` for development.
+
+**Edge cases:** If `callbackUrl` is not set, no webhook is sent. If the callback returns 4xx/5xx or times out (5s), the failure is logged and ignored—no retry.
+
+---
+
+### Job retention
+
+Jobs in terminal state (completed, failed, cancelled) are kept in the BullMQ/Redis store. To prevent unbounded growth, set **JOB_RETENTION_DAYS** (e.g. 7). When the worker runs, it periodically removes jobs older than that. Run: once at startup (setImmediate) and every 24 hours.
+
+- **JOB_RETENTION_DAYS** — Remove completed/failed jobs older than N days. Set to 0 or leave unset to disable cleanup.
+- Only terminal-state jobs are removed; pending and running jobs are never deleted.
+- Video files and temp outputs are cleaned separately (VIDEO_RETENTION_HOURS, runCleanup); this only removes job metadata from Redis.
 
 ---
 

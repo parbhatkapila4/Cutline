@@ -3,7 +3,7 @@ import path from "path";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
-import { scheduleCleanupJob, startVideoWorker } from "@/lib/queue/videoQueue";
+import { scheduleCleanupJob, startVideoWorker, deleteStaleJobs } from "@/lib/queue/videoQueue";
 import { cleanupExpiredTempDirs } from "@/lib/storage/cleanup";
 
 const worker = startVideoWorker();
@@ -27,6 +27,21 @@ if (expiredHours > 0) {
 scheduleCleanupJob()
   .then(() => console.log("[worker] Cleanup job scheduled (every CLEANUP_INTERVAL_HOURS)"))
   .catch((err) => console.error("[worker] Failed to schedule cleanup job:", err));
+
+const retentionDays = process.env.JOB_RETENTION_DAYS != null ? Number(process.env.JOB_RETENTION_DAYS) : 0;
+if (retentionDays > 0) {
+  const runStaleJobs = () => {
+    deleteStaleJobs({ retentionDays })
+      .then((count) => {
+        if (count > 0) console.log("[worker] Deleted " + count + " stale jobs");
+      })
+      .catch((err) => console.error("[worker] deleteStaleJobs error:", err));
+  };
+  setImmediate(runStaleJobs);
+  const intervalMs = 24 * 60 * 60 * 1000;
+  setInterval(runStaleJobs, intervalMs);
+  console.log("[worker] Stale job cleanup scheduled every 24h (retentionDays=" + retentionDays + ")");
+}
 
 console.log("[worker] Video generation worker started. Queue: video-generation");
 
