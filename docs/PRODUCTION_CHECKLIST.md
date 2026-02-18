@@ -1,4 +1,4 @@
-# CUTLINE — Production checklist
+# CUTLINE - Production checklist
 
 Use this list before going live. Tick each item when verified.
 
@@ -104,6 +104,12 @@ Use 1–2 generations to confirm main options work without burning many Veo/API 
 
 4. **URL override**
    - Open `/generate?captions=off` and confirm the UI shows "No captions" selected; then generate to confirm no subtitles in the output.
+
+---
+
+## Legal / license
+
+- [ ] **License** understood: CUTLINE is under the [MIT License](../LICENSE). See the [README License section](https://github.com/parbhatkapila4/cutline#license) for details.
 
 ---
 

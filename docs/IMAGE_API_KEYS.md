@@ -4,7 +4,7 @@ Add these to your **`.env.local`** so the video pipeline uses real images instea
 
 ---
 
-## 1. Unsplash (recommended first — free, good for stock photos)
+## 1. Unsplash (recommended first - free, good for stock photos)
 
 1. Go to **https://unsplash.com/oauth/applications**
 2. Sign in or create an Unsplash account.
@@ -22,7 +22,7 @@ Add these to your **`.env.local`** so the video pipeline uses real images instea
 
 ---
 
-## 2. Pexels (free backup — good if Unsplash fails or hits limits)
+## 2. Pexels (free backup - good if Unsplash fails or hits limits)
 
 1. Go to **https://www.pexels.com/api/**
 2. Sign in or create a Pexels account.
@@ -37,7 +37,7 @@ Add these to your **`.env.local`** so the video pipeline uses real images instea
 
 ---
 
-## 3. OpenAI DALL·E 3 (optional — paid, used when stock fails)
+## 3. OpenAI DALL·E 3 (optional - paid, used when stock fails)
 
 Used when Unsplash and Pexels don’t return a good image for a shot. Generates an image from the shot’s text prompt (e.g. “Energy drink can on table”).
 

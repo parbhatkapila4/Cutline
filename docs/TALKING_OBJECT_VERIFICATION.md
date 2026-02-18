@@ -1,4 +1,4 @@
-# Talking-object video – verification checklist
+# Talking-object video - verification checklist
 
 Use this when testing or recording a demo to confirm everything works.
 

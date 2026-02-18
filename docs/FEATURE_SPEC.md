@@ -1,4 +1,4 @@
-# CUTLINE — Feature & Functionality Spec
+# CUTLINE - Feature & Functionality Spec
 
 Source of truth for product behavior, system responsibilities, and implementation scope. Internal use.
 
@@ -102,4 +102,4 @@ The system must be able to expose, for internal or power-user use: what intent w
 
 ---
 
-*Last updated: January 2025. Scope is MVP unless stated otherwise.*
+*Last updated: Febuary 2026. Scope is MVP unless stated otherwise.*

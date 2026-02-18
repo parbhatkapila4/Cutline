@@ -2,6 +2,7 @@
   "name": "cutline",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "overrides": {
     "zod": "3.22.3"
   },

@@ -127,12 +127,12 @@ In production you may want to restrict who can cancel (e.g. same client that sta
 
 - **Query param:** `limit` (optional). Default **20**, max **50**. Invalid values (e.g. negative or &gt; 50) return **400** with code `BAD_REQUEST`.
 - **Response:** `{ jobs: [{ jobId, status, createdAt, videoUrl?, topic?, error? }] }`
-  - **jobId** (string) — Job ID.
-  - **status** (string) — `pending` | `processing` | `completed` | `failed` | `cancelled`.
-  - **createdAt** (string) — ISO 8601 timestamp when the job was created.
-  - **videoUrl** (string, optional) — Present when status is `completed` (primary video URL).
-  - **topic** (string, optional) — Input/topic from the job (e.g. the one-sentence prompt).
-  - **error** (string, optional) — Present when status is `failed` (failure reason).
+  - **jobId** (string): Job ID.
+  - **status** (string): `pending` | `processing` | `completed` | `failed` | `cancelled`.
+  - **createdAt** (string): ISO 8601 timestamp when the job was created.
+  - **videoUrl** (string, optional): Present when status is `completed` (primary video URL).
+  - **topic** (string, optional): Input/topic from the job (e.g. the one-sentence prompt).
+  - **error** (string, optional): Present when status is `failed` (failure reason).
 - **Store empty:** Returns `{ jobs: [] }`.
 - Jobs removed by retention (e.g. `deleteStaleJobs`) are not in the list; only jobs still in the queue are returned.
 
@@ -171,12 +171,12 @@ CORS is implemented per-route (not middleware) so admin/telemetry stay excluded.
 When starting a job, you can optionally pass `callbackUrl` in **POST /api/generate**. When the job reaches a terminal state (completed, failed, or cancelled), the server sends a **POST** request to that URL with a JSON body. Best-effort, fire-and-forget; no retries, no auth/signing.
 
 **Payload shape:** `{ jobId, status, videoUrl?, variations?, completedAt, error? }`
-- `jobId` (string) — Job ID
-- `status` — `"completed"` | `"failed"` | `"cancelled"`
-- `videoUrl` (string, optional) — When completed, the primary video URL (e.g. `/temp/[jobId].mp4`)
-- `variations` (array, optional) — When completed with multiple variants: `[{ videoUrl }, ...]`
-- `completedAt` (string) — ISO timestamp when the job reached terminal state
-- `error` (string, optional) — When failed/cancelled, the error message
+- `jobId` (string): Job ID
+- `status`: `"completed"` | `"failed"` | `"cancelled"`
+- `videoUrl` (string, optional): When completed, the primary video URL (e.g. `/temp/[jobId].mp4`)
+- `variations` (array, optional): When completed with multiple variants: `[{ videoUrl }, ...]`
+- `completedAt` (string): ISO timestamp when the job reached terminal state
+- `error` (string, optional): When failed/cancelled, the error message
 
 **Validation:** Only `http://` and `https://` URLs are allowed. Localhost is rejected in production; set `ALLOW_LOCALHOST_WEBHOOK=true` for development.
 
@@ -188,13 +188,13 @@ When starting a job, you can optionally pass `callbackUrl` in **POST /api/genera
 
 Jobs in terminal state (completed, failed, cancelled) are kept in the BullMQ/Redis store. To prevent unbounded growth, set **JOB_RETENTION_DAYS** (e.g. 7). When the worker runs, it periodically removes jobs older than that. Run: once at startup (setImmediate) and every 24 hours.
 
-- **JOB_RETENTION_DAYS** — Remove completed/failed jobs older than N days. Set to 0 or leave unset to disable cleanup.
+- **JOB_RETENTION_DAYS**: Remove completed/failed jobs older than N days. Set to 0 or leave unset to disable cleanup.
 - Only terminal-state jobs are removed; pending and running jobs are never deleted.
 - Video files and temp outputs are cleaned separately (VIDEO_RETENTION_HOURS, runCleanup); this only removes job metadata from Redis.
 
 ---
 
-### Video duration (10–60 seconds)
+### Video duration (10-60 seconds)
 
 You can choose a video length between 10 and 60 seconds on the main page. The value is sent as `durationSeconds` in **POST /api/generate** and used for both **Slideshow** and **Talking object** modes. For **Talking object**, videos longer than 8 seconds are built by generating multiple Veo clips (~8s each) and concatenating them. That concatenation step requires **ffmpeg** (on PATH or set `FFMPEG_PATH` in `.env.local`). If ffmpeg is not available and you request a talking_object video over 8 seconds, the job will fail with a clear message.
 
@@ -206,11 +206,11 @@ You can choose a video length between 10 and 60 seconds on the main page. The va
 
 ### Telemetry
 
-Job and stage timings are recorded in memory for admin visibility. The telemetry store keeps up to 500 recent jobs; older entries are evicted by `startedAt`. Data resets when the server restarts unless **file persistence** is enabled: set `TELEMETRY_FILE` or `TELEMETRY_PERSIST_PATH` (e.g. `.data/telemetry.json`). When set, telemetry is loaded from the file on first use and saved after each job completes; the file is capped to the last 500 jobs. Single-process only—multi-instance deployments that share the file will overwrite each other.
+Job and stage timings are recorded in memory for admin visibility. The telemetry store keeps up to 500 recent jobs; older entries are evicted by `startedAt`. Data resets when the server restarts unless **file persistence** is enabled: set `TELEMETRY_FILE` or `TELEMETRY_PERSIST_PATH` (e.g. `.data/telemetry.json`). When set, telemetry is loaded from the file on first use and saved after each job completes; the file is capped to the last 500 jobs. Single-process only multi-instance deployments that share the file will overwrite each other.
 
-- **GET /api/telemetry** — List recent jobs (query param `?limit=50`, max 500)
-- **GET /api/telemetry/[jobId]** — Single job with stage timings
-- **GET /api/telemetry/stats** — Aggregate stats (totalJobs, completed, failed, avgDurationMs)
+- **GET /api/telemetry**: List recent jobs (query param `?limit=50`, max 500)
+- **GET /api/telemetry/[jobId]**: Single job with stage timings
+- **GET /api/telemetry/stats**: Aggregate stats (totalJobs, completed, failed, avgDurationMs)
 
 An admin page at **/admin** shows a table of jobs with status, duration, and expandable stage timings. **Admin auth is required:** set `ADMIN_SECRET` (or `ADMIN_API_SECRET`) in your environment. Without it, all admin/telemetry routes return 401 and the admin page shows "Admin not configured." Login uses a cookie-based session (POST /api/admin/auth with `{ secret }`); logout clears the cookie (GET /api/admin/logout).
 
@@ -258,29 +258,29 @@ You can target a specific platform (**General**, **LinkedIn**, **Twitter**, **Yo
 ```
 Input (one sentence + optional assetIds, brandColors)
     ↓
-1. Intent        — LLM: audience, goal, tone, complexity, duration
+1. Intent        - LLM: audience, goal, tone, complexity, duration
     ↓
-2. Narrative     — LLM: arc, 3–5 beats, pacing
+2. Narrative     - LLM: arc, 3–5 beats, pacing
     ↓
-3. Shots         — LLM: 8–12 shots, purpose, motion, text density
+3. Shots         - LLM: 8–12 shots, purpose, motion, text density
     ↓
-4. Script        — LLM: spoken text (or silence) per shot
+4. Script        - LLM: spoken text (or silence) per shot
     ↓
-5. Subtitles     — In-process: chunk script, estimate timing
+5. Subtitles     - In-process: chunk script, estimate timing
     ↓
-6. TTS           — ElevenLabs/PlayHT: audio per segment, silence where text is null
+6. TTS           - ElevenLabs/PlayHT: audio per segment, silence where text is null
     ↓
-7. Subtitle refine — Word timings from TTS → align subtitle chunks
+7. Subtitle refine - Word timings from TTS → align subtitle chunks
     ↓
-8. Motion        — In-process: motion spec per shot
+8. Motion        - In-process: motion spec per shot
     ↓
-9. Asset analysis — If uploads: LLM vision on logo, product photos, ref video/images
+9. Asset analysis - If uploads: LLM vision on logo, product photos, ref video/images
     ↓
-10. Visuals      — In-process: visual spec from intent + assets
+10. Visuals      - In-process: visual spec from intent + assets
     ↓
-11. Image sourcing — Per shot: LLM query → Unsplash → DALL·E → Pexels → placeholder
+11. Image sourcing - Per shot: LLM query → Unsplash → DALL·E → Pexels → placeholder
     ↓
-12. Remotion render — Compose script, shots, subtitles, motion, images, audio → MP4
+12. Remotion render - Compose script, shots, subtitles, motion, images, audio → MP4
     ↓
 Output: public/temp/[jobId].mp4
 ```
@@ -551,10 +551,10 @@ Implementation: unversioned and v1 routes share the same handler logic (`src/app
 
 #### Health check
 
-**GET /api/health** — Idempotent, no side effects. **Equivalent to readiness:** returns 200 when env and Redis are OK, 503 otherwise. Use for a single combined check; for separate liveness and readiness (e.g. Kubernetes), use **GET /api/health/live** and **GET /api/health/ready** below.
+**GET /api/health**: Idempotent, no side effects. **Equivalent to readiness:** returns 200 when env and Redis are OK, 503 otherwise. Use for a single combined check; for separate liveness and readiness (e.g. Kubernetes), use **GET /api/health/live** and **GET /api/health/ready** below.
 
-- **200 OK** — `{ status: "ok" }` — App and critical dependencies (required env vars, Redis) are ready.
-- **503 Service Unavailable** — `{ status: "unhealthy", checks: { env?: string, redis?: string } }` — A check failed (e.g. missing `OPENROUTER_API_KEY` or `REDIS_URL`, Redis unreachable). `checks` indicates which dependency failed.
+- **200 OK**: `{ status: "ok" }` — App and critical dependencies (required env vars, Redis) are ready.
+- **503 Service Unavailable**: `{ status: "unhealthy", checks: { env?: string, redis?: string } }`: A check failed (e.g. missing `OPENROUTER_API_KEY` or `REDIS_URL`, Redis unreachable). `checks` indicates which dependency failed.
 
 ---
 
@@ -568,7 +568,7 @@ For orchestrators (e.g. Kubernetes) that need separate **liveness** (is the proc
 | **Readiness** | **GET /api/health/ready** | App can accept work. Returns **200** when required env and Redis are OK; **503** when not ready with `{ status: "not_ready", checks: { env?: string, redis?: string } }`. Use to decide whether to **send traffic** (e.g. remove from load balancer when 503). |
 
 - **Relationship to GET /api/health:** Health is equivalent to readiness (same checks). Use **/api/health** as a general combined check; use **/api/health/live** and **/api/health/ready** for separate k8s probes.
-- **No auth** on these endpoints — intentional for probes. Do not expose secrets in response bodies; probes should be reachable only from the cluster or LB.
+- **No auth** on these endpoints intentional for probes. Do not expose secrets in response bodies; probes should be reachable only from the cluster or LB.
 - **Readiness** reuses the same logic as `/api/health` (required env vars, Redis ping). If the check throws, readiness returns 503 with `checks.ready = "check failed"`.
 
 **Example Kubernetes probes:**
@@ -596,9 +596,9 @@ Error responses from the generate API and job status/cancel/download use a consi
 
 **Response shape:** `{ error: string; code: string; details?: unknown }`
 
-- **error** — Human-readable message (do not rely on for logic).
-- **code** — Machine-readable UPPER_SNAKE_CASE code; stable and documented below.
-- **details** — Optional extra data (e.g. `errors`, `retryAfter`, `reason`).
+- **error**: Human-readable message (do not rely on for logic).
+- **code**: Machine-readable UPPER_SNAKE_CASE code; stable and documented below.
+- **details**: Optional extra data (e.g. `errors`, `retryAfter`, `reason`).
 
 | Code | HTTP status | When returned |
 |------|-------------|----------------------------------------------------------------|
@@ -638,7 +638,7 @@ All inputs are validated in one place (`validateGenerateInput`). On failure, the
 | `renderMode`     | no       | string  | `"preview"` \| `"final"`.                                                                 |
 | `previewJobId`   | no       | string  | Required when `renderMode` is `"final"` (final render from preview).                      |
 
-**400 response shape** — `{ error: "Invalid JSON" | "Validation failed", errors: [{ field, message }] }`. Unknown fields are ignored.
+**400 response shape**: `{ error: "Invalid JSON" | "Validation failed", errors: [{ field, message }] }`. Unknown fields are ignored.
 
 #### Request ID
 
@@ -737,9 +737,9 @@ Asset upload validation (file type, size, count) is documented in the existing R
 
 ## Troubleshooting
 
-- **402 Payment Required / Not enough credits** — The app returned this because your token balance is below the cost per video, or you've hit the monthly video limit. Wait for reset, or check your usage on the dashboard.
-- **429 Too many requests** — You're rate limited (e.g. too many generate or suggest-prompt requests). For `POST /api/generate`, the body is `{ error: "Too Many Requests", retryAfter?: number }`. Wait for the time indicated in the `Retry-After` header or the response body, then try again.
-- **500 Server error** — Something failed on the server. Check worker and app logs; ensure env vars and Redis are correct. For generate jobs, check the job status endpoint for a failed reason.
+- **402 Payment Required / Not enough credits**: The app returned this because your token balance is below the cost per video, or you've hit the monthly video limit. Wait for reset, or check your usage on the dashboard.
+- **429 Too many requests**: You're rate limited (e.g. too many generate or suggest-prompt requests). For `POST /api/generate`, the body is `{ error: "Too Many Requests", retryAfter?: number }`. Wait for the time indicated in the `Retry-After` header or the response body, then try again.
+- **500 Server error**: Something failed on the server. Check worker and app logs; ensure env vars and Redis are correct. For generate jobs, check the job status endpoint for a failed reason.
 
 ---
 
@@ -859,11 +859,11 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 
 ## Documentation
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — Pipeline flow, job queue, key modules, storage, data flow.
-- **[docs/FEATURE_SPEC.md](docs/FEATURE_SPEC.md)** — Core principle, user experience, capabilities, non-goals, future extensions.
-- **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** — Env, worker, Redis, API keys, rate limiting, cleanup, smoke test.
-- **[docs/IMAGE_API_KEYS.md](docs/IMAGE_API_KEYS.md)** — Image API keys and setup (if present).
-- **[docs/AUTH_AND_BILLING.md](docs/AUTH_AND_BILLING.md)** — Current identity (IP-based), usage, and roadmap for auth and billing.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Pipeline flow, job queue, key modules, storage, data flow.
+- **[docs/FEATURE_SPEC.md](docs/FEATURE_SPEC.md)**: Core principle, user experience, capabilities, non-goals, future extensions.
+- **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)**: Env, worker, Redis, API keys, rate limiting, cleanup, smoke test.
+- **[docs/IMAGE_API_KEYS.md](docs/IMAGE_API_KEYS.md)**: Image API keys and setup (if present).
+- **[docs/AUTH_AND_BILLING.md](docs/AUTH_AND_BILLING.md)**: Current identity (IP-based), usage, and roadmap for auth and billing.
 
 ---
 
@@ -871,7 +871,7 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 
 - **Rate limits:** App and provider rate limits apply. Default: 5 generate/hour, 20 upload/hour per IP.
 - **Retention:** Rendered videos and uploads cleaned automatically (default 24h). Configure `VIDEO_RETENTION_HOURS`, `UPLOAD_RETENTION_HOURS`.
-- **Render time:** Full pipeline typically 1–3 minutes depending on length and image sourcing.
+- **Render time:** Full pipeline typically 1-3 minutes depending on length and image sourcing.
 - **Worker required:** Async video generation needs the worker process and Redis; Vercel alone cannot run the pipeline.
 - **No auth:** API is public at MVP; add auth and user-scoped jobs for multi-tenant production.
 
@@ -904,7 +904,7 @@ Run `npm run test:run` and `npm run lint` before submitting.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details (if present).
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
