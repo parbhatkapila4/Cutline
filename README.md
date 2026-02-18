@@ -326,12 +326,26 @@ For full setup (env vars, Redis, Vercel + worker deployment), see **[docs/PRODUC
 
 ## Required Environment Variables
 
+The app and worker validate configuration at startup. If required vars are missing, they exit immediately with a clear error (e.g. "Missing required environment variables: OPENROUTER_API_KEY, ELEVENLABS_API_KEY").
+
+**Validated at startup (must be set):**
+
+| Variable | Purpose |
+| -------- | ------- |
+| `REDIS_URL` | BullMQ job queue, rate limiting, usage tracking |
+| `OPENROUTER_API_KEY` | LLM for intent, narrative, shots, script |
+| `ELEVENLABS_API_KEY` | TTS (default provider). Or `PLAYHT_API_KEY` + `PLAYHT_USER_ID` when `TTS_PROVIDER=playht` |
+
+**Recommended (pipeline uses placeholders if missing):** At least one image source (`UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, or `OPENAI_API_KEY`) for real images. If none are set, placeholders are used.
+
 ```bash
 REDIS_URL=redis://localhost:6379
 OPENROUTER_API_KEY=sk-or-...
 ELEVENLABS_API_KEY=...   # or PLAYHT_API_KEY + PLAYHT_USER_ID with TTS_PROVIDER=playht
-UNSPLASH_ACCESS_KEY=...  # or PEXELS_API_KEY (at least one image source)
+UNSPLASH_ACCESS_KEY=...  # recommended; or PEXELS_API_KEY / OPENAI_API_KEY
 ```
+
+**Serverless (Vercel):** Validation runs when the Node.js runtime initializes. On cold start, missing required vars cause a 500 on the first request; check logs for the error message.
 
 ---
 
@@ -398,8 +412,6 @@ RETRY_RENDER_MAX=2
 # FREE_PLAN_VIDEOS_PER_MONTH=10 — free plan videos limit
 # FREE_PLAN_API_CALLS_PER_MONTH=10000 — free plan API calls limit
 ```
-
-**Note:** At least one image source (Unsplash or Pexels) is required for real images; if none are set or all fail, a placeholder is used so the video still generates.
 
 **Temp file cleanup.** Job temp dirs (`public/temp/{jobId}/`) contain intermediates (images, veo chunks, preview-artifacts). These are deleted when the pipeline finishes (success or failure). Final MP4s stay until periodic `runCleanup` (VIDEO_RETENTION_HOURS). If `CLEANUP_EXPIRED_HOURS` is set, the worker runs `cleanupExpiredTempDirs` every 60 minutes to remove orphaned dirs from crashed processes.
 

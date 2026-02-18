@@ -3,6 +3,16 @@ import path from "path";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
+import { validateConfig } from "@/lib/config/validate";
+
+try {
+  validateConfig();
+} catch (e) {
+  const msg = e instanceof Error ? e.message : String(e);
+  console.error("[config] Startup validation failed:", msg);
+  process.exit(1);
+}
+
 import { scheduleCleanupJob, startVideoWorker, deleteStaleJobs } from "@/lib/queue/videoQueue";
 import { cleanupExpiredTempDirs } from "@/lib/storage/cleanup";
 
