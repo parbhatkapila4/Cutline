@@ -8,6 +8,6 @@ export async function register() {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[config] Startup validation failed:", msg);
-    process.exit(1);
+    throw e;
   }
 }

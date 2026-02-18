@@ -50,7 +50,7 @@ For each narrative beat, the system decides: what the shot represents (concept, 
 
 The system generates **spoken copy** aligned to shot boundaries. Script is passed to TTS (ElevenLabs or PlayHT) and to the subtitle stage. Subtitles are chunked and timed; when TTS returns **word-level timings**, the pipeline refines the subtitle track so chunks align to actual spoken words, subtitles appear and disappear in sync with the voice.
 
-**Refinement:** `POST /api/subtitles/refine` with `{ subtitleTrack, wordTimings?, script, shotList }` returns the refined track.
+**Refinement:** `POST /api/subtitles/refine` with `{ subtitleTrack, wordTimings?, script, shotList }` returns the refined track. **Rendering:** Captions flow from `generateSubtitles` → `refineSubtitles` → `getCaptionsRenderOption` → `renderInput` → `buildRemotionProps` → Remotion props → `CUTLINEComposition` → `SubtitleOverlay` (time in ms, global timeline; `useCurrentFrame()` is composition frame).
 
 ---
 
@@ -121,6 +121,51 @@ In production you may want to restrict who can cancel (e.g. same client that sta
 
 ---
 
+### List recent jobs
+
+**GET /api/generate/jobs** (and **GET /api/v1/generate/jobs**) returns a list of recent video generation jobs so clients can show "Your recent generations" or resume polling. The list is global (all jobs in the queue); no auth or user identity in this version.
+
+- **Query param:** `limit` (optional). Default **20**, max **50**. Invalid values (e.g. negative or &gt; 50) return **400** with code `BAD_REQUEST`.
+- **Response:** `{ jobs: [{ jobId, status, createdAt, videoUrl?, topic?, error? }] }`
+  - **jobId** (string) — Job ID.
+  - **status** (string) — `pending` | `processing` | `completed` | `failed` | `cancelled`.
+  - **createdAt** (string) — ISO 8601 timestamp when the job was created.
+  - **videoUrl** (string, optional) — Present when status is `completed` (primary video URL).
+  - **topic** (string, optional) — Input/topic from the job (e.g. the one-sentence prompt).
+  - **error** (string, optional) — Present when status is `failed` (failure reason).
+- **Store empty:** Returns `{ jobs: [] }`.
+- Jobs removed by retention (e.g. `deleteStaleJobs`) are not in the list; only jobs still in the queue are returned.
+
+The generate page includes an optional **Recent generations** collapsible section that fetches this endpoint and lets users open a job (View/Watch) to resume polling or watch the result.
+
+---
+
+### CORS
+
+The generate API (POST /api/generate, GET /api/generate/[jobId], POST cancel, GET download) supports cross-origin requests so it can be called from another domain or port. CORS is **configurable via environment** and applied **only to these routes**; admin and telemetry routes are not included (same-origin or protect separately).
+
+- **Config:** Set `CORS_ORIGIN` (single value) or `CORS_ORIGINS` (comma-separated). Examples: `CORS_ORIGIN=https://app.example.com`, `CORS_ORIGINS=https://app.example.com,https://admin.example.com`. For local dev: `CORS_ORIGIN=http://localhost:3000` or `CORS_ORIGIN=*`. If **unset or empty**, no `Access-Control-*` headers are sent (same-origin only).
+- **Preflight:** OPTIONS requests to the same paths return 204 with `Allow` and CORS headers so browsers can complete preflight before POST/GET.
+- **No Origin header** (e.g. same-origin or curl): no CORS headers are set; the response is readable by the caller.
+- **Origin not in list:** we do not set `Access-Control-Allow-Origin`; the browser will block the response for that cross-origin request. Use `*` only in development if at all.
+
+CORS is implemented per-route (not middleware) so admin/telemetry stay excluded.
+
+---
+
+### Idempotency
+
+**POST /api/generate** accepts an optional **X-Idempotency-Key** header. If the client sends the same key again within a retention window (default 24 hours), the API returns the **same job ID** and response as the first request instead of creating a new job. This allows safe retries after network errors or timeouts.
+
+- **Header:** `X-Idempotency-Key` (case-insensitive). Any string up to **128 characters**; longer keys are rejected with 400 and message "Idempotency key too long".
+- **Matching:** Key-only. The same key within the retention window returns the original `{ jobId }`; request body is not hashed or compared. Two requests with the same key and different bodies will still return the first job’s ID (client should use one key per logical "create" attempt).
+- **Storage:** In-memory only. Keys and their stored results are **lost on server restart**. After a restart, the same key is treated as a new request and may create a new job.
+- **Retention:** Stored keys are removed after **IDEMPOTENCY_RETENTION_HOURS** (default 24, max 168). Expired entries are evicted when reading or when adding; keys older than retention are treated as new.
+- **Concurrent same key:** A per-key lock ensures only one job is created; concurrent requests with the same key serialize and the second receives the same `{ jobId }` from the store.
+- **Job later fails or is cancelled:** The stored response is the initial `{ jobId }`. Retries with the same key still get that job ID; the client can poll GET /api/generate/[jobId] for current status. The store is not updated when the job completes or fails.
+
+---
+
 ### Webhook
 
 When starting a job, you can optionally pass `callbackUrl` in **POST /api/generate**. When the job reaches a terminal state (completed, failed, or cancelled), the server sends a **POST** request to that URL with a JSON body. Best-effort, fire-and-forget; no retries, no auth/signing.
@@ -152,6 +197,10 @@ Jobs in terminal state (completed, failed, cancelled) are kept in the BullMQ/Red
 ### Video duration (10–60 seconds)
 
 You can choose a video length between 10 and 60 seconds on the main page. The value is sent as `durationSeconds` in **POST /api/generate** and used for both **Slideshow** and **Talking object** modes. For **Talking object**, videos longer than 8 seconds are built by generating multiple Veo clips (~8s each) and concatenating them. That concatenation step requires **ffmpeg** (on PATH or set `FFMPEG_PATH` in `.env.local`). If ffmpeg is not available and you request a talking_object video over 8 seconds, the job will fail with a clear message.
+
+**Global max duration:** A configurable cap **MAX_VIDEO_DURATION_SECONDS** (default 300, max 3600) is enforced. Requests with `durationSeconds` above this value are rejected at validation with a clear error (e.g. "Duration cannot exceed 300 seconds."). The pipeline also caps duration to this value so that even unvalidated input cannot exceed it; when capping, a log line is emitted. Platform-specific limits (e.g. YouTube Shorts 60s) are separate; when a platform is set, the effective max is the lower of the platform limit and this global max.
+
+**Output size limit (optional):** If **MAX_VIDEO_OUTPUT_MB** is set, after the final video file is written the pipeline checks its size. If it exceeds the limit (in MB), the job **fails** with a clear error ("Output video exceeds maximum size (N MB).") and normal failure cleanup runs. Each output is checked (including each variation), so no variant can exceed the limit. If not set, no size check is performed.
 
 ---
 
@@ -372,6 +421,10 @@ STORAGE_TYPE=local
 UPLOAD_DIR=uploads
 # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION (if STORAGE_TYPE=s3)
 
+# Video duration and output limits
+# MAX_VIDEO_DURATION_SECONDS=300  — global max duration (default 300, max 3600)
+# MAX_VIDEO_OUTPUT_MB=            — optional; job fails if output file exceeds N MB
+
 # Cleanup
 CLEANUP_ENABLED=true
 VIDEO_RETENTION_HOURS=24
@@ -381,6 +434,12 @@ CLEANUP_SECRET=...
 # Optional: periodic orphan cleanup — delete temp dirs older than N hours (e.g. from crashed jobs)
 # CLEANUP_EXPIRED_HOURS=24
 # TEMP_DIR — override temp root (default: public/temp)
+
+# CORS (generate API only; admin/telemetry not included)
+# CORS_ORIGIN (single) or CORS_ORIGINS (comma-separated). Unset = no CORS (same-origin only).
+# Dev: CORS_ORIGIN=http://localhost:3000 or CORS_ORIGIN=*
+# Prod: CORS_ORIGIN=https://app.example.com or CORS_ORIGINS=https://app.example.com,https://admin.example.com
+# CORS_ORIGIN=
 
 # Rate limiting
 RATE_LIMIT_ENABLED=true
@@ -419,14 +478,37 @@ RETRY_RENDER_MAX=2
 
 ## API Reference
 
+### API versioning
+
+The current API version is **v1**. The **canonical base path** is **/api/v1**. New clients should use the versioned paths so future breaking changes can be introduced under /api/v2 without affecting them.
+
+**v1 endpoints (canonical):**
+
+| Method | Endpoint                              | Description |
+| ------ | ------------------------------------- | ----------- |
+| POST   | `/api/v1/generate`                    | Create video job. Returns `{ jobId }`. Same as unversioned POST /api/generate. |
+| GET    | `/api/v1/generate/[jobId]`            | Job status. Returns `{ status, videoUrl?, error?, ... }`. |
+| POST   | `/api/v1/generate/[jobId]/cancel`     | Cancel a pending or running job. |
+| GET    | `/api/v1/generate/[jobId]/download`   | Stream completed video (attachment). Optional `?variant=N`. |
+| GET    | `/api/v1/generate/jobs`               | List recent jobs. Query: `?limit=20` (default 20, max 50). Returns `{ jobs: [{ jobId, status, createdAt, videoUrl?, topic?, error? }] }`. |
+
+All v1 responses include the header **X-API-Version: 1** so clients can detect the version.
+
+**Unversioned paths** `/api/generate`, `/api/generate/[jobId]`, and the cancel/download sub-routes **remain supported** and behave identically to v1 (same handlers, no redirect). They are kept for backward compatibility; existing links and webhooks that point at unversioned URLs continue to work. **Recommendation:** use `/api/v1/...` for new integrations. Future breaking changes will be introduced under **/api/v2** (and documented).
+
+Implementation: unversioned and v1 routes share the same handler logic (`src/app/api/generate/handlers.ts`); route files under `/api/generate` and `/api/v1/generate` call these handlers so business logic is not duplicated.
+
+---
+
 ### Endpoints
 
 #### Video generation
 
 | Method | Endpoint                | Description                                                                                                                                             |
 | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/generate`         | Create video job. Body: `{ input, assetIds?, brandColors?, mode? }`. Returns `{ jobId }`. Rate limited per client (IP or X-Forwarded-For). Use `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_SECONDS` when set; otherwise `RATE_LIMIT_GENERATE` per hour. Returns 429 when exceeded. |
-| GET    | `/api/generate/[jobId]` | Job status. Returns `{ status, videoUrl?, error? }`. `status`: `pending` \| `processing` \| `completed` \| `failed`. Rate limited (e.g. 60/min per IP). |
+| POST   | `/api/generate`         | Create video job. Body: `{ input, assetIds?, brandColors?, mode? }`. Returns `{ jobId }`. Rate limited per client (IP or X-Forwarded-For). Use `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_SECONDS` when set; otherwise `RATE_LIMIT_GENERATE` per hour. Returns 429 when exceeded. **Also:** POST `/api/v1/generate`. |
+| GET    | `/api/generate/[jobId]` | Job status. Returns `{ status, videoUrl?, error? }`. `status`: `pending` \| `processing` \| `completed` \| `failed`. Rate limited (e.g. 60/min per IP). **Also:** GET `/api/v1/generate/[jobId]`. |
+| GET    | `/api/generate/jobs`    | List recent jobs. Query: `?limit=20` (default 20, max 50). Returns `{ jobs: [{ jobId, status, createdAt, videoUrl?, topic?, error? }] }`. **Also:** GET `/api/v1/generate/jobs`. |
 
 #### Prompt suggestions
 
@@ -462,21 +544,84 @@ RETRY_RENDER_MAX=2
 
 | Method | Endpoint       | Description                                                                                                         |
 | ------ | -------------- | ------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/health`  | Health and readiness. Returns 200 + `{ status: "ok" }` when ready. On dependency failure: 503 + `{ status: "unhealthy", checks }`. No auth, no rate limit. Safe for LB/k8s probes. |
-| POST   | `/api/cleanup` | Manual cleanup (temp videos, uploads, per-job images). Optional header: `X-Cleanup-Secret` if `CLEANUP_SECRET` set. |
+| GET    | `/api/health`       | Combined health (same as readiness). 200 when env + Redis OK; 503 + `{ status: "unhealthy", checks }` otherwise. No auth. |
+| GET    | `/api/health/live`   | Liveness probe. 200 + `{ status: "ok" }` if process is up. No dependency checks. For k8s livenessProbe. |
+| GET    | `/api/health/ready`  | Readiness probe. 200 when ready to accept work; 503 + `{ status: "not_ready", checks }` when not. For k8s readinessProbe. |
+| POST   | `/api/cleanup`       | Manual cleanup (temp videos, uploads, per-job images). Optional header: `X-Cleanup-Secret` if `CLEANUP_SECRET` set. |
 
 #### Health check
 
-**GET /api/health** — Idempotent, no side effects. Use for load balancers and Kubernetes liveness/readiness probes.
+**GET /api/health** — Idempotent, no side effects. **Equivalent to readiness:** returns 200 when env and Redis are OK, 503 otherwise. Use for a single combined check; for separate liveness and readiness (e.g. Kubernetes), use **GET /api/health/live** and **GET /api/health/ready** below.
 
 - **200 OK** — `{ status: "ok" }` — App and critical dependencies (required env vars, Redis) are ready.
-- **503 Service Unavailable** — `{ status: "unhealthy", checks: { env?: string, redis?: string } }` — A readiness check failed (e.g. missing `OPENROUTER_API_KEY` or `REDIS_URL`, Redis unreachable). `checks` indicates which dependency failed.
+- **503 Service Unavailable** — `{ status: "unhealthy", checks: { env?: string, redis?: string } }` — A check failed (e.g. missing `OPENROUTER_API_KEY` or `REDIS_URL`, Redis unreachable). `checks` indicates which dependency failed.
+
+---
+
+#### Liveness and readiness
+
+For orchestrators (e.g. Kubernetes) that need separate **liveness** (is the process running?) and **readiness** (can the app accept traffic?):
+
+| Probe      | Endpoint              | Purpose                                                                 |
+| ---------- | --------------------- | ----------------------------------------------------------------------- |
+| **Liveness**  | **GET /api/health/live**  | Process is up. Returns **200** with `{ status: "ok" }`. No dependency checks, no I/O. Use to decide whether to **kill and restart** the process. |
+| **Readiness** | **GET /api/health/ready** | App can accept work. Returns **200** when required env and Redis are OK; **503** when not ready with `{ status: "not_ready", checks: { env?: string, redis?: string } }`. Use to decide whether to **send traffic** (e.g. remove from load balancer when 503). |
+
+- **Relationship to GET /api/health:** Health is equivalent to readiness (same checks). Use **/api/health** as a general combined check; use **/api/health/live** and **/api/health/ready** for separate k8s probes.
+- **No auth** on these endpoints — intentional for probes. Do not expose secrets in response bodies; probes should be reachable only from the cluster or LB.
+- **Readiness** reuses the same logic as `/api/health` (required env vars, Redis ping). If the check throws, readiness returns 503 with `checks.ready = "check failed"`.
+
+**Example Kubernetes probes:**
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /api/health/live
+    port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /api/health/ready
+    port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 5
+```
+
+---
+
+### API error codes
+
+Error responses from the generate API and job status/cancel/download use a consistent shape so clients can branch on a stable code instead of parsing messages.
+
+**Response shape:** `{ error: string; code: string; details?: unknown }`
+
+- **error** — Human-readable message (do not rely on for logic).
+- **code** — Machine-readable UPPER_SNAKE_CASE code; stable and documented below.
+- **details** — Optional extra data (e.g. `errors`, `retryAfter`, `reason`).
+
+| Code | HTTP status | When returned |
+|------|-------------|----------------------------------------------------------------|
+| `VALIDATION_FAILED` | 400 | Request body fails validation. `details.errors` has field-level errors. |
+| `INVALID_JSON` | 400 | Request body is not valid JSON. |
+| `BAD_REQUEST` | 400 | Generic bad request (e.g. invalid jobId format). |
+| `PREVIEW_JOB_NOT_FOUND` | 400 | Final render references a preview job that does not exist or is not completed. |
+| `INSUFFICIENT_CREDITS` | 402 | Not enough credits to start a video. `details`: `tokensRemaining`, `tokensRequired`. |
+| `MONTHLY_LIMIT_REACHED` | 402 | Monthly video limit reached. `details`: `videosUsed`, `videosLimit`. |
+| `RATE_LIMITED` | 429 | Too many requests. `details.retryAfter` (seconds); response includes `Retry-After` header. |
+| `JOB_NOT_FOUND` | 404 | Job does not exist (status, cancel, or download). |
+| `JOB_NOT_READY` | 404 | Job exists but is not completed (download only). |
+| `VIDEO_NOT_FOUND` | 404 | Video file or path missing (e.g. file cleaned up). |
+| `JOB_CANNOT_CANCEL` | 409 | Job already completed or cancelled. `details.reason`: `already_finished`. |
+| `INTERNAL_ERROR` | 500 | Unhandled server error. Message is generic; do not leak internals. |
+
+Codes are stable; do not change them in a backward-incompatible way. Additional codes (e.g. `WEBHOOK_INVALID_URL`) may be added for new flows.
 
 ---
 
 ### Generate request (POST /api/generate)
 
-All inputs are validated in one place (`validateGenerateInput`). On failure, the API returns **400** with `{ error: string, errors: Array<{ field: string, message: string }> }` so the UI can show field-level errors.
+All inputs are validated in one place (`validateGenerateInput`). On failure, the API returns **400** with `{ error: string, code: "VALIDATION_FAILED", details: { errors: Array<{ field: string, message: string }> } }` so the UI can show field-level errors.
 
 | Field            | Required | Type    | Limits / values                                                                          |
 | ---------------- | -------- | ------- | ---------------------------------------------------------------------------------------- |
@@ -580,7 +725,7 @@ curl -X POST "http://localhost:3000/api/intent" \
 | Too long (> 2000 chars)   | 400      | `{ field: "input", message: "Topic must be at most 2000 characters" }`              |
 | Prompt-injection patterns | 400      | `{ field: "input", message: "Input contains invalid instructions..." }`             |
 | Missing durationSeconds   | 400      | `{ field: "durationSeconds", message: "durationSeconds is required" }`              |
-| Invalid durationSeconds   | 400      | `{ field: "durationSeconds", message: "durationSeconds must be between 10 and 60" }`|
+| Invalid durationSeconds   | 400      | `{ field: "durationSeconds", message: "durationSeconds must be at least 10" }` or `"Duration cannot exceed N seconds."` (N = MAX_VIDEO_DURATION_SECONDS) |
 | Invalid platform          | 400      | `{ field: "platform", message: "platform must be one of \"general\", \"linkedin\", \"twitter\", \"youtube_shorts\"" }` |
 | Invalid job ID            | 400      | `Invalid job ID.`                                                                   |
 | Job not found             | 404      | `Job not found.`                                                                    |

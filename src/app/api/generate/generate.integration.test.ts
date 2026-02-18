@@ -15,7 +15,7 @@ describe.skipIf(!hasRedis)("POST /api/generate integration", () => {
     const res = await fetch(`${BASE}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input: "Explain why coffee wakes you up in 30 seconds" }),
+      body: JSON.stringify({ input: "Explain why coffee wakes you up in 30 seconds", durationSeconds: 30 }),
     });
 
     expect(res.status).toBe(200);
@@ -52,6 +52,7 @@ describe.skipIf(!hasRedis)("POST /api/generate integration", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         input: "A 15 second test video about the sky.",
+        durationSeconds: 15,
         captions: "off",
       }),
     });
@@ -66,6 +67,7 @@ describe.skipIf(!hasRedis)("POST /api/generate integration", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         input: "A 15 second test video about the ocean.",
+        durationSeconds: 15,
         captions: "on",
       }),
     });
