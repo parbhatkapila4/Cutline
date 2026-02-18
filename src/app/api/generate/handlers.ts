@@ -150,28 +150,32 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
   try {
     const queue = getVideoQueue();
     const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth, TOKENS_PER_VIDEO, FREE_PLAN_VIDEOS_PER_MONTH } = await import("@/lib/usage");
-    const tokensRemaining = await getTokens(identifier);
-    if (tokensRemaining < TOKENS_PER_VIDEO) {
-      return apiError({
-        code: ErrorCode.INSUFFICIENT_CREDITS,
-        message: `Not enough credits. You have ${tokensRemaining} credits, need ${TOKENS_PER_VIDEO} per video.`,
-        status: 402,
-        details: { tokensRemaining, tokensRequired: TOKENS_PER_VIDEO },
-        headers,
-      });
-    }
-    const videosCompletedThisMonth = await getVideosCompletedThisMonth(identifier);
-    if (videosCompletedThisMonth >= FREE_PLAN_VIDEOS_PER_MONTH) {
-      return apiError({
-        code: ErrorCode.MONTHLY_LIMIT_REACHED,
-        message: `Monthly video limit reached. You've used ${videosCompletedThisMonth} of ${FREE_PLAN_VIDEOS_PER_MONTH} videos this month.`,
-        status: 402,
-        details: {
-          videosUsed: videosCompletedThisMonth,
-          videosLimit: FREE_PLAN_VIDEOS_PER_MONTH,
-        },
-        headers,
-      });
+    const creditsCheckDisabled =
+      process.env.DISABLE_CREDITS_CHECK === "true" || process.env.DISABLE_CREDITS_CHECK === "1";
+    if (!creditsCheckDisabled) {
+      const tokensRemaining = await getTokens(identifier);
+      if (tokensRemaining < TOKENS_PER_VIDEO) {
+        return apiError({
+          code: ErrorCode.INSUFFICIENT_CREDITS,
+          message: `Not enough credits. You have ${tokensRemaining} credits, need ${TOKENS_PER_VIDEO} per video.`,
+          status: 402,
+          details: { tokensRemaining, tokensRequired: TOKENS_PER_VIDEO },
+          headers,
+        });
+      }
+      const videosCompletedThisMonth = await getVideosCompletedThisMonth(identifier);
+      if (videosCompletedThisMonth >= FREE_PLAN_VIDEOS_PER_MONTH) {
+        return apiError({
+          code: ErrorCode.MONTHLY_LIMIT_REACHED,
+          message: `Monthly video limit reached. You've used ${videosCompletedThisMonth} of ${FREE_PLAN_VIDEOS_PER_MONTH} videos this month.`,
+          status: 402,
+          details: {
+            videosUsed: videosCompletedThisMonth,
+            videosLimit: FREE_PLAN_VIDEOS_PER_MONTH,
+          },
+          headers,
+        });
+      }
     }
     const userId: string | undefined = undefined;
     const jobPayload = {
@@ -220,6 +224,20 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
   } catch (e) {
     const { logServerError } = await import("@/lib/utils/error");
     logServerError("POST /api/generate", e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    const isRedisReadOnly =
+      errMsg.includes("READONLY") ||
+      errMsg.includes("readonly") ||
+      (e as { code?: string }).code === "READONLY";
+    if (isRedisReadOnly) {
+      return apiError({
+        code: ErrorCode.QUEUE_UNAVAILABLE,
+        message:
+          "Queue is temporarily unavailable. Redis is in read-only mode (often during a server upgrade). Please try again in a few minutes.",
+        status: 503,
+        headers,
+      });
+    }
     return apiError({
       code: ErrorCode.INTERNAL_ERROR,
       message: "Something went wrong",

@@ -180,6 +180,7 @@ function HomeContent() {
     setJobId(null);
     setSubmitting(true);
 
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       let assetIds: string[] = [];
       if (images.length > 0) {
@@ -195,6 +196,8 @@ function HomeContent() {
         }
       }
 
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), 25_000);
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,7 +210,9 @@ function HomeContent() {
           ...(assetIds.length > 0 ? { assetIds } : {}),
           ...(mode === "talking_object" ? { talkingObjectStyle } : {}),
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (!res.ok) {
         let msg = getUserFriendlyErrorMessage(data.error || "Failed to start generation");
@@ -228,8 +233,13 @@ function HomeContent() {
       }
       setJobId(data.jobId);
       setStatus("pending");
-    } catch {
-      setError("Connection failed. Please try again.");
+    } catch (err) {
+      if (timeoutId != null) clearTimeout(timeoutId);
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("Request timed out. The server may be starting or Redis may be unavailable. Try again in a moment.");
+      } else {
+        setError("Connection failed. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
