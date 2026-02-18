@@ -1,16 +1,33 @@
-# CUTLINE
+<div align="center">
 
-**AI-directed video editing.** One sentence of intent → a 30-45 second edited video. The system decides narrative, shots, pacing, motion, subtitles, voice, and images. No templates, no user config. Images are optional, we fetch from the web (Unsplash/DALL·E/Pexels) using your description, or use a placeholder if APIs fail.
+  <img src="public/header.svg" alt="CUTLINE - One sentence → One video" width="920" />
 
-**Tech stack:** Next.js, TypeScript, React 19, Remotion, BullMQ, Redis (ioredis), OpenRouter (AI), ElevenLabs/PlayHT (TTS), Unsplash/Pexels/OpenAI (images), Tailwind CSS.
+  **AI-directed video editing.** Describe your idea in a single sentence and get a 30-45 second edited video. The system handles narrative, shots, pacing, motion, subtitles, voice, and images,no templates, no manual config. Images are optional: we fetch from the web (Unsplash / DALL·E / Pexels) from your description, or use a placeholder if APIs fail.
 
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![Remotion](https://img.shields.io/badge/Remotion-4-000?style=flat-square)](https://www.remotion.dev/)
-[![BullMQ](https://img.shields.io/badge/BullMQ-5-FF6B6B?style=flat-square)](https://docs.bullmq.io/)
-[![Redis](https://img.shields.io/badge/Redis-ioredis-DC382D?style=flat-square&logo=redis)](https://redis.io/)
-[![OpenRouter](https://img.shields.io/badge/OpenRouter-AI-000?style=flat-square)](https://openrouter.ai/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
+  **Tech stack**
+
+  <a href="https://nextjs.org/" title="Next.js"><img src="https://cdn.simpleicons.org/nextdotjs/000" height="28" alt="Next.js" /></a>
+  <a href="https://www.typescriptlang.org/" title="TypeScript"><img src="https://cdn.simpleicons.org/typescript/3178C6" height="28" alt="TypeScript" /></a>
+  <a href="https://react.dev/" title="React"><img src="https://cdn.simpleicons.org/react/61DAFB" height="28" alt="React" /></a>
+  <a href="https://www.remotion.dev/" title="Remotion"><img src="https://cdn.simpleicons.org/remotion/000" height="28" alt="Remotion" /></a>
+  <a href="https://docs.bullmq.io/" title="BullMQ"><img src="https://img.shields.io/badge/BullMQ-5-FF6B6B?style=flat-square" height="28" alt="BullMQ" /></a>
+  <a href="https://redis.io/" title="Redis"><img src="https://cdn.simpleicons.org/redis/DC382D" height="28" alt="Redis" /></a>
+  <a href="https://openrouter.ai/" title="OpenRouter"><img src="https://img.shields.io/badge/OpenRouter-AI-000?style=flat-square" height="28" alt="OpenRouter" /></a>
+  <a href="https://elevenlabs.io/" title="ElevenLabs"><img src="https://cdn.simpleicons.org/elevenlabs/000" height="28" alt="ElevenLabs" /></a>
+  <a href="https://play.ht/" title="PlayHT"><img src="https://img.shields.io/badge/PlayHT-TTS-000?style=flat-square" height="28" alt="PlayHT" /></a>
+  <a href="https://tailwindcss.com/" title="Tailwind CSS"><img src="https://cdn.simpleicons.org/tailwindcss/06B6D4" height="28" alt="Tailwind CSS" /></a>
+
+  Next.js · TypeScript · React 19 · Remotion · BullMQ · Redis · OpenRouter · ElevenLabs / PlayHT · Tailwind CSS
+
+  [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+  [![Remotion](https://img.shields.io/badge/Remotion-4-000?style=flat-square&logo=remotion)](https://www.remotion.dev/)
+  [![BullMQ](https://img.shields.io/badge/BullMQ-5-FF6B6B?style=flat-square)](https://docs.bullmq.io/)
+  [![Redis](https://img.shields.io/badge/Redis-ioredis-DC382D?style=flat-square&logo=redis)](https://redis.io/)
+  [![OpenRouter](https://img.shields.io/badge/OpenRouter-AI-000?style=flat-square)](https://openrouter.ai/)
+  [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
+
+</div>
 
 ---
 
@@ -110,7 +127,7 @@ Rendered videos are written to `public/temp/[jobId].mp4`. Cleanup (repeatable Bu
 
 You can cancel a pending or running job. Cancellation is **best-effort**: if the pipeline is mid-stage (e.g. LLM or render call), it finishes that step before exiting. The pipeline checks a cancelled flag between stages.
 
-- **POST /api/generate/[jobId]/cancel** — Cancel the job. Returns `200 { cancelled: true, jobId }` if cancelled; `409 { error, reason }` if already completed/failed; `404` if job not found.
+- **POST /api/generate/[jobId]/cancel**: Cancel the job. Returns `200 { cancelled: true, jobId }` if cancelled; `409 { error, reason }` if already completed/failed; `404` if job not found.
 - **Source of truth:** Redis SET `cutline:job:cancelled`; worker and API both read/write this.
 - **Cleanup:** When cancelled, the pipeline runs the same temp-artifact cleanup as on failure (`cleanupJobArtifacts`).
 - **Effect delay:** Cancellation may take up to one stage duration to take effect (checks are between stages only).
@@ -322,7 +339,7 @@ Output: public/temp/[jobId].mp4
 
 ## Engineering Constraints & Tradeoffs
 
-**Render time vs. interactivity.** Full pipeline (Intent → Render) typically takes 1–3 minutes. We use async jobs and polling so the UI stays responsive. Real-time streaming or “preview in 10s” would require a different architecture (e.g. lower-quality fast path).
+**Render time vs. interactivity.** Full pipeline (Intent → Render) typically takes 1-3 minutes. We use async jobs and polling so the UI stays responsive. Real-time streaming or “preview in 10s” would require a different architecture (e.g. lower-quality fast path).
 
 **Determinism vs. variety.** Same intent and same system version aim for same output. That simplifies debugging and quality control. Asset selection (e.g. which Unsplash photo) can vary; we don’t guarantee bit-identical reruns.
 
@@ -553,7 +570,7 @@ Implementation: unversioned and v1 routes share the same handler logic (`src/app
 
 **GET /api/health**: Idempotent, no side effects. **Equivalent to readiness:** returns 200 when env and Redis are OK, 503 otherwise. Use for a single combined check; for separate liveness and readiness (e.g. Kubernetes), use **GET /api/health/live** and **GET /api/health/ready** below.
 
-- **200 OK**: `{ status: "ok" }` — App and critical dependencies (required env vars, Redis) are ready.
+- **200 OK**: `{ status: "ok" }`: App and critical dependencies (required env vars, Redis) are ready.
 - **503 Service Unavailable**: `{ status: "unhealthy", checks: { env?: string, redis?: string } }`: A check failed (e.g. missing `OPENROUTER_API_KEY` or `REDIS_URL`, Redis unreachable). `checks` indicates which dependency failed.
 
 ---
@@ -916,7 +933,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
     </sub>
   </p>
   <p>
-    <a href="https://twitter.com/parbhatkapila4">Twitter</a>
+    <a href="https://x.com/Parbhat03">Twitter</a>
     ·
     <a href="https://linkedin.com/in/parbhat-kapila">LinkedIn</a>
     ·
