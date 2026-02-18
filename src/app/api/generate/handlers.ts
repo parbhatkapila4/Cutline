@@ -1,0 +1,533 @@
+/**
+ * Shared handlers for the generate API. Used by both /api/generate and /api/v1/generate
+ * so logic is not duplicated. Route files (unversioned and v1) call these and optionally
+ * add version headers.
+ */
+import { NextResponse } from "next/server";
+import { getVideoQueue, cancelJob, listRecentJobs, type VideoJobResult } from "@/lib/queue/videoQueue";
+import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
+import { getRequestIdFromRequest } from "@/lib/requestId";
+import { validateGenerateInput, validateJobId } from "@/lib/validation/input";
+import { DEFAULT_PLATFORM } from "@/lib/platform/types";
+import { getCorsHeaders } from "@/lib/cors";
+import { apiError, ErrorCode } from "@/lib/api/errors";
+import {
+  IDEMPOTENCY_KEY_MAX_LENGTH,
+  getIdempotencyResult,
+  setIdempotencyResult,
+  withIdempotencyLock,
+} from "@/lib/api/idempotency";
+import fs from "fs";
+import path from "path";
+
+type JobStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
+
+function mapStateToStatus(state: string, failedReason?: string | null): JobStatus {
+  if (state === "failed" && failedReason?.includes("cancelled")) {
+    return "cancelled";
+  }
+  switch (state) {
+    case "waiting":
+    case "delayed":
+    case "paused":
+      return "pending";
+    case "active":
+      return "processing";
+    case "completed":
+      return "completed";
+    case "failed":
+      return "failed";
+    default:
+      return "pending";
+  }
+}
+
+export function handleGenerateOptions(request: Request): NextResponse {
+  const origin = request.headers.get("Origin");
+  const cors = getCorsHeaders(origin);
+  return new NextResponse(null, {
+    status: 204,
+    headers: { ...cors, Allow: "GET, POST, OPTIONS" },
+  });
+}
+
+export async function handleGeneratePost(request: Request): Promise<NextResponse> {
+  const requestId = getRequestIdFromRequest(request);
+  const origin = request.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
+  const headers = { "X-Request-ID": requestId, ...corsHeaders };
+  const idempotencyKeyRaw = request.headers.get("x-idempotency-key");
+  const idempotencyKey = (idempotencyKeyRaw ?? "").trim();
+  if (idempotencyKey.length > IDEMPOTENCY_KEY_MAX_LENGTH) {
+    return apiError({
+      code: ErrorCode.BAD_REQUEST,
+      message: "Idempotency key too long",
+      status: 400,
+      headers,
+    });
+  }
+  const identifier = getClientIdentifier(request);
+  const limit = await checkRateLimit(identifier, "generate");
+  if (!limit.allowed) {
+    const retryAfter = limit.retryAfter ?? 60;
+    return apiError({
+      code: ErrorCode.RATE_LIMITED,
+      message: "Too Many Requests",
+      status: 429,
+      details: { retryAfter },
+      headers: { ...headers, "Retry-After": String(retryAfter) },
+    });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return apiError({
+      code: ErrorCode.INVALID_JSON,
+      message: "Invalid JSON",
+      status: 400,
+      details: { errors: [{ field: "body", message: "Invalid JSON" }] },
+      headers,
+    });
+  }
+
+  const validation = validateGenerateInput(body);
+  if (!validation.success) {
+    return apiError({
+      code: ErrorCode.VALIDATION_FAILED,
+      message: "Validation failed",
+      status: 400,
+      details: { errors: validation.errors },
+      headers,
+    });
+  }
+
+  const data = validation.data;
+  const previewJobIdStr = data.previewJobId;
+  const renderModeValid = data.renderMode;
+
+  if (renderModeValid === "final" && previewJobIdStr) {
+    try {
+      const queue = getVideoQueue();
+      const previewJob = await queue.getJob(previewJobIdStr);
+      if (!previewJob) {
+        return apiError({
+          code: ErrorCode.PREVIEW_JOB_NOT_FOUND,
+          message: "Preview job not found or not completed.",
+          status: 400,
+          headers,
+        });
+      }
+      const state = await previewJob.getState();
+      if (state !== "completed") {
+        return apiError({
+          code: ErrorCode.PREVIEW_JOB_NOT_FOUND,
+          message: "Preview job not found or not completed.",
+          status: 400,
+          headers,
+        });
+      }
+    } catch {
+      return apiError({
+        code: ErrorCode.PREVIEW_JOB_NOT_FOUND,
+        message: "Preview job not found or not completed.",
+        status: 400,
+        headers,
+      });
+    }
+  }
+
+  if (idempotencyKey) {
+    const cached = getIdempotencyResult(idempotencyKey);
+    if (cached) {
+      return NextResponse.json(cached.responseBody as { jobId: string }, {
+        headers,
+      });
+    }
+  }
+
+  try {
+    const queue = getVideoQueue();
+    const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth, TOKENS_PER_VIDEO, FREE_PLAN_VIDEOS_PER_MONTH } = await import("@/lib/usage");
+    const tokensRemaining = await getTokens(identifier);
+    if (tokensRemaining < TOKENS_PER_VIDEO) {
+      return apiError({
+        code: ErrorCode.INSUFFICIENT_CREDITS,
+        message: `Not enough credits. You have ${tokensRemaining} credits, need ${TOKENS_PER_VIDEO} per video.`,
+        status: 402,
+        details: { tokensRemaining, tokensRequired: TOKENS_PER_VIDEO },
+        headers,
+      });
+    }
+    const videosCompletedThisMonth = await getVideosCompletedThisMonth(identifier);
+    if (videosCompletedThisMonth >= FREE_PLAN_VIDEOS_PER_MONTH) {
+      return apiError({
+        code: ErrorCode.MONTHLY_LIMIT_REACHED,
+        message: `Monthly video limit reached. You've used ${videosCompletedThisMonth} of ${FREE_PLAN_VIDEOS_PER_MONTH} videos this month.`,
+        status: 402,
+        details: {
+          videosUsed: videosCompletedThisMonth,
+          videosLimit: FREE_PLAN_VIDEOS_PER_MONTH,
+        },
+        headers,
+      });
+    }
+    const userId: string | undefined = undefined;
+    const jobPayload = {
+      input: data.input,
+      clientId: identifier,
+      requestId,
+      ...(userId ? { userId } : {}),
+      ...(data.assetIds?.length ? { assetIds: data.assetIds } : {}),
+      ...(data.brandColors ? { brandColors: data.brandColors } : {}),
+      ...(data.mode ? { mode: data.mode } : {}),
+      durationSeconds: data.durationSeconds,
+      ...(data.textModel ? { textModel: data.textModel } : {}),
+      captions: data.captions,
+      ...(data.talkingObjectStyle ? { talkingObjectStyle: data.talkingObjectStyle } : {}),
+      ...(data.renderMode ? { renderMode: data.renderMode } : {}),
+      ...(data.previewJobId ? { previewJobId: data.previewJobId } : {}),
+      variationCount: data.variationCount ?? 1,
+      platform: data.platform ?? DEFAULT_PLATFORM,
+      ...(data.callbackUrl ? { callbackUrl: data.callbackUrl } : {}),
+    };
+
+    if (idempotencyKey) {
+      const result = await withIdempotencyLock(idempotencyKey, async () => {
+        const again = getIdempotencyResult(idempotencyKey);
+        if (again) return again.responseBody as { jobId: string };
+        const job = await queue.add("video", jobPayload);
+        await incrementApiCallsThisMonth(identifier);
+        const jobId = String(job.id);
+        const responseBody = { jobId };
+        setIdempotencyResult(idempotencyKey, {
+          jobId,
+          status: "pending",
+          responseBody,
+        });
+        return responseBody;
+      });
+      console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + result.jobId + " idempotencyKey=" + idempotencyKey);
+      return NextResponse.json(result, { headers });
+    }
+
+    const job = await queue.add("video", jobPayload);
+    await incrementApiCallsThisMonth(identifier);
+    const jobId = String(job.id);
+    console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + jobId);
+    return NextResponse.json({ jobId }, { headers });
+  } catch (e) {
+    const { logServerError } = await import("@/lib/utils/error");
+    logServerError("POST /api/generate", e);
+    return apiError({
+      code: ErrorCode.INTERNAL_ERROR,
+      message: "Something went wrong",
+      status: 500,
+      headers,
+    });
+  }
+}
+
+export function handleJobOptions(request: Request): NextResponse {
+  const origin = request.headers.get("Origin");
+  const cors = getCorsHeaders(origin);
+  return new NextResponse(null, {
+    status: 204,
+    headers: { ...cors, Allow: "GET, POST, OPTIONS" },
+  });
+}
+
+export async function handleJobGet(request: Request, jobId: string): Promise<NextResponse> {
+  const origin = request.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
+  const identifier = getClientIdentifier(request);
+  const limit = await checkRateLimit(identifier, "status");
+  if (!limit.allowed) {
+    const retryAfter = limit.retryAfter ?? 60;
+    return apiError({
+      code: ErrorCode.RATE_LIMITED,
+      message: "Too many requests. Please try again later.",
+      status: 429,
+      details: { retryAfter },
+      headers: { ...corsHeaders, "Retry-After": String(retryAfter) },
+    });
+  }
+
+  const jobIdValidation = validateJobId(jobId);
+  if (!jobIdValidation.valid) {
+    return apiError({
+      code: ErrorCode.BAD_REQUEST,
+      message: jobIdValidation.error,
+      status: 400,
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    const queue = getVideoQueue();
+    const job = await queue.getJob(jobId);
+    if (!job) {
+      console.log("[api] GET /api/generate/[jobId] jobId=" + jobId + " status=404");
+      return apiError({
+        code: ErrorCode.JOB_NOT_FOUND,
+        message: "Job not found.",
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    const state = await job.getState();
+    const failedReason = job.failedReason;
+    const status: JobStatus = mapStateToStatus(state, failedReason);
+
+    const response: {
+      status: JobStatus;
+      videoUrl?: string;
+      message?: string;
+      error?: string;
+      isPreview?: boolean;
+      cost?: { llm: number; tts: number; video: number; images: number; total: number };
+      variations?: Array<{ videoUrl: string; cost?: { llm: number; tts: number; video: number; images: number; total: number } }>;
+    } = { status };
+
+    if (status === "completed") {
+      const result = job.returnvalue as VideoJobResult | undefined;
+      if (result?.variations && result.variations.length > 0) {
+        response.videoUrl = result.variations[0].videoUrl;
+        response.variations = result.variations;
+      } else if (result?.videoPath) {
+        response.videoUrl = result.videoPath;
+      }
+      if (result?.message) {
+        response.message = result.message;
+      }
+      if (result?.isPreview === true) {
+        response.isPreview = true;
+      }
+      if (result?.cost) {
+        response.cost = result.cost;
+      }
+    }
+
+    if (status === "failed") {
+      const { getUserFriendlyErrorMessage } = await import("@/lib/utils/error");
+      response.error = getUserFriendlyErrorMessage(job.failedReason ?? "Job failed.");
+    }
+
+    return NextResponse.json(response, { headers: corsHeaders });
+  } catch (e) {
+    console.log("[api] GET /api/generate/[jobId] jobId=" + jobId + " status=500");
+    const { logServerError } = await import("@/lib/utils/error");
+    logServerError("GET /api/generate/[jobId]", e);
+    return apiError({
+      code: ErrorCode.INTERNAL_ERROR,
+      message: "Something went wrong",
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+}
+
+export function handleCancelOptions(request: Request): NextResponse {
+  const origin = request.headers.get("Origin");
+  const cors = getCorsHeaders(origin);
+  return new NextResponse(null, {
+    status: 204,
+    headers: { ...cors, Allow: "GET, POST, OPTIONS" },
+  });
+}
+
+export async function handleCancelPost(request: Request, jobId: string): Promise<NextResponse> {
+  const origin = request.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
+  const jobIdValidation = validateJobId(jobId);
+  if (!jobIdValidation.valid) {
+    return apiError({
+      code: ErrorCode.BAD_REQUEST,
+      message: jobIdValidation.error,
+      status: 400,
+      headers: corsHeaders,
+    });
+  }
+
+  const result = await cancelJob(jobId);
+  if (result.ok) {
+    return NextResponse.json({ cancelled: true, jobId }, { headers: corsHeaders });
+  }
+  if (result.reason === "not_found") {
+    return apiError({
+      code: ErrorCode.JOB_NOT_FOUND,
+      message: "Job not found.",
+      status: 404,
+      details: { reason: "not_found" },
+      headers: corsHeaders,
+    });
+  }
+  return apiError({
+    code: ErrorCode.JOB_CANNOT_CANCEL,
+    message: "Job cannot be cancelled",
+    status: 409,
+    details: { reason: "already_finished" },
+    headers: corsHeaders,
+  });
+}
+
+export function handleDownloadOptions(request: Request): NextResponse {
+  const origin = request.headers.get("Origin");
+  const cors = getCorsHeaders(origin);
+  return new NextResponse(null, {
+    status: 204,
+    headers: { ...cors, Allow: "GET, POST, OPTIONS" },
+  });
+}
+
+export async function handleDownloadGet(request: Request, jobId: string): Promise<NextResponse> {
+  const origin = request.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
+  const jobIdValidation = validateJobId(jobId);
+  if (!jobIdValidation.valid) {
+    return apiError({
+      code: ErrorCode.BAD_REQUEST,
+      message: jobIdValidation.error,
+      status: 400,
+      headers: corsHeaders,
+    });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const variantParam = searchParams.get("variant");
+  const variantIndex = variantParam != null ? Math.max(0, Math.floor(Number(variantParam))) : 0;
+
+  try {
+    const queue = getVideoQueue();
+    const job = await queue.getJob(jobId);
+    if (!job) {
+      return apiError({
+        code: ErrorCode.JOB_NOT_FOUND,
+        message: "Job not found.",
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    const state = await job.getState();
+    if (state !== "completed") {
+      return apiError({
+        code: ErrorCode.JOB_NOT_READY,
+        message: "Video not ready. Job is not completed.",
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    const result = job.returnvalue as VideoJobResult | undefined;
+    let videoPath: string | undefined;
+
+    if (result?.variations && result.variations.length > 0) {
+      const v = result.variations[Math.min(variantIndex, result.variations.length - 1)];
+      videoPath = v?.videoUrl;
+    } else if (result?.videoPath) {
+      videoPath = result.videoPath;
+    }
+
+    if (!videoPath || typeof videoPath !== "string") {
+      return apiError({
+        code: ErrorCode.VIDEO_NOT_FOUND,
+        message: "Video path not found.",
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    const basename = path.basename(videoPath);
+    const cwd = process.cwd();
+    const filePath = path.join(cwd, "public", "temp", basename);
+
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      return apiError({
+        code: ErrorCode.VIDEO_NOT_FOUND,
+        message: "Video file not found. It may have been cleaned up.",
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    const suggestedFilename = basename.startsWith("cutline-") ? basename : `cutline-${basename}`;
+    const contentDisposition = `attachment; filename="${suggestedFilename}"`;
+
+    const fileBuffer = fs.readFileSync(filePath);
+    return new NextResponse(fileBuffer, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "video/mp4",
+        "Content-Disposition": contentDisposition,
+        "Content-Length": String(fileBuffer.length),
+      },
+    });
+  } catch (e) {
+    console.error("[api] GET /api/generate/[jobId]/download error:", e);
+    return apiError({
+      code: ErrorCode.INTERNAL_ERROR,
+      message: "Something went wrong",
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+}
+
+const LIST_JOBS_DEFAULT_LIMIT = 20;
+const LIST_JOBS_MAX_LIMIT = 50;
+
+export function handleJobsOptions(request: Request): NextResponse {
+  const origin = request.headers.get("Origin");
+  const cors = getCorsHeaders(origin);
+  return new NextResponse(null, {
+    status: 204,
+    headers: { ...cors, Allow: "GET, OPTIONS" },
+  });
+}
+
+export async function handleJobsGet(request: Request): Promise<NextResponse> {
+  const origin = request.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
+  const { searchParams } = new URL(request.url);
+  const limitParam = searchParams.get("limit");
+  let limit = LIST_JOBS_DEFAULT_LIMIT;
+  if (limitParam != null && limitParam !== "") {
+    const parsed = parseInt(limitParam, 10);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > LIST_JOBS_MAX_LIMIT) {
+      return apiError({
+        code: ErrorCode.BAD_REQUEST,
+        message: `Invalid limit. Must be between 1 and ${LIST_JOBS_MAX_LIMIT}.`,
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+    limit = parsed;
+  }
+  try {
+    const jobs = await listRecentJobs({ limit });
+    const body = {
+      jobs: jobs.map((j) => ({
+        jobId: j.jobId,
+        status: j.status,
+        createdAt: new Date(j.createdAt).toISOString(),
+        ...(j.videoUrl != null ? { videoUrl: j.videoUrl } : {}),
+        ...(j.topic != null ? { topic: j.topic } : {}),
+        ...(j.error != null ? { error: j.error } : {}),
+      })),
+    };
+    return NextResponse.json(body, { headers: corsHeaders });
+  } catch (e) {
+    const { logServerError } = await import("@/lib/utils/error");
+    logServerError("GET /api/generate/jobs", e);
+    return apiError({
+      code: ErrorCode.INTERNAL_ERROR,
+      message: "Something went wrong",
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+}
