@@ -1,11 +1,23 @@
 import { NextResponse } from "next/server";
+import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
+const MAX_PROMPT_LENGTH = 2000;
 
 export async function POST(request: Request) {
   try {
+    const identifier = getClientIdentifier(request);
+    const limit = await checkRateLimit(identifier, "general");
+    if (!limit.allowed) {
+      const retryAfter = limit.retryAfter ?? 60;
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later.", retryAfter },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } }
+      );
+    }
+
     const apiKey = process.env.OPENROUTER_API_KEY;
     const model = process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
 
@@ -16,11 +28,34 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
-    const partial = typeof body.prompt === "string" ? body.prompt.trim() : "";
-    const refine = Boolean(body.refine);
-    const durationSeconds = typeof body.durationSeconds === "number" && body.durationSeconds >= DURATION_MIN && body.durationSeconds <= DURATION_MAX
-      ? Math.round(body.durationSeconds)
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body. Send { prompt?: string, refine?: boolean, durationSeconds?: number }." },
+        { status: 400 }
+      );
+    }
+
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: "Invalid JSON body. Send { prompt?: string, refine?: boolean, durationSeconds?: number }." },
+        { status: 400 }
+      );
+    }
+
+    const b = body as { prompt?: unknown; refine?: unknown; durationSeconds?: unknown };
+    const partial = typeof b.prompt === "string" ? b.prompt.trim() : "";
+    if (partial.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: "Prompt is too long. Keep it under 2000 characters." },
+        { status: 400 }
+      );
+    }
+    const refine = Boolean(b.refine);
+    const durationSeconds = typeof b.durationSeconds === "number" && b.durationSeconds >= DURATION_MIN && b.durationSeconds <= DURATION_MAX
+      ? Math.round(b.durationSeconds)
       : 30;
     const isLongVideo = durationSeconds >= 45;
     const isShortVideo = durationSeconds <= 15;
