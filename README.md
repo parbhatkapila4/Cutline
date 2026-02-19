@@ -1,23 +1,10 @@
 <div align="center">
 
-  <img src="public/header.svg" alt="CUTLINE - One sentence → One video" width="920" />
+  <img src="public/header.png" alt="CUTLINE — One sentence → One video" width="920" />
 
   **AI-directed video editing.** Describe your idea in a single sentence and get a 30-45 second edited video. The system handles narrative, shots, pacing, motion, subtitles, voice, and images,no templates, no manual config. Images are optional: we fetch from the web (Unsplash / DALL·E / Pexels) from your description, or use a placeholder if APIs fail.
 
   **Tech stack**
-
-  <a href="https://nextjs.org/" title="Next.js"><img src="https://cdn.simpleicons.org/nextdotjs/000" height="28" alt="Next.js" /></a>
-  <a href="https://www.typescriptlang.org/" title="TypeScript"><img src="https://cdn.simpleicons.org/typescript/3178C6" height="28" alt="TypeScript" /></a>
-  <a href="https://react.dev/" title="React"><img src="https://cdn.simpleicons.org/react/61DAFB" height="28" alt="React" /></a>
-  <a href="https://www.remotion.dev/" title="Remotion"><img src="https://cdn.simpleicons.org/remotion/000" height="28" alt="Remotion" /></a>
-  <a href="https://docs.bullmq.io/" title="BullMQ"><img src="https://img.shields.io/badge/BullMQ-5-FF6B6B?style=flat-square" height="28" alt="BullMQ" /></a>
-  <a href="https://redis.io/" title="Redis"><img src="https://cdn.simpleicons.org/redis/DC382D" height="28" alt="Redis" /></a>
-  <a href="https://openrouter.ai/" title="OpenRouter"><img src="https://img.shields.io/badge/OpenRouter-AI-000?style=flat-square" height="28" alt="OpenRouter" /></a>
-  <a href="https://elevenlabs.io/" title="ElevenLabs"><img src="https://cdn.simpleicons.org/elevenlabs/000" height="28" alt="ElevenLabs" /></a>
-  <a href="https://play.ht/" title="PlayHT"><img src="https://img.shields.io/badge/PlayHT-TTS-000?style=flat-square" height="28" alt="PlayHT" /></a>
-  <a href="https://tailwindcss.com/" title="Tailwind CSS"><img src="https://cdn.simpleicons.org/tailwindcss/06B6D4" height="28" alt="Tailwind CSS" /></a>
-
-  Next.js · TypeScript · React 19 · Remotion · BullMQ · Redis · OpenRouter · ElevenLabs / PlayHT · Tailwind CSS
 
   [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)

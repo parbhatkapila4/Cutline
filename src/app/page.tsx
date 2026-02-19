@@ -92,7 +92,7 @@ function HomeContent() {
           data?.defaultScriptModel &&
           setDefaultScriptModel(data.defaultScriptModel),
       )
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -845,22 +845,20 @@ function HomeContent() {
                     {STAGES.map((stageName, i) => (
                       <div
                         key={i}
-                        className={`flex items-center gap-3 transition-all duration-300 ${
-                          i < stage
+                        className={`flex items-center gap-3 transition-all duration-300 ${i < stage
                             ? "opacity-50"
                             : i === stage
                               ? "opacity-100"
                               : "opacity-30"
-                        }`}
+                          }`}
                       >
                         <div
-                          className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300 ${
-                            i < stage
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300 ${i < stage
                               ? "bg-white border-white"
                               : i === stage
                                 ? "border-white"
                                 : "border-zinc-700"
-                          }`}
+                            }`}
                         >
                           {i < stage && (
                             <svg
@@ -984,11 +982,10 @@ function HomeContent() {
                       onDragLeave={() => setDragActive(false)}
                       onDrop={handleDrop}
                       onClick={() => fileInputRef.current?.click()}
-                      className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-                        dragActive
+                      className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${dragActive
                           ? "border-blue-500 bg-blue-500/10"
                           : "border-zinc-800 hover:border-zinc-700"
-                      }`}
+                        }`}
                     >
                       <input
                         ref={fileInputRef}
@@ -1111,8 +1108,8 @@ function HomeContent() {
                                 const displayLabel =
                                   opt.value === "" && defaultScriptModel
                                     ? (TEXT_MODEL_OPTIONS.find(
-                                        (o) => o.value === defaultScriptModel,
-                                      )?.label ?? defaultScriptModel)
+                                      (o) => o.value === defaultScriptModel,
+                                    )?.label ?? defaultScriptModel)
                                     : opt.label;
                                 return (
                                   <button
@@ -1122,18 +1119,16 @@ function HomeContent() {
                                       setTextModel(opt.value);
                                       setModelDropdownOpen(false);
                                     }}
-                                    className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition-colors ${
-                                      isActive
+                                    className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition-colors ${isActive
                                         ? "bg-white/[0.07]"
                                         : "hover:bg-white/[0.04]"
-                                    }`}
+                                      }`}
                                   >
                                     <div
-                                      className={`mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
-                                        isActive
+                                      className={`mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${isActive
                                           ? "border-blue-400 bg-blue-500/20"
                                           : "border-zinc-600"
-                                      }`}
+                                        }`}
                                     >
                                       {isActive && (
                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
@@ -1813,19 +1808,17 @@ function HomeContent() {
                         <div className="grid grid-cols-2 gap-3">
                           <button
                             onClick={() => setMode("slideshow")}
-                            className={`p-4 rounded-xl border text-left transition-all ${
-                              mode === "slideshow"
+                            className={`p-4 rounded-xl border text-left transition-all ${mode === "slideshow"
                                 ? "border-blue-500 bg-blue-500/10"
                                 : "border-zinc-800 hover:border-zinc-700"
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-2 mb-2">
                               <div
-                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                                  mode === "slideshow"
+                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${mode === "slideshow"
                                     ? "border-blue-500"
                                     : "border-zinc-700"
-                                }`}
+                                  }`}
                               >
                                 {mode === "slideshow" && (
                                   <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -1841,19 +1834,17 @@ function HomeContent() {
                           </button>
                           <button
                             onClick={() => setMode("talking_object")}
-                            className={`p-4 rounded-xl border text-left transition-all ${
-                              mode === "talking_object"
+                            className={`p-4 rounded-xl border text-left transition-all ${mode === "talking_object"
                                 ? "border-blue-500 bg-blue-500/10"
                                 : "border-zinc-800 hover:border-zinc-700"
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-2 mb-2">
                               <div
-                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                                  mode === "talking_object"
+                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${mode === "talking_object"
                                     ? "border-blue-500"
                                     : "border-zinc-700"
-                                }`}
+                                  }`}
                               >
                                 {mode === "talking_object" && (
                                   <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -1878,11 +1869,10 @@ function HomeContent() {
                               <button
                                 type="button"
                                 onClick={() => setTalkingObjectStyle("cartoon")}
-                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${
-                                  talkingObjectStyle === "cartoon"
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${talkingObjectStyle === "cartoon"
                                     ? "border-amber-500/50 bg-amber-500/10 text-amber-200"
                                     : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
-                                }`}
+                                  }`}
                               >
                                 {talkingObjectStyle === "cartoon" && (
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
@@ -1892,11 +1882,10 @@ function HomeContent() {
                               <button
                                 type="button"
                                 onClick={() => setTalkingObjectStyle("real")}
-                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${
-                                  talkingObjectStyle === "real"
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${talkingObjectStyle === "real"
                                     ? "border-amber-500/50 bg-amber-500/10 text-amber-200"
                                     : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
-                                }`}
+                                  }`}
                               >
                                 {talkingObjectStyle === "real" && (
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
@@ -1920,11 +1909,10 @@ function HomeContent() {
                           <button
                             type="button"
                             onClick={() => setCaptions("on")}
-                            className={`p-3 rounded-xl border text-left transition-all ${
-                              captions === "on"
+                            className={`p-3 rounded-xl border text-left transition-all ${captions === "on"
                                 ? "border-blue-500 bg-blue-500/10"
                                 : "border-zinc-800 hover:border-zinc-700"
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-2">
                               <div
@@ -1942,11 +1930,10 @@ function HomeContent() {
                           <button
                             type="button"
                             onClick={() => setCaptions("off")}
-                            className={`p-3 rounded-xl border text-left transition-all ${
-                              captions === "off"
+                            className={`p-3 rounded-xl border text-left transition-all ${captions === "off"
                                 ? "border-blue-500 bg-blue-500/10"
                                 : "border-zinc-800 hover:border-zinc-700"
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-2">
                               <div
@@ -2110,11 +2097,10 @@ function HomeContent() {
                 <button
                   key={tab}
                   onClick={() => setActiveFeatureTab(i)}
-                  className={`px-5 py-2.5 rounded-full text-sm transition-all duration-200 ${
-                    activeFeatureTab === i
+                  className={`px-5 py-2.5 rounded-full text-sm transition-all duration-200 ${activeFeatureTab === i
                       ? "bg-white text-black font-semibold"
                       : "text-zinc-400 hover:text-white"
-                  }`}
+                    }`}
                 >
                   {tab}
                 </button>
@@ -2624,11 +2610,10 @@ function HomeContent() {
                 return (
                   <div
                     key={plan.name}
-                    className={`relative rounded-2xl border p-6 flex flex-col ${
-                      plan.highlighted
+                    className={`relative rounded-2xl border p-6 flex flex-col ${plan.highlighted
                         ? "border-white/15 bg-zinc-900/60"
                         : "border-white/8 bg-zinc-950/80"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-5">
                       <div
@@ -2702,11 +2687,10 @@ function HomeContent() {
                     >
                       <a
                         href={plan.href}
-                        className={`flex items-center justify-center gap-2 font-semibold py-3 px-4 rounded-xl transition-all text-sm mb-5 ${
-                          plan.highlighted
+                        className={`flex items-center justify-center gap-2 font-semibold py-3 px-4 rounded-xl transition-all text-sm mb-5 ${plan.highlighted
                             ? "bg-white text-black hover:bg-zinc-200"
                             : "border border-white/15 text-white hover:bg-white/5"
-                        }`}
+                          }`}
                       >
                         {plan.cta}
                         <svg
@@ -2919,11 +2903,10 @@ function HomeContent() {
                     <button
                       key={i}
                       onClick={() => setActivePainPoint(i)}
-                      className={`w-full text-left rounded-xl border transition-all duration-300 ${
-                        activePainPoint === i
+                      className={`w-full text-left rounded-xl border transition-all duration-300 ${activePainPoint === i
                           ? "border-white/10 bg-zinc-900/80 p-5"
                           : "border-transparent bg-transparent px-5 py-4 hover:bg-zinc-900/30"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div

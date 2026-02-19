@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 200" width="920" height="200">
+  <defs>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#14b8a6"/>
+      <stop offset="100%" style="stop-color:#f97316"/>
+    </linearGradient>
+  </defs>
+  <!-- Black background -->
+  <rect width="100%" height="100%" fill="#0a0a0a"/>
+  <!-- Small top-left label -->
+  <text x="32" y="42" fill="#a3a3a3" font-family="system-ui, sans-serif" font-size="14" font-weight="600" letter-spacing="0.2em">cutline</text>
+  <!-- Main title: CUT (white) + LINE (teal) -->
+  <text x="32" y="98" fill="#ffffff" font-family="system-ui, sans-serif" font-size="52" font-weight="800" letter-spacing="-0.02em">CUT</text>
+  <text x="168" y="98" fill="#14b8a6" font-family="system-ui, sans-serif" font-size="52" font-weight="800" letter-spacing="-0.02em">LINE</text>
+  <!-- Tagline right of title: AI-Directed Video Editing that Delivers -->
+  <text x="320" y="88" fill="#ffffff" font-family="system-ui, sans-serif" font-size="22" font-weight="600">AI-Directed Video Editing</text>
+  <text x="320" y="115" fill="#14b8a6" font-family="system-ui, sans-serif" font-size="22" font-weight="600">that Delivers</text>
+  <!-- Subtitle -->
+  <text x="32" y="148" fill="#a3a3a3" font-family="system-ui, sans-serif" font-size="15" font-weight="500">? One sentence in, one video out.</text>
+  <!-- Film reel decorations (instead of bees) -->
+  <g fill="none" stroke="#14b8a6" stroke-width="2" opacity="0.85">
+    <circle cx="280" cy="52" r="12"/>
+    <circle cx="280" cy="52" r="6" fill="#14b8a6"/>
+    <circle cx="620" cy="75" r="10"/>
+    <circle cx="620" cy="75" r="4" fill="#f97316"/>
+    <circle cx="780" cy="95" r="11"/>
+    <circle cx="780" cy="95" r="5" fill="#14b8a6"/>
+  </g>
+  <!-- Play triangle accents -->
+  <path d="M 248 48 L 248 58 L 258 53 Z" fill="#f97316" opacity="0.9"/>
+  <path d="M 848 88 L 848 98 L 858 93 Z" fill="#14b8a6" opacity="0.9"/>
+  <!-- Two thick yellow/teal-orange bars at bottom -->
+  <rect x="0" y="172" width="100%" height="10" fill="url(#accent)" opacity="0.95"/>
+  <rect x="0" y="186" width="100%" height="6" fill="#14b8a6"/>
+</svg>
