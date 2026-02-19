@@ -1,9 +1,3 @@
-/**
- * POST /api/cleanup — manually trigger storage cleanup.
- * When CLEANUP_SECRET is set, require header X-Cleanup-Secret to match.
- * Useful for testing or external cron; primary cleanup runs via worker (BullMQ repeatable job).
- */
-
 import { NextResponse } from "next/server";
 import { runCleanup } from "@/lib/storage/cleanup";
 

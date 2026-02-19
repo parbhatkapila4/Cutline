@@ -1,8 +1,3 @@
-/**
- * Shared handlers for the generate API. Used by both /api/generate and /api/v1/generate
- * so logic is not duplicated. Route files (unversioned and v1) call these and optionally
- * add version headers.
- */
 import { NextResponse } from "next/server";
 import { getVideoQueue, cancelJob, listRecentJobs, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
