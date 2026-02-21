@@ -278,8 +278,8 @@ export default function DashboardVideoDetailPage() {
                         >
                           <div
                             className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === "user"
-                                ? "bg-white text-zinc-900 rounded-br-md shadow-lg"
-                                : "bg-zinc-800 text-zinc-200 border border-zinc-700/50 rounded-bl-md"
+                              ? "bg-white text-zinc-900 rounded-br-md shadow-lg"
+                              : "bg-zinc-800 text-zinc-200 border border-zinc-700/50 rounded-bl-md"
                               }`}
                           >
                             {msg.text}

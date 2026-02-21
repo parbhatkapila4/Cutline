@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { DashboardVideoItem } from "@/app/api/dashboard/videos/route";
 
 type VideoStatus = "completed" | "processing" | "failed";
@@ -65,74 +65,64 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/dashboard/videos")
-      .then(async (res) => {
-        if (res.ok) {
-          const data = (await res.json()) as DashboardVideoItem[] | unknown;
-          if (!cancelled) {
-            setVideosError(null);
-            if (Array.isArray(data)) setVideos(data);
-          }
-        } else {
-          let msg = "Failed to load videos. Please try again.";
-          try {
-            const body = (await res.json()) as { error?: string };
-            if (typeof body?.error === "string" && body.error.trim()) msg = body.error;
-          } catch {
-            /* use default msg */
-          }
-          if (!cancelled) {
-            setVideosError(msg);
-          }
+  const fetchVideos = useCallback(async () => {
+    setVideosLoading(true);
+    setVideosError(null);
+    try {
+      const res = await fetch("/api/dashboard/videos");
+      if (res.ok) {
+        const data = (await res.json()) as DashboardVideoItem[] | unknown;
+        setVideosError(null);
+        if (Array.isArray(data)) setVideos(data);
+      } else {
+        let msg = "Failed to load videos. Please try again.";
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (typeof body?.error === "string" && body.error.trim()) msg = body.error;
+        } catch {
         }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setVideosError("Failed to load videos. Please try again.");
-          setVideos([]);
+        setVideosError(msg);
+      }
+    } catch {
+      setVideosError("Failed to load videos. Please try again.");
+      setVideos([]);
+    } finally {
+      setVideosLoading(false);
+    }
+  }, []);
+
+  const fetchUsage = useCallback(async () => {
+    setUsageLoading(true);
+    setUsageError(null);
+    try {
+      const res = await fetch("/api/dashboard/usage");
+      if (res.ok) {
+        const data = (await res.json()) as UsageData;
+        setUsageError(null);
+        setUsage(data);
+      } else {
+        let msg = "Failed to load usage. Please try again.";
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (typeof body?.error === "string" && body.error.trim()) msg = body.error;
+        } catch {
         }
-      })
-      .finally(() => {
-        if (!cancelled) setVideosLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+        setUsageError(msg);
+      }
+    } catch {
+      setUsageError("Failed to load usage. Please try again.");
+    } finally {
+      setUsageLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/dashboard/usage")
-      .then(async (res) => {
-        if (res.ok) {
-          const data = (await res.json()) as UsageData;
-          if (!cancelled) {
-            setUsageError(null);
-            setUsage(data);
-          }
-        } else {
-          let msg = "Failed to load usage. Please try again.";
-          try {
-            const body = (await res.json()) as { error?: string };
-            if (typeof body?.error === "string" && body.error.trim()) msg = body.error;
-          } catch {
-            /* use default msg */
-          }
-          if (!cancelled) setUsageError(msg);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setUsageError("Failed to load usage. Please try again.");
-      })
-      .finally(() => {
-        if (!cancelled) setUsageLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    fetchVideos();
+  }, [fetchVideos]);
+
+  useEffect(() => {
+    fetchUsage();
+  }, [fetchUsage]);
 
   const filteredVideos = videos.filter((v) => {
     const matchStatus = videoFilter === "all" || v.status === videoFilter;
@@ -153,7 +143,10 @@ export default function DashboardPage() {
               {usageLoading ? (
                 <div className="space-y-3 text-xs text-zinc-500">Loading…</div>
               ) : usageError ? (
-                <p className="text-xs text-red-400">{usageError}</p>
+                <div>
+                  <p className="text-xs text-red-400">{usageError}</p>
+                  <button type="button" onClick={() => fetchUsage()} className="mt-2 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">Try again</button>
+                </div>
               ) : (
                 <>
                   <div className="space-y-4">
@@ -185,7 +178,10 @@ export default function DashboardPage() {
               {usageLoading ? (
                 <p className="text-xs text-zinc-500">Loading…</p>
               ) : usageError ? (
-                <p className="text-xs text-red-400">{usageError}</p>
+                <div>
+                  <p className="text-xs text-red-400">{usageError}</p>
+                  <button type="button" onClick={() => fetchUsage()} className="mt-2 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">Try again</button>
+                </div>
               ) : usage.recentActivity.length === 0 ? (
                 <p className="text-xs text-zinc-500">No recent activity</p>
               ) : (
@@ -207,7 +203,10 @@ export default function DashboardPage() {
               {usageLoading ? (
                 <p className="text-xs text-zinc-500">Loading…</p>
               ) : usageError ? (
-                <p className="text-xs text-red-400">{usageError}</p>
+                <div>
+                  <p className="text-xs text-red-400">{usageError}</p>
+                  <button type="button" onClick={() => fetchUsage()} className="mt-2 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">Try again</button>
+                </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-baseline justify-between gap-2">
@@ -240,7 +239,10 @@ export default function DashboardPage() {
               {usageLoading ? (
                 <p className="text-xs text-zinc-500">Loading…</p>
               ) : usageError ? (
-                <p className="text-xs text-red-400">{usageError}</p>
+                <div>
+                  <p className="text-xs text-red-400">{usageError}</p>
+                  <button type="button" onClick={() => fetchUsage()} className="mt-2 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">Try again</button>
+                </div>
               ) : (
                 <>
                   <p className="text-sm font-medium text-white">{usage.planLabel}</p>
@@ -486,6 +488,7 @@ export default function DashboardPage() {
             ) : videosError ? (
               <div className="rounded-xl border border-white/10 bg-zinc-950 p-8 text-center">
                 <p className="text-red-400 font-medium">{videosError}</p>
+                <button type="button" onClick={() => fetchVideos()} className="mt-4 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors">Try again</button>
               </div>
             ) : filteredVideos.length === 0 ? (
               <div className="rounded-xl border border-white/10 bg-zinc-950 border-dashed p-12 text-center">
