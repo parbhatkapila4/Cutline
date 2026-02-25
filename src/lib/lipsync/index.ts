@@ -1,0 +1,1 @@
+export { createTalkingVideo } from "./heygen";
