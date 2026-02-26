@@ -297,7 +297,6 @@ function HomeContent() {
             filter: "blur(80px)",
           }}
         />
-
         <div
           className="absolute w-[140px] h-[1300px] -left-[20px] -top-[200px] rounded-[60px] animate-[ribbonWaveLeft_8s_ease-in-out_infinite]"
           style={{
@@ -307,7 +306,6 @@ function HomeContent() {
             transformOrigin: "top center",
           }}
         />
-
         <div
           className="absolute w-[90px] h-[1200px] left-[60px] -top-[150px] rounded-[50px] opacity-70 animate-[ribbonFlowLeft_10s_ease-in-out_infinite]"
           style={{
@@ -317,7 +315,6 @@ function HomeContent() {
             transformOrigin: "top center",
           }}
         />
-
         <div
           className="absolute w-[30px] h-[1100px] left-[160px] -top-[100px] rounded-full opacity-40 animate-[ribbonWaveLeft_7s_ease-in-out_infinite]"
           style={{
@@ -327,7 +324,6 @@ function HomeContent() {
             transformOrigin: "top center",
           }}
         />
-
         <div
           className="absolute w-[600px] h-[900px] -right-[120px] -top-[80px] rounded-full opacity-40 animate-[ribbonDriftRight_14s_ease-in-out_infinite]"
           style={{
@@ -336,7 +332,6 @@ function HomeContent() {
             filter: "blur(80px)",
           }}
         />
-
         <div
           className="absolute w-[140px] h-[1300px] -right-[20px] -top-[200px] rounded-[60px] animate-[ribbonWaveRight_8s_ease-in-out_infinite]"
           style={{
@@ -346,7 +341,6 @@ function HomeContent() {
             transformOrigin: "top center",
           }}
         />
-
         <div
           className="absolute w-[90px] h-[1200px] right-[60px] -top-[150px] rounded-[50px] opacity-70 animate-[ribbonFlowRight_10s_ease-in-out_infinite]"
           style={{
@@ -356,7 +350,6 @@ function HomeContent() {
             transformOrigin: "top center",
           }}
         />
-
         <div
           className="absolute w-[30px] h-[1100px] right-[160px] -top-[100px] rounded-full opacity-40 animate-[ribbonWaveRight_7s_ease-in-out_infinite]"
           style={{
@@ -378,7 +371,6 @@ function HomeContent() {
               filter: "blur(16px)",
             }}
           />
-
           <nav
             className="relative z-10 flex items-center gap-6 bg-[#0c0c0c]/90 backdrop-blur-2xl border border-white/[0.07] rounded-[22px] px-8 py-3 min-w-[560px] max-w-[90vw]"
             style={{
