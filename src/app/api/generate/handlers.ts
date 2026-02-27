@@ -12,6 +12,7 @@ import {
   setIdempotencyResult,
   withIdempotencyLock,
 } from "@/lib/api/idempotency";
+import { runGenerationFlow, checkDownloadAllowed } from "@/lib/anon";
 import fs from "fs";
 import path from "path";
 
@@ -142,12 +143,30 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
+  // Anonymous funnel: one free generation per anon session; then require auth
+  // TODO: when auth is implemented, set userId from session and skip anon flow when present
+  const userId: string | undefined = undefined;
+  let anonFlow: Awaited<ReturnType<typeof runGenerationFlow>> | null = null;
+  if (!userId) {
+    anonFlow = await runGenerationFlow(request, data.input);
+    if (!anonFlow.result.allowed) {
+      return apiError({
+        code: ErrorCode.ANON_LIMIT_REACHED,
+        message: "Sign in to generate more videos, download, or access your dashboard.",
+        status: 403,
+        details: { reason: anonFlow.result.reason, anon_session_id: anonFlow.result.anon_session_id },
+        headers,
+      });
+    }
+  }
+
   try {
     const queue = getVideoQueue();
     const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth, TOKENS_PER_VIDEO, FREE_PLAN_VIDEOS_PER_MONTH } = await import("@/lib/usage");
     const creditsCheckDisabled =
       process.env.DISABLE_CREDITS_CHECK === "true" || process.env.DISABLE_CREDITS_CHECK === "1";
-    if (!creditsCheckDisabled) {
+    const skipCreditsForAnon = Boolean(anonFlow?.result.allowed);
+    if (!creditsCheckDisabled && !skipCreditsForAnon) {
       const tokensRemaining = await getTokens(identifier);
       if (tokensRemaining < TOKENS_PER_VIDEO) {
         return apiError({
@@ -172,12 +191,12 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         });
       }
     }
-    const userId: string | undefined = undefined;
     const jobPayload = {
       input: data.input,
-      clientId: identifier,
+      clientId: anonFlow?.result.anon_session_id ?? identifier,
       requestId,
       ...(userId ? { userId } : {}),
+      ...(anonFlow?.result.allowed ? { videoJobId: anonFlow.result.job_id } : {}),
       ...(data.assetIds?.length ? { assetIds: data.assetIds } : {}),
       ...(data.brandColors ? { brandColors: data.brandColors } : {}),
       ...(data.mode ? { mode: data.mode } : {}),
@@ -192,13 +211,16 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(data.callbackUrl ? { callbackUrl: data.callbackUrl } : {}),
     };
 
+    const anonJobId = anonFlow?.result.allowed ? anonFlow.result.job_id : undefined;
+    const queueAddOptions = anonJobId ? { jobId: anonJobId } : undefined;
+
     if (idempotencyKey) {
       const result = await withIdempotencyLock(idempotencyKey, async () => {
         const again = getIdempotencyResult(idempotencyKey);
         if (again) return again.responseBody as { jobId: string };
-        const job = await queue.add("video", jobPayload);
-        await incrementApiCallsThisMonth(identifier);
-        const jobId = String(job.id);
+        const job = await queue.add("video", jobPayload, queueAddOptions);
+        await incrementApiCallsThisMonth(anonFlow?.result.anon_session_id ?? identifier);
+        const jobId = anonJobId ?? String(job.id);
         const responseBody = { jobId };
         setIdempotencyResult(idempotencyKey, {
           jobId,
@@ -208,14 +230,18 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         return responseBody;
       });
       console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + result.jobId + " idempotencyKey=" + idempotencyKey);
-      return NextResponse.json(result, { headers });
+      const resHeaders = { ...headers };
+      if (anonFlow?.setCookieHeader) resHeaders["Set-Cookie"] = anonFlow.setCookieHeader;
+      return NextResponse.json(result, { headers: resHeaders });
     }
 
-    const job = await queue.add("video", jobPayload);
-    await incrementApiCallsThisMonth(identifier);
-    const jobId = String(job.id);
+    const job = await queue.add("video", jobPayload, queueAddOptions);
+    await incrementApiCallsThisMonth(anonFlow?.result.anon_session_id ?? identifier);
+    const jobId = anonJobId ?? String(job.id);
     console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + jobId);
-    return NextResponse.json({ jobId }, { headers });
+    const resHeaders = { ...headers };
+    if (anonFlow?.setCookieHeader) resHeaders["Set-Cookie"] = anonFlow.setCookieHeader;
+    return NextResponse.json({ jobId }, { headers: resHeaders });
   } catch (e) {
     const { logServerError } = await import("@/lib/utils/error");
     logServerError("POST /api/generate", e);
@@ -411,6 +437,17 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
   const { searchParams } = new URL(request.url);
   const variantParam = searchParams.get("variant");
   const variantIndex = variantParam != null ? Math.max(0, Math.floor(Number(variantParam))) : 0;
+
+  // Download gating: block anon-owned jobs until user authenticates
+  const gate = await checkDownloadAllowed(jobId);
+  if (gate.allowed === false && gate.reason === "auth_required") {
+    return apiError({
+      code: ErrorCode.AUTH_REQUIRED,
+      message: "Sign in to download this video.",
+      status: 403,
+      headers: corsHeaders,
+    });
+  }
 
   try {
     const queue = getVideoQueue();
