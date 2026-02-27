@@ -13,6 +13,7 @@ import {
   withIdempotencyLock,
 } from "@/lib/api/idempotency";
 import { runGenerationFlow, checkDownloadAllowed } from "@/lib/anon";
+import { isDatabaseConfigured } from "@/lib/db";
 import fs from "fs";
 import path from "path";
 
@@ -143,11 +144,11 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
-  // Anonymous funnel: one free generation per anon session; then require auth
+  // Anonymous funnel: one free generation per anon session when DB is configured
   // TODO: when auth is implemented, set userId from session and skip anon flow when present
   const userId: string | undefined = undefined;
   let anonFlow: Awaited<ReturnType<typeof runGenerationFlow>> | null = null;
-  if (!userId) {
+  if (!userId && isDatabaseConfigured()) {
     anonFlow = await runGenerationFlow(request, data.input);
     if (!anonFlow.result.allowed) {
       return apiError({
@@ -438,15 +439,17 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
   const variantParam = searchParams.get("variant");
   const variantIndex = variantParam != null ? Math.max(0, Math.floor(Number(variantParam))) : 0;
 
-  // Download gating: block anon-owned jobs until user authenticates
-  const gate = await checkDownloadAllowed(jobId);
-  if (gate.allowed === false && gate.reason === "auth_required") {
-    return apiError({
-      code: ErrorCode.AUTH_REQUIRED,
-      message: "Sign in to download this video.",
-      status: 403,
-      headers: corsHeaders,
-    });
+  // Download gating: block anon-owned jobs until user authenticates (when DB is configured)
+  if (isDatabaseConfigured()) {
+    const gate = await checkDownloadAllowed(jobId);
+    if (gate.allowed === false && gate.reason === "auth_required") {
+      return apiError({
+        code: ErrorCode.AUTH_REQUIRED,
+        message: "Sign in to download this video.",
+        status: 403,
+        headers: corsHeaders,
+      });
+    }
   }
 
   try {
