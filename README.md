@@ -11,6 +11,7 @@
   [![Remotion](https://img.shields.io/badge/Remotion-4-000?style=flat-square&logo=remotion)](https://www.remotion.dev/)
   [![BullMQ](https://img.shields.io/badge/BullMQ-5-FF6B6B?style=flat-square)](https://docs.bullmq.io/)
   [![Redis](https://img.shields.io/badge/Redis-ioredis-DC382D?style=flat-square&logo=redis)](https://redis.io/)
+  [![Neon](https://img.shields.io/badge/Neon-Postgres-00E599?style=flat-square&logo=neon)](https://neon.tech/)
   [![OpenRouter](https://img.shields.io/badge/OpenRouter-AI-000?style=flat-square)](https://openrouter.ai/)
   [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
 
@@ -93,6 +94,27 @@ Analysis output is passed to the visual layer and image sourcing. Logo placement
 ### Video Rendering
 
 The final stage takes the locked narrative plan, shot list, script, subtitles, motion spec, visual spec, **image spec**, and TTS audio and produces a single MP4 via **Remotion**. Output is written to `public/temp/[jobId].mp4` and served at `/temp/[jobId].mp4`. Cleanup runs automatically (configurable retention).
+
+---
+
+### Hybrid anonymous → authenticated funnel
+
+When **DATABASE_URL** (Neon Postgres) is set, the app supports an anonymous-first flow:
+
+- **One free video without sign-in.** A first-time visitor can generate one video. The app creates an **anonymous session** (stored in DB), sets an HTTP-only cookie (`cutline_anon_session`), and tracks how many generations that session has used.
+- **Second video and download require auth.** If the same visitor tries to generate a second video or download their video without signing in, the API returns **403** with `ANON_LIMIT_REACHED` or `AUTH_REQUIRED` and a message to sign in.
+- **Seamless history after sign-in.** When the user authenticates, call **`migrateAnonToUserOnAuth(request, userId)`** (e.g. in your auth callback). All video jobs owned by that anonymous session are reassigned to the user so their history appears in one place. This migration is idempotent.
+
+**Database schema (Neon):**
+
+- **anon_sessions** — `id` (UUID), `created_at`, `generation_count` (default 0).
+- **video_jobs** — `id`, `owner_type` (`anon` | `user`), `owner_id` (anon_session_id or user_id), `prompt`, `status`, `preview_url`, `final_url`, `created_at`, optional `queue_job_id` (BullMQ).
+
+**Apply the schema once:** Open Neon Dashboard → your project → **SQL Editor**, paste the contents of **`src/lib/db/schema.sql`**, and run it. The script is idempotent (safe to run multiple times).
+
+**Without DATABASE_URL:** The anon funnel is skipped. Generation and download behave as before (no per-session limit, no download gating). The app does not require a database to run.
+
+**Implementation:** `src/lib/db/` (types, schema, client), `src/lib/anon/` (cookie, session service, middleware, generation flow, download gate, migrate-on-auth), `src/lib/jobs/` (video job service). Generate and download handlers use `isDatabaseConfigured()` to enable or skip the funnel.
 
 ---
 
@@ -302,7 +324,7 @@ Output: public/temp/[jobId].mp4
 | AI                | OpenRouter                    | Single API for multiple models (Gemini, Claude, GPT); intent, narrative, shots, script, image query, asset analysis |
 | TTS               | ElevenLabs / PlayHT           | High-quality voice; PCM (ElevenLabs) for silence stitching; configurable                                            |
 | Images            | Unsplash, Pexels, DALL·E 3    | Stock first, AI fallback; placeholder if all fail so video still completes                                          |
-| Storage           | Local / S3                    | Uploads and temp files; no DB for pipeline state—job state in Redis/BullMQ                                          |
+| Storage           | Local / S3                    | Uploads and temp files; job state in Redis/BullMQ; optional Neon for anon sessions and job ownership              |
 | Rate limiting     | Redis + rate-limiter-flexible | Per-IP limits on generate, upload, status; abuse protection                                                         |
 | Testing           | Vitest                        | Unit tests next to source; integration test for POST /api/generate + poll                                           |
 
@@ -338,7 +360,7 @@ Output: public/temp/[jobId].mp4
 
 **Cleanup and retention.** Temp videos, uploads, and per-job images are deleted automatically (e.g. 24h retention, hourly cleanup job). Job temp dirs (images, veo chunks, preview-artifacts) are deleted when the pipeline finishes (success or failure). Final MP4s are retained until periodic cleanup removes them by age. Set CLEANUP_EXPIRED_HOURS for orphan cleanup (dirs older than N hours). That keeps disk bounded. For long-term storage, you’d need to copy outputs to durable storage (S3, CDN) outside CUTLINE.
 
-**No DB.** Pipeline state lives in BullMQ (Redis). There is no PostgreSQL or Prisma. User identity, billing, or project history would require adding a DB and auth in a future iteration.
+**Optional DB for anon funnel.** Pipeline state lives in BullMQ (Redis). When **DATABASE_URL** (Neon Postgres) is set, the app uses it for anonymous sessions and video job ownership (one free generation per anon session, download gating, and migration on auth). Without it, the app runs as before with no per-session limit. Full user identity and billing would require auth and possibly more tables.
 
 ---
 
@@ -391,11 +413,14 @@ The app and worker validate configuration at startup. If required vars are missi
 
 **Recommended (pipeline uses placeholders if missing):** At least one image source (`UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, or `OPENAI_API_KEY`) for real images. If none are set, placeholders are used.
 
+**Optional — anonymous funnel:** Set **`DATABASE_URL`** (Neon Postgres connection string) to enable the hybrid anonymous → authenticated flow (one free video per anon session, download gating, migration on auth). If unset, the app runs without the funnel.
+
 ```bash
 REDIS_URL=redis://localhost:6379
 OPENROUTER_API_KEY=sk-or-...
 ELEVENLABS_API_KEY=...   # or PLAYHT_API_KEY + PLAYHT_USER_ID with TTS_PROVIDER=playht
 UNSPLASH_ACCESS_KEY=...  # recommended; or PEXELS_API_KEY / OPENAI_API_KEY
+# DATABASE_URL=postgresql://...  # optional; Neon Postgres for anon funnel
 ```
 
 **Serverless (Vercel):** Validation runs when the Node.js runtime initializes. On cold start, missing required vars cause a 500 on the first request; check logs for the error message.
@@ -455,6 +480,10 @@ RATE_LIMIT_GENERAL=100
 # If RATE_LIMIT_MAX unset, RATE_LIMIT_GENERATE (5) per 3600s (1h) applies. Example: 10 per 60s:
 # RATE_LIMIT_MAX=10
 # RATE_LIMIT_WINDOW_SECONDS=60
+
+# Database (optional — anonymous funnel: one free video per session, download gating, migrate on auth)
+# DATABASE_URL=postgresql://user:pass@host.neon.tech/db?sslmode=require
+# Apply schema once: Neon Dashboard → SQL Editor → paste src/lib/db/schema.sql → Run
 
 # Retry (LLM, TTS, image, render)
 RETRY_ENABLED=true
@@ -617,6 +646,8 @@ Error responses from the generate API and job status/cancel/download use a consi
 | `JOB_NOT_READY` | 404 | Job exists but is not completed (download only). |
 | `VIDEO_NOT_FOUND` | 404 | Video file or path missing (e.g. file cleaned up). |
 | `JOB_CANNOT_CANCEL` | 409 | Job already completed or cancelled. `details.reason`: `already_finished`. |
+| `ANON_LIMIT_REACHED` | 403 | Anonymous user has used their one free generation; must sign in to generate more, download, or access dashboard. |
+| `AUTH_REQUIRED` | 403 | Action requires authentication (e.g. download anon-owned video, second video, dashboard). |
 | `INTERNAL_ERROR` | 500 | Unhandled server error. Message is generic; do not leak internals. |
 
 Codes are stable; do not change them in a backward-incompatible way. Additional codes (e.g. `WEBHOOK_INVALID_URL`) may be added for new flows.
@@ -741,6 +772,7 @@ Asset upload validation (file type, size, count) is documented in the existing R
 
 ## Troubleshooting
 
+- **403 ANON_LIMIT_REACHED / AUTH_REQUIRED**: With the anonymous funnel enabled (DATABASE_URL set), anonymous users get one free generation; a second video or download requires sign-in. Sign in and retry, or call `migrateAnonToUserOnAuth(request, userId)` after auth to attach anon jobs to the user.
 - **402 Payment Required / Not enough credits**: The app returned this because your token balance is below the cost per video, or you've hit the monthly video limit. Wait for reset, or check your usage on the dashboard.
 - **429 Too many requests**: You're rate limited (e.g. too many generate or suggest-prompt requests). For `POST /api/generate`, the body is `{ error: "Too Many Requests", retryAfter?: number }`. Wait for the time indicated in the `Retry-After` header or the response body, then try again.
 - **500 Server error**: Something failed on the server. Check worker and app logs; ensure env vars and Redis are correct. For generate jobs, check the job status endpoint for a failed reason.
@@ -783,8 +815,11 @@ src/
 │   ├── HowItWorks.tsx
 │   └── ...
 ├── lib/
+│   ├── anon/                  # Anonymous funnel: cookie, session service, middleware, generation flow, download gate, migrate-on-auth
 │   ├── assets/                # Storage, analysis, validation, types
+│   ├── db/                    # Neon Postgres: types, schema.sql, client
 │   ├── images/                # Unsplash, Pexels, DALL·E, source.ts
+│   ├── jobs/                  # Video job service (ownership, create, migrate)
 │   ├── pipeline/              # Orchestrator, intent, narrative, shots, script, subtitles, tts, motion, visuals, renderVideo
 │   ├── queue/                 # BullMQ videoQueue
 │   ├── rate-limit.ts
@@ -877,7 +912,7 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 - **Retention:** Rendered videos and uploads cleaned automatically (default 24h). Configure `VIDEO_RETENTION_HOURS`, `UPLOAD_RETENTION_HOURS`.
 - **Render time:** Full pipeline typically 1-3 minutes depending on length and image sourcing.
 - **Worker required:** Async video generation needs the worker process and Redis; Vercel alone cannot run the pipeline.
-- **No auth:** API is public at MVP; add auth and user-scoped jobs for multi-tenant production.
+- **Anonymous funnel (optional):** When DATABASE_URL is set, one free video per anon session; download and second video require auth. Call `migrateAnonToUserOnAuth` after sign-in to merge anon jobs into the user. Without DATABASE_URL, no per-session limit.
 
 ---
 
