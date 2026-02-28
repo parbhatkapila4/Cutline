@@ -30,8 +30,6 @@ export async function runGenerationFlow(
 ): Promise<GenerationFlowOutput> {
   const { anonSessionId, setCookieHeader } = await ensureAnonSession(request);
 
-  // TODO: When DB is connected, use getAnonSessionById(anonSessionId) for generation_count.
-  // Until then we have no persisted count; allow one by not blocking.
   const session = await getAnonSessionById(anonSessionId);
   const generationCount = session?.generation_count ?? 0;
 
