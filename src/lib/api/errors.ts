@@ -15,6 +15,10 @@ export const ErrorCode = {
   VIDEO_NOT_FOUND: "VIDEO_NOT_FOUND",
   WEBHOOK_INVALID_URL: "WEBHOOK_INVALID_URL",
   QUEUE_UNAVAILABLE: "QUEUE_UNAVAILABLE",
+  /** Anonymous user has used their one free generation; must sign in to continue */
+  ANON_LIMIT_REACHED: "ANON_LIMIT_REACHED",
+  /** Action requires authentication (e.g. download, second video, dashboard) */
+  AUTH_REQUIRED: "AUTH_REQUIRED",
 } as const;
 
 export type ApiErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
