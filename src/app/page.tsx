@@ -2939,6 +2939,14 @@ function HomeContent() {
       </main>
 
       <footer className="relative pt-16 pb-12 overflow-hidden">
+        {/* Blend with section above: black at top, then ease into the purple glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(180deg, #000 0%, #0a000d 15%, transparent 50%)",
+          }}
+        />
         <div className="absolute bottom-0 left-0 right-0 h-80 pointer-events-none">
           <div className="absolute bottom-0 left-0 w-80 h-64 bg-purple-700/25 rounded-full blur-[100px]" />
           <div className="absolute bottom-0 left-1/4 w-96 h-72 bg-purple-600/30 rounded-full blur-[120px]" />
