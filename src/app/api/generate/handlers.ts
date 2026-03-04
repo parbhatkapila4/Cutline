@@ -231,7 +231,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         return responseBody;
       });
       console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + result.jobId + " idempotencyKey=" + idempotencyKey);
-      const resHeaders = { ...headers };
+      const resHeaders: Record<string, string> = { ...headers };
       if (anonFlow?.setCookieHeader) resHeaders["Set-Cookie"] = anonFlow.setCookieHeader;
       return NextResponse.json(result, { headers: resHeaders });
     }
@@ -240,7 +240,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     await incrementApiCallsThisMonth(anonFlow?.result.anon_session_id ?? identifier);
     const jobId = anonJobId ?? String(job.id);
     console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + jobId);
-    const resHeaders = { ...headers };
+    const resHeaders: Record<string, string> = { ...headers };
     if (anonFlow?.setCookieHeader) resHeaders["Set-Cookie"] = anonFlow.setCookieHeader;
     return NextResponse.json({ jobId }, { headers: resHeaders });
   } catch (e) {
