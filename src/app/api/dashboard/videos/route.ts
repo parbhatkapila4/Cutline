@@ -9,7 +9,10 @@ export type DashboardVideoItem = {
   date: string;
   duration: string;
   status: "completed" | "processing" | "failed";
-  videoUrl: string;
+  /** Present only when status is "completed"; empty for processing/failed */
+  videoUrl?: string;
+  /** Unix timestamp (ms) for sorting; derived from finishedOn/processedOn/timestamp */
+  timestamp: number;
 };
 
 function formatDate(ms: number | undefined): string {
@@ -71,11 +74,11 @@ export async function GET(request: Request) {
     const toItem = (
       job: { id?: string; data?: unknown; finishedOn?: number; processedOn?: number; timestamp?: number },
       status: "completed" | "processing" | "failed",
-      videoUrl: string
+      videoUrl?: string
     ): DashboardVideoItem => {
       const data = job.data as VideoJobData | undefined;
       const input = data?.input;
-      const ts = job.finishedOn ?? job.processedOn ?? job.timestamp;
+      const ts = job.finishedOn ?? job.processedOn ?? job.timestamp ?? 0;
       return {
         id: String(job.id ?? ""),
         title: titleFromInput(input),
@@ -83,7 +86,8 @@ export async function GET(request: Request) {
         date: formatDate(ts),
         duration: formatDuration(data?.durationSeconds),
         status,
-        videoUrl,
+        ...(videoUrl ? { videoUrl } : {}),
+        timestamp: typeof ts === "number" ? ts : 0,
       };
     };
 
@@ -106,7 +110,7 @@ export async function GET(request: Request) {
       items.push(toItem(job, "processing", ""));
     }
 
-    items.sort((a, b) => b.date.localeCompare(a.date));
+    items.sort((a, b) => b.timestamp - a.timestamp);
 
     return NextResponse.json(items);
   } catch (e) {
