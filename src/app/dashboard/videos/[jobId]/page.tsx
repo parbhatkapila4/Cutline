@@ -184,7 +184,7 @@ export default function DashboardVideoDetailPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
 
-      <div className="fixed inset-0 bg-linear-to-br from-zinc-950 via-zinc-950 to-zinc-900/80 pointer-events-none" aria-hidden="true" />
+      <div className="fixed inset-0 bg-gradient-to-br from-zinc-950 via-zinc-950 to-zinc-900/80 pointer-events-none" aria-hidden="true" />
       <header className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/80">
         <div className="w-full h-14 px-6 lg:px-10 flex items-center justify-between max-w-7xl mx-auto">
           <Link href="/" className="font-semibold text-white tracking-tight text-lg">
@@ -300,16 +300,6 @@ export default function DashboardVideoDetailPage() {
                     </>
                   )}
                 </div>
-
-                {editInProgress && (
-                  <div className="px-4 sm:px-5 py-3 border-t border-amber-500/30 bg-amber-500/10 flex items-center gap-3 shrink-0">
-                    <svg className="w-5 h-5 shrink-0 animate-spin text-amber-400" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span className="text-sm text-amber-200/90">Regenerating video… You can send another message when this finishes.</span>
-                  </div>
-                )}
 
                 <form onSubmit={handleSubmit} className="p-4 sm:p-5 border-t border-zinc-800 bg-zinc-800/30 shrink-0">
                   <div className="flex gap-3">
