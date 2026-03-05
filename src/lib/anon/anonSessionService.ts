@@ -25,7 +25,7 @@ export async function getAnonSessionById(sessionId: string): Promise<AnonSession
     WHERE id = ${sessionId}
     LIMIT 1
   `;
-  const row = rows[0];
+  const row = (rows as unknown as Record<string, unknown>[])[0];
   if (!row || typeof row !== "object") return null;
   return mapRow(row as { id: string; created_at: Date; generation_count: number });
 }
@@ -40,7 +40,7 @@ export async function createAnonSession(): Promise<AnonSession> {
     VALUES (gen_random_uuid(), now(), 0)
     RETURNING id, created_at, generation_count
   `;
-  const row = rows[0];
+  const row = (rows as unknown as Record<string, unknown>[])[0];
   if (!row || typeof row !== "object") {
     throw new Error("Failed to create anon session");
   }
