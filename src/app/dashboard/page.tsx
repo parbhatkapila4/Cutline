@@ -141,7 +141,17 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-white/10 bg-zinc-950 p-4">
               <h2 className="text-sm font-semibold text-white mb-3">Usage</h2>
               {usageLoading ? (
-                <div className="space-y-3 text-xs text-zinc-500">Loading…</div>
+                <div className="space-y-4 animate-pulse">
+                  <div>
+                    <div className="h-3 w-24 bg-zinc-800 rounded mb-2" />
+                    <div className="h-2 rounded-full bg-zinc-800" />
+                  </div>
+                  <div>
+                    <div className="h-3 w-16 bg-zinc-800 rounded mb-2" />
+                    <div className="h-2 rounded-full bg-zinc-800" />
+                  </div>
+                  <div className="h-3 w-32 bg-zinc-800 rounded mt-3" />
+                </div>
               ) : usageError ? (
                 <div>
                   <p className="text-xs text-red-400">{usageError}</p>
@@ -176,7 +186,17 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-white/10 bg-zinc-950 p-4">
               <h2 className="text-sm font-semibold text-white mb-3">Recent activity</h2>
               {usageLoading ? (
-                <p className="text-xs text-zinc-500">Loading…</p>
+                <div className="space-y-2.5 animate-pulse">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <div className="shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full bg-zinc-800" />
+                      <div className="flex-1 min-w-0">
+                        <div className="h-3 w-3/4 bg-zinc-800 rounded" />
+                        <div className="h-[11px] w-1/2 bg-zinc-800 rounded mt-1" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : usageError ? (
                 <div>
                   <p className="text-xs text-red-400">{usageError}</p>
@@ -201,7 +221,16 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-white/10 bg-zinc-950 p-4">
               <h2 className="text-sm font-semibold text-white mb-3">Tokens</h2>
               {usageLoading ? (
-                <p className="text-xs text-zinc-500">Loading…</p>
+                <div className="space-y-3 animate-pulse">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="h-8 w-12 bg-zinc-800 rounded" />
+                    <div className="h-3 w-24 bg-zinc-800 rounded" />
+                  </div>
+                  <div className="h-2 rounded-full bg-zinc-800" />
+                  <div className="h-3 w-full bg-zinc-800 rounded" />
+                  <div className="h-3 w-32 bg-zinc-800 rounded" />
+                  <div className="h-9 w-full bg-zinc-800 rounded mt-3" />
+                </div>
               ) : usageError ? (
                 <div>
                   <p className="text-xs text-red-400">{usageError}</p>
@@ -237,7 +266,11 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-white/10 bg-zinc-950 p-4 shrink-0">
               <h2 className="text-sm font-semibold text-white mb-3">Plan</h2>
               {usageLoading ? (
-                <p className="text-xs text-zinc-500">Loading…</p>
+                <div className="space-y-2 animate-pulse">
+                  <div className="h-4 w-16 bg-zinc-800 rounded" />
+                  <div className="h-3 w-32 bg-zinc-800 rounded" />
+                  <div className="h-9 w-full bg-zinc-800 rounded mt-3" />
+                </div>
               ) : usageError ? (
                 <div>
                   <p className="text-xs text-red-400">{usageError}</p>
@@ -411,30 +444,23 @@ export default function DashboardPage() {
 
           <section className="mb-8">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div className="rounded-lg border border-white/10 bg-zinc-950 p-3">
-                <p className="text-xs text-zinc-500 font-medium">Total videos</p>
-                <p className="text-xl font-bold text-white mt-0.5">{usageLoading ? "—" : (usage.overview?.totalVideos ?? 0)}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-zinc-950 p-3">
-                <p className="text-xs text-zinc-500 font-medium">This week</p>
-                <p className="text-xl font-bold text-white mt-0.5">{usageLoading ? "—" : (usage.overview?.thisWeek ?? 0)}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-zinc-950 p-3">
-                <p className="text-xs text-zinc-500 font-medium">This month</p>
-                <p className="text-xl font-bold text-white mt-0.5">{usageLoading ? "—" : (usage.overview?.thisMonth ?? 0)}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-zinc-950 p-3">
-                <p className="text-xs text-zinc-500 font-medium">Total duration</p>
-                <p className="text-xl font-bold text-white mt-0.5">{usageLoading ? "—" : `${usage.overview?.totalDurationMin ?? 0} min`}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-zinc-950 p-3">
-                <p className="text-xs text-zinc-500 font-medium">Storage used</p>
-                <p className="text-xl font-bold text-white mt-0.5">{usageLoading ? "—" : (usage.overview?.storageUsed ?? "—")}</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-zinc-950 p-3">
-                <p className="text-xs text-zinc-500 font-medium">In progress</p>
-                <p className="text-xl font-bold text-white mt-0.5">{usageLoading ? "—" : (usage.overview?.inProgress ?? 0)}</p>
-              </div>
+              {[
+                { label: "Total videos", value: usageLoading ? null : (usage.overview?.totalVideos ?? 0), suffix: "" },
+                { label: "This week", value: usageLoading ? null : (usage.overview?.thisWeek ?? 0), suffix: "" },
+                { label: "This month", value: usageLoading ? null : (usage.overview?.thisMonth ?? 0), suffix: "" },
+                { label: "Total duration", value: usageLoading ? null : (usage.overview?.totalDurationMin ?? 0), suffix: " min" },
+                { label: "Storage used", value: usageLoading ? null : (usage.overview?.storageUsed ?? "—"), suffix: "" },
+                { label: "In progress", value: usageLoading ? null : (usage.overview?.inProgress ?? 0), suffix: "" },
+              ].map(({ label, value, suffix }) => (
+                <div key={label} className="rounded-lg border border-white/10 bg-zinc-950 p-3">
+                  <p className="text-xs text-zinc-500 font-medium">{label}</p>
+                  {value === null ? (
+                    <div className="h-7 w-12 bg-zinc-800 rounded animate-pulse mt-1" />
+                  ) : (
+                    <p className="text-xl font-bold text-white mt-0.5">{value}{suffix}</p>
+                  )}
+                </div>
+              ))}
             </div>
             <p className="text-xs text-zinc-500 mt-2">
               Avg. render time: {usage.overview?.avgRenderSec != null ? `~${usage.overview.avgRenderSec} sec` : "—"}
@@ -481,9 +507,17 @@ export default function DashboardPage() {
             </div>
 
             {videosLoading ? (
-              <div className="rounded-xl border border-white/10 bg-zinc-950 p-12 text-center">
-                <div className="w-10 h-10 mx-auto rounded-full border-2 border-white/20 border-t-white animate-spin mb-4" />
-                <p className="text-zinc-400 font-medium">Loading videos...</p>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="rounded-xl border border-white/10 bg-zinc-950 overflow-hidden animate-pulse">
+                    <div className="aspect-video bg-zinc-800" />
+                    <div className="p-4 space-y-2">
+                      <div className="h-4 w-3/4 bg-zinc-800 rounded" />
+                      <div className="h-3 w-full bg-zinc-800 rounded" />
+                      <div className="h-3 w-1/2 bg-zinc-800 rounded" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : videosError ? (
               <div className="rounded-xl border border-white/10 bg-zinc-950 p-8 text-center">
