@@ -1,3 +1,22 @@
+/**
+ * Pipeline orchestrator: runs the full video generation flow from intent to rendered MP4.
+ *
+ * Stages (slideshow mode):
+ * 1. Intent — LLM parses input into audience, goal, tone, duration
+ * 2. Narrative — LLM plans arc and beats
+ * 3. Shots — LLM breaks into 8–12 shots with motion and text density
+ * 4. Script — LLM generates spoken text per shot
+ * 5. Subtitles — Chunk script, estimate timing
+ * 6. TTS — ElevenLabs/PlayHT generates audio
+ * 7. Subtitle refine — Word timings from TTS → aligned chunks
+ * 8. Motion — Per-shot motion spec
+ * 9. Asset analysis — (if uploads) LLM vision on assets
+ * 10. Visuals — Visual spec from intent + assets
+ * 11. Image sourcing — Per-shot: query → Unsplash/DALL·E/Pexels
+ * 12. Remotion render — Compose script, shots, subtitles, motion, images, audio → MP4
+ *
+ * Talking-object mode: replaces image sourcing with Veo-generated clips.
+ */
 import fs from "fs";
 import path from "path";
 
@@ -46,6 +65,7 @@ import { createCostTracker } from "@/lib/cost/costEstimator";
 import type { CostBreakdown } from "@/lib/cost/types";
 import type { Job } from "bullmq";
 
+/** Approximate LLM token counts per stage for cost estimation */
 const TOKENS_ESTIMATE = {
   intent: 400,
   narrative: 600,
@@ -57,8 +77,10 @@ const TOKENS_ESTIMATE = {
 } as const;
 
 
+/** BullMQ job lock extension interval (30 min) for long-running pipelines */
 const LOCK_DURATION_MS = 1_800_000;
 
+/** Wraps a pipeline stage with telemetry (recordStageStart/recordStageEnd) */
 function withStageTelemetry<T>(
   jobId: string,
   stageName: string,
@@ -250,6 +272,11 @@ export type PipelineResult = {
   variations?: Array<{ videoUrl: string; cost?: CostBreakdown }>;
 };
 
+/**
+ * Orchestrates the full video generation pipeline. Runs stages in order with
+ * retries for transient failures. Supports slideshow (images + TTS + Remotion)
+ * and talking-object (Veo-generated clips). Handles preview/final and multi-variant flows.
+ */
 export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
   const { renderMode, previewJobId, variationCount, platform, jobId, job } = options;
   const isFinalFromPreview = renderMode === "final" && previewJobId;
@@ -685,7 +712,13 @@ async function runPipelineOnce(
             if (attempt < VEO_CHUNK_VALIDATE_RETRIES) {
               const delayMs = (attempt + 1) * 3000;
               console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " invalid, retrying in " + delayMs + "ms: " + lastChunkError.message);
-              if (fs.existsSync(chunkPath)) try { fs.unlinkSync(chunkPath); } catch { }
+              if (fs.existsSync(chunkPath)) {
+                try {
+                  fs.unlinkSync(chunkPath);
+                } catch (unlinkErr) {
+                  console.warn("[pipeline] jobId=" + jobId + " failed to unlink chunk:", unlinkErr instanceof Error ? unlinkErr.message : String(unlinkErr));
+                }
+              }
               await new Promise((r) => setTimeout(r, delayMs));
             } else {
               throw new Error(
