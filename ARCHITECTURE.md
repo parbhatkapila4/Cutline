@@ -1,4 +1,4 @@
-# CUTLINE — Architecture
+# CUTLINE - Architecture
 
 A 5‑minute overview for engineers. One sentence in → video out.
 
@@ -11,29 +11,29 @@ The video pipeline runs in order. Each stage consumes the previous output; any f
 ```
 Input (one sentence)
     ↓
-1. Intent        — LLM: audience, goal, tone, complexity, duration
+1. Intent        - LLM: audience, goal, tone, complexity, duration
     ↓
-2. Narrative     — LLM: arc, 3–5 beats, pacing
+2. Narrative     - LLM: arc, 3-5 beats, pacing
     ↓
-3. Shots         — LLM: 8–12 shots, purpose, motion, text density
+3. Shots         - LLM: 8-12 shots, purpose, motion, text density
     ↓
-4. Script        — LLM: spoken text (or silence) per shot
+4. Script        - LLM: spoken text (or silence) per shot
     ↓
-5. Subtitles     — In-process: chunk script, estimate timing
+5. Subtitles     - In-process: chunk script, estimate timing
     ↓
-6. TTS           — ElevenLabs/PlayHT: audio per segment, silence where text is null
+6. TTS           - ElevenLabs/PlayHT: audio per segment, silence where text is null
     ↓
-7. Subtitle refine — Word timings from TTS → align subtitle chunks
+7. Subtitle refine - Word timings from TTS → align subtitle chunks
     ↓
-8. Motion        — In-process: motion spec per shot (from shot list)
+8. Motion        - In-process: motion spec per shot (from shot list)
     ↓
-9. Asset analysis — If uploads: LLM vision on logo, product photos, ref video/images
+9. Asset analysis - If uploads: LLM vision on logo, product photos, ref video/images
     ↓
-10. Visuals      — In-process: visual spec (colors, layout) from intent + assets
+10. Visuals      - In-process: visual spec (colors, layout) from intent + assets
     ↓
-11. Image sourcing — Per shot: LLM query → Unsplash → DALL·E → Pexels → simplified query
+11. Image sourcing - Per shot: LLM query → Unsplash → DALL·E → Pexels → simplified query
     ↓
-12. Remotion render — Compose script, shots, subtitles, motion, images, audio → MP4
+12. Remotion render - Compose script, shots, subtitles, motion, images, audio → MP4
     ↓
 Output: public/temp/[jobId].mp4
 ```
@@ -86,7 +86,7 @@ Output: public/temp/[jobId].mp4
 1. User submits sentence (and optional assets) on `/generate`.
 2. If assets: `POST /api/assets/upload` → store files → `assetIds`.
 3. `POST /api/generate` → body `{ input, assetIds?, brandColors? }` → rate limit → validate → `queue.add(...)` → `{ jobId }`.
-4. Worker: `runPipeline({ input, jobId, assetIds?, brandColors? })` → stages 1–12 → write MP4.
+4. Worker: `runPipeline({ input, jobId, assetIds?, brandColors? })` → stages 1-12 → write MP4.
 5. UI polls `GET /api/generate/[jobId]` until `status === "completed"` or `"failed"` → show video or error.
 
 ---
