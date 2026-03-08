@@ -1,19 +1,89 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
-  --bg: #000000;
-  --fg: #fafafa;
-  --muted: #71717a;
-  --border: #1a1a1a;
-  --card: #000000;
-  --accent: #3b82f6;
+  --bg: #FAFAFA;
+  --fg: #0a0a0a;
+  --muted: oklch(0.97 0 0);
+  --border: oklch(0.922 0 0);
+  --card: oklch(1 0 0);
+  --accent: oklch(0.97 0 0);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.58 0.22 27);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  --elegant-font: 'Great Vibes';
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --elegant-font: var(----elegant-font);
 }
 
 * {
@@ -102,7 +172,6 @@ body {
   background: #444;
 }
 
-
 html:has(.dashboard-root) {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -113,8 +182,6 @@ html:has(.dashboard-root)::-webkit-scrollbar {
   width: 0;
   height: 0;
 }
-
-
 
 @keyframes ribbonWaveLeft {
 
@@ -147,7 +214,6 @@ html:has(.dashboard-root)::-webkit-scrollbar {
     translate: -5px 10px;
   }
 }
-
 
 @keyframes ribbonFlowLeft {
 
@@ -189,7 +255,6 @@ html:has(.dashboard-root)::-webkit-scrollbar {
   }
 }
 
-
 @keyframes ribbonDriftLeft {
 
   0%,
@@ -218,7 +283,6 @@ html:has(.dashboard-root)::-webkit-scrollbar {
   }
 }
 
-
 @keyframes diagram-figure8-orbit {
 
   0%,
@@ -238,7 +302,6 @@ html:has(.dashboard-root)::-webkit-scrollbar {
     transform: translate(12px, 16px) scale(1.02);
   }
 }
-
 
 @keyframes diagram-3d-tumble {
   0% {
@@ -285,7 +348,6 @@ html:has(.dashboard-root)::-webkit-scrollbar {
   animation: diagram-rotate-reverse 18s linear infinite;
 }
 
-
 @keyframes feature-grid-shimmer {
   0% {
     opacity: 0.3;
@@ -321,8 +383,6 @@ html:has(.dashboard-root)::-webkit-scrollbar {
   animation: feature-grid-shimmer 2s ease-in-out infinite;
 }
 
-
-
 @keyframes fade-in {
   0% {
     opacity: 0;
@@ -338,7 +398,6 @@ html:has(.dashboard-root)::-webkit-scrollbar {
 .animate-fade-in {
   animation: fade-in 0.4s ease-out;
 }
-
 
 @keyframes progress-wave {
   0% {
@@ -391,94 +450,304 @@ html:has(.dashboard-root)::-webkit-scrollbar {
 
 /* ─── Hero (new) ─── */
 @keyframes hero-mesh {
-  0%, 100% { opacity: 0.6; transform: scale(1) translate(0, 0) rotate(0deg); }
-  33% { opacity: 0.8; transform: scale(1.05) translate(2%, -1%) rotate(1deg); }
-  66% { opacity: 0.7; transform: scale(0.98) translate(-1%, 2%) rotate(-0.5deg); }
+
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1) translate(0, 0) rotate(0deg);
+  }
+
+  33% {
+    opacity: 0.8;
+    transform: scale(1.05) translate(2%, -1%) rotate(1deg);
+  }
+
+  66% {
+    opacity: 0.7;
+    transform: scale(0.98) translate(-1%, 2%) rotate(-0.5deg);
+  }
 }
 
 @keyframes hero-orb-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-  50% { transform: translate(8vw, -5vh) scale(1.1); opacity: 0.6; }
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: translate(8vw, -5vh) scale(1.1);
+    opacity: 0.6;
+  }
 }
 
 @keyframes hero-orb-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.35; }
-  50% { transform: translate(-6vw, 4vh) scale(1.15); opacity: 0.5; }
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.35;
+  }
+
+  50% {
+    transform: translate(-6vw, 4vh) scale(1.15);
+    opacity: 0.5;
+  }
 }
 
 @keyframes hero-orb-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
-  50% { transform: translate(4vw, 6vh) scale(1.08); opacity: 0.45; }
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.3;
+  }
+
+  50% {
+    transform: translate(4vw, 6vh) scale(1.08);
+    opacity: 0.45;
+  }
 }
 
 @keyframes hero-orb-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.25; }
-  50% { transform: translate(-5vw, -3vh) scale(1.12); opacity: 0.4; }
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.25;
+  }
+
+  50% {
+    transform: translate(-5vw, -3vh) scale(1.12);
+    opacity: 0.4;
+  }
 }
 
 @keyframes hero-word {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes hero-sub {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes hero-cta-glow {
-  0%, 100% { opacity: 0.5; filter: blur(20px); }
-  50% { opacity: 0.8; filter: blur(28px); }
+
+  0%,
+  100% {
+    opacity: 0.5;
+    filter: blur(20px);
+  }
+
+  50% {
+    opacity: 0.8;
+    filter: blur(28px);
+  }
 }
 
 @keyframes hero-shine {
-  0% { left: -100%; }
-  100% { left: 100%; }
+  0% {
+    left: -100%;
+  }
+
+  100% {
+    left: 100%;
+  }
 }
 
 @keyframes hero-scroll-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(6px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(6px);
+  }
 }
 
 @keyframes hero-ring-pulse {
-  0%, 100% { opacity: 0.15; transform: scale(1); }
-  50% { opacity: 0.25; transform: scale(1.03); }
+
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.25;
+    transform: scale(1.03);
+  }
 }
 
 @keyframes hero-frame-float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-8px) rotate(0.5deg); }
+
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
 }
 
 .hero-mesh-bg {
   animation: hero-mesh 18s ease-in-out infinite;
 }
 
-.hero-orb-1 { animation: hero-orb-1 14s ease-in-out infinite; }
-.hero-orb-2 { animation: hero-orb-2 16s ease-in-out infinite; }
-.hero-orb-3 { animation: hero-orb-3 12s ease-in-out infinite; }
-.hero-orb-4 { animation: hero-orb-4 15s ease-in-out infinite; }
+.hero-orb-1 {
+  animation: hero-orb-1 14s ease-in-out infinite;
+}
 
-.hero-word { animation: hero-word 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-.hero-sub { animation: hero-sub 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-.hero-cta-glow { animation: hero-cta-glow 3s ease-in-out infinite; }
-.hero-scroll-bounce { animation: hero-scroll-bounce 2s ease-in-out infinite; }
-.hero-ring-pulse { animation: hero-ring-pulse 4s ease-in-out infinite; }
-.hero-frame-float { animation: hero-frame-float 5s ease-in-out infinite; }
+.hero-orb-2 {
+  animation: hero-orb-2 16s ease-in-out infinite;
+}
+
+.hero-orb-3 {
+  animation: hero-orb-3 12s ease-in-out infinite;
+}
+
+.hero-orb-4 {
+  animation: hero-orb-4 15s ease-in-out infinite;
+}
+
+.hero-word {
+  animation: hero-word 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.hero-sub {
+  animation: hero-sub 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.hero-cta-glow {
+  animation: hero-cta-glow 3s ease-in-out infinite;
+}
+
+.hero-scroll-bounce {
+  animation: hero-scroll-bounce 2s ease-in-out infinite;
+}
+
+.hero-ring-pulse {
+  animation: hero-ring-pulse 4s ease-in-out infinite;
+}
+
+.hero-frame-float {
+  animation: hero-frame-float 5s ease-in-out infinite;
+}
 
 @keyframes hero-glow-slow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.08); }
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.08);
+  }
 }
+
 @keyframes hero-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
 }
+
 @keyframes hero-reveal {
-  from { opacity: 0; transform: translateY(32px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.hero-glow-slow { animation: hero-glow-slow 6s ease-in-out infinite; }
-.hero-float { animation: hero-float 5s ease-in-out infinite; }
-.hero-reveal { animation: hero-reveal 1s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+.hero-glow-slow {
+  animation: hero-glow-slow 6s ease-in-out infinite;
+}
+
+.hero-float {
+  animation: hero-float 5s ease-in-out infinite;
+}
+
+.hero-reveal {
+  animation: hero-reveal 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.87 0.00 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  html {
+    @apply font-mono;
+  }
+}
