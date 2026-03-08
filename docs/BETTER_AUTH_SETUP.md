@@ -1,4 +1,4 @@
-# Better Auth — How to Start and Implement
+# Better Auth - How to Start and Implement
 
 This guide walks you through adding Better Auth to Cutline so users can sign in, get a stable `userId`, and your existing anon → user migration works.
 
@@ -149,7 +149,7 @@ Use `NEXT_PUBLIC_APP_URL` in production so the client points at your real domain
 
 Your generate handler already has a placeholder for `userId`. Get the session from Better Auth and pass the user id.
 
-**Option A — in the handler (recommended):**
+**Option A - in the handler (recommended):**
 
 In **`src/app/api/generate/handlers.ts`**, replace the hardcoded `userId` with:
 
@@ -214,7 +214,7 @@ So: first time (or every time) a user signs in, any jobs tied to their anon sess
 
 Add a simple auth UI so users can sign up and sign in.
 
-**Example — sign-in page** (`src/app/signin/page.tsx`):
+**Example - sign-in page** (`src/app/signin/page.tsx`):
 
 ```tsx
 "use client";
@@ -274,7 +274,7 @@ export default function SignInPage() {
 
 ## 12. Link “Sign in” from the app
 
-- In the generate flow, when the API returns `ANON_LIMIT_REACHED` or `AUTH_REQUIRED`, you already show “Sign in to generate more…” — point that to `/signin` (or your sign-in route).
+- In the generate flow, when the API returns `ANON_LIMIT_REACHED` or `AUTH_REQUIRED`, you already show “Sign in to generate more…” - point that to `/signin` (or your sign-in route).
 - In the dashboard header or layout, show “Sign in” when there’s no session and “Sign out” when there is (using `useSession()` from the auth client).
 
 ---
@@ -296,8 +296,8 @@ export default function SignInPage() {
 
 ## References
 
-- [Better Auth — Installation](https://www.better-auth.com/docs/installation)
-- [Better Auth — PostgreSQL](https://www.better-auth.com/docs/adapters/postgresql)
-- [Better Auth — Next.js](https://www.better-auth.com/docs/integrations/next-js) (mount handler)
-- [Better Auth — Basic usage](https://www.better-auth.com/docs/basic-usage) (client, signIn, signUp, getSession)
+- [Better Auth - Installation](https://www.better-auth.com/docs/installation)
+- [Better Auth - PostgreSQL](https://www.better-auth.com/docs/adapters/postgresql)
+- [Better Auth - Next.js](https://www.better-auth.com/docs/integrations/next-js) (mount handler)
+- [Better Auth - Basic usage](https://www.better-auth.com/docs/basic-usage) (client, signIn, signUp, getSession)
 - Cutline: `src/lib/anon/migrateOnAuth.ts`, `docs/AUTH_AND_BILLING.md`

@@ -102,4 +102,4 @@ The system must be able to expose, for internal or power-user use: what intent w
 
 ---
 
-*Last updated: Febuary 2026. Scope is MVP unless stated otherwise.*
+*Last updated: March 2026. Scope is MVP unless stated otherwise.*
