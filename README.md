@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="public/header.png" alt="CUTLINE - One sentence → One video" width="920" />
+  <img src="public/header.svg" alt="CUTLINE — One sentence → One video" width="920" />
 
   **AI-directed video editing.** Describe your idea in a single sentence and get a 30-45 second edited video. The system handles narrative, shots, pacing, motion, subtitles, voice, and images,no templates, no manual config. Images are optional: we fetch from the web (Unsplash / DALL·E / Pexels) from your description, or use a placeholder if APIs fail.
 

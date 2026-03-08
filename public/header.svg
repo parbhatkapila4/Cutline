@@ -1,35 +1,84 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 200" width="920" height="200">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 200" aria-hidden="true">
   <defs>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#14b8a6"/>
-      <stop offset="100%" style="stop-color:#f97316"/>
+    <style>
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes drawLine {
+        from { transform: scaleX(0); }
+        to { transform: scaleX(1); }
+      }
+      @keyframes drawBottom {
+        from { transform: scaleX(0); }
+        to { transform: scaleX(1); }
+      }
+      .header-logo {
+        opacity: 0;
+        animation: fadeInUp 0.5s ease-out forwards;
+      }
+      .header-underline {
+        transform-origin: 320px 80px;
+        animation: drawLine 0.5s 0.15s ease-out forwards;
+      }
+      .header-tagline {
+        opacity: 0;
+        animation: fadeIn 0.35s 0.25s ease-out forwards;
+      }
+      .header-sub {
+        opacity: 0;
+        animation: fadeIn 0.35s 0.4s ease-out forwards;
+      }
+      .header-bottom {
+        transform-origin: 0 198px;
+        animation: drawBottom 0.6s 0.2s ease-out forwards;
+      }
+    </style>
+    <linearGradient id="header-bg" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#0c0c0e" />
+      <stop offset="1" stop-color="#0a0a0c" />
+    </linearGradient>
+    <linearGradient id="header-accent" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#f5f0e8" />
+      <stop offset="1" stop-color="#e8e0d4" />
     </linearGradient>
   </defs>
-  <!-- Black background -->
-  <rect width="100%" height="100%" fill="#0a0a0a"/>
-  <!-- Small top-left label -->
-  <text x="32" y="42" fill="#a3a3a3" font-family="system-ui, sans-serif" font-size="14" font-weight="600" letter-spacing="0.2em">cutline</text>
-  <!-- Main title: CUT (white) + LINE (teal) -->
-  <text x="32" y="98" fill="#ffffff" font-family="system-ui, sans-serif" font-size="52" font-weight="800" letter-spacing="-0.02em">CUT</text>
-  <text x="168" y="98" fill="#14b8a6" font-family="system-ui, sans-serif" font-size="52" font-weight="800" letter-spacing="-0.02em">LINE</text>
-  <!-- Tagline right of title: AI-Directed Video Editing that Delivers -->
-  <text x="320" y="88" fill="#ffffff" font-family="system-ui, sans-serif" font-size="22" font-weight="600">AI-Directed Video Editing</text>
-  <text x="320" y="115" fill="#14b8a6" font-family="system-ui, sans-serif" font-size="22" font-weight="600">that Delivers</text>
-  <!-- Subtitle -->
-  <text x="32" y="148" fill="#a3a3a3" font-family="system-ui, sans-serif" font-size="15" font-weight="500">? One sentence in, one video out.</text>
-  <!-- Film reel decorations (instead of bees) -->
-  <g fill="none" stroke="#14b8a6" stroke-width="2" opacity="0.85">
-    <circle cx="280" cy="52" r="12"/>
-    <circle cx="280" cy="52" r="6" fill="#14b8a6"/>
-    <circle cx="620" cy="75" r="10"/>
-    <circle cx="620" cy="75" r="4" fill="#f97316"/>
-    <circle cx="780" cy="95" r="11"/>
-    <circle cx="780" cy="95" r="5" fill="#14b8a6"/>
+
+  <rect width="640" height="200" fill="url(#header-bg)" />
+
+  <g stroke="#1c1c1e" stroke-width="0.8" fill="none" opacity="0.5">
+    <rect x="72" y="48" width="56" height="32" rx="2" />
+    <rect x="140" y="56" width="48" height="27" rx="2" />
+    <rect x="500" y="52" width="52" height="29" rx="2" />
+    <rect x="564" y="44" width="48" height="27" rx="2" />
   </g>
-  <!-- Play triangle accents -->
-  <path d="M 248 48 L 248 58 L 258 53 Z" fill="#f97316" opacity="0.9"/>
-  <path d="M 848 88 L 848 98 L 858 93 Z" fill="#14b8a6" opacity="0.9"/>
-  <!-- Two thick yellow/teal-orange bars at bottom -->
-  <rect x="0" y="172" width="100%" height="10" fill="url(#accent)" opacity="0.95"/>
-  <rect x="0" y="186" width="100%" height="6" fill="#14b8a6"/>
+
+  <g fill="#1a1a1c" opacity="0.7">
+    <rect x="0" y="88" width="12" height="8" />
+    <rect x="0" y="104" width="12" height="8" />
+    <rect x="0" y="120" width="12" height="8" />
+    <rect x="628" y="88" width="12" height="8" />
+    <rect x="628" y="104" width="12" height="8" />
+    <rect x="628" y="120" width="12" height="8" />
+  </g>
+
+  <text class="header-logo" x="320" y="68" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="42" font-weight="700" letter-spacing="-0.04em">
+    <tspan fill="#fafafa">CUT</tspan><tspan fill="url(#header-accent)">LINE</tspan>
+  </text>
+
+  <rect class="header-underline" x="148" y="78" width="344" height="5" rx="2.5" fill="url(#header-accent)" />
+
+  <text class="header-tagline" x="320" y="108" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" font-weight="500" fill="#fafafa">
+    One sentence in, one video out.
+  </text>
+
+  <text class="header-sub" x="320" y="132" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="400" fill="#52525b">
+    Script to video. One platform. Export anywhere.
+  </text>
+
+  <rect class="header-bottom" x="0" y="196" width="640" height="4" fill="url(#header-accent)" />
 </svg>
