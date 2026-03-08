@@ -62,7 +62,7 @@ Used when Unsplash and Pexels don’t return a good image for a shot. Generates 
 **Example `.env.local` snippet** (only the image-related lines):
 
 ```bash
-# Image APIs — add at least one of Unsplash or Pexels
+# Image APIs - add at least one of Unsplash or Pexels
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 PEXELS_API_KEY=your_pexels_api_key
 # Optional: for AI-generated images when stock fails
