@@ -10,7 +10,7 @@ Use this when testing or recording a demo to confirm everything works.
 - If `acrossfade` fails (e.g. missing audio in a clip), **fallback** runs: video still uses `xfade` (no black), audio is trimmed and concatenated to match.
 - Fallback trims use `dA`/`dB` with a minimum of 0.5s so atrim never gets invalid values.
 
-**What to check:** Generate a talking-object video > 8s (e.g. 20–35s). Play it; there should be no 1–2s black pause between “speakers” or segments, only a short visual/audio crossfade.
+**What to check:** Generate a talking-object video > 8s (e.g. 20-35s). Play it; there should be no 1-2s black pause between “speakers” or segments, only a short visual/audio crossfade.
 
 ---
 
@@ -22,7 +22,7 @@ Use this when testing or recording a demo to confirm everything works.
 - Boundaries are **sentence-level** (`.!?`). Long sentences are split on **commas/semicolons** (or by word count if no punctuation).
 - **Veo prompts** tell the model: first chunk = “opening… finish last word clearly”; middle = “continues directly… start immediately… in about 8 seconds”; last = “continues directly… end naturally”.
 
-**What to check:** Same 20–35s video. Listen for:
+**What to check:** Same 20-35s video. Listen for:
 
 - No cut in the middle of a sentence.
 - Each segment ends with a complete phrase; next segment continues from the next phrase/sentence.

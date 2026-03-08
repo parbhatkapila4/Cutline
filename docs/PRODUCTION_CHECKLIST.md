@@ -6,9 +6,9 @@ Use this list before going live. Tick each item when verified.
 
 ## Options verification summary (code + tests)
 
-The following were verified in code and tests so you can rely on 1–2 manual runs instead of many:
+The following were verified in code and tests so you can rely on 1-2 manual runs instead of many:
 
-- **Duration:** UI sends `durationSeconds` (10–60); API validates and puts it in job data; worker passes it to the pipeline; orchestrator overrides intent duration and uses it for script length (slideshow) and for talking_object effective duration and Veo chunking. Tests: API accepts 30/40/50 and includes in job data; API rejects &lt;10 and &gt;60.
+- **Duration:** UI sends `durationSeconds` (10-60); API validates and puts it in job data; worker passes it to the pipeline; orchestrator overrides intent duration and uses it for script length (slideshow) and for talking_object effective duration and Veo chunking. Tests: API accepts 30/40/50 and includes in job data; API rejects &lt;10 and &gt;60.
 - **Captions:** UI sends `captions: "on" | "off"`; API accepts and defaults to `"on"`; job data includes `captions`; pipeline uses `getCaptionsRenderOption(captions, subtitleTrackRefined)` so that `captions === "off"` yields `showCaptions: false` and empty `subtitleTrack`; Remotion receives that and does not render the subtitle layer. Tests: API job data includes captions on/off; orchestrator `getCaptionsRenderOption("off", …)` returns showCaptions false and empty track; `buildRemotionProps` with showCaptions false yields Remotion props with showCaptions false.
 - **Mode:** API accepts `mode: "slideshow" | "talking_object"` and includes it in job data; worker passes it to pipeline; orchestrator branches on mode (slideshow vs talking_object). Test: API includes mode in job data for both values.
 - **textModel / assetIds / brandColors:** Read from request, validated, stored in job data, passed to pipeline and used (script model override, asset analysis, product photos, brand colors). Test: API includes textModel and assetIds in job data when provided.
@@ -84,7 +84,7 @@ No fixes were required for wiring; tests were added to lock behavior.
 
 ## Manual smoke-test checklist (options end-to-end)
 
-Use 1–2 generations to confirm main options work without burning many Veo/API credits:
+Use 1-2 generations to confirm main options work without burning many Veo/API credits:
 
 1. **Duration + captions off**
 
