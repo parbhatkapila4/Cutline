@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="public/header.png" alt="CUTLINE — One sentence → One video" width="920" />
+  <img src="public/header.png" alt="CUTLINE - One sentence → One video" width="920" />
 
   **AI-directed video editing.** Describe your idea in a single sentence and get a 30-45 second edited video. The system handles narrative, shots, pacing, motion, subtitles, voice, and images,no templates, no manual config. Images are optional: we fetch from the web (Unsplash / DALL·E / Pexels) from your description, or use a placeholder if APIs fail.
 
@@ -107,8 +107,8 @@ When **DATABASE_URL** (Neon Postgres) is set, the app supports an anonymous-firs
 
 **Database schema (Neon):**
 
-- **anon_sessions** — `id` (UUID), `created_at`, `generation_count` (default 0).
-- **video_jobs** — `id`, `owner_type` (`anon` | `user`), `owner_id` (anon_session_id or user_id), `prompt`, `status`, `preview_url`, `final_url`, `created_at`, optional `queue_job_id` (BullMQ).
+- **anon_sessions** - `id` (UUID), `created_at`, `generation_count` (default 0).
+- **video_jobs** - `id`, `owner_type` (`anon` | `user`), `owner_id` (anon_session_id or user_id), `prompt`, `status`, `preview_url`, `final_url`, `created_at`, optional `queue_job_id` (BullMQ).
 
 **Apply the schema once:** Open Neon Dashboard → your project → **SQL Editor**, paste the contents of **`src/lib/db/schema.sql`**, and run it. The script is idempotent (safe to run multiple times).
 
@@ -206,7 +206,7 @@ When starting a job, you can optionally pass `callbackUrl` in **POST /api/genera
 
 **Validation:** Only `http://` and `https://` URLs are allowed. Localhost is rejected in production; set `ALLOW_LOCALHOST_WEBHOOK=true` for development.
 
-**Edge cases:** If `callbackUrl` is not set, no webhook is sent. If the callback returns 4xx/5xx or times out (5s), the failure is logged and ignored—no retry.
+**Edge cases:** If `callbackUrl` is not set, no webhook is sent. If the callback returns 4xx/5xx or times out (5s), the failure is logged and ignored-no retry.
 
 ---
 
@@ -286,9 +286,9 @@ Input (one sentence + optional assetIds, brandColors)
     ↓
 1. Intent        - LLM: audience, goal, tone, complexity, duration
     ↓
-2. Narrative     - LLM: arc, 3–5 beats, pacing
+2. Narrative     - LLM: arc, 3-5 beats, pacing
     ↓
-3. Shots         - LLM: 8–12 shots, purpose, motion, text density
+3. Shots         - LLM: 8-12 shots, purpose, motion, text density
     ↓
 4. Script        - LLM: spoken text (or silence) per shot
     ↓
@@ -413,7 +413,7 @@ The app and worker validate configuration at startup. If required vars are missi
 
 **Recommended (pipeline uses placeholders if missing):** At least one image source (`UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, or `OPENAI_API_KEY`) for real images. If none are set, placeholders are used.
 
-**Optional — anonymous funnel:** Set **`DATABASE_URL`** (Neon Postgres connection string) to enable the hybrid anonymous → authenticated flow (one free video per anon session, download gating, migration on auth). If unset, the app runs without the funnel.
+**Optional - anonymous funnel:** Set **`DATABASE_URL`** (Neon Postgres connection string) to enable the hybrid anonymous → authenticated flow (one free video per anon session, download gating, migration on auth). If unset, the app runs without the funnel.
 
 ```bash
 REDIS_URL=redis://localhost:6379
@@ -451,8 +451,8 @@ UPLOAD_DIR=uploads
 # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION (if STORAGE_TYPE=s3)
 
 # Video duration and output limits
-# MAX_VIDEO_DURATION_SECONDS=300  — global max duration (default 300, max 3600)
-# MAX_VIDEO_OUTPUT_MB=            — optional; job fails if output file exceeds N MB
+# MAX_VIDEO_DURATION_SECONDS=300  - global max duration (default 300, max 3600)
+# MAX_VIDEO_OUTPUT_MB=            - optional; job fails if output file exceeds N MB
 
 # Cleanup
 CLEANUP_ENABLED=true
@@ -460,9 +460,9 @@ VIDEO_RETENTION_HOURS=24
 UPLOAD_RETENTION_HOURS=24
 CLEANUP_INTERVAL_HOURS=1
 CLEANUP_SECRET=...
-# Optional: periodic orphan cleanup — delete temp dirs older than N hours (e.g. from crashed jobs)
+# Optional: periodic orphan cleanup - delete temp dirs older than N hours (e.g. from crashed jobs)
 # CLEANUP_EXPIRED_HOURS=24
-# TEMP_DIR — override temp root (default: public/temp)
+# TEMP_DIR - override temp root (default: public/temp)
 
 # CORS (generate API only; admin/telemetry not included)
 # CORS_ORIGIN (single) or CORS_ORIGINS (comma-separated). Unset = no CORS (same-origin only).
@@ -481,7 +481,7 @@ RATE_LIMIT_GENERAL=100
 # RATE_LIMIT_MAX=10
 # RATE_LIMIT_WINDOW_SECONDS=60
 
-# Database (optional — anonymous funnel: one free video per session, download gating, migrate on auth)
+# Database (optional - anonymous funnel: one free video per session, download gating, migrate on auth)
 # DATABASE_URL=postgresql://user:pass@host.neon.tech/db?sslmode=require
 # Apply schema once: Neon Dashboard → SQL Editor → paste src/lib/db/schema.sql → Run
 
@@ -493,16 +493,16 @@ RETRY_IMAGE_MAX=2
 RETRY_RENDER_MAX=2
 
 # Cost estimation (optional; defaults to 0)
-# COST_PER_1K_TOKENS — USD per 1k LLM tokens (OpenRouter)
-# COST_PER_TTS_SECOND — USD per second of TTS audio
-# COST_PER_VIDEO_SECOND — USD per second of Veo/video output
-# COST_PER_IMAGE_CALL — USD per image API call (Unsplash, DALL·E, etc.)
+# COST_PER_1K_TOKENS - USD per 1k LLM tokens (OpenRouter)
+# COST_PER_TTS_SECOND - USD per second of TTS audio
+# COST_PER_VIDEO_SECOND - USD per second of Veo/video output
+# COST_PER_IMAGE_CALL - USD per image API call (Unsplash, DALL·E, etc.)
 
 # Usage / plan limits (credits and dashboard)
-# DEFAULT_TOKENS=100 — initial token balance per client
-# TOKENS_PER_VIDEO=10 — tokens per completed video
-# FREE_PLAN_VIDEOS_PER_MONTH=10 — free plan videos limit
-# FREE_PLAN_API_CALLS_PER_MONTH=10000 — free plan API calls limit
+# DEFAULT_TOKENS=100 - initial token balance per client
+# TOKENS_PER_VIDEO=10 - tokens per completed video
+# FREE_PLAN_VIDEOS_PER_MONTH=10 - free plan videos limit
+# FREE_PLAN_API_CALLS_PER_MONTH=10000 - free plan API calls limit
 ```
 
 **Temp file cleanup.** Job temp dirs (`public/temp/{jobId}/`) contain intermediates (images, veo chunks, preview-artifacts). These are deleted when the pipeline finishes (success or failure). Final MP4s stay until periodic `runCleanup` (VIDEO_RETENTION_HOURS). If `CLEANUP_EXPIRED_HOURS` is set, the worker runs `cleanupExpiredTempDirs` every 60 minutes to remove orphaned dirs from crashed processes.
@@ -660,13 +660,13 @@ All inputs are validated in one place (`validateGenerateInput`). On failure, the
 
 | Field            | Required | Type    | Limits / values                                                                          |
 | ---------------- | -------- | ------- | ---------------------------------------------------------------------------------------- |
-| `input`          | yes      | string  | Non-empty topic, 5–2000 chars. Trimmed. Prompt-injection patterns rejected.              |
-| `durationSeconds`| yes      | number  | Integer 10–60. Coerced from string (e.g. `"60"` → 60).                                    |
+| `input`          | yes      | string  | Non-empty topic, 5-2000 chars. Trimmed. Prompt-injection patterns rejected.              |
+| `durationSeconds`| yes      | number  | Integer 10-60. Coerced from string (e.g. `"60"` → 60).                                    |
 | `assetIds`       | no       | string[]| Array of asset IDs from upload.                                                          |
-| `brandColors`    | no       | object  | `{ primary?: string, secondary?: string }` — hex colors (e.g. `#FF0000`).                 |
+| `brandColors`    | no       | object  | `{ primary?: string, secondary?: string }` - hex colors (e.g. `#FF0000`).                 |
 | `mode`           | no       | string  | `"slideshow"` \| `"talking_object"`.                                                      |
 | `platform`       | no       | string  | `"general"` \| `"linkedin"` \| `"twitter"` \| `"youtube_shorts"`.                         |
-| `variationCount` | no       | number  | Integer 1–5. Default 1.                                                                   |
+| `variationCount` | no       | number  | Integer 1-5. Default 1.                                                                   |
 | `textModel`      | no       | string  | OpenRouter model override.                                                                |
 | `captions`       | no       | string  | `"on"` \| `"off"`. Default `"on"`.                                                        |
 | `talkingObjectStyle` | no   | string  | `"cartoon"` \| `"real"`.                                                                  |
