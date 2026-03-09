@@ -18,7 +18,7 @@ function titleFromInput(input: string | undefined): string {
 }
 
 function relativeTime(ms: number | undefined): string {
-  if (ms == null || typeof ms !== "number") return "—";
+  if (ms == null || typeof ms !== "number") return "-";
   const sec = Math.floor((Date.now() - ms) / 1000);
   if (sec < 60) return "Just now";
   if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
