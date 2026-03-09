@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth/admin";
 import { timingSafeEqual } from "crypto";
 
-const SESSION_DURATION_SEC = 24 * 60 * 60; // 24 hours
+const SESSION_DURATION_SEC = 24 * 60 * 60;
 
 export async function POST(request: Request) {
   const secret = getAdminSecret();
