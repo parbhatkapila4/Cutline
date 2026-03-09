@@ -112,7 +112,7 @@ export default function AdminPage() {
   };
 
   const formatMs = (ms: number | undefined) => {
-    if (ms == null) return "—";
+    if (ms == null) return "-";
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   };
@@ -362,7 +362,7 @@ export default function AdminPage() {
                           {formatMs(job.durationMs)}
                         </td>
                         <td className="px-6 py-3 text-zinc-500 max-w-xs truncate">
-                          {job.error ?? "—"}
+                          {job.error ?? "-"}
                         </td>
                         <td className="px-6 py-3">
                           <button
