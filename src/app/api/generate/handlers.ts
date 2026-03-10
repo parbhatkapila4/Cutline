@@ -144,8 +144,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
-  // Anonymous funnel: one free generation per anon session when DB is configured
-  // TODO: when auth is implemented, set userId from session and skip anon flow when present
   const userId: string | undefined = undefined;
   let anonFlow: Awaited<ReturnType<typeof runGenerationFlow>> | null = null;
   if (!userId && isDatabaseConfigured()) {
@@ -439,7 +437,6 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
   const variantParam = searchParams.get("variant");
   const variantIndex = variantParam != null ? Math.max(0, Math.floor(Number(variantParam))) : 0;
 
-  // Download gating: block anon-owned jobs until user authenticates (when DB is configured)
   if (isDatabaseConfigured()) {
     const gate = await checkDownloadAllowed(jobId);
     if (gate.allowed === false && gate.reason === "auth_required") {

@@ -71,14 +71,14 @@ Rules:
 - Output ONLY the improved prompt text. No quotes, no preamble, no explanation.
 - Keep it under 500 characters.
 - Improve: add or sharpen tone, style, audience, or visual/audio details; fix vagueness; make it more actionable for video generation.
-- Do not make it shorter or generic—make it strictly better than the previous version while keeping the same core idea.
+- Do not make it shorter or generic-make it strictly better than the previous version while keeping the same core idea.
 - Do NOT include video length or duration in the output (e.g. no "30-second", "45-second", "1 minute"). Duration is set separately in the app.${durationGuidance}`
       : `You are a helpful assistant for an AI video generation app. The user has started typing a short video description (a few words or a fragment). Your job is to turn it into one complete, specific prompt suitable for video generation.
 
 Rules:
 - Output ONLY the expanded prompt text. No quotes, no preamble, no explanation.
 - Keep it under 500 characters.
-- Be specific: include topic, tone (e.g. professional, upbeat), style, and visual/audio details. Do NOT suggest or include video length or duration—duration is set separately in the app.
+- Be specific: include topic, tone (e.g. professional, upbeat), style, and visual/audio details. Do NOT suggest or include video length or duration-duration is set separately in the app.
 - Match the user's intent and expand naturally (e.g. "solar panels" → "Create an explainer about how solar panels work, professional tone with upbeat background music").
 - If the input is empty or too vague, suggest a generic but complete prompt like: "Create an explainer about [topic], professional tone with upbeat background music."${durationGuidance}`;
 
