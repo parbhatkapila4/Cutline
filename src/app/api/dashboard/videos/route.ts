@@ -9,14 +9,12 @@ export type DashboardVideoItem = {
   date: string;
   duration: string;
   status: "completed" | "processing" | "failed";
-  /** Present only when status is "completed"; empty for processing/failed */
   videoUrl?: string;
-  /** Unix timestamp (ms) for sorting; derived from finishedOn/processedOn/timestamp */
   timestamp: number;
 };
 
 function formatDate(ms: number | undefined): string {
-  if (ms == null || typeof ms !== "number") return "—";
+  if (ms == null || typeof ms !== "number") return "-";
   try {
     const d = new Date(ms);
     return d.toLocaleDateString("en-US", {
@@ -25,12 +23,12 @@ function formatDate(ms: number | undefined): string {
       day: "numeric",
     });
   } catch {
-    return "—";
+    return "-";
   }
 }
 
 function formatDuration(seconds: number | undefined): string {
-  if (seconds == null || typeof seconds !== "number" || seconds < 0) return "—";
+  if (seconds == null || typeof seconds !== "number" || seconds < 0) return "-";
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
