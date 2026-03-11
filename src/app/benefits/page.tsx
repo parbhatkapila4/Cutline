@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const WHAT_YOU_GET = [
-  { title: "One MP4, 10–60 seconds", desc: "A single video file you can download or share. Duration is inferred from your prompt or set by you. No trimming or export steps." },
+  { title: "One MP4, 10-60 seconds", desc: "A single video file you can download or share. Duration is inferred from your prompt or set by you. No trimming or export steps." },
   { title: "Script and voiceover", desc: "The system writes the script and generates AI voiceover (ElevenLabs or PlayHT). You get spoken copy that matches the narrative, no hiring a voice artist or recording yourself." },
   { title: "Images per shot", desc: "Every shot gets an image: sourced from stock (Unsplash, Pexels) or generated (DALL·E), or from your uploads. The pipeline picks; you don't hunt for B-roll." },
   { title: "Motion and pacing", desc: "Pan, zoom, and shot length are decided by the pipeline from the narrative. The edit feels intentional, not random or template-flat." },
@@ -19,7 +19,7 @@ const WHY_BETTER = [
 const HOW_USEFUL = [
   { title: "Explainers and how-tos", body: "Turn \"Explain how X works in 45 seconds\" or \"A 30-second intro to our product\" into a short video. The system infers structure (hook, explanation, wrap) and picks visuals that support the script. Useful for onboarding, docs, or social education." },
   { title: "Product and feature teasers", body: "One sentence like \"Tease our new API launch\" or \"Show the main benefit of feature Y\" becomes a focused clip. Add optional product photos or a logo; the pipeline folds them into the edit. Good for launch content, landing pages, or internal updates." },
-  { title: "Social and short-form", body: "You need a 15–60 second clip for Twitter, LinkedIn, or in-app. Describe the message; get an MP4 with voice, images, and subtitles. No need to book a designer or editor for every post." },
+  { title: "Social and short-form", body: "You need a 15-60 second clip for Twitter, LinkedIn, or in-app. Describe the message; get an MP4 with voice, images, and subtitles. No need to book a designer or editor for every post." },
   { title: "Talking-avatar or character clips", body: "In \"Talking object\" mode, the system generates a talking character (e.g. cartoon) that speaks your script. Useful when you want a face and voice without being on camera: explainers, fun shorts, or character-driven content." },
   { title: "Rapid iteration", body: "Change the sentence and regenerate. Try different tones, lengths, or angles without rewriting a full script or re-briefing someone. Helpful when you're testing messaging or exploring formats." },
 ];
@@ -121,7 +121,7 @@ export default function BenefitsPage() {
             <div className="grid md:grid-cols-3 gap-8 md:gap-12">
               <div>
                 <h3 className="text-lg font-semibold text-white mb-3">Time to first video</h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">Generation runs in the background (usually 1–3 minutes). You get a job ID right away and the UI polls until the video is ready. No blocking; when it’s done, you get a link to the MP4.</p>
+                <p className="text-sm text-zinc-400 leading-relaxed">Generation runs in the background (usually 1-3 minutes). You get a job ID right away and the UI polls until the video is ready. No blocking; when it’s done, you get a link to the MP4.</p>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white mb-3">No account or credit card</h3>
@@ -141,7 +141,7 @@ export default function BenefitsPage() {
             <p className="text-zinc-500 mb-10 max-w-2xl">You’re not stuck with one style or one length. Optional inputs and modes let you tune the output.</p>
             <div className="grid sm:grid-cols-2 gap-6">
               {[
-                { key: "Duration", text: "Set 10–60 seconds so the video matches your channel or format instead of relying only on inferred length." },
+                { key: "Duration", text: "Set 10-60 seconds so the video matches your channel or format instead of relying only on inferred length." },
                 { key: "Mode", text: "Choose slideshow (voice + images + motion + subtitles) or talking object (AI-generated talking character). Same intent, different output style." },
                 { key: "Assets", text: "Upload a logo, product photos, or reference media; the pipeline analyzes them and uses them in the visual spec and image sourcing. Brand colors (hex) can be passed in." },
                 { key: "Model", text: "Override the default LLM per job (e.g. use a stronger model for one video). All text stages use that model so you can trade cost for quality when it matters." },
