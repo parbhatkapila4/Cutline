@@ -20,7 +20,7 @@ export default function HowPage() {
               How CUTLINE works
             </h1>
             <p className="text-xl text-zinc-400 leading-relaxed max-w-2xl mb-6">
-              You give one sentence describing what you want the video to do—for example, “Explain why coffee makes you feel awake in 30 seconds” or “A short product teaser for our new API.” CUTLINE turns that into a finished short video: script, voiceover, images, motion, and subtitles. No templates, no storyboards; the system acts as both director and editor.
+              You give one sentence describing what you want the video to do-for example, “Explain why coffee makes you feel awake in 30 seconds” or “A short product teaser for our new API.” CUTLINE turns that into a finished short video: script, voiceover, images, motion, and subtitles. No templates, no storyboards; the system acts as both director and editor.
             </p>
             <p className="text-zinc-500 text-sm max-w-2xl">
               This page walks through the pipeline, the tech behind it, how to pick models, the two video modes, and how jobs are run in the background. Use the links below to jump to a section.
@@ -56,7 +56,7 @@ export default function HowPage() {
               Pipeline: from sentence to video
             </h2>
             <p className="text-zinc-400 mb-6 leading-relaxed">
-              The video is built in a single linear pipeline: 12 stages run one after another. Each stage uses the output of the previous one. If any stage fails, the whole job fails (though the system retries a few times for things like temporary API errors). There are no branches or optional paths—every slideshow video goes through the same sequence so behavior is predictable and debuggable.
+              The video is built in a single linear pipeline: 12 stages run one after another. Each stage uses the output of the previous one. If any stage fails, the whole job fails (though the system retries a few times for things like temporary API errors). There are no branches or optional paths-every slideshow video goes through the same sequence so behavior is predictable and debuggable.
             </p>
             <div className="rounded-2xl border border-white/10 bg-white/2 p-6 sm:p-8 font-mono text-sm overflow-x-auto">
               <div className="space-y-2 text-zinc-300">
@@ -96,12 +96,12 @@ export default function HowPage() {
                 {
                   num: "2. Narrative",
                   title: "Planning the story",
-                  body: "From the intent, the same AI plans the narrative: a simple arc (e.g. hook → explanation → conclusion), 3–5 beats, and pacing. This is an internal plan, not something you see—it’s used to decide what each shot will be and what the script will say.",
+                  body: "From the intent, the same AI plans the narrative: a simple arc (e.g. hook → explanation → conclusion), 3-5 beats, and pacing. This is an internal plan, not something you see-it’s used to decide what each shot will be and what the script will say.",
                 },
                 {
                   num: "3. Shots",
                   title: "Breaking the video into shots",
-                  body: "The AI produces a list of 8–12 shots. For each shot it decides: purpose (e.g. establish, reveal, transition), how long it lasts, how much text it carries, and how it connects to the previous and next shot. This is the “edit decision list” that drives both the script and the final cut.",
+                  body: "The AI produces a list of 8-12 shots. For each shot it decides: purpose (e.g. establish, reveal, transition), how long it lasts, how much text it carries, and how it connects to the previous and next shot. This is the “edit decision list” that drives both the script and the final cut.",
                 },
                 {
                   num: "4. Script",
@@ -126,7 +126,7 @@ export default function HowPage() {
                 {
                   num: "8. Motion",
                   title: "How each shot moves",
-                  body: "From the shot list, the system computes a “motion spec” per shot: e.g. scale, pan, zoom. No AI here—it’s rules based on shot purpose and order. This drives how the image is animated in the final render.",
+                  body: "From the shot list, the system computes a “motion spec” per shot: e.g. scale, pan, zoom. No AI here-it’s rules based on shot purpose and order. This drives how the image is animated in the final render.",
                 },
                 {
                   num: "9. Asset analysis",
@@ -175,7 +175,7 @@ export default function HowPage() {
                 { name: "Remotion 4", role: "Programmatic video. The final MP4 is rendered by Remotion from a React composition: it layers images, motion, subtitles, and audio into one file. Same codebase as the app, so rendering is deterministic and easy to reason about." },
                 { name: "BullMQ + Redis", role: "Background jobs. When you submit a video, a job is added to a queue. A separate worker process (npm run worker) runs the pipeline. Redis stores the queue and is also used for rate limiting. You must run Redis (locally or a managed service) for generation to work." },
                 { name: "Google Veo (optional)", role: "Used only in “Talking object” mode: AI-generated talking character clips. Requires GEMINI_API_KEY. For videos longer than ~8 seconds, multiple clips are stitched with ffmpeg." },
-                { name: "Storage", role: "Uploads can be stored on disk (local) or in S3. There is no database for pipeline state—job status lives in Redis. Rendered videos and temp assets are cleaned up automatically based on retention settings." },
+                { name: "Storage", role: "Uploads can be stored on disk (local) or in S3. There is no database for pipeline state-job status lives in Redis. Rendered videos and temp assets are cleaned up automatically based on retention settings." },
               ].map((item, i) => (
                 <div key={i} className="rounded-xl border border-white/10 bg-white/2 p-4">
                   <h3 className="font-semibold text-white mb-1">{item.name}</h3>
@@ -207,11 +207,11 @@ export default function HowPage() {
             </div>
             <p className="text-zinc-400 mt-6 mb-2 text-sm">Example options in the dropdown (approximate limits are from the providers):</p>
             <div className="rounded-xl border border-white/10 bg-white/2 p-4 font-mono text-sm text-zinc-400 space-y-1">
-              <div>• Default (from env) — uses OPENROUTER_MODEL</div>
-              <div>• google/gemini-2.0-flash-exp — ~500/day</div>
-              <div>• google/gemini-2.5-flash-preview-05-20 — ~10K/day</div>
-              <div>• google/gemini-2.5-flash-image — ~2K/day</div>
-              <div>• google/gemini-2.0-flash-lite-001 — default Gemini Flash Lite</div>
+              <div>• Default (from env) - uses OPENROUTER_MODEL</div>
+              <div>• google/gemini-2.0-flash-exp - ~500/day</div>
+              <div>• google/gemini-2.5-flash-preview-05-20 - ~10K/day</div>
+              <div>• google/gemini-2.5-flash-image - ~2K/day</div>
+              <div>• google/gemini-2.0-flash-lite-001 - default Gemini Flash Lite</div>
             </div>
           </section>
 
@@ -220,13 +220,13 @@ export default function HowPage() {
               Slideshow vs Talking object
             </h2>
             <p className="text-zinc-400 mb-8 leading-relaxed">
-              CUTLINE has two ways to produce a video. “Slideshow” is the full pipeline above: script, voice, stock or generated images, motion, subtitles, all composed in Remotion. “Talking object” skips that and uses Google Veo to generate a talking character that speaks your script—no slideshow, no image sourcing; just AI-generated video.
+              CUTLINE has two ways to produce a video. “Slideshow” is the full pipeline above: script, voice, stock or generated images, motion, subtitles, all composed in Remotion. “Talking object” skips that and uses Google Veo to generate a talking character that speaks your script-no slideshow, no image sourcing; just AI-generated video.
             </p>
             <div className="space-y-6">
               <div className="rounded-xl border border-white/10 bg-white/2 p-6">
                 <h3 className="font-semibold text-white mb-2">Slideshow (default)</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed mb-3">
-                  The full 12-stage pipeline runs. You get a classic short-form video: voiceover, one image per shot (from Unsplash/DALL·E/Pexels or your uploads), motion (pan, zoom, etc.), and subtitles. Duration is either inferred from your sentence or set by you (10–60 seconds) via the duration control or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">durationSeconds</code> in the API.
+                  The full 12-stage pipeline runs. You get a classic short-form video: voiceover, one image per shot (from Unsplash/DALL·E/Pexels or your uploads), motion (pan, zoom, etc.), and subtitles. Duration is either inferred from your sentence or set by you (10-60 seconds) via the duration control or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">durationSeconds</code> in the API.
                 </p>
                 <p className="text-zinc-500 text-sm">Best for: explainers, product teasers, social clips where you want a polished edit with voice and imagery.</p>
               </div>
@@ -248,14 +248,14 @@ export default function HowPage() {
               How jobs run: submit, worker, poll
             </h2>
             <p className="text-zinc-400 mb-6 leading-relaxed">
-              Video generation can take a minute or more, so it runs in the background. The browser never waits for the pipeline to finish. Instead, you get a job ID immediately and the UI polls until the job is done. That requires Redis and a separate worker process—the Next.js app only creates jobs and returns status; it does not run the pipeline itself.
+              Video generation can take a minute or more, so it runs in the background. The browser never waits for the pipeline to finish. Instead, you get a job ID immediately and the UI polls until the job is done. That requires Redis and a separate worker process-the Next.js app only creates jobs and returns status; it does not run the pipeline itself.
             </p>
             <div className="space-y-5 text-zinc-400 text-sm">
               <div className="flex gap-4">
                 <span className="text-blue-400 font-mono shrink-0 font-semibold">1.</span>
                 <div>
                   <p className="font-semibold text-zinc-300 mb-1">Submit</p>
-                  <p>You enter your sentence (and optionally duration, mode, text model, assets) and hit create. The app sends <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">POST /api/generate</code> with your input. The API validates the input, applies rate limiting, then adds a job to the BullMQ queue and returns a <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">jobId</code>. Nothing has been rendered yet—the job is just queued.</p>
+                  <p>You enter your sentence (and optionally duration, mode, text model, assets) and hit create. The app sends <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">POST /api/generate</code> with your input. The API validates the input, applies rate limiting, then adds a job to the BullMQ queue and returns a <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">jobId</code>. Nothing has been rendered yet-the job is just queued.</p>
                 </div>
               </div>
               <div className="flex gap-4">
@@ -291,19 +291,19 @@ export default function HowPage() {
             </p>
             <ul className="space-y-4 text-zinc-400 text-sm">
               <li>
-                <strong className="text-zinc-300">durationSeconds</strong> — A number between 10 and 60. Overrides the duration that would otherwise be inferred from your sentence. Used for both slideshow and talking_object.
+                <strong className="text-zinc-300">durationSeconds</strong> - A number between 10 and 60. Overrides the duration that would otherwise be inferred from your sentence. Used for both slideshow and talking_object.
               </li>
               <li>
-                <strong className="text-zinc-300">assetIds</strong> — An array of strings: the IDs you got from <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">POST /api/assets/upload</code>. When present, the pipeline runs asset analysis (logo, product photos, reference media) and uses the results in the visual spec and image sourcing (e.g. assigning your product photos to certain shots).
+                <strong className="text-zinc-300">assetIds</strong> - An array of strings: the IDs you got from <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">POST /api/assets/upload</code>. When present, the pipeline runs asset analysis (logo, product photos, reference media) and uses the results in the visual spec and image sourcing (e.g. assigning your product photos to certain shots).
               </li>
               <li>
-                <strong className="text-zinc-300">brandColors</strong> — An object <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">{`{ primary: "hex", secondary?: "hex" }`}</code>. Passed into the visual spec so the composition can use your brand colors where appropriate.
+                <strong className="text-zinc-300">brandColors</strong> - An object <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">{`{ primary: "hex", secondary?: "hex" }`}</code>. Passed into the visual spec so the composition can use your brand colors where appropriate.
               </li>
               <li>
-                <strong className="text-zinc-300">mode</strong> — Either <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">"slideshow"</code> or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">"talking_object"</code>. Default is slideshow.
+                <strong className="text-zinc-300">mode</strong> - Either <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">"slideshow"</code> or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">"talking_object"</code>. Default is slideshow.
               </li>
               <li>
-                <strong className="text-zinc-300">textModel</strong> — An OpenRouter model ID (e.g. <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">google/gemini-2.5-flash-preview-05-20</code>). Overrides <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> for this job only; every LLM stage in that job uses this model.
+                <strong className="text-zinc-300">textModel</strong> - An OpenRouter model ID (e.g. <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">google/gemini-2.5-flash-preview-05-20</code>). Overrides <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> for this job only; every LLM stage in that job uses this model.
               </li>
             </ul>
           </section>
@@ -317,18 +317,18 @@ export default function HowPage() {
             </p>
             <div className="rounded-xl border border-white/10 bg-white/2 p-6 font-mono text-sm space-y-3 text-zinc-400">
               <div><span className="text-zinc-500"># Required for generation</span></div>
-              <div><span className="text-amber-400/80">REDIS_URL</span> — Queue and rate limiting (e.g. redis://localhost:6379 or a managed Redis URL).</div>
-              <div><span className="text-amber-400/80">OPENROUTER_API_KEY</span> — Used for every LLM stage (Intent, Narrative, Shots, Script, image query, asset analysis).</div>
-              <div className="pt-2"><span className="text-zinc-500"># TTS — pick one provider</span></div>
+              <div><span className="text-amber-400/80">REDIS_URL</span> - Queue and rate limiting (e.g. redis://localhost:6379 or a managed Redis URL).</div>
+              <div><span className="text-amber-400/80">OPENROUTER_API_KEY</span> - Used for every LLM stage (Intent, Narrative, Shots, Script, image query, asset analysis).</div>
+              <div className="pt-2"><span className="text-zinc-500"># TTS - pick one provider</span></div>
               <div><span className="text-amber-400/80">ELEVENLABS_API_KEY</span> and <span className="text-amber-400/80">TTS_PROVIDER=elevenlabs</span> (and optionally ELEVENLABS_USE_MP3, TTS_VOICE_ID).</div>
               <div>Or <span className="text-amber-400/80">PLAYHT_API_KEY</span>, <span className="text-amber-400/80">PLAYHT_USER_ID</span>, and <span className="text-amber-400/80">TTS_PROVIDER=playht</span>.</div>
-              <div className="pt-2"><span className="text-zinc-500"># Images — at least one stock source; DALL·E recommended as fallback</span></div>
+              <div className="pt-2"><span className="text-zinc-500"># Images - at least one stock source; DALL·E recommended as fallback</span></div>
               <div><span className="text-amber-400/80">UNSPLASH_ACCESS_KEY</span> and/or <span className="text-amber-400/80">PEXELS_API_KEY</span>; <span className="text-amber-400/80">OPENAI_API_KEY</span> for DALL·E 3.</div>
               <div className="pt-2"><span className="text-zinc-500"># Optional</span></div>
-              <div><span className="text-amber-400/80">OPENROUTER_MODEL</span>, <span className="text-amber-400/80">OPENROUTER_VISION_MODEL</span> — default LLM (and vision model for asset analysis).</div>
-              <div><span className="text-amber-400/80">GEMINI_API_KEY</span> — required only for talking_object mode (Veo).</div>
-              <div><span className="text-amber-400/80">FFMPEG_PATH</span> — for talking_object videos longer than 8 seconds (concatenation).</div>
-              <div><span className="text-amber-400/80">CLEANUP_ENABLED</span>, <span className="text-amber-400/80">VIDEO_RETENTION_HOURS</span>, <span className="text-amber-400/80">UPLOAD_RETENTION_HOURS</span>, <span className="text-amber-400/80">RATE_LIMIT_*</span> — tune cleanup and rate limits.</div>
+              <div><span className="text-amber-400/80">OPENROUTER_MODEL</span>, <span className="text-amber-400/80">OPENROUTER_VISION_MODEL</span> - default LLM (and vision model for asset analysis).</div>
+              <div><span className="text-amber-400/80">GEMINI_API_KEY</span> - required only for talking_object mode (Veo).</div>
+              <div><span className="text-amber-400/80">FFMPEG_PATH</span> - for talking_object videos longer than 8 seconds (concatenation).</div>
+              <div><span className="text-amber-400/80">CLEANUP_ENABLED</span>, <span className="text-amber-400/80">VIDEO_RETENTION_HOURS</span>, <span className="text-amber-400/80">UPLOAD_RETENTION_HOURS</span>, <span className="text-amber-400/80">RATE_LIMIT_*</span> - tune cleanup and rate limits.</div>
             </div>
           </section>
 
