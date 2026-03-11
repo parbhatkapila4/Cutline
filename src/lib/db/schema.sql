@@ -4,18 +4,14 @@ CREATE TABLE IF NOT EXISTS anon_sessions (
   generation_count INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_anon_sessions_created_at ON anon_sessions (created_at);
-
-DO $$ BEGIN
-  CREATE TYPE video_job_status AS ENUM ('queued', 'processing', 'completed', 'failed');
+DO $$ BEGIN CREATE TYPE video_job_status AS ENUM ('queued', 'processing', 'completed', 'failed');
 EXCEPTION
-  WHEN duplicate_object THEN NULL;
+WHEN duplicate_object THEN NULL;
 END $$;
-DO $$ BEGIN
-  CREATE TYPE video_job_owner_type AS ENUM ('anon', 'user');
+DO $$ BEGIN CREATE TYPE video_job_owner_type AS ENUM ('anon', 'user');
 EXCEPTION
-  WHEN duplicate_object THEN NULL;
+WHEN duplicate_object THEN NULL;
 END $$;
-
 CREATE TABLE IF NOT EXISTS video_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_type video_job_owner_type NOT NULL,
