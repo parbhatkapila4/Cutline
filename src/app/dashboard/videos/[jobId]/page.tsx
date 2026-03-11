@@ -191,7 +191,7 @@ export default function DashboardVideoDetailPage() {
             cutline
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm">
-            <Link href="/#features" className="text-zinc-400 hover:text-white transition-colors">Features</Link>
+            <Link href="/features" className="text-zinc-400 hover:text-white transition-colors">Features</Link>
             <Link href="/#how" className="text-zinc-400 hover:text-white transition-colors">How it works</Link>
             <Link href="/#faq" className="text-zinc-400 hover:text-white transition-colors">FAQ</Link>
             <Link href="/dashboard" className="text-white font-medium">Dashboard</Link>
@@ -244,7 +244,7 @@ export default function DashboardVideoDetailPage() {
                   </div>
                   <div>
                     <h2 className="font-semibold text-white text-lg">Edit with AI</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Ask for changes — we’ll regenerate the video.</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Ask for changes - we’ll regenerate the video.</p>
                   </div>
                 </div>
               </div>
