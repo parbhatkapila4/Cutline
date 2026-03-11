@@ -179,7 +179,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </div>
-                  <p className="text-xs text-zinc-500 mt-3">Resets on {usage.resetDate || "—"}</p>
+                  <p className="text-xs text-zinc-500 mt-3">Resets on {usage.resetDate || "-"}</p>
                 </>
               )}
             </div>
@@ -449,7 +449,7 @@ export default function DashboardPage() {
                 { label: "This week", value: usageLoading ? null : (usage.overview?.thisWeek ?? 0), suffix: "" },
                 { label: "This month", value: usageLoading ? null : (usage.overview?.thisMonth ?? 0), suffix: "" },
                 { label: "Total duration", value: usageLoading ? null : (usage.overview?.totalDurationMin ?? 0), suffix: " min" },
-                { label: "Storage used", value: usageLoading ? null : (usage.overview?.storageUsed ?? "—"), suffix: "" },
+                { label: "Storage used", value: usageLoading ? null : (usage.overview?.storageUsed ?? "-"), suffix: "" },
                 { label: "In progress", value: usageLoading ? null : (usage.overview?.inProgress ?? 0), suffix: "" },
               ].map(({ label, value, suffix }) => (
                 <div key={label} className="rounded-lg border border-white/10 bg-zinc-950 p-3">
@@ -463,7 +463,7 @@ export default function DashboardPage() {
               ))}
             </div>
             <p className="text-xs text-zinc-500 mt-2">
-              Avg. render time: {usage.overview?.avgRenderSec != null ? `~${usage.overview.avgRenderSec} sec` : "—"}
+              Avg. render time: {usage.overview?.avgRenderSec != null ? `~${usage.overview.avgRenderSec} sec` : "-"}
             </p>
           </section>
 
