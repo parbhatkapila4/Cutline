@@ -46,7 +46,6 @@ const STAGES = [
   { label: "Rendering video", icon: "🎬" },
 ];
 
-/** Interval (ms) between visual stage step advances during processing */
 const STAGE_INTERVAL_MS = 18_000;
 
 type Props = { embedded?: boolean };
@@ -717,7 +716,7 @@ export function GenerateFlow({ embedded = false }: Props) {
           />
           <span className="text-sm text-zinc-500">sec</span>
         </div>
-        <p className="text-xs text-zinc-600 mt-1">{DURATION_MIN}–{DURATION_MAX} seconds. Talking object over 8s uses multiple clips.</p>
+        <p className="text-xs text-zinc-600 mt-1">{DURATION_MIN}-{DURATION_MAX} seconds. Talking object over 8s uses multiple clips.</p>
       </div>
 
       <div className="mb-6">
@@ -963,10 +962,10 @@ export function GenerateFlow({ embedded = false }: Props) {
                       </code>
                       <span
                         className={`text-xs px-2 py-0.5 rounded ${j.status === "completed"
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : j.status === "failed" || j.status === "cancelled"
-                              ? "bg-zinc-600/30 text-zinc-400"
-                              : "bg-blue-500/20 text-blue-400"
+                          ? "bg-emerald-500/20 text-emerald-400"
+                          : j.status === "failed" || j.status === "cancelled"
+                            ? "bg-zinc-600/30 text-zinc-400"
+                            : "bg-blue-500/20 text-blue-400"
                           }`}
                       >
                         {j.status}
