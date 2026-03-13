@@ -1,4 +1,3 @@
-
 export type CUTLINECompositionProps = {
   script: { entries: Array<{ shotId: string; text: string | null; order: number }> };
   shotList: {
@@ -49,4 +48,5 @@ export type CUTLINECompositionProps = {
   audioFormat?: "wav" | "mp3";
   width?: number;
   height?: number;
+  durationSeconds?: number;
 };
