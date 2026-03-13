@@ -60,10 +60,9 @@ if (!connectionString) {
 
 // Optional: use schema "auth" so Better Auth tables live in auth.*
 const poolOptions: ConstructorParameters<typeof Pool>[0] = {
-  connectionString:
-    connectionString.includes("?")
-      ? `${connectionString}&options=-c%20search_path%3Dauth`
-      : `${connectionString}?options=-c%20search_path%3Dauth`,
+  connectionString: connectionString.includes("?")
+    ? `${connectionString}&options=-c%20search_path%3Dauth`
+    : `${connectionString}?options=-c%20search_path%3Dauth`,
 };
 
 export const auth = betterAuth({
@@ -123,7 +122,20 @@ If the CLI can’t find your config, run it with the config path, for example:
 npx auth@latest migrate --config src/lib/auth.ts
 ```
 
+Or use the npm script: `npm run auth:migrate`
+
+**Neon users:** Ensure `DATABASE_URL` uses `sslmode=require` with an **equals sign** (e.g. `?sslmode=require`), not `sslmode-require`.
+
 (Check [Better Auth CLI docs](https://www.better-auth.com/docs/concepts/cli) for your version.)
+
+---
+
+### If you get 500 on "Continue with Google"
+
+1. **Run the migration** – Better Auth needs its tables (user, session, account, etc.). From project root: `npm run auth:migrate` or `npx auth@latest migrate --yes --config src/lib/auth.ts`.
+2. **Check the terminal** – When a 500 occurs, the auth route logs the response body. Look for `[Better Auth] POST ... status 500` and the message that follows.
+3. **Redirect URI in Google Cloud** – Under "Authorized redirect URIs" add exactly: `http://localhost:3001/api/auth/callback/google` (use your app port).
+4. **DATABASE_URL** – Must be a valid Postgres connection string. For Neon, use the **pooled** URL and `sslmode=require` (with `=`).
 
 ---
 
@@ -231,7 +243,11 @@ export default function SignInPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await signIn.email({ email, password, callbackURL: "/dashboard" });
+    const res = await signIn.email({
+      email,
+      password,
+      callbackURL: "/dashboard",
+    });
     if (res.error) setError(res.error.message ?? "Sign in failed");
   }
 
@@ -256,11 +272,17 @@ export default function SignInPage() {
           required
           className="w-full px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-white"
         />
-        <button type="submit" className="w-full py-2 rounded-lg bg-white text-black font-medium">
+        <button
+          type="submit"
+          className="w-full py-2 rounded-lg bg-white text-black font-medium"
+        >
           Sign in
         </button>
         <p className="text-sm text-zinc-500">
-          No account? <Link href="/signup" className="text-blue-400 hover:underline">Sign up</Link>
+          No account?{" "}
+          <Link href="/signup" className="text-blue-400 hover:underline">
+            Sign up
+          </Link>
         </p>
       </form>
     </div>

@@ -12,6 +12,7 @@
   [![BullMQ](https://img.shields.io/badge/BullMQ-5-FF6B6B?style=flat-square)](https://docs.bullmq.io/)
   [![Redis](https://img.shields.io/badge/Redis-ioredis-DC382D?style=flat-square&logo=redis)](https://redis.io/)
   [![Neon](https://img.shields.io/badge/Neon-Postgres-00E599?style=flat-square&logo=neon)](https://neon.tech/)
+  [![Better Auth](https://img.shields.io/badge/Better%20Auth-Sign--in%20%2B%20OAuth-6B4EFF?style=flat-square)](https://www.better-auth.com/)
   [![OpenRouter](https://img.shields.io/badge/OpenRouter-AI-000?style=flat-square)](https://openrouter.ai/)
   [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
 
@@ -103,7 +104,7 @@ When **DATABASE_URL** (Neon Postgres) is set, the app supports an anonymous-firs
 
 - **One free video without sign-in.** A first-time visitor can generate one video. The app creates an **anonymous session** (stored in DB), sets an HTTP-only cookie (`cutline_anon_session`), and tracks how many generations that session has used.
 - **Second video and download require auth.** If the same visitor tries to generate a second video or download their video without signing in, the API returns **403** with `ANON_LIMIT_REACHED` or `AUTH_REQUIRED` and a message to sign in.
-- **Seamless history after sign-in.** When the user authenticates, call **`migrateAnonToUserOnAuth(request, userId)`** (e.g. in your auth callback). All video jobs owned by that anonymous session are reassigned to the user so their history appears in one place. This migration is idempotent.
+- **Seamless history after sign-in.** When the user signs in (Better Auth), **`migrateAnonToUserOnAuth(request, userId)`** is invoked from the auth sign-in callback (see `docs/BETTER_AUTH_SETUP.md`). All video jobs owned by that anonymous session are reassigned to the user so their history appears in one place. This migration is idempotent.
 
 **Database schema (Neon):**
 
@@ -115,6 +116,39 @@ When **DATABASE_URL** (Neon Postgres) is set, the app supports an anonymous-firs
 **Without DATABASE_URL:** The anon funnel is skipped. Generation and download behave as before (no per-session limit, no download gating). The app does not require a database to run.
 
 **Implementation:** `src/lib/db/` (types, schema, client), `src/lib/anon/` (cookie, session service, middleware, generation flow, download gate, migrate-on-auth), `src/lib/jobs/` (video job service). Generate and download handlers use `isDatabaseConfigured()` to enable or skip the funnel.
+
+---
+
+### Authentication (Better Auth)
+
+User sign-in and sign-up are handled by **[Better Auth](https://www.better-auth.com/)**. The app supports **email/password** and **Google OAuth**. When **DATABASE_URL** is set, Better Auth stores users and sessions in Postgres (same Neon DB as the anon funnel); its tables are created via the auth CLI migration.
+
+**Routes:**
+
+- **`/auth/sign-in`** – Custom sign-in page (email/password + “Continue with Google”). Nav “Generate” links here when auth is required.
+- **`/signin`** – Redirects to `/auth/sign-in`.
+- **`/auth/sign-up`**, **`/auth/forgot-password`** – Additional auth views (default Better Auth UI when used).
+- **`/api/auth/*`** – Better Auth API (session, sign-in, sign-out, OAuth callback, etc.). All handlers live under `src/app/api/auth/[...all]/route.ts`.
+
+**Environment variables:**
+
+| Variable | Purpose |
+| -------- | ------- |
+| `BETTER_AUTH_SECRET` | Secret for signing sessions/tokens (min 32 chars; e.g. `openssl rand -base64 32`). |
+| `NEXT_PUBLIC_APP_URL` | Base URL of the app (e.g. `http://localhost:3001`). Must match the origin you use in the browser so OAuth and API calls work. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Required for “Continue with Google.” |
+
+**Google OAuth setup:** In the OAuth client, set **Authorized redirect URI** to `{NEXT_PUBLIC_APP_URL}/api/auth/callback/google` (e.g. `http://localhost:3001/api/auth/callback/google`).
+
+**Database migration:** Run once (or when Better Auth schema changes):
+
+```bash
+npm run auth:migrate
+```
+
+Or: `npx auth@latest migrate --yes --config src/lib/auth.ts`. This creates/updates the `user`, `session`, `account`, and related tables. **DATABASE_URL** must be set.
+
+**Implementation:** `src/lib/auth.ts` (server config), `src/lib/auth-client.ts` (client for `signIn`, `signOut`, `useSession`), `src/components/ui/sign-in.tsx` (custom sign-in UI), `src/app/auth/[...path]/page.tsx` (auth pages). After sign-in, call **`migrateAnonToUserOnAuth(request, userId)`** in the Better Auth sign-in callback so anonymous-session jobs are attached to the user (see **Hybrid anonymous → authenticated funnel** above and **docs/BETTER_AUTH_SETUP.md**).
 
 ---
 
@@ -324,7 +358,8 @@ Output: public/temp/[jobId].mp4
 | AI                | OpenRouter                    | Single API for multiple models (Gemini, Claude, GPT); intent, narrative, shots, script, image query, asset analysis |
 | TTS               | ElevenLabs / PlayHT           | High-quality voice; PCM (ElevenLabs) for silence stitching; configurable                                            |
 | Images            | Unsplash, Pexels, DALL·E 3    | Stock first, AI fallback; placeholder if all fail so video still completes                                          |
-| Storage           | Local / S3                    | Uploads and temp files; job state in Redis/BullMQ; optional Neon for anon sessions and job ownership              |
+| Storage           | Local / S3                    | Uploads and temp files; job state in Redis/BullMQ; optional Neon for anon sessions, job ownership, and Better Auth (user/session) |
+| Auth              | Better Auth                   | Email/password + Google OAuth; session and user storage in Postgres when DATABASE_URL is set                      |
 | Rate limiting     | Redis + rate-limiter-flexible | Per-IP limits on generate, upload, status; abuse protection                                                         |
 | Testing           | Vitest                        | Unit tests next to source; integration test for POST /api/generate + poll                                           |
 
@@ -360,7 +395,7 @@ Output: public/temp/[jobId].mp4
 
 **Cleanup and retention.** Temp videos, uploads, and per-job images are deleted automatically (e.g. 24h retention, hourly cleanup job). Job temp dirs (images, veo chunks, preview-artifacts) are deleted when the pipeline finishes (success or failure). Final MP4s are retained until periodic cleanup removes them by age. Set CLEANUP_EXPIRED_HOURS for orphan cleanup (dirs older than N hours). That keeps disk bounded. For long-term storage, you’d need to copy outputs to durable storage (S3, CDN) outside CUTLINE.
 
-**Optional DB for anon funnel.** Pipeline state lives in BullMQ (Redis). When **DATABASE_URL** (Neon Postgres) is set, the app uses it for anonymous sessions and video job ownership (one free generation per anon session, download gating, and migration on auth). Without it, the app runs as before with no per-session limit. Full user identity and billing would require auth and possibly more tables.
+**Optional DB for anon funnel and auth.** Pipeline state lives in BullMQ (Redis). When **DATABASE_URL** (Neon Postgres) is set, the app uses it for anonymous sessions, video job ownership, and Better Auth (user/session tables). That enables one free generation per anon session, download gating, sign-in (email + Google OAuth), and migration of anon jobs to the user on sign-in. Without DATABASE_URL, the app runs with no per-session limit and no sign-in.
 
 ---
 
@@ -384,7 +419,7 @@ Edit `.env.local` with required variables (see [Required Environment Variables](
 npx next dev
 ```
 
-App runs at `http://localhost:3000`. Open `/generate` for video generation, `/test` for pipeline stage testing.
+App runs at `http://localhost:3000` (or another port if 3000 is in use). Open `/generate` for video generation, `/test` for pipeline stage testing. **Sign-in** is at `/auth/sign-in` (or `/signin`). If you use the anonymous funnel and auth, set `DATABASE_URL` and `BETTER_AUTH_SECRET`, then run **`npm run auth:migrate`** once to create auth tables.
 
 **Worker (required for async video generation):**
 
@@ -413,14 +448,19 @@ The app and worker validate configuration at startup. If required vars are missi
 
 **Recommended (pipeline uses placeholders if missing):** At least one image source (`UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, or `OPENAI_API_KEY`) for real images. If none are set, placeholders are used.
 
-**Optional - anonymous funnel:** Set **`DATABASE_URL`** (Neon Postgres connection string) to enable the hybrid anonymous → authenticated flow (one free video per anon session, download gating, migration on auth). If unset, the app runs without the funnel.
+**Optional - anonymous funnel and auth:** Set **`DATABASE_URL`** (Neon Postgres) to enable the hybrid anonymous → authenticated flow and Better Auth (user/session storage). If unset, the app runs without the funnel and without sign-in.
+
+**Required for authentication (when using sign-in / Google OAuth):** Set **`BETTER_AUTH_SECRET`** (min 32 chars, e.g. `openssl rand -base64 32`) and **`NEXT_PUBLIC_APP_URL`** (e.g. `http://localhost:3001`) so the auth client and OAuth redirects use the correct origin. For Google sign-in, also set **`GOOGLE_CLIENT_ID`** and **`GOOGLE_CLIENT_SECRET`** from Google Cloud Console.
 
 ```bash
 REDIS_URL=redis://localhost:6379
 OPENROUTER_API_KEY=sk-or-...
 ELEVENLABS_API_KEY=...   # or PLAYHT_API_KEY + PLAYHT_USER_ID with TTS_PROVIDER=playht
 UNSPLASH_ACCESS_KEY=...  # recommended; or PEXELS_API_KEY / OPENAI_API_KEY
-# DATABASE_URL=postgresql://...  # optional; Neon Postgres for anon funnel
+# DATABASE_URL=postgresql://...  # optional; Neon Postgres for anon funnel + Better Auth
+# BETTER_AUTH_SECRET=...         # required for auth; min 32 chars
+# NEXT_PUBLIC_APP_URL=http://localhost:3001
+# GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...  # for "Continue with Google"
 ```
 
 **Serverless (Vercel):** Validation runs when the Node.js runtime initializes. On cold start, missing required vars cause a 500 on the first request; check logs for the error message.
@@ -481,9 +521,15 @@ RATE_LIMIT_GENERAL=100
 # RATE_LIMIT_MAX=10
 # RATE_LIMIT_WINDOW_SECONDS=60
 
-# Database (optional - anonymous funnel: one free video per session, download gating, migrate on auth)
+# Database (optional - anonymous funnel + Better Auth user/session storage)
 # DATABASE_URL=postgresql://user:pass@host.neon.tech/db?sslmode=require
-# Apply schema once: Neon Dashboard → SQL Editor → paste src/lib/db/schema.sql → Run
+# Apply anon funnel schema once: Neon Dashboard → SQL Editor → paste src/lib/db/schema.sql → Run
+# Then run: npm run auth:migrate  (creates Better Auth tables)
+
+# Authentication (Better Auth)
+# BETTER_AUTH_SECRET=...          # min 32 chars (e.g. openssl rand -base64 32)
+# NEXT_PUBLIC_APP_URL=http://localhost:3001   # must match app origin
+# GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...   # for Google OAuth; redirect URI: {NEXT_PUBLIC_APP_URL}/api/auth/callback/google
 
 # Retry (LLM, TTS, image, render)
 RETRY_ENABLED=true
@@ -581,6 +627,12 @@ Implementation: unversioned and v1 routes share the same handler logic (`src/app
 | GET    | `/api/health/live`   | Liveness probe. 200 + `{ status: "ok" }` if process is up. No dependency checks. For k8s livenessProbe. |
 | GET    | `/api/health/ready`  | Readiness probe. 200 when ready to accept work; 503 + `{ status: "not_ready", checks }` when not. For k8s readinessProbe. |
 | POST   | `/api/cleanup`       | Manual cleanup (temp videos, uploads, per-job images). Optional header: `X-Cleanup-Secret` if `CLEANUP_SECRET` set. |
+
+#### Authentication (Better Auth)
+
+| Method | Endpoint           | Description                                                                 |
+| ------ | ------------------ | --------------------------------------------------------------------------- |
+| GET/POST | `/api/auth/[...all]` | Catch-all for Better Auth: session, sign-in (email + social), sign-out, OAuth callback (e.g. `/api/auth/callback/google`). See **Authentication (Better Auth)** in Core Capabilities and **docs/BETTER_AUTH_SETUP.md**. |
 
 #### Health check
 
@@ -875,7 +927,7 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 - **Input validation:** All text and asset input validated before the pipeline (Zod/validation modules). Prompt-injection patterns rejected.
 - **Rate limiting:** Redis-backed per-IP limits on generate, upload, and status to reduce abuse and runaway cost.
 - **Cleanup:** Optional `CLEANUP_SECRET` to restrict manual `POST /api/cleanup` to authorized callers.
-- **No auth at MVP.** API routes are public. For production with multiple users, add authentication (e.g. Clerk, NextAuth) and scope jobs/assets by user.
+- **Auth (optional).** Better Auth is integrated for sign-in (email/password + Google OAuth). When DATABASE_URL is set, the anonymous funnel and auth are enabled; generate and download can require sign-in. For production with multiple users, scope jobs/assets by user (e.g. via session in generate handler).
 - **Secrets:** API keys and secrets only in env; never logged or returned in responses.
 
 ---
@@ -902,6 +954,7 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 - **[docs/FEATURE_SPEC.md](docs/FEATURE_SPEC.md)**: Core principle, user experience, capabilities, non-goals, future extensions.
 - **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)**: Env, worker, Redis, API keys, rate limiting, cleanup, smoke test.
 - **[docs/IMAGE_API_KEYS.md](docs/IMAGE_API_KEYS.md)**: Image API keys and setup (if present).
+- **[docs/BETTER_AUTH_SETUP.md](docs/BETTER_AUTH_SETUP.md)**: Better Auth setup (env, DB migration, Google OAuth, sign-in callback, anon migration).
 - **[docs/AUTH_AND_BILLING.md](docs/AUTH_AND_BILLING.md)**: Current identity (IP-based), usage, and roadmap for auth and billing.
 
 ---
@@ -912,7 +965,7 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 - **Retention:** Rendered videos and uploads cleaned automatically (default 24h). Configure `VIDEO_RETENTION_HOURS`, `UPLOAD_RETENTION_HOURS`.
 - **Render time:** Full pipeline typically 1-3 minutes depending on length and image sourcing.
 - **Worker required:** Async video generation needs the worker process and Redis; Vercel alone cannot run the pipeline.
-- **Anonymous funnel (optional):** When DATABASE_URL is set, one free video per anon session; download and second video require auth. Call `migrateAnonToUserOnAuth` after sign-in to merge anon jobs into the user. Without DATABASE_URL, no per-session limit.
+- **Anonymous funnel and auth (optional):** When DATABASE_URL is set, one free video per anon session; download and second video require sign-in. Auth is provided by Better Auth (email/password + Google OAuth) at `/auth/sign-in`. After sign-in, `migrateAnonToUserOnAuth` runs in the auth callback to merge anon jobs into the user. See **docs/BETTER_AUTH_SETUP.md**. Without DATABASE_URL, no per-session limit and no sign-in.
 
 ---
 
@@ -921,7 +974,7 @@ See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before goin
 - **Worker scaling:** Run multiple worker processes (same Redis queue) for higher throughput. Ensure storage (temp/output) is shared or per-worker and cleanup accounts for it.
 - **Redis:** Use a managed Redis (Upstash, Redis Cloud) with persistence. Monitor queue depth and job failure rate.
 - **Storage:** Use S3 (or equivalent) for uploads and consider moving rendered MP4s to a CDN or durable bucket; cleanup can then focus on temp dirs only.
-- **Rate limiting:** Keep Redis-backed limits; consider stricter tiers or per-user limits if you add auth.
+- **Rate limiting:** Keep Redis-backed limits; consider stricter tiers or per-user limits (auth is integrated via Better Auth).
 - **Observability:** Log pipeline stage duration and failure reasons; add metrics (e.g. job completed/failed per hour, TTS/LLM latency) for tuning and alerting.
 - **Cost:** OpenRouter, TTS, and image APIs dominate cost. Cap context size and image resolution where possible; monitor usage per job.
 
