@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/idempotency";
 import { runGenerationFlow, checkDownloadAllowed } from "@/lib/anon";
 import { isDatabaseConfigured } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import fs from "fs";
 import path from "path";
 
@@ -144,7 +145,14 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
-  const userId: string | undefined = undefined;
+  let userId: string | undefined;
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    userId = session?.user?.id != null ? String(session.user.id) : undefined;
+  } catch {
+    userId = undefined;
+  }
+
   let anonFlow: Awaited<ReturnType<typeof runGenerationFlow>> | null = null;
   if (!userId && isDatabaseConfigured()) {
     anonFlow = await runGenerationFlow(request, data.input);
@@ -159,6 +167,8 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
+  const creditsIdentifier = userId ?? anonFlow?.result.anon_session_id ?? identifier;
+
   try {
     const queue = getVideoQueue();
     const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth, TOKENS_PER_VIDEO, FREE_PLAN_VIDEOS_PER_MONTH } = await import("@/lib/usage");
@@ -166,7 +176,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       process.env.DISABLE_CREDITS_CHECK === "true" || process.env.DISABLE_CREDITS_CHECK === "1";
     const skipCreditsForAnon = Boolean(anonFlow?.result.allowed);
     if (!creditsCheckDisabled && !skipCreditsForAnon) {
-      const tokensRemaining = await getTokens(identifier);
+      const tokensRemaining = await getTokens(creditsIdentifier);
       if (tokensRemaining < TOKENS_PER_VIDEO) {
         return apiError({
           code: ErrorCode.INSUFFICIENT_CREDITS,
@@ -176,7 +186,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
           headers,
         });
       }
-      const videosCompletedThisMonth = await getVideosCompletedThisMonth(identifier);
+      const videosCompletedThisMonth = await getVideosCompletedThisMonth(creditsIdentifier);
       if (videosCompletedThisMonth >= FREE_PLAN_VIDEOS_PER_MONTH) {
         return apiError({
           code: ErrorCode.MONTHLY_LIMIT_REACHED,
@@ -192,7 +202,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
     const jobPayload = {
       input: data.input,
-      clientId: anonFlow?.result.anon_session_id ?? identifier,
+      clientId: creditsIdentifier,
       requestId,
       ...(userId ? { userId } : {}),
       ...(anonFlow?.result.allowed ? { videoJobId: anonFlow.result.job_id } : {}),
@@ -207,6 +217,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(data.previewJobId ? { previewJobId: data.previewJobId } : {}),
       variationCount: data.variationCount ?? 1,
       platform: data.platform ?? DEFAULT_PLATFORM,
+      ...(data.aspectRatio ? { aspectRatio: data.aspectRatio } : {}),
       ...(data.callbackUrl ? { callbackUrl: data.callbackUrl } : {}),
     };
 
@@ -218,7 +229,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         const again = getIdempotencyResult(idempotencyKey);
         if (again) return again.responseBody as { jobId: string };
         const job = await queue.add("video", jobPayload, queueAddOptions);
-        await incrementApiCallsThisMonth(anonFlow?.result.anon_session_id ?? identifier);
+        await incrementApiCallsThisMonth(creditsIdentifier);
         const jobId = anonJobId ?? String(job.id);
         const responseBody = { jobId };
         setIdempotencyResult(idempotencyKey, {
@@ -235,7 +246,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
 
     const job = await queue.add("video", jobPayload, queueAddOptions);
-    await incrementApiCallsThisMonth(anonFlow?.result.anon_session_id ?? identifier);
+    await incrementApiCallsThisMonth(creditsIdentifier);
     const jobId = anonJobId ?? String(job.id);
     console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + jobId);
     const resHeaders: Record<string, string> = { ...headers };
