@@ -488,7 +488,7 @@ function HomeContent() {
               How it works
             </Link>
             <Link
-              href="/#create"
+              href="/signin"
               className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
             >
               <svg
@@ -1917,12 +1917,8 @@ function HomeContent() {
                           ) : (
                             <>
                               Generate
-                              <svg
-                                className="w-4 h-4"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path d="M8 5v14l11-7z" />
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z" />
                               </svg>
                             </>
                           )}
