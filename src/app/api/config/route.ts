@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-
-const DEFAULT_SCRIPT_MODEL = "google/gemini-2.0-flash-lite-001";
+import { DEFAULT_TEXT_MODEL } from "@/constants/landing";
 
 export async function GET() {
   const defaultScriptModel =
-    process.env.OPENROUTER_MODEL ?? DEFAULT_SCRIPT_MODEL;
+    process.env.OPENROUTER_MODEL ?? DEFAULT_TEXT_MODEL;
   return NextResponse.json({ defaultScriptModel });
 }
