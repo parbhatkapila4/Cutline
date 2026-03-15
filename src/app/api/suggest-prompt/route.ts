@@ -3,7 +3,7 @@ import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
+const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
 const MAX_PROMPT_LENGTH = 2000;
 
 export async function POST(request: Request) {
