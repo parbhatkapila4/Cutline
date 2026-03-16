@@ -357,7 +357,7 @@ export default function TestIntentPage() {
           <a href="/" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
             ← CUTLINE
           </a>
-          <span className="ml-4 text-sm text-zinc-400">Stage 1–5: Intent → Narrative → Shots → Script → Subtitles</span>
+          <span className="ml-4 text-sm text-zinc-400">Stage 1-5: Intent → Narrative → Shots → Script → Subtitles</span>
         </div>
       </header>
 
@@ -803,7 +803,7 @@ export default function TestIntentPage() {
                 >
                   <span className="font-medium text-zinc-900">{chunk.text}</span>
                   <span className="ml-2 text-zinc-500">
-                    {chunk.startMs}ms – {chunk.endMs}ms
+                    {chunk.startMs}ms - {chunk.endMs}ms
                   </span>
                   <span className="ml-2 text-zinc-400">· {chunk.shotId}</span>
                 </li>
