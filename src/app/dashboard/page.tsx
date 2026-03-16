@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { DashboardVideoItem } from "@/app/api/dashboard/videos/route";
+import { authClient } from "@/lib/auth-client";
 
 type VideoStatus = "completed" | "processing" | "failed";
 
@@ -55,6 +57,7 @@ const DEFAULT_USAGE: UsageData = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [videos, setVideos] = useState<DashboardVideoItem[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
   const [videosError, setVideosError] = useState<string | null>(null);
@@ -294,6 +297,10 @@ export default function DashboardPage() {
           <div className="mt-auto pt-4 shrink-0">
             <button
               type="button"
+              onClick={async () => {
+                await authClient.signOut({ callbackURL: "/" });
+                router.push("/");
+              }}
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-white/10 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-colors font-medium"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -322,10 +329,10 @@ export default function DashboardPage() {
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     <Link
-                      href="/#create"
+                      href="/create"
                       className="inline-flex items-center gap-2 bg-white text-black font-semibold px-5 py-3 rounded-xl hover:bg-zinc-200 transition-colors"
                     >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z" /></svg>
                       Create new video
                     </Link>
                   </div>
