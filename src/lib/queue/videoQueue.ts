@@ -42,6 +42,7 @@ export type VideoJobData = {
   previewJobId?: string;
   variationCount?: number;
   platform?: Platform;
+  aspectRatio?: string;
   callbackUrl?: string;
 };
 
@@ -219,7 +220,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         }
         return { videoPath: "" } as VideoJobResult;
       }
-      const { input, assetIds, brandColors, mode, durationSeconds, textModel, captions, talkingObjectStyle, renderMode, previewJobId, variationCount, platform, requestId, callbackUrl } = job.data;
+      const { input, assetIds, brandColors, mode, durationSeconds, textModel, captions, talkingObjectStyle, renderMode, previewJobId, variationCount, platform, aspectRatio, requestId, callbackUrl } = job.data;
       const jobId = job.id;
       if (!jobId) {
         throw new Error("Job has no id");
@@ -244,6 +245,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
           previewJobId,
           variationCount,
           platform: platform ?? "general",
+          aspectRatio,
           requestId,
           job,
         });
