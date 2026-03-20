@@ -1,8 +1,3 @@
-/**
- * Anonymous session service.
- * Persists anon_sessions and tracks generation_count via Neon Postgres.
- */
-
 import type { AnonSession } from "@/lib/db/types";
 import { getSql } from "@/lib/db/client";
 
@@ -14,9 +9,6 @@ function mapRow(row: { id: string; created_at: Date; generation_count: number })
   };
 }
 
-/**
- * Get an existing anon session by id.
- */
 export async function getAnonSessionById(sessionId: string): Promise<AnonSession | null> {
   const sql = getSql();
   const rows = await sql`
@@ -30,9 +22,6 @@ export async function getAnonSessionById(sessionId: string): Promise<AnonSession
   return mapRow(row as { id: string; created_at: Date; generation_count: number });
 }
 
-/**
- * Create a new anon session and return it.
- */
 export async function createAnonSession(): Promise<AnonSession> {
   const sql = getSql();
   const rows = await sql`
@@ -47,10 +36,6 @@ export async function createAnonSession(): Promise<AnonSession> {
   return mapRow(row as { id: string; created_at: Date; generation_count: number });
 }
 
-/**
- * Increment generation_count for the given anon session.
- * Call after successfully creating a video_job for this session.
- */
 export async function incrementAnonGenerationCount(sessionId: string): Promise<boolean> {
   const sql = getSql();
   const rows = await sql`
