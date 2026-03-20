@@ -1,10 +1,17 @@
 export const POLL_INTERVAL_MS = 2500;
 
+export const DEFAULT_TEXT_MODEL = "anthropic/claude-3.5-haiku";
+
 export const TEXT_MODEL_OPTIONS: { value: string; label: string; desc: string }[] = [
   {
     value: "",
-    label: "Default (from env)",
-    desc: "Uses the model configured on the server",
+    label: "Default (Haiku 3)",
+    desc: "Uses server default: Claude 3.5 Haiku",
+  },
+  {
+    value: "anthropic/claude-3.5-haiku",
+    label: "Claude 3.5 Haiku",
+    desc: "Fast, capable default for script & intent",
   },
   {
     value: "google/gemini-2.0-flash-exp",
@@ -15,11 +22,6 @@ export const TEXT_MODEL_OPTIONS: { value: string; label: string; desc: string }[
     value: "google/gemini-2.5-flash-preview-05-20",
     label: "Gemini 2.5 Flash",
     desc: "Latest: ~10K req/day",
-  },
-  {
-    value: "google/gemini-2.5-flash-image",
-    label: "Nano Banana / 2.5 Flash Image",
-    desc: "Vision model: ~2K req/day",
   },
   {
     value: "google/gemini-2.0-flash-lite-001",
