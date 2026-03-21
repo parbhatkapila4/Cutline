@@ -6,7 +6,7 @@ import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
+const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
 
 export type PlanNarrativeOptions = {
   model?: string;
@@ -14,20 +14,20 @@ export type PlanNarrativeOptions = {
   platform?: Platform;
 };
 
-const SYSTEM_PROMPT = `You are a narrative planner for a short video (30–45 seconds). Given a structured Intent, output a single JSON object with exactly these keys (no other keys, no markdown, no explanation):
+const SYSTEM_PROMPT = `You are a narrative planner for a short video (30-45 seconds). Given a structured Intent, output a single JSON object with exactly these keys (no other keys, no markdown, no explanation):
 
 - arc: one of "hook-build-payoff" | "problem-solution-cta" | "setup-delivery" | "teaser-reveal"
   Map from intent.goal: "explain" → hook-build-payoff, "persuade" → problem-solution-cta, "entertain" → setup-delivery or teaser-reveal.
-- beats: array of 3–5 objects, each with:
+- beats: array of 3-5 objects, each with:
   - id: string (e.g. "beat-1", "beat-2")
-  - purpose: string (e.g. "hook attention", "present problem", "deliver payoff") — must be about the topic in intent.rawInput (e.g. energy drink, product).
+  - purpose: string (e.g. "hook attention", "present problem", "deliver payoff") - must be about the topic in intent.rawInput (e.g. energy drink, product).
   - durationSeconds: number (positive integer)
   - pacing: one of "fast" | "slow" | "steady"
   The sum of all beat durationSeconds MUST equal the intent's durationSeconds. Allocate time across beats appropriately. The whole narrative must be about the user's topic (e.g. energy drink, brand).
 
 INTRO AND OUTRO (required):
-- The first beat must be an intro: purpose should be a clear opener (e.g. "hook attention", "welcome and set context", "introduce topic"). Give it enough duration (e.g. 3–6 seconds) so the video has a proper start.
-- The last beat must be an outro: purpose should be a clear ending (e.g. "conclusion and sign-off", "call to action", "final message"). Its durationSeconds must be exactly 2 seconds so the ending always occupies the last 2 seconds of the video (e.g. for a 30s video, ending at 28–30s; for 50s, 48–50s). This makes the video feel properly finished, not cut off.
+- The first beat must be an intro: purpose should be a clear opener (e.g. "hook attention", "welcome and set context", "introduce topic"). Give it enough duration (e.g. 3-6 seconds) so the video has a proper start.
+- The last beat must be an outro: purpose should be a clear ending (e.g. "conclusion and sign-off", "call to action", "final message"). Its durationSeconds must be exactly 2 seconds so the ending always occupies the last 2 seconds of the video (e.g. for a 30s video, ending at 28-30s; for 50s, 48-50s). This makes the video feel properly finished, not cut off.
 
 - totalDurationSeconds: number, must equal the intent's durationSeconds
 - rationale: one sentence explaining why this arc and beat structure fit the intent (for debugging)
@@ -57,7 +57,7 @@ function parseAndValidatePlan(raw: string, targetDuration: number): NarrativePla
 
   const beatsRaw = obj.beats;
   if (!Array.isArray(beatsRaw) || beatsRaw.length < 3 || beatsRaw.length > 5) {
-    throw new Error("Narrative planning failed: beats must be an array of 3–5 items");
+    throw new Error("Narrative planning failed: beats must be an array of 3-5 items");
   }
 
   const beats: NarrativeBeat[] = beatsRaw.map((b, i) => {
