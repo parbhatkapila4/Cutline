@@ -1,22 +1,3 @@
-/**
- * Pipeline orchestrator: runs the full video generation flow from intent to rendered MP4.
- *
- * Stages (slideshow mode):
- * 1. Intent — LLM parses input into audience, goal, tone, duration
- * 2. Narrative — LLM plans arc and beats
- * 3. Shots — LLM breaks into 8–12 shots with motion and text density
- * 4. Script — LLM generates spoken text per shot
- * 5. Subtitles — Chunk script, estimate timing
- * 6. TTS — ElevenLabs/PlayHT generates audio
- * 7. Subtitle refine — Word timings from TTS → aligned chunks
- * 8. Motion — Per-shot motion spec
- * 9. Asset analysis — (if uploads) LLM vision on assets
- * 10. Visuals — Visual spec from intent + assets
- * 11. Image sourcing — Per-shot: query → Unsplash/DALL·E/Pexels
- * 12. Remotion render — Compose script, shots, subtitles, motion, images, audio → MP4
- *
- * Talking-object mode: replaces image sourcing with Veo-generated clips.
- */
 import fs from "fs";
 import path from "path";
 
@@ -52,6 +33,7 @@ import { concatenateMp4s, isFfmpegAvailable, getDuration, CROSSFADE_DURATION_SEC
 import { validateVideoChunk } from "@/lib/pipeline/validateChunk";
 import { burnSubtitlesIntoVideo, type SubtitleEntry } from "@/lib/pipeline/burnSubtitles";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
+import { getDimensionsForAspectRatio, isValidAspectRatio } from "@/lib/validation/aspectRatio";
 import { getMaxDurationSeconds, getMaxOutputMb } from "@/lib/config/limits";
 import { logPipelineEvent } from "@/lib/utils/pipelineLogger";
 import {
@@ -65,7 +47,6 @@ import { createCostTracker } from "@/lib/cost/costEstimator";
 import type { CostBreakdown } from "@/lib/cost/types";
 import type { Job } from "bullmq";
 
-/** Approximate LLM token counts per stage for cost estimation */
 const TOKENS_ESTIMATE = {
   intent: 400,
   narrative: 600,
@@ -76,11 +57,8 @@ const TOKENS_ESTIMATE = {
   scriptExtend: 400,
 } as const;
 
-
-/** BullMQ job lock extension interval (30 min) for long-running pipelines */
 const LOCK_DURATION_MS = 1_800_000;
 
-/** Wraps a pipeline stage with telemetry (recordStageStart/recordStageEnd) */
 function withStageTelemetry<T>(
   jobId: string,
   stageName: string,
@@ -128,6 +106,7 @@ export type PipelineOptions = {
   outputSuffix?: string;
   variationStrategy?: string;
   platform?: Platform;
+  aspectRatio?: string;
   job?: Job;
 };
 
@@ -272,11 +251,6 @@ export type PipelineResult = {
   variations?: Array<{ videoUrl: string; cost?: CostBreakdown }>;
 };
 
-/**
- * Orchestrates the full video generation pipeline. Runs stages in order with
- * retries for transient failures. Supports slideshow (images + TTS + Remotion)
- * and talking-object (Veo-generated clips). Handles preview/final and multi-variant flows.
- */
 export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
   const { renderMode, previewJobId, variationCount, platform, jobId, job } = options;
   const isFinalFromPreview = renderMode === "final" && previewJobId;
@@ -359,7 +333,7 @@ async function runPipelineOnce(
   costTracker: ReturnType<typeof createCostTracker>
 ): Promise<{ videoPath: string; message?: string; isPreview?: boolean; cost?: CostBreakdown }> {
   const startTime = Date.now();
-  const { input, jobId, requestId, assetIds, brandColors, mode, durationSeconds: optionsDuration, textModel, captions, talkingObjectStyle, renderMode, previewJobId, outputSuffix, variationStrategy, platform, job } = options;
+  const { input, jobId, requestId, assetIds, brandColors, mode, durationSeconds: optionsDuration, textModel, captions, talkingObjectStyle, renderMode, previewJobId, outputSuffix, variationStrategy, platform, aspectRatio, job } = options;
   const logEvent = (p: Parameters<typeof logPipelineEvent>[0]) =>
     logPipelineEvent({ ...p, ...(requestId ? { requestId } : {}) });
   const resolvedPlatform: Platform = platform ?? "general";
@@ -993,6 +967,10 @@ async function runPipelineOnce(
   }
 
   const effectiveOutputPath = outputPath;
+  const aspectDimensions =
+    !isPreview && aspectRatio && isValidAspectRatio(aspectRatio)
+      ? getDimensionsForAspectRatio(aspectRatio)
+      : null;
   const renderInput = {
     script,
     shotList: finalShotList,
@@ -1005,7 +983,7 @@ async function runPipelineOnce(
     audioBase64,
     audioFormat: ttsResult.audioFormat,
     durationSeconds: compositionDurationSec,
-    ...(isPreview ? { width: 1280, height: 720 } : {}),
+    ...(isPreview ? { width: 1280, height: 720 } : aspectDimensions ? { width: aspectDimensions.width, height: aspectDimensions.height } : {}),
   };
 
   await checkCancelledAndThrow();
