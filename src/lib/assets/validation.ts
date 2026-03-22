@@ -1,4 +1,3 @@
-
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 const REF_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
