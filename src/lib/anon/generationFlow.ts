@@ -1,10 +1,3 @@
-/**
- * Generation flow: anonymous first-video allowance and gating.
- * 1. Ensure anon session (cookie or create).
- * 2. If generation_count >= 1 → block, require auth.
- * 3. Else: create video_job, increment generation_count, return job id.
- */
-
 import type { GenerationFlowResult } from "@/lib/db/types";
 import { ensureAnonSession } from "./middleware";
 import { getAnonSessionById, incrementAnonGenerationCount } from "./anonSessionService";
@@ -17,13 +10,6 @@ export type GenerationFlowOutput = {
   setCookieHeader: string | null;
 };
 
-/**
- * Run the anonymous generation flow.
- * - If no anon cookie: create session (and persist when DB connected), set cookie.
- * - If anon session has generation_count >= 1: return allowed: false, reason: anon_limit_reached.
- * - Else: create video_job (owner_type=anon, owner_id=anon_session_id), increment generation_count, return job id.
- * Caller must attach setCookieHeader to response when present.
- */
 export async function runGenerationFlow(
   request: Request,
   prompt: string
