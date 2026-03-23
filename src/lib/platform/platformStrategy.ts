@@ -45,9 +45,9 @@ const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
     platform: "youtube_shorts",
     maxDurationSeconds: 60,
     intentSnippet:
-      " This video targets YouTube Shorts: vertical-first, strong hook in the first 3 seconds, high retention, 15–60 seconds.",
+      " This video targets YouTube Shorts: vertical-first, strong hook in the first 3 seconds, high retention, 15-60 seconds.",
     narrativeSnippet:
-      " Optimize for YouTube Shorts: explosive hook in the first 3 seconds, high-retention pacing, vertical-first mindset. 15–60 sec ideal.",
+      " Optimize for YouTube Shorts: explosive hook in the first 3 seconds, high-retention pacing, vertical-first mindset. 15-60 sec ideal.",
     shotsSnippet:
       " Structure shots for YouTube Shorts: vertical-first framing, strong hook shot first. Fast cuts to maintain retention.",
     scriptSnippet:
