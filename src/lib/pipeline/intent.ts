@@ -11,7 +11,7 @@ import {
 } from "@/lib/types";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
+const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
 
 const SYSTEM_PROMPT = `You are an intent interpreter for a video editing system. Given one sentence from the user, output a single JSON object with exactly these keys and types (no other keys, no markdown, no explanation):
 
@@ -21,9 +21,9 @@ const SYSTEM_PROMPT = `You are an intent interpreter for a video editing system.
 - complexity: one of "simple" | "multi-part"
 - durationSeconds: number between ${INTENT_DURATION_MIN} and ${INTENT_DURATION_MAX} (infer from the sentence if mentioned, otherwise use ${INTENT_DURATION_MAX})
 - rawInput: the exact original user sentence as a string
-- mainSubject: string or null — From the user sentence, identify the main subject/object the video is about or that is "talking". Use a short, single noun or noun phrase (e.g. "football", "energy drink", "coffee cup"). If the sentence does not describe a talking object or clear main subject, set mainSubject to null.
+- mainSubject: string or null - From the user sentence, identify the main subject/object the video is about or that is "talking". Use a short, single noun or noun phrase (e.g. "football", "energy drink", "coffee cup"). If the sentence does not describe a talking object or clear main subject, set mainSubject to null.
 
-Identify the main topic or product (e.g. energy drink, coffee, app, brand). The entire video—script, narrative, and visuals—must be about this topic. Infer audience, goal, tone, and complexity from the sentence. Output only valid JSON.`;
+Identify the main topic or product (e.g. energy drink, coffee, app, brand). The entire video-script, narrative, and visuals-must be about this topic. Infer audience, goal, tone, and complexity from the sentence. Output only valid JSON.`;
 
 function isIntentAudience(s: string): s is IntentAudience {
   return s === "broad" || s === "technical" || s === "casual";
