@@ -5,17 +5,17 @@ import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
+const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
 
 const BASE_SYSTEM_PROMPT = `You are a script writer for a short video. Structure (beats, shots) is already decided. You fill each shot with spoken text or silence.
 
 Given Intent, NarrativePlan, and ShotList, output a single JSON object with exactly one key:
 - entries: array of script entries, one per shot, in shot order (order 1, 2, 3, ...). Each entry has:
   - shotId: string (must match the shot id from ShotList)
-  - text: string or null. Use null ONLY when the shot has textDensity 0 (silence). For every shot with textDensity > 0 you MUST provide a non-empty text string—one short sentence of dialogue. Text must never be null or omitted for those shots.
+  - text: string or null. Use null ONLY when the shot has textDensity 0 (silence). For every shot with textDensity > 0 you MUST provide a non-empty text string-one short sentence of dialogue. Text must never be null or omitted for those shots.
   - order: number (same as shot order, 1-based)
 
-CRITICAL — Stay on topic: Every spoken line must be ABOUT the topic in intent.rawInput. If the user asked for an energy drink video, every line must relate to energy drinks (e.g. taste, energy, brand, why try it). If they asked for a product or brand, every line must be about that product/brand. Never write generic, negative, or off-topic content. Keep it positive and on-brand for what the user asked for.
+CRITICAL - Stay on topic: Every spoken line must be ABOUT the topic in intent.rawInput. If the user asked for an energy drink video, every line must relate to energy drinks (e.g. taste, energy, brand, why try it). If they asked for a product or brand, every line must be about that product/brand. Never write generic, negative, or off-topic content. Keep it positive and on-brand for what the user asked for.
 
 Rules:
 - For shots with textDensity > 0: every entry must have a non-empty text string (one short sentence of dialogue). Never output null or omit text for those shots.
@@ -55,14 +55,14 @@ function buildSystemPrompt(options?: {
     const maxWords = targetWords + 50;
     prompt += `
 
-TARGET LENGTH (CRITICAL): The user chose a video duration of ${sec} seconds. The total word count of ALL spoken dialogue (sum of words in every entries[].text) MUST be approximately ${targetWords} words (between ${minWords} and ${maxWords}). At ~2.5 words per second, this fills the full ${sec} seconds with voice. Write enough substantive sentences per shot—longer sentences where needed—so the combined dialogue reaches this word count. Short scripts produce short audio and break caption sync; always hit the target word range.`;
+TARGET LENGTH (CRITICAL): The user chose a video duration of ${sec} seconds. The total word count of ALL spoken dialogue (sum of words in every entries[].text) MUST be approximately ${targetWords} words (between ${minWords} and ${maxWords}). At ~2.5 words per second, this fills the full ${sec} seconds with voice. Write enough substantive sentences per shot-longer sentences where needed-so the combined dialogue reaches this word count. Short scripts produce short audio and break caption sync; always hit the target word range.`;
 
     const endingStartSec = Math.max(1, sec - 2);
     prompt += `
 
 INTRO AND OUTRO (required): The video must have a clear beginning and a proper ending so it does not feel cut off.
-- Intro (first 1–2 shots): Write dialogue that works as a proper intro—e.g. a welcome, a hook, or what this video is about.
-- Outro (CRITICAL—last 2 seconds only): For a ${sec}-second video the ending must be COMPLETE by second ${sec - 1} (e.g. 59 for 60s). So the very last sentence of the entire script MUST be 3–5 words ONLY (e.g. "Thanks for watching!", "Stay refreshed!", "Try it today!"). No long sentence in the final shot. This short line must be the ONLY dialogue in the last shot and must be spoken in full within seconds ${endingStartSec}–${sec}. All other dialogue must fit in the first ${sec - 2} seconds so the last 2 seconds contain only this one short sign-off. The video must not cut off mid-word—the final line must be complete.`;
+- Intro (first 1-2 shots): Write dialogue that works as a proper intro-e.g. a welcome, a hook, or what this video is about.
+- Outro (CRITICAL-last 2 seconds only): For a ${sec}-second video the ending must be COMPLETE by second ${sec - 1} (e.g. 59 for 60s). So the very last sentence of the entire script MUST be 3-5 words ONLY (e.g. "Thanks for watching!", "Stay refreshed!", "Try it today!"). No long sentence in the final shot. This short line must be the ONLY dialogue in the last shot and must be spoken in full within seconds ${endingStartSec}-${sec}. All other dialogue must fit in the first ${sec - 2} seconds so the last 2 seconds contain only this one short sign-off. The video must not cut off mid-word-the final line must be complete.`;
   }
   return prompt;
 }
@@ -236,7 +236,7 @@ export async function generateScript(
 const EXTEND_SCRIPT_SYSTEM_PROMPT = `You extend a video script with new dialogue. You will be given the current script, the video topic, tone, and how many more words to add.
 
 Rules:
-- Output ONLY the new sentences—no repetition of the existing script, no preamble, no "Here is more dialogue:".
+- Output ONLY the new sentences-no repetition of the existing script, no preamble, no "Here is more dialogue:".
 - Same topic and tone as the original. Stay on topic (match the user's intent).
 - Natural, conversational. One or more short sentences that continue the video.
 - Plain text only. No JSON, no bullet points, no labels.`;
