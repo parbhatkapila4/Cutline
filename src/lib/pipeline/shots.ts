@@ -11,7 +11,7 @@ import type {
 } from "@/lib/types";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
+const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
 
 const SHOT_PURPOSES: ShotPurpose[] = [
   "establish",
@@ -41,14 +41,14 @@ const EMOTIONAL_INTENTS: EmotionalIntent[] = [
 
 const SYSTEM_PROMPT = `You are a shot-level reasoner for a short video. Given an Intent and a NarrativePlan (with beats), output a single JSON object with exactly these keys (no other keys, no markdown, no explanation):
 
-- shots: array of 4–12 shot objects. Map 1–3 shots per narrative beat (use fewer for short videos). Each shot has:
+- shots: array of 4-12 shot objects. Map 1-3 shots per narrative beat (use fewer for short videos). Each shot has:
   - id: string (e.g. "shot-1", "shot-2")
   - beatId: string (must be one of the beat ids from the NarrativePlan)
   - durationSeconds: number (positive integer)
   - purpose: one of "establish" | "reveal" | "emphasize" | "transition" | "hold"
   - motionType: one of "static" | "push" | "pull" | "pan-left" | "pan-right" | "zoom-in" | "zoom-out" | "cut"
   - emotionalIntent: one of "tension" | "release" | "curiosity" | "urgency" | "calm" | "neutral"
-  - textDensity: number 0, 1, 2, or 3 (0 = silence, 1 = low, 2 = medium, 3 = high). Use 0 for transition/hold; 1–3 for beats that carry meaning. Match to beat pacing.
+  - textDensity: number 0, 1, 2, or 3 (0 = silence, 1 = low, 2 = medium, 3 = high). Use 0 for transition/hold; 1-3 for beats that carry meaning. Match to beat pacing.
   - order: number (sequence order, 1-based)
   Purpose, motion, and emotional intent must align with each beat's purpose and pacing. The sum of all shot durationSeconds MUST equal NarrativePlan.totalDurationSeconds.
 - totalDurationSeconds: number, must equal NarrativePlan.totalDurationSeconds
@@ -88,7 +88,7 @@ function parseAndValidateShotList(
   const minShots = 4;
   const maxShots = 12;
   if (!Array.isArray(shotsRaw) || shotsRaw.length < minShots || shotsRaw.length > maxShots) {
-    throw new Error(`Shot reasoning failed: shots must be an array of ${minShots}–${maxShots} items (got ${Array.isArray(shotsRaw) ? shotsRaw.length : "non-array"})`);
+    throw new Error(`Shot reasoning failed: shots must be an array of ${minShots}-${maxShots} items (got ${Array.isArray(shotsRaw) ? shotsRaw.length : "non-array"})`);
   }
 
   const beatIds = new Set(plan.beats.map((b) => b.id));
