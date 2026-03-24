@@ -15,6 +15,7 @@ import {
 import { runGenerationFlow, checkDownloadAllowed } from "@/lib/anon";
 import { isDatabaseConfigured } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { ensureInProcessWorkerStarted } from "@/lib/queue/autoStartWorker";
 import fs from "fs";
 import path from "path";
 
@@ -170,6 +171,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
   const creditsIdentifier = userId ?? anonFlow?.result.anon_session_id ?? identifier;
 
   try {
+    await ensureInProcessWorkerStarted();
     const queue = getVideoQueue();
     const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth, TOKENS_PER_VIDEO, FREE_PLAN_VIDEOS_PER_MONTH } = await import("@/lib/usage");
     const creditsCheckDisabled =
@@ -213,6 +215,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(data.textModel ? { textModel: data.textModel } : {}),
       captions: data.captions,
       ...(data.talkingObjectStyle ? { talkingObjectStyle: data.talkingObjectStyle } : {}),
+      ...(data.avatar ? { avatar: data.avatar } : {}),
       ...(data.renderMode ? { renderMode: data.renderMode } : {}),
       ...(data.previewJobId ? { previewJobId: data.previewJobId } : {}),
       variationCount: data.variationCount ?? 1,
