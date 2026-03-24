@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
+import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
+import { auth } from "@/lib/auth";
 
 export type DashboardVideoItem = {
   id: string;
@@ -41,9 +43,19 @@ function titleFromInput(input: string | undefined): string {
   return trimmed.slice(0, 50);
 }
 
+async function resolveDashboardIdentifier(request: Request): Promise<string | null> {
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    const userId = session?.user?.id;
+    if (typeof userId === "string" && userId.trim()) return userId;
+  } catch {
+  }
+  return getAnonSessionIdFromRequest(request);
+}
+
 export async function GET(request: Request) {
-  const identifier = getClientIdentifier(request);
-  const limit = await checkRateLimit(identifier, "status");
+  const rateLimitIdentifier = getClientIdentifier(request);
+  const limit = await checkRateLimit(rateLimitIdentifier, "status");
   if (!limit.allowed) {
     const retryAfter = limit.retryAfter ?? 60;
     return NextResponse.json(
@@ -53,6 +65,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    const identifier = await resolveDashboardIdentifier(request);
+    if (!identifier) return NextResponse.json([]);
+
     const queue = getVideoQueue();
     const [completed, failed, waiting, active] = await Promise.all([
       queue.getCompleted(0, 199),
