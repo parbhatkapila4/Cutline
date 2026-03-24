@@ -1,10 +1,11 @@
 import type { CostBreakdown } from "./types";
+import { SERVICE_COSTS } from "./pricing";
 
-function getRate(name: string): number {
+function getRate(name: string, fallback: number): number {
   const v = process.env[name];
-  if (v === undefined || v === "") return 0;
+  if (v === undefined || v === "") return fallback;
   const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? n : 0;
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
 function round(value: number, decimals = 4): number {
@@ -21,10 +22,10 @@ export interface CostTracker {
 }
 
 export function createCostTracker(): CostTracker {
-  const costPer1kTokens = getRate("COST_PER_1K_TOKENS");
-  const costPerTtsSecond = getRate("COST_PER_TTS_SECOND");
-  const costPerVideoSecond = getRate("COST_PER_VIDEO_SECOND");
-  const costPerImageCall = getRate("COST_PER_IMAGE_CALL");
+  const costPer1kTokens = getRate("COST_PER_1K_TOKENS", SERVICE_COSTS.LLM_PER_1K_TOKENS);
+  const costPerTtsSecond = getRate("COST_PER_TTS_SECOND", SERVICE_COSTS.TTS_PER_SECOND);
+  const costPerVideoSecond = getRate("COST_PER_VIDEO_SECOND", SERVICE_COSTS.VEO_PER_SECOND);
+  const costPerImageCall = getRate("COST_PER_IMAGE_CALL", SERVICE_COSTS.DALLE_PER_IMAGE);
 
   let llmTokens = 0;
   let ttsSeconds = 0;
