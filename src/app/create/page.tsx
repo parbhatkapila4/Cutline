@@ -7,13 +7,21 @@ import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
 import { STAGES } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
+import type { AvatarPresetId } from "@/lib/types/avatar";
 import WarpShaderHero from "@/components/ui/warp-shader";
 
 type JobStatus = "pending" | "processing" | "completed" | "failed";
 type Mode = "slideshow" | "talking_object";
 type Platform = "general" | "linkedin" | "twitter" | "youtube_shorts";
+type AvatarMode = "default" | "preset" | "upload";
 
 const POLL_MS = 2500;
+const AVATAR_PRESETS: Array<{ id: AvatarPresetId; label: string; hint: string }> = [
+  { id: "presenter_female_1", label: "Presenter (Female)", hint: "Professional look" },
+  { id: "presenter_male_1", label: "Presenter (Male)", hint: "Professional look" },
+  { id: "creator_female_1", label: "Creator (Female)", hint: "Casual creator vibe" },
+  { id: "creator_male_1", label: "Creator (Male)", hint: "Casual creator vibe" },
+];
 
 const PROMPT_CHIPS = [
   { label: "Product launch", prompt: "Product launch video: highlight key features and benefits, end with a clear call-to-action. Confident, professional tone. Suitable for website and social." },
@@ -24,6 +32,23 @@ const PROMPT_CHIPS = [
   { label: "Reel / Short hook", prompt: "Scroll-stopping hook for Reels or Shorts: strong opener, one clear message. Trend-aware and shareable." },
 ];
 
+function CutlineMark({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
+  const dim = size === "sm" ? 20 : size === "lg" ? 32 : 24;
+  return (
+    <svg width={dim} height={dim} viewBox="0 0 32 32" fill="none">
+      <defs>
+        <linearGradient id="cmG" x1="0" y1="0" x2="32" y2="32">
+          <stop offset="0%" stopColor="#fb7185" />
+          <stop offset="100%" stopColor="#e11d48" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="4" width="28" height="20" rx="4" stroke="url(#cmG)" strokeWidth="2" fill="none" />
+      <path d="M13 10v8l7-4z" fill="url(#cmG)" />
+      <line x1="2" y1="28" x2="30" y2="28" stroke="url(#cmG)" strokeWidth="2" strokeLinecap="round" strokeDasharray="4 3" />
+    </svg>
+  );
+}
+
 export default function CreatePage() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<Mode>("slideshow");
@@ -32,6 +57,10 @@ export default function CreatePage() {
   const [dur, setDur] = useState(30);
   const [cc, setCc] = useState(true);
   const [objStyle, setObjStyle] = useState<"cartoon" | "real">("cartoon");
+  const [avatarMode, setAvatarMode] = useState<AvatarMode>("default");
+  const [avatarPresetId, setAvatarPresetId] = useState<AvatarPresetId>("presenter_female_1");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarFileUrl, setAvatarFileUrl] = useState<string | null>(null);
   const [imgs, setImgs] = useState<File[]>([]);
   const [imgUrls, setImgUrls] = useState<string[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -46,12 +75,23 @@ export default function CreatePage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const u = imgs.map((f) => URL.createObjectURL(f));
     setImgUrls(u);
     return () => u.forEach((x) => URL.revokeObjectURL(x));
   }, [imgs]);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarFileUrl(null);
+      return;
+    }
+    const u = URL.createObjectURL(avatarFile);
+    setAvatarFileUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [avatarFile]);
 
   const busy = submitting || (jobId != null && (status === "pending" || status === "processing"));
   const done = status === "completed" && !!videoUrl;
@@ -93,12 +133,32 @@ export default function CreatePage() {
     setError(null); setVideoUrl(null); setStatus(null); setJobId(null); setSubmitting(true);
     try {
       let assetIds: string[] = [];
+      let avatarUploadAssetId: string | undefined;
       if (imgs.length) {
         const fd = new FormData();
         imgs.forEach((f) => fd.append("productPhotos", f));
         const u = await fetch("/api/assets/upload", { method: "POST", body: fd });
         const ud = await u.json();
         if (u.ok && ud.assetIds) assetIds = ud.assetIds;
+      }
+      if (mode === "talking_object" && objStyle === "real" && avatarMode === "upload") {
+        if (!avatarFile) {
+          setError("Please upload an avatar image or choose default/preset avatar.");
+          return;
+        }
+        const fd = new FormData();
+        fd.append("referenceImages", avatarFile);
+        const uploadRes = await fetch("/api/assets/upload", { method: "POST", body: fd });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok || !Array.isArray(uploadData.assetIds) || uploadData.assetIds.length === 0) {
+          const uploadError =
+            typeof uploadData?.error === "string" && uploadData.error.trim()
+              ? uploadData.error
+              : "Avatar upload failed. Please try a different image.";
+          setError(uploadError);
+          return;
+        }
+        avatarUploadAssetId = String(uploadData.assetIds[0]);
       }
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(), 25_000);
@@ -110,6 +170,16 @@ export default function CreatePage() {
           captions: cc ? "on" : "off",
           ...(assetIds.length ? { assetIds } : {}),
           ...(mode === "talking_object" ? { talkingObjectStyle: objStyle } : {}),
+          ...(mode === "talking_object" && objStyle === "real"
+            ? {
+              avatar:
+                avatarMode === "preset"
+                  ? { mode: "preset", presetId: avatarPresetId }
+                  : avatarMode === "upload" && avatarUploadAssetId
+                    ? { mode: "upload", uploadAssetId: avatarUploadAssetId }
+                    : { mode: "default" },
+            }
+            : {}),
         }),
         signal: ac.signal,
       });
@@ -126,6 +196,7 @@ export default function CreatePage() {
     stop(); setJobId(null); setStatus(null); setVideoUrl(null); setError(null);
     setPrompt(""); setImgs([]); setMode("slideshow"); setPlatform("general"); setAspectRatio("16:9");
     setDur(30); setCc(true); setObjStyle("cartoon");
+    setAvatarMode("default"); setAvatarPresetId("presenter_female_1"); setAvatarFile(null);
   };
 
   const suggest = async () => {
@@ -158,8 +229,8 @@ export default function CreatePage() {
       {/* ── Nav ── */}
       <nav className="relative z-10 flex items-center justify-between px-6 lg:px-10 py-4">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-rose-500 to-rose-700 flex items-center justify-center shadow-lg shadow-rose-500/20 group-hover:shadow-rose-500/30 transition-shadow">
-            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 2v4M17 2v4" /><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 10h20" /><path d="m10 14 3 2-3 2v-4z" /></svg>
+          <div className="w-8 h-8 rounded-lg bg-rose-950/60 border border-rose-500/20 flex items-center justify-center shadow-lg shadow-rose-500/15 group-hover:shadow-rose-500/25 transition-shadow">
+            <CutlineMark size="sm" />
           </div>
           <span className="text-base font-semibold tracking-tight text-white">CUTLINE</span>
         </Link>
@@ -191,8 +262,8 @@ export default function CreatePage() {
                       <circle cx="40" cy="4" r="2.5" fill="#f43f5e"><animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" /></circle>
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-rose-500 to-rose-600 flex items-center justify-center shadow-xl shadow-rose-500/25">
-                        <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M7 2v4M17 2v4" /><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 10h20" /><path d="m10 14 3 2-3 2v-4z" /></svg>
+                      <div className="w-14 h-14 rounded-2xl bg-rose-950/80 border border-rose-500/20 flex items-center justify-center shadow-xl shadow-rose-500/20">
+                        <CutlineMark size="lg" />
                       </div>
                     </div>
                   </div>
@@ -286,8 +357,8 @@ export default function CreatePage() {
 
             <div className="grid lg:grid-cols-[1fr_320px] gap-6">
               {/* Video */}
-              <div className="rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50">
-                <video src={videoUrl} controls autoPlay className="w-full aspect-video bg-black" />
+              <div className="rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 min-h-[360px]">
+                <video src={videoUrl} controls autoPlay className="w-full h-full object-contain bg-black" />
               </div>
 
               <div className="space-y-4">
@@ -537,6 +608,83 @@ export default function CreatePage() {
                                 </button>
                               ))}
                             </div>
+                            {objStyle === "real" && (
+                              <div className="mt-4">
+                                <p className="text-xs font-medium text-gray-500 mb-2">Avatar</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                  {(["default", "preset", "upload"] as const).map((m) => (
+                                    <button
+                                      key={m}
+                                      type="button"
+                                      onClick={() => setAvatarMode(m)}
+                                      className={`px-3 py-2 rounded-lg border text-sm transition-all ${
+                                        avatarMode === m
+                                          ? "border-blue-500/50 bg-blue-500/10 text-blue-200"
+                                          : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"
+                                      }`}
+                                    >
+                                      {m === "default" ? "Default" : m === "preset" ? "Preset" : "Upload"}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {avatarMode === "preset" && (
+                                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {AVATAR_PRESETS.map((preset) => (
+                                      <button
+                                        key={preset.id}
+                                        type="button"
+                                        onClick={() => setAvatarPresetId(preset.id)}
+                                        className={`p-2.5 rounded-lg border text-left transition-all ${
+                                          avatarPresetId === preset.id
+                                            ? "border-amber-500/50 bg-amber-500/10"
+                                            : "border-zinc-700 hover:border-zinc-600"
+                                        }`}
+                                      >
+                                        <p className="text-sm text-white">{preset.label}</p>
+                                        <p className="text-xs text-zinc-500">{preset.hint}</p>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {avatarMode === "upload" && (
+                                  <div className="mt-3">
+                                    <input
+                                      ref={avatarFileRef}
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => avatarFileRef.current?.click()}
+                                      className="w-full rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-300 transition-colors"
+                                    >
+                                      {avatarFile ? "Change avatar image" : "Upload avatar image"}
+                                    </button>
+                                    {avatarFileUrl ? (
+                                      <div className="mt-2 flex items-center gap-3">
+                                        <img src={avatarFileUrl} alt="Avatar preview" className="w-12 h-12 rounded-lg object-cover border border-zinc-700" />
+                                        <div className="min-w-0">
+                                          <p className="text-xs text-zinc-400 truncate">{avatarFile?.name}</p>
+                                          <button
+                                            type="button"
+                                            onClick={() => setAvatarFile(null)}
+                                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <p className="text-[11px] text-zinc-600 mt-2">Use a clear face photo for best results.</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
