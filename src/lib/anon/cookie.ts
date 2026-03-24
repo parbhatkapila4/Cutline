@@ -1,17 +1,8 @@
-/**
- * Anonymous session cookie: HTTP-only, used to persist anon_session_id.
- * Do NOT use IP or frontend-only tracking; this cookie is the source of truth.
- */
-
 export const ANON_SESSION_COOKIE_NAME = "cutline_anon_session";
 
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365; // 1 year
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 const COOKIE_PATH = "/";
 
-/**
- * Read anon_session_id from request cookies.
- * Returns null if missing or invalid (not a UUID).
- */
 export function getAnonSessionIdFromRequest(request: Request): string | null {
   const cookieHeader = request.headers.get("cookie");
   if (!cookieHeader) return null;
@@ -25,10 +16,6 @@ export function getAnonSessionIdFromRequest(request: Request): string | null {
   return decoded;
 }
 
-/**
- * Build Set-Cookie header value for anon session (HTTP-only, SameSite=Lax).
- * Caller should add this to Response headers.
- */
 export function buildAnonSessionCookieHeader(sessionId: string): string {
   const encoded = encodeURIComponent(sessionId);
   return [
