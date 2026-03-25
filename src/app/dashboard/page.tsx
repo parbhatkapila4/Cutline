@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { DashboardVideoItem } from "@/app/api/dashboard/videos/route";
 import { authClient } from "@/lib/auth-client";
@@ -11,13 +10,28 @@ type VideoStatus = "completed" | "processing" | "failed";
 type UsageData = {
   plan: string;
   planLabel: string;
-  videosLimit: number;
-  apiCallsLimit: number;
+  videosLimit: number | null;
+  apiCallsLimit: number | null;
   videosUsed: number;
   apiCallsUsed: number;
   resetDate: string;
-  tokens: { initialBalance: number; remaining: number; used: number };
-  recentActivity: { id: string; title: string; status: string; time: string }[];
+  tokens: {
+    unlimited?: boolean;
+    initialBalance: number | null;
+    remaining: number;
+    used: number;
+    usdPerToken?: number;
+    totalCostUsd?: number;
+    totalTokensSpent?: number;
+  };
+  recentActivity: {
+    id: string;
+    title: string;
+    status: string;
+    time: string;
+    tokensUsed?: number;
+    costUsd?: number;
+  }[];
   overview?: {
     totalVideos: number;
     thisWeek: number;
@@ -38,12 +52,12 @@ const statusStyles: Record<VideoStatus, string> = {
 const DEFAULT_USAGE: UsageData = {
   plan: "free",
   planLabel: "Free",
-  videosLimit: 10,
+  videosLimit: 1,
   apiCallsLimit: 10_000,
   videosUsed: 0,
   apiCallsUsed: 0,
   resetDate: "",
-  tokens: { initialBalance: 100, remaining: 100, used: 0 },
+  tokens: { unlimited: false, initialBalance: 10, remaining: 10, used: 0, usdPerToken: 0.10 },
   recentActivity: [],
   overview: {
     totalVideos: 0,
@@ -57,7 +71,6 @@ const DEFAULT_USAGE: UsageData = {
 };
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [videos, setVideos] = useState<DashboardVideoItem[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
   const [videosError, setVideosError] = useState<string | null>(null);
@@ -166,7 +179,9 @@ export default function DashboardPage() {
                     <div>
                       <div className="flex justify-between text-xs mb-1.5">
                         <span className="text-zinc-400">Videos this month</span>
-                        <span className="font-medium text-white">{usage.videosUsed} / {usage.videosLimit}</span>
+                        <span className="font-medium text-white">
+                          {usage.videosLimit == null ? `${usage.videosUsed} / Unlimited` : `${usage.videosUsed} / ${usage.videosLimit}`}
+                        </span>
                       </div>
                       <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
                         <div className="h-full rounded-full bg-blue-500" style={{ width: `${usage.videosLimit ? Math.min(100, (usage.videosUsed / usage.videosLimit) * 100) : 0}%` }} />
@@ -175,7 +190,11 @@ export default function DashboardPage() {
                     <div>
                       <div className="flex justify-between text-xs mb-1.5">
                         <span className="text-zinc-400">API calls</span>
-                        <span className="font-medium text-white">{usage.apiCallsUsed.toLocaleString()} / {usage.apiCallsLimit.toLocaleString()}</span>
+                        <span className="font-medium text-white">
+                          {usage.apiCallsLimit == null
+                            ? `${usage.apiCallsUsed.toLocaleString()} / Unlimited`
+                            : `${usage.apiCallsUsed.toLocaleString()} / ${usage.apiCallsLimit.toLocaleString()}`}
+                        </span>
                       </div>
                       <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
                         <div className="h-full rounded-full bg-emerald-500/80" style={{ width: `${usage.apiCallsLimit ? Math.min(100, (usage.apiCallsUsed / usage.apiCallsLimit) * 100) : 0}%` }} />
@@ -212,9 +231,14 @@ export default function DashboardPage() {
                   {usage.recentActivity.map((a) => (
                     <li key={a.id} className="flex items-start gap-2.5">
                       <span className={`shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full ${a.status === "completed" ? "bg-emerald-500" : a.status === "processing" ? "bg-amber-500" : "bg-red-500"}`} />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium text-white truncate">{a.title}</p>
-                        <p className="text-[11px] text-zinc-500">{a.time} · {a.status}</p>
+                        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                          <span>{a.time} · {a.status}</span>
+                          {a.tokensUsed != null && a.tokensUsed > 0 ? (
+                            <span className="text-violet-400/80">· {a.tokensUsed} tokens</span>
+                          ) : null}
+                        </div>
                       </div>
                     </li>
                   ))}
@@ -241,28 +265,68 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-2xl font-bold text-white">{usage.tokens.remaining}</span>
-                    <span className="text-xs text-zinc-500">of {usage.tokens.initialBalance} remaining</span>
+                  <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                    <span className="text-2xl font-bold text-white">
+                      {(usage.tokens.totalTokensSpent ?? usage.tokens.used ?? 0).toLocaleString()}
+                    </span>
+                    <span className="text-xs text-zinc-500">credits used</span>
                   </div>
-                  <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-violet-500"
-                      style={{ width: `${usage.tokens.initialBalance ? (usage.tokens.remaining / usage.tokens.initialBalance) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed">
-                    New users start with {usage.tokens.initialBalance} tokens. Each video uses tokens.
+                  <p className="text-[11px] text-zinc-500 leading-snug">
+                    Total charged on <span className="text-zinc-400">your</span> account from completed videos (same as token deductions we record per finished job). Failed or cancelled jobs don’t count.
                   </p>
-                  <div className="pt-1 flex justify-between text-[11px] text-zinc-500">
-                    <span>Used this period: {usage.tokens.used}</span>
+                  {usage.tokens.unlimited ? (
+                    <p className="text-[11px] text-emerald-400/80 font-medium">Unlimited plan · no fixed token cap</p>
+                  ) : null}
+                  {!usage.tokens.unlimited && usage.tokens.usdPerToken ? (
+                    <p className="text-[11px] text-emerald-400/80 font-medium">
+                      ~${(usage.tokens.remaining * usage.tokens.usdPerToken).toFixed(2)} wallet balance (estimate)
+                    </p>
+                  ) : null}
+                  {!usage.tokens.unlimited ? (
+                    <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-violet-500"
+                        style={{
+                          width: `${usage.tokens.initialBalance
+                            ? Math.min(100, (usage.tokens.remaining / usage.tokens.initialBalance) * 100)
+                            : 0}%`,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  {!usage.tokens.unlimited ? (
+                    <div className="flex justify-between text-[11px] text-zinc-500 gap-2">
+                      <span>Wallet balance</span>
+                      <span className="text-zinc-400 font-medium tabular-nums text-right">
+                        {usage.tokens.initialBalance != null
+                          ? `${usage.tokens.remaining.toLocaleString()} / ${usage.tokens.initialBalance.toLocaleString()} credits left`
+                          : `${usage.tokens.remaining.toLocaleString()} credits left`}
+                      </span>
+                    </div>
+                  ) : null}
+                  <p className="text-[11px] text-zinc-500 leading-relaxed">
+                    Cost varies by video length &amp; mode. AI video (Veo) costs more than slideshow.
+                  </p>
+                  <div className="pt-1 space-y-1">
+                    {usage.tokens.totalCostUsd != null && usage.tokens.totalCostUsd > 0 ? (
+                      <div className="flex justify-between text-[11px] text-zinc-500">
+                        <span>Total generation cost (completed)</span>
+                        <span className="text-zinc-400 font-medium">${usage.tokens.totalCostUsd.toFixed(2)}</span>
+                      </div>
+                    ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className="w-full mt-3 py-2 rounded-lg bg-white text-black text-sm font-medium hover:bg-zinc-200 transition-colors"
-                  >
-                    Add tokens
-                  </button>
+                  {!usage.tokens.unlimited ? (
+                    <button
+                      type="button"
+                      className="w-full mt-3 py-2 rounded-lg bg-white text-black text-sm font-medium hover:bg-zinc-200 transition-colors"
+                    >
+                      Add tokens
+                    </button>
+                  ) : (
+                    <p className="mt-3 text-[11px] text-zinc-500 text-center">
+                      Generation is covered by your plan - no wallet top-ups.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -282,7 +346,14 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <p className="text-sm font-medium text-white">{usage.planLabel}</p>
-                  <p className="text-xs text-zinc-500 mt-0.5">{usage.videosLimit} videos / month · {usage.apiCallsLimit >= 1000 ? `${usage.apiCallsLimit / 1000}k` : usage.apiCallsLimit} API calls</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {usage.videosLimit == null ? "Unlimited videos / month" : `${usage.videosLimit} videos / month`} ·{" "}
+                    {usage.apiCallsLimit == null
+                      ? "Unlimited API calls"
+                      : usage.apiCallsLimit >= 1000
+                        ? `${usage.apiCallsLimit / 1000}k API calls`
+                        : `${usage.apiCallsLimit} API calls`}
+                  </p>
                   <button
                     type="button"
                     className="w-full mt-3 py-2 rounded-lg border border-white/10 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors"
@@ -298,8 +369,11 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={async () => {
-                await authClient.signOut({ callbackURL: "/" });
-                router.push("/");
+                try {
+                  await authClient.signOut({ fetchOptions: { onSuccess: () => {} } });
+                } finally {
+                  window.location.href = "/";
+                }
               }}
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-white/10 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-colors font-medium"
             >
@@ -542,7 +616,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-zinc-500 mt-1">
                   {videos.length === 0 ? "Create your first video to see it here." : "Try a different filter or search."}
                 </p>
-                <Link href="/#create" className="inline-flex items-center gap-2 mt-4 text-blue-400 hover:text-blue-300 font-medium text-sm">Create video →</Link>
+                <Link href="/create" className="inline-flex items-center gap-2 mt-4 text-blue-400 hover:text-blue-300 font-medium text-sm">Create video →</Link>
               </div>
             ) : viewMode === "list" ? (
               <div className="rounded-xl border border-white/10 bg-zinc-950 overflow-hidden">
