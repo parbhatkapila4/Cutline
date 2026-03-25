@@ -26,3 +26,11 @@ CREATE TABLE IF NOT EXISTS video_jobs (
 CREATE INDEX IF NOT EXISTS idx_video_jobs_owner ON video_jobs (owner_type, owner_id);
 CREATE INDEX IF NOT EXISTS idx_video_jobs_created_at ON video_jobs (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_video_jobs_status ON video_jobs (status);
+
+-- Manual user plan overrides (managed by admin directly in DB)
+CREATE TABLE IF NOT EXISTS user_plan_overrides (
+  user_id TEXT PRIMARY KEY,
+  plan TEXT NOT NULL CHECK (plan IN ('free', 'beginner', 'professional', 'enterprise')),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_user_plan_overrides_plan ON user_plan_overrides (plan);
