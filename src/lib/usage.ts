@@ -11,7 +11,8 @@ function parseIntEnv(key: string, fallback: number): number {
   return n;
 }
 
-export const DEFAULT_TOKENS = parseIntEnv("DEFAULT_TOKENS", 100);
+export const DEFAULT_TOKENS = parseIntEnv("DEFAULT_TOKENS", 10);
+/** @deprecated Use estimateTokenCost / calculateTokensFromCost from pricing.ts */
 export const TOKENS_PER_VIDEO = parseIntEnv("TOKENS_PER_VIDEO", 10);
 
 let redis: Redis | null = null;
@@ -31,7 +32,7 @@ function monthKey(identifier: string): string {
   return `${KEY_PREFIX}${identifier}:${y}-${m}`;
 }
 
-export const FREE_PLAN_VIDEOS_PER_MONTH = parseIntEnv("FREE_PLAN_VIDEOS_PER_MONTH", 10);
+export const FREE_PLAN_VIDEOS_PER_MONTH = parseIntEnv("FREE_PLAN_VIDEOS_PER_MONTH", 1);
 export const FREE_PLAN_API_CALLS_PER_MONTH = parseIntEnv("FREE_PLAN_API_CALLS_PER_MONTH", 10_000);
 
 export async function getTokens(identifier: string): Promise<number> {
