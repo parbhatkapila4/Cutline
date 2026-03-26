@@ -4,7 +4,7 @@ import type { Shot } from "@/lib/types";
 import type { Script } from "@/lib/types";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
+const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
 
 export type DeriveResult = {
   searchQuery: string;
@@ -37,7 +37,7 @@ export async function deriveImageQuery(
   const purpose = shot.purpose;
 
   const systemPrompt = `You are an image search and prompt assistant for a video editing system. Given a shot's purpose, the spoken text for that shot, the video topic, and tone, output exactly two strings:
-1. searchQuery: 3–6 words for stock photo search. MUST be directly about the video topic. Include the main subject from the topic in every query (e.g. topic "soda soft drinks" → "soda drink can", "soft drink bottle", "refreshing soda pour"). Never return generic or off-topic queries. Every image in the video must match the user's description/topic.
+1. searchQuery: 3-6 words for stock photo search. MUST be directly about the video topic. Include the main subject from the topic in every query (e.g. topic "soda soft drinks" → "soda drink can", "soft drink bottle", "refreshing soda pour"). Never return generic or off-topic queries. Every image in the video must match the user's description/topic.
 2. imagePrompt: one short sentence for image generation. MUST depict the video topic clearly. The image must look like it belongs in a video about this topic. No markdown, no explanation. Output only valid JSON with keys searchQuery and imagePrompt.`;
 
   let userPrompt = `Video topic (ALL images must relate to this): "${topic}". Shot purpose: ${purpose}. Script for this shot: "${scriptText}". Tone: ${tone}. Return searchQuery and imagePrompt that are clearly about "${topic}".`;
@@ -46,7 +46,7 @@ export async function deriveImageQuery(
       .slice(-8)
       .map((u) => `search: "${u.searchQuery ?? ""}" / prompt: "${(u.imagePrompt ?? "").slice(0, 60)}..."`)
       .join("; ");
-    userPrompt += ` Already used for other shots in this video (suggest a DIFFERENT scene, angle, or composition—do not repeat): ${usedList}. Return a NEW searchQuery and imagePrompt that are still about "${topic}" but visually different from the above.`;
+    userPrompt += ` Already used for other shots in this video (suggest a DIFFERENT scene, angle, or composition-do not repeat): ${usedList}. Return a NEW searchQuery and imagePrompt that are still about "${topic}" but visually different from the above.`;
   }
 
   const body = {
