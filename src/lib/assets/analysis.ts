@@ -17,7 +17,7 @@ import type {
 import type { AssetMetadata } from "@/lib/assets/types";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_VISION_MODEL = "google/gemini-2.0-flash-lite-001";
+const DEFAULT_VISION_MODEL = "anthropic/claude-3.5-haiku";
 const HEX_REGEX = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
 
 function normalizeHex(s: string): string {
