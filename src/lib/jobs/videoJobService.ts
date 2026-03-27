@@ -1,8 +1,3 @@
-/**
- * Video job service (Postgres-backed ownership and metadata).
- * Uses Neon Postgres; links to BullMQ via queue_job_id when integrated.
- */
-
 import type { VideoJob, VideoJobInsert, VideoJobStatus, OwnerType } from "@/lib/db/types";
 import { getSql } from "@/lib/db/client";
 
@@ -32,13 +27,10 @@ function mapRow(row: VideoJobRow): VideoJob {
   };
 }
 
-/**
- * Create a video_job row and return its id.
- */
 export async function createVideoJob(insert: VideoJobInsert): Promise<{ id: string }> {
   const sql = getSql();
   const status = insert.status ?? "queued";
-  const rows = await sql`
+  const rows = (await sql`
     INSERT INTO video_jobs (owner_type, owner_id, prompt, status, preview_url, final_url)
     VALUES (
       ${insert.owner_type}::video_job_owner_type,
@@ -49,7 +41,7 @@ export async function createVideoJob(insert: VideoJobInsert): Promise<{ id: stri
       ${insert.final_url ?? null}
     )
     RETURNING id
-  `;
+  `) as { id: string }[];
   const row = rows[0];
   if (!row || typeof row !== "object" || typeof (row as { id?: string }).id !== "string") {
     throw new Error("Failed to create video job");
@@ -57,25 +49,19 @@ export async function createVideoJob(insert: VideoJobInsert): Promise<{ id: stri
   return { id: (row as { id: string }).id };
 }
 
-/**
- * Get a video job by id. Used for download gate and job status.
- */
 export async function getVideoJobById(jobId: string): Promise<VideoJob | null> {
   const sql = getSql();
-  const rows = await sql`
+  const rows = (await sql`
     SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id
     FROM video_jobs
     WHERE id = ${jobId}::uuid
     LIMIT 1
-  `;
+  `) as VideoJobRow[];
   const row = rows[0];
   if (!row || typeof row !== "object") return null;
   return mapRow(row as VideoJobRow);
 }
 
-/**
- * List video jobs for an owner (dashboard/history).
- */
 export async function listVideoJobsByOwner(
   ownerType: OwnerType,
   ownerId: string,
@@ -92,9 +78,6 @@ export async function listVideoJobsByOwner(
   return (Array.isArray(rows) ? rows : []).map((r) => mapRow(r as VideoJobRow));
 }
 
-/**
- * Find all video_jobs owned by an anon session (for auth migration).
- */
 export async function findVideoJobsByAnonSession(
   anonSessionId: string
 ): Promise<VideoJob[]> {
@@ -107,9 +90,6 @@ export async function findVideoJobsByAnonSession(
   return (Array.isArray(rows) ? rows : []).map((r) => mapRow(r as VideoJobRow));
 }
 
-/**
- * Migrate all jobs from an anon session to a user. Idempotent.
- */
 export async function migrateAnonJobsToUser(
   anonSessionId: string,
   userId: string
@@ -124,9 +104,6 @@ export async function migrateAnonJobsToUser(
   return { migrated: Array.isArray(rows) ? rows.length : 0 };
 }
 
-/**
- * Update job status (and optionally preview_url / final_url). For worker integration.
- */
 export async function updateVideoJobStatus(
   jobId: string,
   status: VideoJobStatus,
