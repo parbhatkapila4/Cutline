@@ -1,11 +1,11 @@
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001";
+const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
 
 const SYSTEM_PROMPT = `You are an edit interpreter for a video generation system. You are given:
 1. The original video prompt (what the current video was generated from).
 2. The user's edit request (e.g. tone change, add content, regenerate, more info on X).
 
-Your task: Output a single, concise prompt that incorporates the user's request. The output will be used as the new input for a full video regeneration—so it must be a complete, standalone prompt (one sentence or short paragraph), not a diff or instruction.
+Your task: Output a single, concise prompt that incorporates the user's request. The output will be used as the new input for a full video regeneration-so it must be a complete, standalone prompt (one sentence or short paragraph), not a diff or instruction.
 
 Rules:
 - Output ONLY the new prompt text. No quotes, no preamble, no explanation.
