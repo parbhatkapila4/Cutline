@@ -19,19 +19,63 @@ type HeyGenUploadPhotoResponse = {
 type HeyGenUploadAssetResponse = {
   code: number;
   data?: {
-    audio_asset_id: string;
-    audio_url: string;
+    /** Current API returns `id`; older responses used `audio_asset_id`. */
+    id?: string;
+    audio_asset_id?: string;
+    url?: string;
+    audio_url?: string;
+    file_type?: string;
   };
   message?: string;
+  msg?: string | null;
 };
 
+/** V2 generate often returns `{ error: null, data: { video_id } }` without top-level `code`. */
 type HeyGenCreateVideoResponse = {
-  code: number;
+  code?: number;
   data?: {
-    video_id: string;
-  };
+    video_id?: string;
+    id?: string;
+  } | null;
   message?: string;
+  msg?: string | null;
+  error?: null | string | { code?: string; message?: string; detail?: string };
 };
+
+function extractHeyGenCreateVideoId(root: unknown): string | undefined {
+  if (root === null || typeof root !== "object" || Array.isArray(root)) return undefined;
+  const o = root as Record<string, unknown>;
+  const d = o.data;
+  if (d && typeof d === "object" && !Array.isArray(d)) {
+    const inner = d as Record<string, unknown>;
+    const v = inner.video_id ?? inner.videoId ?? inner.id;
+    if (typeof v === "string" && v.trim() !== "") return v.trim();
+  }
+  for (const k of ["video_id", "videoId"]) {
+    const v = o[k];
+    if (typeof v === "string" && v.trim() !== "") return v.trim();
+  }
+  return undefined;
+}
+
+function extractHeyGenApiErrorMessage(root: unknown): string | undefined {
+  if (root === null || typeof root !== "object" || Array.isArray(root)) return undefined;
+  const o = root as Record<string, unknown>;
+  const e = o.error;
+  if (e == null) return undefined;
+  if (typeof e === "string") return e.trim() || undefined;
+  if (typeof e === "object") {
+    const eo = e as Record<string, unknown>;
+    const msg = eo.message ?? eo.detail ?? eo.code;
+    if (typeof msg === "string" && msg.length > 0) return msg;
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return String(e);
+    }
+  }
+  return undefined;
+}
 
 type HeyGenVideoStatus = "pending" | "processing" | "completed" | "failed";
 
@@ -202,13 +246,16 @@ async function uploadAudioAsset(
   }
 
   const data = (await response.json()) as HeyGenUploadAssetResponse;
-  if (data.code !== 100 || !data.data?.audio_asset_id) {
+  const audioAssetId =
+    data.data?.audio_asset_id ?? data.data?.id;
+  if (data.code !== 100 || !audioAssetId) {
+    const hint = JSON.stringify(data).slice(0, 500);
     throw new Error(
-      `HeyGen audio upload failed: ${data.message || "Invalid response"}`
+      `HeyGen audio upload failed: ${data.message || data.msg || "Invalid response"}. Body: ${hint}`
     );
   }
 
-  return data.data.audio_asset_id;
+  return audioAssetId;
 }
 
 async function createVideo(
@@ -246,8 +293,9 @@ async function createVideo(
     response = await fetch(url, {
       method: "POST",
       headers: {
-        "X-Api-Key": apiKey,
+        "x-api-key": apiKey,
         "Content-Type": "application/json",
+        Accept: "application/json",
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -262,21 +310,44 @@ async function createVideo(
     clearTimeout(timeoutId);
   }
 
+  const rawText = await response.text();
   if (!response.ok) {
-    const text = await response.text();
     throw new Error(
-      `HeyGen video creation failed: ${response.status} ${response.statusText}. ${text}`
+      `HeyGen video creation failed: ${response.status} ${response.statusText}. ${rawText.slice(0, 800)}`
     );
   }
 
-  const data = (await response.json()) as HeyGenCreateVideoResponse;
-  if (data.code !== 100 || !data.data?.video_id) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawText) as HeyGenCreateVideoResponse;
+  } catch {
     throw new Error(
-      `HeyGen video creation failed: ${data.message || "Invalid response"}`
+      `HeyGen video creation failed: response was not JSON (first 400 chars): ${rawText.slice(0, 400)}`
     );
   }
 
-  return data.data.video_id;
+  const data = parsed as HeyGenCreateVideoResponse;
+  const videoId = extractHeyGenCreateVideoId(parsed);
+
+  const errFromPayload = extractHeyGenApiErrorMessage(parsed);
+  if (errFromPayload && !videoId) {
+    throw new Error(`HeyGen video creation failed: ${errFromPayload}`);
+  }
+
+  if (typeof data.code === "number" && data.code !== 100 && !videoId) {
+    throw new Error(
+      `HeyGen video creation failed: ${data.message || data.msg || `code ${data.code}`}`
+    );
+  }
+
+  if (videoId) {
+    return videoId;
+  }
+
+  const hint = rawText.length > 800 ? `${rawText.slice(0, 800)}…` : rawText;
+  throw new Error(
+    `HeyGen video creation failed: ${data.message || data.msg || "No video_id in response"}. Raw: ${hint}`
+  );
 }
 
 async function pollVideoStatus(
@@ -296,7 +367,7 @@ async function pollVideoStatus(
       response = await fetch(url, {
         method: "GET",
         headers: {
-          "X-Api-Key": apiKey,
+          "x-api-key": apiKey,
         },
         signal: controller.signal,
       });
