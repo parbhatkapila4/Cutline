@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="public/header.svg" alt="CUTLINE — One sentence → One video" width="920" />
+  <img src="public/header.svg" alt="CUTLINE - One sentence → One video" width="920" />
 
   **AI-directed video editing.** Describe your idea in a single sentence and get a 30-45 second edited video. The system handles narrative, shots, pacing, motion, subtitles, voice, and images,no templates, no manual config. Images are optional: we fetch from the web (Unsplash / DALL·E / Pexels) from your description, or use a placeholder if APIs fail.
 
@@ -125,10 +125,10 @@ User sign-in and sign-up are handled by **[Better Auth](https://www.better-auth.
 
 **Routes:**
 
-- **`/auth/sign-in`** – Custom sign-in page (email/password + “Continue with Google”). Nav “Generate” links here when auth is required.
-- **`/signin`** – Redirects to `/auth/sign-in`.
-- **`/auth/sign-up`**, **`/auth/forgot-password`** – Additional auth views (default Better Auth UI when used).
-- **`/api/auth/*`** – Better Auth API (session, sign-in, sign-out, OAuth callback, etc.). All handlers live under `src/app/api/auth/[...all]/route.ts`.
+- **`/auth/sign-in`** - Custom sign-in page (email/password + “Continue with Google”). Nav “Generate” links here when auth is required.
+- **`/signin`** - Redirects to `/auth/sign-in`.
+- **`/auth/sign-up`**, **`/auth/forgot-password`** - Additional auth views (default Better Auth UI when used).
+- **`/api/auth/*`** - Better Auth API (session, sign-in, sign-out, OAuth callback, etc.). All handlers live under `src/app/api/auth/[...all]/route.ts`.
 
 **Environment variables:**
 
