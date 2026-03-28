@@ -38,6 +38,74 @@ function isIntentComplexity(s: string): s is IntentComplexity {
   return s === "simple" || s === "multi-part";
 }
 
+function normalizeAudience(value: unknown): IntentAudience {
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (isIntentAudience(v)) return v;
+    if (v === "general" || v === "public" || v === "mass") return "broad";
+    if (v === "pro" || v === "professional" || v === "expert") return "technical";
+    if (v === "friendly" || v === "informal") return "casual";
+  }
+  return "broad";
+}
+
+function normalizeGoal(value: unknown): IntentGoal {
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (isIntentGoal(v)) return v;
+    if (v === "educate" || v === "inform" || v === "teach") return "explain";
+    if (v === "sell" || v === "convert" || v === "promote" || v === "market") return "persuade";
+    if (v === "fun" || v === "engage" || v === "viral") return "entertain";
+  }
+  return "explain";
+}
+
+function normalizeTone(value: unknown): IntentTone {
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (isIntentTone(v)) return v;
+    if (
+      v === "professional" ||
+      v === "formal" ||
+      v === "neutral" ||
+      v === "confident" ||
+      v === "trustworthy"
+    ) {
+      return "serious";
+    }
+    if (
+      v === "friendly" ||
+      v === "casual" ||
+      v === "fun" ||
+      v === "light" ||
+      v === "humorous" ||
+      v === "upbeat"
+    ) {
+      return "playful";
+    }
+    if (
+      v === "excited" ||
+      v === "energetic" ||
+      v === "high-energy" ||
+      v === "motivational" ||
+      v === "action"
+    ) {
+      return "urgent";
+    }
+  }
+  return "serious";
+}
+
+function normalizeComplexity(value: unknown): IntentComplexity {
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (isIntentComplexity(v)) return v;
+    if (v === "complex" || v === "detailed" || v === "advanced") return "multi-part";
+    if (v === "basic" || v === "short" || v === "quick") return "simple";
+  }
+  return "simple";
+}
+
 function parseAndValidateIntent(raw: string, rawInput: string): Intent {
   let parsed: unknown;
   try {
@@ -50,44 +118,21 @@ function parseAndValidateIntent(raw: string, rawInput: string): Intent {
   }
   const obj = parsed as Record<string, unknown>;
 
-  const audience = obj.audience;
-  const goal = obj.goal;
-  const tone = obj.tone;
-  const complexity = obj.complexity;
+  const audience = normalizeAudience(obj.audience);
+  const goal = normalizeGoal(obj.goal);
+  const tone = normalizeTone(obj.tone);
+  const complexity = normalizeComplexity(obj.complexity);
   const durationSeconds = obj.durationSeconds;
   const mainSubject = obj.mainSubject;
-
-  if (typeof audience !== "string" || !isIntentAudience(audience)) {
-    throw new Error(
-      "Intent interpretation failed: invalid or missing audience (expected broad | technical | casual)"
-    );
-  }
-  if (typeof goal !== "string" || !isIntentGoal(goal)) {
-    throw new Error(
-      "Intent interpretation failed: invalid or missing goal (expected explain | persuade | entertain)"
-    );
-  }
-  if (typeof tone !== "string" || !isIntentTone(tone)) {
-    throw new Error(
-      "Intent interpretation failed: invalid or missing tone (expected serious | playful | urgent)"
-    );
-  }
-  if (typeof complexity !== "string" || !isIntentComplexity(complexity)) {
-    throw new Error(
-      "Intent interpretation failed: invalid or missing complexity (expected simple | multi-part)"
-    );
-  }
   const duration =
     typeof durationSeconds === "number"
       ? Math.round(durationSeconds)
       : typeof durationSeconds === "string"
         ? parseInt(durationSeconds, 10)
         : NaN;
-  if (Number.isNaN(duration) || duration < INTENT_DURATION_MIN || duration > INTENT_DURATION_MAX) {
-    throw new Error(
-      `Intent interpretation failed: durationSeconds must be a number between ${INTENT_DURATION_MIN} and ${INTENT_DURATION_MAX}`
-    );
-  }
+  const safeDuration = Number.isNaN(duration)
+    ? INTENT_DURATION_MAX
+    : Math.min(INTENT_DURATION_MAX, Math.max(INTENT_DURATION_MIN, duration));
 
   let parsedMainSubject: string | null = null;
   if (typeof mainSubject === "string" && mainSubject.trim() !== "") {
@@ -99,7 +144,7 @@ function parseAndValidateIntent(raw: string, rawInput: string): Intent {
     goal,
     tone,
     complexity,
-    durationSeconds: duration,
+    durationSeconds: safeDuration,
     rawInput,
     mainSubject: parsedMainSubject,
   };
