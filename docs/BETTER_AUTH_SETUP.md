@@ -132,10 +132,10 @@ Or use the npm script: `npm run auth:migrate`
 
 ### If you get 500 on "Continue with Google"
 
-1. **Run the migration** – Better Auth needs its tables (user, session, account, etc.). From project root: `npm run auth:migrate` or `npx auth@latest migrate --yes --config src/lib/auth.ts`.
-2. **Check the terminal** – When a 500 occurs, the auth route logs the response body. Look for `[Better Auth] POST ... status 500` and the message that follows.
-3. **Redirect URI in Google Cloud** – Under "Authorized redirect URIs" add exactly: `http://localhost:3001/api/auth/callback/google` (use your app port).
-4. **DATABASE_URL** – Must be a valid Postgres connection string. For Neon, use the **pooled** URL and `sslmode=require` (with `=`).
+1. **Run the migration** - Better Auth needs its tables (user, session, account, etc.). From project root: `npm run auth:migrate` or `npx auth@latest migrate --yes --config src/lib/auth.ts`.
+2. **Check the terminal** - When a 500 occurs, the auth route logs the response body. Look for `[Better Auth] POST ... status 500` and the message that follows.
+3. **Redirect URI in Google Cloud** - Under "Authorized redirect URIs" add exactly: `http://localhost:3001/api/auth/callback/google` (use your app port).
+4. **DATABASE_URL** - Must be a valid Postgres connection string. For Neon, use the **pooled** URL and `sslmode=require` (with `=`).
 
 ---
 
