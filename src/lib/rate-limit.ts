@@ -1,6 +1,6 @@
-
 import Redis from "ioredis";
 import { RateLimiterRedis } from "rate-limiter-flexible";
+import { createManagedRedis } from "@/lib/redis/managedRedis";
 
 export type RateLimitType = "generate" | "upload" | "status" | "general";
 
@@ -21,7 +21,7 @@ const limiters: Partial<Record<RateLimitType, RateLimiterRedis>> = {};
 function getRedis(): Redis {
   if (!redisClient) {
     const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-    redisClient = new Redis(url, { maxRetriesPerRequest: null });
+    redisClient = createManagedRedis(url, { maxRetriesPerRequest: null });
   }
   return redisClient;
 }
