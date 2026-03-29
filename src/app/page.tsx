@@ -19,6 +19,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { ImagePlayer } from "@/components/image-player";
 import TestimonialV2 from "@/components/ui/testimonial-v2";
+import { authClient } from "@/lib/auth-client";
 
 const HOW_IT_WORKS_IMAGES = [
   "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1494&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
@@ -31,6 +32,9 @@ type JobStatus = "pending" | "processing" | "completed" | "failed";
 
 function HomeContent() {
   const searchParams = useSearchParams();
+  const { data: sessionData, isPending: sessionPending } = authClient.useSession();
+  const isLoggedIn = !sessionPending && !!sessionData;
+  const generateHref = isLoggedIn ? "/create" : "/signin";
   const [prompt, setPrompt] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -60,9 +64,6 @@ function HomeContent() {
   const [dragActive, setDragActive] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [activeFeatureTab, setActiveFeatureTab] = useState(0);
-  const [pricingPeriod, setPricingPeriod] = useState<"monthly" | "yearly">(
-    "monthly",
-  );
   const [activePainPoint, setActivePainPoint] = useState(0);
   const [defaultScriptModel, setDefaultScriptModel] = useState<string | null>(
     null,
@@ -488,7 +489,7 @@ function HomeContent() {
               How it works
             </Link>
             <Link
-              href="/signin"
+              href={generateHref}
               className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
             >
               <svg
@@ -2289,22 +2290,7 @@ function HomeContent() {
                   </h2>
                 </div>
 
-                <div className="flex items-end lg:items-center lg:pt-8">
-                  <div className="inline-flex rounded-full border border-gray-200 bg-gray-100 p-1">
-                    <button
-                      onClick={() => setPricingPeriod("monthly")}
-                      className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${pricingPeriod === "monthly" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"}`}
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      onClick={() => setPricingPeriod("yearly")}
-                      className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${pricingPeriod === "yearly" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"}`}
-                    >
-                      Yearly
-                    </button>
-                  </div>
-                </div>
+                <div className="hidden lg:block" />
 
                 <div className="flex items-end lg:items-center lg:pt-8">
                   <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
@@ -2317,10 +2303,7 @@ function HomeContent() {
 
               <div className="grid md:grid-cols-3 gap-5">
                 {PRICING.map((plan) => {
-                  const price =
-                    pricingPeriod === "monthly"
-                      ? plan.monthlyPrice
-                      : plan.yearlyPrice;
+                  const price = plan.monthlyPrice;
                   return (
                     <div
                       key={plan.name}
@@ -2383,9 +2366,7 @@ function HomeContent() {
                           <span className="text-3xl font-bold text-gray-900">
                             {price}
                           </span>
-                          <span className="text-sm text-gray-500">
-                            / Per {pricingPeriod === "monthly" ? "Month" : "Year"}
-                          </span>
+                          <span className="text-sm text-gray-500">/ Per Month</span>
                         </div>
                       </div>
 
