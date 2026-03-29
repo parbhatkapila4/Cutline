@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Avatar Placeholder</title>
+  <desc id="desc">Fallback placeholder for avatar preset cards.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)" />
+  <circle cx="400" cy="350" r="130" fill="#cbd5e1" />
+  <rect x="250" y="490" width="300" height="320" rx="150" fill="#475569" />
+  <text x="50%" y="900" dominant-baseline="middle" text-anchor="middle" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="34" font-weight="700">Avatar Preview</text>
+</svg>
