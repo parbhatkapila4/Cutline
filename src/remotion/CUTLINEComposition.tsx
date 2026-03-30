@@ -9,14 +9,14 @@ const FALLBACK_IMAGE = "/fallback.png";
 
 const DEFAULT_CAPTION_STYLE = {
   fontFamily: "TikTok Sans",
-  fontSize: 42,
+  fontSize: 28,
   fontColor: "#FFFFFF",
   strokeColor: "#000000",
-  strokeWidth: 2,
+  strokeWidth: 1.2,
   alignment: "center" as const,
   verticalPosition: "bottom" as const,
   yOffset: 0,
-  styleType: "pop" as const,
+  styleType: "clean" as const,
 };
 
 export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
