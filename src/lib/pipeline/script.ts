@@ -83,45 +83,40 @@ function parseAndValidateScript(
   const obj = parsed as Record<string, unknown>;
 
   const entriesRaw = obj.entries;
-  if (!Array.isArray(entriesRaw) || entriesRaw.length !== shotList.shots.length) {
-    throw new Error(
-      `Script generation failed: entries must be an array of length ${shotList.shots.length} (one per shot)`
-    );
+  if (!Array.isArray(entriesRaw)) {
+    throw new Error("Script generation failed: entries must be an array");
   }
 
   const shotById = new Map(shotList.shots.map((s) => [s.id, s]));
-  const seenShotIds = new Set<string>();
+  const TEXT_PLACEHOLDER = "...";
 
-  const entries: ScriptEntry[] = entriesRaw.map((item, i) => {
+  /** One map entry per shot id (first wins). Ignore unknown ids and duplicates. */
+  const entryByShotId = new Map<string, Record<string, unknown>>();
+  for (const item of entriesRaw) {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) continue;
     const e = item as Record<string, unknown>;
-    const shotId = e.shotId;
-    const text = e.text;
-    const order = e.order;
+    const shotIdRaw = e.shotId;
+    if (typeof shotIdRaw !== "string" || shotIdRaw.trim() === "") continue;
+    const shotId = shotIdRaw.trim();
+    if (!shotById.has(shotId) || entryByShotId.has(shotId)) continue;
+    entryByShotId.set(shotId, e);
+  }
 
-    if (typeof shotId !== "string" || shotId.trim() === "") {
-      throw new Error(`Script generation failed: entry ${i} missing or invalid shotId`);
-    }
-    const shot = shotById.get(shotId);
-    if (!shot) {
-      throw new Error(
-        `Script generation failed: entry ${i} shotId "${shotId}" does not match any shot`
-      );
-    }
-    if (seenShotIds.has(shotId)) {
-      throw new Error(`Script generation failed: duplicate shotId ${shotId}`);
-    }
-    seenShotIds.add(shotId);
+  if (entryByShotId.size === 0 && entriesRaw.length > 0) {
+    throw new Error(
+      "Script generation failed: no entries matched shot ids (check model output shotId fields)"
+    );
+  }
+
+  const entries: ScriptEntry[] = shotList.shots.map((shot) => {
+    const e = entryByShotId.get(shot.id);
+    const text = e?.text;
 
     if (shot.textDensity === 0) {
-      if (text !== null && text !== undefined) {
-        throw new Error(
-          `Script generation failed: shot ${shotId} has textDensity 0, text must be null`
-        );
-      }
-      return { shotId, text: null, order: shot.order };
+      // Model often returns dialogue anyway; silence shots stay null for TTS.
+      return { shotId: shot.id, text: null, order: shot.order };
     }
 
-    const TEXT_PLACEHOLDER = "...";
     let str: string;
     if (text != null && typeof text === "string") {
       str = text.trim();
@@ -131,9 +126,8 @@ function parseAndValidateScript(
     if (str.length === 0) {
       str = TEXT_PLACEHOLDER;
     }
-    return { shotId, text: str, order: shot.order };
+    return { shotId: shot.id, text: str, order: shot.order };
   });
-
 
   entries.sort((a, b) => a.order - b.order);
 
@@ -171,7 +165,10 @@ export async function generateScript(
   }
 
   const systemPrompt = buildSystemPrompt(options);
-  const userContent = JSON.stringify({ intent, plan, shotList });
+  const n = shotList.shots.length;
+  const userContent = `${JSON.stringify({ intent, plan, shotList })}
+
+CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have exactly ${n} objects, in the same order as shots (order 1..${n}). Each entry.shotId must equal shotList.shots[i].id for that index. Do not merge shots, skip shots, or add extra entries.`;
   const url = `${OPENROUTER_BASE}/chat/completions`;
   const body = {
     model,
