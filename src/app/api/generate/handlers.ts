@@ -173,30 +173,41 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
   try {
     await ensureInProcessWorkerStarted();
     const queue = getVideoQueue();
-    const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth, TOKENS_PER_VIDEO, FREE_PLAN_VIDEOS_PER_MONTH } = await import("@/lib/usage");
+    const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth } = await import("@/lib/usage");
+    const { estimateTokenCost } = await import("@/lib/cost/pricing");
+    const { getUserPlan } = await import("@/lib/users/planService");
     const creditsCheckDisabled =
       process.env.DISABLE_CREDITS_CHECK === "true" || process.env.DISABLE_CREDITS_CHECK === "1";
     const skipCreditsForAnon = Boolean(anonFlow?.result.allowed);
     if (!creditsCheckDisabled && !skipCreditsForAnon) {
+      const userPlan = await getUserPlan(userId);
+      const estimatedTokens = estimateTokenCost({
+        mode: data.mode ?? "slideshow",
+        durationSeconds: data.durationSeconds ?? 30,
+      });
       const tokensRemaining = await getTokens(creditsIdentifier);
-      if (tokensRemaining < TOKENS_PER_VIDEO) {
+      if (tokensRemaining < estimatedTokens) {
         return apiError({
           code: ErrorCode.INSUFFICIENT_CREDITS,
-          message: `Not enough credits. You have ${tokensRemaining} credits, need ${TOKENS_PER_VIDEO} per video.`,
+          message: `Not enough tokens. You have ${tokensRemaining} tokens, this video needs approximately ${estimatedTokens} tokens.`,
           status: 402,
-          details: { tokensRemaining, tokensRequired: TOKENS_PER_VIDEO },
+          details: { tokensRemaining, tokensRequired: estimatedTokens },
           headers,
         });
       }
       const videosCompletedThisMonth = await getVideosCompletedThisMonth(creditsIdentifier);
-      if (videosCompletedThisMonth >= FREE_PLAN_VIDEOS_PER_MONTH) {
+      if (
+        userPlan.videosPerMonth != null &&
+        videosCompletedThisMonth >= userPlan.videosPerMonth
+      ) {
         return apiError({
           code: ErrorCode.MONTHLY_LIMIT_REACHED,
-          message: `Monthly video limit reached. You've used ${videosCompletedThisMonth} of ${FREE_PLAN_VIDEOS_PER_MONTH} videos this month.`,
+          message: "You are out of your plan limit. Upgrade to create more videos.",
           status: 402,
           details: {
             videosUsed: videosCompletedThisMonth,
-            videosLimit: FREE_PLAN_VIDEOS_PER_MONTH,
+            videosLimit: userPlan.videosPerMonth,
+            plan: userPlan.id,
           },
           headers,
         });
