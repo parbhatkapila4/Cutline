@@ -1,4 +1,4 @@
-import Redis from "ioredis";
+import { createManagedRedis } from "@/lib/redis/managedRedis";
 
 const PING_TIMEOUT_MS = 2000;
 
@@ -20,7 +20,7 @@ export function runReadinessChecks(): ReadinessResult {
 
 export async function pingRedis(): Promise<{ ok: boolean; error?: string }> {
   const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-  const redis = new Redis(url, { maxRetriesPerRequest: 0 });
+  const redis = createManagedRedis(url, { maxRetriesPerRequest: 0 });
   try {
     const result = await Promise.race([
       redis.ping(),
