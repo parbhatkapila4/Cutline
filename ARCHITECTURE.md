@@ -1,6 +1,6 @@
 # CUTLINE - Architecture
 
-A 5‑minute overview for engineers. One sentence in → video out.
+A 5-minute overview for engineers. One sentence in → video out.
 
 ---
 
