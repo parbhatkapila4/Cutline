@@ -34,3 +34,20 @@ CREATE TABLE IF NOT EXISTS user_plan_overrides (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_user_plan_overrides_plan ON user_plan_overrides (plan);
+
+-- Payment records (Stripe checkout sessions)
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  plan TEXT NOT NULL CHECK (plan IN ('beginner', 'professional', 'enterprise')),
+  amount_cents INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'usd',
+  stripe_checkout_session_id TEXT UNIQUE NOT NULL,
+  stripe_payment_intent_id TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments (user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_stripe_session ON payments (stripe_checkout_session_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments (status);
