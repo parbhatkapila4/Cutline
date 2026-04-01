@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import { createManagedRedis } from "@/lib/redis/managedRedis";
 
 const KEY_PREFIX = "cutline:usage:";
 const TOKENS_PREFIX = "cutline:user:";
@@ -20,7 +21,7 @@ let redis: Redis | null = null;
 function getRedis(): Redis {
   if (!redis) {
     const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-    redis = new Redis(url, { maxRetriesPerRequest: null });
+    redis = createManagedRedis(url, { maxRetriesPerRequest: null });
   }
   return redis;
 }
