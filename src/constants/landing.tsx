@@ -169,7 +169,7 @@ export const FEATURE_TABS = [
   "Content Creators",
   "Marketers",
   "Educators",
-  "E\u2011commerce",
+  "E-commerce",
   "Social Media",
   "Agencies",
 ];
@@ -178,7 +178,7 @@ export const FEATURE_TAB_DATA = [
   {
     card1: {
       title: "AI Script Engine",
-      desc: "A fast, intelligent script engine built for content speed\u00a0\u2014 auto-generate narratives, structure, and pacing with zero friction.",
+      desc: "A fast, intelligent script engine built for content speed - auto-generate narratives, structure, and pacing with zero friction.",
       statValue: "30%",
       statLabel: "vs Last Week",
       mainLabel: "Script Length",
@@ -186,7 +186,7 @@ export const FEATURE_TAB_DATA = [
     },
     card2: {
       title: "Visual\nIntelligence",
-      desc: "Smart image sourcing from the web, AI generation, or your uploads\u00a0\u2014 matched to each scene automatically.",
+      desc: "Smart image sourcing from the web, AI generation, or your uploads - matched to each scene automatically.",
       list: [
         { name: "Web Search", count: "12", active: true },
         { name: "AI Generated", count: "5", active: false },
@@ -200,12 +200,12 @@ export const FEATURE_TAB_DATA = [
     },
     card3: {
       title: "Video Studio",
-      desc: "Full control from resolution to captions\u00a0\u2014 preview, export, and download your HD video instantly.",
+      desc: "Full control from resolution to captions - preview, export, and download your HD video instantly.",
       dd1: "1080p Resolution",
       dd2: "MP4 Format",
       infoTitle: "Render Time",
       infoDesc:
-        "Track your render speed across all videos\u00a0\u2014 average 60\u00a0seconds for a complete HD export.",
+        "Track your render speed across all videos - average 60\u00a0seconds for a complete HD export.",
       btn: "Export MP4",
     },
   },
@@ -213,7 +213,7 @@ export const FEATURE_TAB_DATA = [
   {
     card1: {
       title: "Campaign Script",
-      desc: "Generate ad copy, landing page scripts, and marketing narratives tuned for conversion\u00a0\u2014 on brand, on message.",
+      desc: "Generate ad copy, landing page scripts, and marketing narratives tuned for conversion - on brand, on message.",
       statValue: "45%",
       statLabel: "vs Last Month",
       mainLabel: "Ad Copy",
@@ -235,7 +235,7 @@ export const FEATURE_TAB_DATA = [
     },
     card3: {
       title: "Multi-Format",
-      desc: "Export for every channel\u00a0\u2014 Instagram, YouTube, LinkedIn, TikTok\u00a0\u2014 in one click.",
+      desc: "Export for every channel - Instagram, YouTube, LinkedIn, TikTok - in one click.",
       dd1: "4K Resolution",
       dd2: "All Platforms",
       infoTitle: "Campaign ROI",
@@ -248,7 +248,7 @@ export const FEATURE_TAB_DATA = [
   {
     card1: {
       title: "Lesson Builder",
-      desc: "Turn lesson plans into engaging video lectures with clear structure, pacing, and visual cues\u00a0\u2014 automatically.",
+      desc: "Turn lesson plans into engaging video lectures with clear structure, pacing, and visual cues - automatically.",
       statValue: "52%",
       statLabel: "Engagement Up",
       mainLabel: "Lesson Plan",
@@ -270,7 +270,7 @@ export const FEATURE_TAB_DATA = [
     },
     card3: {
       title: "Course Studio",
-      desc: "Optimized exports for LMS platforms, YouTube, and classroom presentations\u00a0\u2014 captioned and accessible.",
+      desc: "Optimized exports for LMS platforms, YouTube, and classroom presentations - captioned and accessible.",
       dd1: "720p Optimized",
       dd2: "WebM Format",
       infoTitle: "Student Retention",
@@ -283,7 +283,7 @@ export const FEATURE_TAB_DATA = [
   {
     card1: {
       title: "Product Script",
-      desc: "Auto-generate product demos, unboxing scripts, and feature highlights that sell\u00a0\u2014 no copywriter needed.",
+      desc: "Auto-generate product demos, unboxing scripts, and feature highlights that sell - no copywriter needed.",
       statValue: "38%",
       statLabel: "Conv. Boost",
       mainLabel: "Product Copy",
@@ -340,7 +340,7 @@ export const FEATURE_TAB_DATA = [
     },
     card3: {
       title: "Platform Export",
-      desc: "One-click export sized for Reels, TikTok, Shorts, and Stories\u00a0\u2014 no manual cropping.",
+      desc: "One-click export sized for Reels, TikTok, Shorts, and Stories - no manual cropping.",
       dd1: "9:16 Portrait",
       dd2: "Reel Format",
       infoTitle: "Reach Analytics",
@@ -353,7 +353,7 @@ export const FEATURE_TAB_DATA = [
   {
     card1: {
       title: "Client Scripts",
-      desc: "Turn client briefs into polished video scripts at scale\u00a0\u2014 consistent tone, fast turnaround, zero rewrites.",
+      desc: "Turn client briefs into polished video scripts at scale - consistent tone, fast turnaround, zero rewrites.",
       statValue: "28%",
       statLabel: "Faster Delivery",
       mainLabel: "Brief",
@@ -375,7 +375,7 @@ export const FEATURE_TAB_DATA = [
     },
     card3: {
       title: "Batch Export",
-      desc: "Deliver multiple formats and resolutions in a single run\u00a0\u2014 built for agency-scale output.",
+      desc: "Deliver multiple formats and resolutions in a single run - built for agency-scale output.",
       dd1: "4K Master",
       dd2: "Multi-Format",
       infoTitle: "Delivery Time",
