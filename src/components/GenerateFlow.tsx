@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import type { Platform } from "@/lib/platform/types";
+import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import { CopyLinkButton } from "@/components/generate/CopyLinkButton";
 
 type JobStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
@@ -33,6 +34,7 @@ const FIELD_LABELS: Record<string, string> = {
   input: "Topic",
   durationSeconds: "Duration",
   platform: "Platform",
+  aspectRatio: "Aspect ratio",
   variationCount: "Number of variants",
   mode: "Video style",
   brandColors: "Brand colors",
@@ -62,6 +64,7 @@ export function GenerateFlow({ embedded = false }: Props) {
   const [selectedVariationIndex, setSelectedVariationIndex] = useState(0);
   const [variationCount, setVariationCount] = useState(1);
   const [platform, setPlatform] = useState<Platform>("general");
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
   const [isPreview, setIsPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -187,13 +190,14 @@ export function GenerateFlow({ embedded = false }: Props) {
       input: input.trim(),
       mode,
       durationSeconds: Math.min(DURATION_MAX, Math.max(DURATION_MIN, durationSeconds)),
+      aspectRatio,
       ...(mode === "talking_object" ? { talkingObjectStyle } : {}),
       ...(opts.renderMode ? { renderMode: opts.renderMode } : {}),
       ...(opts.previewJobId ? { previewJobId: opts.previewJobId } : {}),
       ...(variationCount > 1 && opts.renderMode !== "preview" && !opts.previewJobId ? { variationCount } : {}),
       ...(platform !== "general" ? { platform } : {}),
     }),
-    [input, mode, durationSeconds, talkingObjectStyle, variationCount, platform]
+    [input, mode, durationSeconds, talkingObjectStyle, variationCount, platform, aspectRatio]
   );
 
   const doSubmit = useCallback(
@@ -344,6 +348,7 @@ export function GenerateFlow({ embedded = false }: Props) {
     setDurationSeconds(DURATION_DEFAULT);
     setVariationCount(1);
     setPlatform("general");
+    setAspectRatio("16:9");
   }, [stopPolling]);
 
   useEffect(() => {
@@ -742,6 +747,30 @@ export function GenerateFlow({ embedded = false }: Props) {
           ))}
         </div>
         <p className="text-xs text-zinc-500 mt-1.5">Tone, length, and structure are tuned for the selected platform.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-zinc-300 mb-2">
+          Aspect ratio
+        </label>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {ASPECT_RATIOS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setAspectRatio(r)}
+              className={`flex items-center justify-center min-h-[38px] rounded-lg border px-2 py-1.5 text-xs font-medium tabular-nums transition-all ${aspectRatio === r
+                ? "border-blue-500/50 bg-blue-500/10 text-blue-200"
+                : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-zinc-500 mt-1.5">
+          Output size for slideshow (Remotion) and talking object (Veo). Some ratios map to the closest size the video API supports.
+        </p>
       </div>
 
       <div className="mb-6">
