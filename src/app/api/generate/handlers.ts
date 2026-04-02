@@ -181,20 +181,24 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     const skipCreditsForAnon = Boolean(anonFlow?.result.allowed);
     if (!creditsCheckDisabled && !skipCreditsForAnon) {
       const userPlan = await getUserPlan(userId);
-      const estimatedTokens = estimateTokenCost({
-        mode: data.mode ?? "slideshow",
-        durationSeconds: data.durationSeconds ?? 30,
-      });
-      const tokensRemaining = await getTokens(creditsIdentifier);
-      if (tokensRemaining < estimatedTokens) {
-        return apiError({
-          code: ErrorCode.INSUFFICIENT_CREDITS,
-          message: `Not enough tokens. You have ${tokensRemaining} tokens, this video needs approximately ${estimatedTokens} tokens.`,
-          status: 402,
-          details: { tokensRemaining, tokensRequired: estimatedTokens },
-          headers,
+
+      if (!userPlan.tokensUnlimited) {
+        const estimatedTokens = estimateTokenCost({
+          mode: data.mode ?? "slideshow",
+          durationSeconds: data.durationSeconds ?? 30,
         });
+        const tokensRemaining = await getTokens(creditsIdentifier);
+        if (tokensRemaining < estimatedTokens) {
+          return apiError({
+            code: ErrorCode.INSUFFICIENT_CREDITS,
+            message: `Not enough tokens. You have ${tokensRemaining} tokens, this video needs approximately ${estimatedTokens} tokens.`,
+            status: 402,
+            details: { tokensRemaining, tokensRequired: estimatedTokens },
+            headers,
+          });
+        }
       }
+
       const videosCompletedThisMonth = await getVideosCompletedThisMonth(creditsIdentifier);
       if (
         userPlan.videosPerMonth != null &&
@@ -202,7 +206,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ) {
         return apiError({
           code: ErrorCode.MONTHLY_LIMIT_REACHED,
-          message: "You are out of your plan limit. Upgrade to create more videos.",
+          message: "Your current plan limit has been reached. Please upgrade to continue creating videos.",
           status: 402,
           details: {
             videosUsed: videosCompletedThisMonth,
