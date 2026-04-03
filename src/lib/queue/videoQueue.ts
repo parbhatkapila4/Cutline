@@ -2,6 +2,7 @@ import { Queue, Worker, type Job } from "bullmq";
 import type { JobState } from "bullmq";
 import { logPipelineEvent } from "@/lib/utils/pipelineLogger";
 import Redis from "ioredis";
+import { createManagedRedis } from "@/lib/redis/managedRedis";
 import { runPipeline } from "@/lib/pipeline/orchestrator";
 import { runCleanup } from "@/lib/storage/cleanup";
 import { CANCELLED_JOBS_KEY, isJobCancelled } from "./cancelCheck";
@@ -13,7 +14,7 @@ const QUEUE_NAME = "video-generation";
 
 function getRedisConnection(): Redis {
   const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-  return new Redis(url, {
+  return createManagedRedis(url, {
     maxRetriesPerRequest: null,
   });
 }
@@ -25,6 +26,7 @@ export function createRedisConnection(): Redis {
 import type { BrandColors } from "@/lib/assets/types";
 import type { Platform } from "@/lib/platform/types";
 import type { CostBreakdown } from "@/lib/cost/types";
+import type { AvatarSelection } from "@/lib/types/avatar";
 
 export type VideoJobData = {
   input: string;
@@ -38,6 +40,7 @@ export type VideoJobData = {
   textModel?: string;
   captions?: "on" | "off";
   talkingObjectStyle?: "cartoon" | "real";
+  avatar?: AvatarSelection;
   renderMode?: "preview" | "final";
   previewJobId?: string;
   variationCount?: number;
@@ -220,7 +223,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         }
         return { videoPath: "" } as VideoJobResult;
       }
-      const { input, assetIds, brandColors, mode, durationSeconds, textModel, captions, talkingObjectStyle, renderMode, previewJobId, variationCount, platform, aspectRatio, requestId, callbackUrl } = job.data;
+      const { input, assetIds, brandColors, mode, durationSeconds, textModel, captions, talkingObjectStyle, avatar, renderMode, previewJobId, variationCount, platform, aspectRatio, requestId, callbackUrl } = job.data;
       const jobId = job.id;
       if (!jobId) {
         throw new Error("Job has no id");
@@ -241,6 +244,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
           textModel,
           captions,
           talkingObjectStyle,
+          avatar,
           renderMode,
           previewJobId,
           variationCount,
@@ -298,10 +302,15 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
       ...(data?.requestId ? { requestId: data.requestId } : {}),
     });
     const clientId = data?.clientId;
+    let tokensCharged = 0;
     if (clientId && typeof clientId === "string") {
       try {
-        const { decrementTokens, TOKENS_PER_VIDEO } = await import("@/lib/usage");
-        await decrementTokens(clientId, TOKENS_PER_VIDEO);
+        const { calculateTokensFromCost } = await import("@/lib/cost/pricing");
+        const { decrementTokens } = await import("@/lib/usage");
+        tokensCharged = result?.cost
+          ? calculateTokensFromCost(result.cost)
+          : 1;
+        await decrementTokens(clientId, tokensCharged);
       } catch (e) {
         console.error("[worker] jobId=" + job?.id + " decrementTokens error=" + (e instanceof Error ? e.message : String(e)));
       }
@@ -315,7 +324,10 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
     if (result?.cost) {
       const c = result.cost;
       console.log(
-        "[worker] jobId=" + job?.id + " cost llm=" + c.llm + " tts=" + c.tts + " video=" + c.video + " images=" + c.images + " total=" + c.total
+        "[worker] jobId=" + job?.id +
+        " cost llm=$" + c.llm + " tts=$" + c.tts + " video=$" + c.video +
+        " images=$" + c.images + " total=$" + c.total +
+        " tokensCharged=" + tokensCharged
       );
     }
   });
