@@ -8,6 +8,7 @@ import { STAGES } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId } from "@/lib/types/avatar";
+import type { PlanId } from "@/lib/plans";
 import WarpShaderHero from "@/components/ui/warp-shader";
 
 type JobStatus = "pending" | "processing" | "completed" | "failed";
@@ -15,12 +16,24 @@ type Mode = "slideshow" | "talking_object";
 type Platform = "general" | "linkedin" | "twitter" | "youtube_shorts";
 type AvatarMode = "default" | "preset" | "upload";
 
+const PRO_AVATAR_MODES: AvatarMode[] = ["preset", "upload"];
+function canUseProAvatar(plan: PlanId): boolean {
+  return plan === "professional" || plan === "enterprise";
+}
+
 const POLL_MS = 2500;
-const AVATAR_PRESETS: Array<{ id: AvatarPresetId; label: string; hint: string }> = [
-  { id: "presenter_female_1", label: "Presenter (Female)", hint: "Professional look" },
-  { id: "presenter_male_1", label: "Presenter (Male)", hint: "Professional look" },
-  { id: "creator_female_1", label: "Creator (Female)", hint: "Casual creator vibe" },
-  { id: "creator_male_1", label: "Creator (Male)", hint: "Casual creator vibe" },
+/** Stock previews under `/public/avatars/presets` for reliable prod rendering. */
+const AVATAR_PRESETS: Array<{
+  id: AvatarPresetId;
+  label: string;
+  hint: string;
+  imageSrc: string;
+}> = [
+  // These images are used as both UI previews AND actual avatar references for HeyGen lipsync generation.
+  { id: "presenter_female_1", label: "Presenter (Female)", hint: "Professional look", imageSrc: "/avatars/presets/presenter-female-1.jpg" },
+  { id: "presenter_male_1", label: "Presenter (Male)", hint: "Professional look", imageSrc: "/avatars/presets/presenter-male-1.jpg" },
+  { id: "creator_female_1", label: "Creator (Female)", hint: "Casual creator vibe", imageSrc: "/avatars/presets/creator-female-1.jpg" },
+  { id: "creator_male_1", label: "Creator (Male)", hint: "Casual creator vibe", imageSrc: "/avatars/presets/creator-male-1.jpg" },
 ];
 
 const PROMPT_CHIPS = [
@@ -49,6 +62,32 @@ function CutlineMark({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   );
 }
 
+function ProAvatarGate() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/4 p-4"
+    >
+      <div className="flex items-center gap-2.5 mb-2">
+        <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+        <span className="text-xs font-semibold text-amber-300">Pro &amp; Enterprise only</span>
+      </div>
+      <p className="text-[11px] text-zinc-400 leading-relaxed mb-3">
+        Custom avatars are available on paid plans. Upgrade to use presets or upload your own face.
+      </p>
+      <Link
+        href="/pricing"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-colors"
+      >
+        View plans
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+      </Link>
+    </motion.div>
+  );
+}
+
 export default function CreatePage() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<Mode>("slideshow");
@@ -67,15 +106,24 @@ export default function CreatePage() {
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState(0);
   const [suggesting, setSuggesting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [userPlan, setUserPlan] = useState<PlanId>("free");
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const avatarFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/dashboard/usage")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.plan) setUserPlan(d.plan as PlanId); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const u = imgs.map((f) => URL.createObjectURL(f));
@@ -130,7 +178,11 @@ export default function CreatePage() {
 
   const submit = async () => {
     if (!prompt.trim() || prompt.trim().length < 5 || submitting) return;
-    setError(null); setVideoUrl(null); setStatus(null); setJobId(null); setSubmitting(true);
+    if (mode === "talking_object" && objStyle === "real" && PRO_AVATAR_MODES.includes(avatarMode) && !canUseProAvatar(userPlan)) {
+      setError("Custom avatars need a Pro plan. Switch to Default or upgrade.");
+      return;
+    }
+    setError(null); setErrorCode(null); setVideoUrl(null); setStatus(null); setJobId(null); setSubmitting(true);
     try {
       let assetIds: string[] = [];
       let avatarUploadAssetId: string | undefined;
@@ -185,7 +237,16 @@ export default function CreatePage() {
       });
       clearTimeout(t);
       const d = await r.json();
-      if (!r.ok) { setError(getUserFriendlyErrorMessage(d.error || "Failed")); return; }
+      if (!r.ok) {
+        const code = typeof d?.code === "string" ? d.code : null;
+        setErrorCode(code);
+        if (code === "MONTHLY_LIMIT_REACHED" || code === "ANON_LIMIT_REACHED") {
+          setError("Your current plan limit has been reached. Please upgrade to continue creating videos.");
+        } else {
+          setError(getUserFriendlyErrorMessage(d.error || "Failed"));
+        }
+        return;
+      }
       setJobId(d.jobId); setStatus("pending");
     } catch (e) {
       setError(e instanceof Error && e.name === "AbortError" ? "Timed out. Try again." : "Connection failed.");
@@ -193,7 +254,7 @@ export default function CreatePage() {
   };
 
   const reset = () => {
-    stop(); setJobId(null); setStatus(null); setVideoUrl(null); setError(null);
+    stop(); setJobId(null); setStatus(null); setVideoUrl(null); setError(null); setErrorCode(null);
     setPrompt(""); setImgs([]); setMode("slideshow"); setPlatform("general"); setAspectRatio("16:9");
     setDur(30); setCc(true); setObjStyle("cartoon");
     setAvatarMode("default"); setAvatarPresetId("presenter_female_1"); setAvatarFile(null);
@@ -271,7 +332,7 @@ export default function CreatePage() {
                   {/* Title */}
                   <div className="text-center mb-8">
                     <h2 className="text-xl font-semibold text-white tracking-tight mb-1.5">Creating your video</h2>
-                    <p className="text-sm text-zinc-500">Usually takes 1–3 minutes</p>
+                    <p className="text-sm text-zinc-500">Usually takes 1-3 minutes</p>
                   </div>
 
                   {/* Overall progress bar */}
@@ -612,76 +673,122 @@ export default function CreatePage() {
                               <div className="mt-4">
                                 <p className="text-xs font-medium text-gray-500 mb-2">Avatar</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                  {(["default", "preset", "upload"] as const).map((m) => (
-                                    <button
-                                      key={m}
-                                      type="button"
-                                      onClick={() => setAvatarMode(m)}
-                                      className={`px-3 py-2 rounded-lg border text-sm transition-all ${
-                                        avatarMode === m
-                                          ? "border-blue-500/50 bg-blue-500/10 text-blue-200"
-                                          : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"
-                                      }`}
-                                    >
-                                      {m === "default" ? "Default" : m === "preset" ? "Preset" : "Upload"}
-                                    </button>
-                                  ))}
+                                  {(["default", "preset", "upload"] as const).map((m) => {
+                                    const isPro = PRO_AVATAR_MODES.includes(m);
+                                    const locked = isPro && !canUseProAvatar(userPlan);
+                                    return (
+                                      <button
+                                        key={m}
+                                        type="button"
+                                        onClick={() => setAvatarMode(m)}
+                                        className={`relative px-3 py-2 rounded-lg border text-sm transition-all ${
+                                          avatarMode === m
+                                            ? "border-blue-500/50 bg-blue-500/10 text-blue-200"
+                                            : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"
+                                        }`}
+                                      >
+                                        {locked && (
+                                          <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-1.5 py-px text-[9px] font-semibold tracking-wide text-amber-400 bg-zinc-900 border border-amber-500/30 rounded-full leading-none">
+                                            ✦ Pro
+                                          </span>
+                                        )}
+                                        {m === "default" ? "Default" : m === "preset" ? "Preset" : "Upload"}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
 
                                 {avatarMode === "preset" && (
-                                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {AVATAR_PRESETS.map((preset) => (
-                                      <button
-                                        key={preset.id}
-                                        type="button"
-                                        onClick={() => setAvatarPresetId(preset.id)}
-                                        className={`p-2.5 rounded-lg border text-left transition-all ${
-                                          avatarPresetId === preset.id
-                                            ? "border-amber-500/50 bg-amber-500/10"
-                                            : "border-zinc-700 hover:border-zinc-600"
-                                        }`}
-                                      >
-                                        <p className="text-sm text-white">{preset.label}</p>
-                                        <p className="text-xs text-zinc-500">{preset.hint}</p>
-                                      </button>
-                                    ))}
-                                  </div>
+                                  canUseProAvatar(userPlan) ? (
+                                    <motion.div
+                                      layout
+                                      initial={{ opacity: 0.85, y: 6 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{ duration: 0.2 }}
+                                      className="mt-4 rounded-2xl border border-zinc-700/90 bg-linear-to-b from-zinc-900/80 to-black/40 p-2.5 sm:p-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
+                                    >
+                                      <div className="grid grid-cols-2 gap-2.5">
+                                        {AVATAR_PRESETS.map((preset) => (
+                                          <button
+                                            key={preset.id}
+                                            type="button"
+                                            onClick={() => setAvatarPresetId(preset.id)}
+                                            className={`group relative aspect-square w-full rounded-lg border-2 overflow-hidden text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
+                                              avatarPresetId === preset.id
+                                                ? "border-amber-400 ring-2 ring-amber-500/35 shadow-lg shadow-amber-950/40"
+                                                : "border-zinc-700 hover:border-zinc-500"
+                                            }`}
+                                          >
+                                            <img
+                                              src={preset.imageSrc}
+                                              alt={preset.label}
+                                              className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                                              loading="lazy"
+                                              onError={(e) => {
+                                                const img = e.currentTarget;
+                                                img.onerror = null;
+                                                img.src = "/avatars/presets/fallback.svg";
+                                              }}
+                                            />
+                                            <div
+                                              className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent"
+                                              aria-hidden
+                                            />
+                                            <div className="absolute bottom-0 left-0 right-0 p-2">
+                                              <p className="text-xs font-semibold text-white drop-shadow-md leading-tight">
+                                                {preset.label}
+                                              </p>
+                                              <p className="text-[10px] text-zinc-200/80 mt-0.5 drop-shadow leading-tight">
+                                                {preset.hint}
+                                              </p>
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </motion.div>
+                                  ) : (
+                                    <ProAvatarGate />
+                                  )
                                 )}
 
                                 {avatarMode === "upload" && (
-                                  <div className="mt-3">
-                                    <input
-                                      ref={avatarFileRef}
-                                      type="file"
-                                      accept="image/*"
-                                      className="hidden"
-                                      onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => avatarFileRef.current?.click()}
-                                      className="w-full rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-300 transition-colors"
-                                    >
-                                      {avatarFile ? "Change avatar image" : "Upload avatar image"}
-                                    </button>
-                                    {avatarFileUrl ? (
-                                      <div className="mt-2 flex items-center gap-3">
-                                        <img src={avatarFileUrl} alt="Avatar preview" className="w-12 h-12 rounded-lg object-cover border border-zinc-700" />
-                                        <div className="min-w-0">
-                                          <p className="text-xs text-zinc-400 truncate">{avatarFile?.name}</p>
-                                          <button
-                                            type="button"
-                                            onClick={() => setAvatarFile(null)}
-                                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                                          >
-                                            Remove
-                                          </button>
+                                  canUseProAvatar(userPlan) ? (
+                                    <div className="mt-3">
+                                      <input
+                                        ref={avatarFileRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => avatarFileRef.current?.click()}
+                                        className="w-full rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-300 transition-colors"
+                                      >
+                                        {avatarFile ? "Change avatar image" : "Upload avatar image"}
+                                      </button>
+                                      {avatarFileUrl ? (
+                                        <div className="mt-2 flex items-center gap-3">
+                                          <img src={avatarFileUrl} alt="Avatar preview" className="w-12 h-12 rounded-lg object-cover border border-zinc-700" />
+                                          <div className="min-w-0">
+                                            <p className="text-xs text-zinc-400 truncate">{avatarFile?.name}</p>
+                                            <button
+                                              type="button"
+                                              onClick={() => setAvatarFile(null)}
+                                              className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                            >
+                                              Remove
+                                            </button>
+                                          </div>
                                         </div>
-                                      </div>
-                                    ) : (
-                                      <p className="text-[11px] text-zinc-600 mt-2">Use a clear face photo for best results.</p>
-                                    )}
-                                  </div>
+                                      ) : (
+                                        <p className="text-[11px] text-zinc-600 mt-2">Use a clear face photo for best results.</p>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <ProAvatarGate />
+                                  )
                                 )}
                               </div>
                             )}
@@ -760,9 +867,26 @@ export default function CreatePage() {
               </motion.div>
 
               {error && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-red-500/[0.07] border border-red-500/15">
-                  <svg className="w-5 h-5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-                  <p className="text-sm text-red-300">{error}</p>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 flex items-start gap-3.5 px-5 py-4 rounded-2xl bg-red-500/10 border border-red-500/30"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-red-200">{error}</p>
+                    {(errorCode === "MONTHLY_LIMIT_REACHED" || errorCode === "ANON_LIMIT_REACHED") && (
+                      <Link
+                        href="/pricing"
+                        className="inline-flex items-center gap-1.5 mt-2.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-colors"
+                      >
+                        Upgrade plan
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+                      </Link>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </div>
