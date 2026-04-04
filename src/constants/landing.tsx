@@ -387,6 +387,7 @@ export const FEATURE_TAB_DATA = [
 
 export const PRICING = [
   {
+    planId: "beginner" as const,
     name: "Beginner",
     monthlyPrice: "$29",
     yearlyPrice: "$19",
@@ -406,6 +407,7 @@ export const PRICING = [
     icon: "beginner",
   },
   {
+    planId: "professional" as const,
     name: "Professional",
     monthlyPrice: "$59",
     yearlyPrice: "$39",
@@ -425,6 +427,7 @@ export const PRICING = [
     icon: "professional",
   },
   {
+    planId: "enterprise" as const,
     name: "Enterprise",
     monthlyPrice: "$89",
     yearlyPrice: "$59",
