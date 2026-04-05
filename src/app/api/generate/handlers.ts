@@ -225,7 +225,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(anonFlow?.result.allowed ? { videoJobId: anonFlow.result.job_id } : {}),
       ...(data.assetIds?.length ? { assetIds: data.assetIds } : {}),
       ...(data.brandColors ? { brandColors: data.brandColors } : {}),
-      ...(data.mode ? { mode: data.mode } : {}),
+      mode: data.mode ?? "slideshow",
       durationSeconds: data.durationSeconds,
       ...(data.textModel ? { textModel: data.textModel } : {}),
       captions: data.captions,
