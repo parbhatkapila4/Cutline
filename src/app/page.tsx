@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, Fragment, Suspense } from "react";
+import { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
@@ -20,6 +20,7 @@ import Image from "next/image";
 import { ImagePlayer } from "@/components/image-player";
 import TestimonialV2 from "@/components/ui/testimonial-v2";
 import { authClient } from "@/lib/auth-client";
+import PixelFlowerGarden from "@/components/PixelFlowerGarden";
 
 const HOW_IT_WORKS_IMAGES = [
   "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1494&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
@@ -33,8 +34,8 @@ type JobStatus = "pending" | "processing" | "completed" | "failed";
 function HomeContent() {
   const searchParams = useSearchParams();
   const { data: sessionData, isPending: sessionPending } = authClient.useSession();
+  const sessionUser = sessionData?.user;
   const isLoggedIn = !sessionPending && !!sessionData;
-  const generateHref = isLoggedIn ? "/create" : "/signin";
   const [prompt, setPrompt] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -488,138 +489,231 @@ function HomeContent() {
               </svg>
               How it works
             </Link>
-            <Link
-              href={generateHref}
-              className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
-            >
-              <svg
-                className="w-5 h-5 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
+            {sessionPending ? (
+              <div
+                className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] min-h-[42px]"
+                aria-hidden
               >
-                <defs>
-                  <linearGradient
-                    id="nav-ic-grid1"
-                    x1="3"
-                    y1="3"
-                    x2="11"
-                    y2="11"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#a1a1aa" />
-                    <stop offset="1" stopColor="#52525b" />
-                  </linearGradient>
-                  <linearGradient
-                    id="nav-ic-grid2"
-                    x1="13"
-                    y1="3"
-                    x2="21"
-                    y2="11"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#71717a" />
-                    <stop offset="1" stopColor="#3f3f46" />
-                  </linearGradient>
-                  <linearGradient
-                    id="nav-ic-grid3"
-                    x1="3"
-                    y1="13"
-                    x2="11"
-                    y2="21"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#71717a" />
-                    <stop offset="1" stopColor="#3f3f46" />
-                  </linearGradient>
-                  <linearGradient
-                    id="nav-ic-grid4"
-                    x1="13"
-                    y1="13"
-                    x2="21"
-                    y2="21"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#a1a1aa" />
-                    <stop offset="1" stopColor="#52525b" />
-                  </linearGradient>
-                </defs>
-                <rect
-                  x="3.5"
-                  y="3.5"
-                  width="7"
-                  height="7"
-                  rx="1.8"
-                  fill="url(#nav-ic-grid1)"
-                />
-                <rect
-                  x="13.5"
-                  y="3.5"
-                  width="7"
-                  height="7"
-                  rx="1.8"
-                  fill="url(#nav-ic-grid2)"
-                />
-                <rect
-                  x="3.5"
-                  y="13.5"
-                  width="7"
-                  height="7"
-                  rx="1.8"
-                  fill="url(#nav-ic-grid3)"
-                />
-                <rect
-                  x="13.5"
-                  y="13.5"
-                  width="7"
-                  height="7"
-                  rx="1.8"
-                  fill="url(#nav-ic-grid4)"
-                />
+                <span className="h-5 w-28 bg-gray-100 rounded-md animate-pulse" />
+              </div>
+            ) : isLoggedIn && sessionUser ? (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-3 pl-6 pr-5 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 max-w-[min(320px,34vw)]"
+              >
+                <svg
+                  className="w-5 h-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden
+                >
+                  <defs>
+                    <linearGradient
+                      id="nav-ic-dash1"
+                      x1="3"
+                      y1="3"
+                      x2="11"
+                      y2="11"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#a1a1aa" />
+                      <stop offset="1" stopColor="#52525b" />
+                    </linearGradient>
+                    <linearGradient
+                      id="nav-ic-dash2"
+                      x1="13"
+                      y1="3"
+                      x2="21"
+                      y2="11"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#71717a" />
+                      <stop offset="1" stopColor="#3f3f46" />
+                    </linearGradient>
+                    <linearGradient
+                      id="nav-ic-dash3"
+                      x1="3"
+                      y1="13"
+                      x2="11"
+                      y2="21"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#71717a" />
+                      <stop offset="1" stopColor="#3f3f46" />
+                    </linearGradient>
+                    <linearGradient
+                      id="nav-ic-dash4"
+                      x1="13"
+                      y1="13"
+                      x2="21"
+                      y2="21"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#a1a1aa" />
+                      <stop offset="1" stopColor="#52525b" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash1)" />
+                  <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash2)" />
+                  <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash3)" />
+                  <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash4)" />
+                </svg>
+                <span className="shrink-0">Dashboard</span>
+                <span className="flex items-center gap-2 min-w-0 ml-1 border-l border-gray-200 pl-3">
+                  {typeof sessionUser.image === "string" && sessionUser.image.trim() ? (
+                    <img
+                      src={sessionUser.image}
+                      alt=""
+                      width={28}
+                      height={28}
+                      className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-gray-200"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600 shrink-0">
+                      {(sessionUser.name?.trim()?.[0] ?? sessionUser.email?.trim()?.[0] ?? "?").toUpperCase()}
+                    </span>
+                  )}
+                  <span className="truncate text-[14px] text-gray-800">
+                    {sessionUser.name?.trim() || sessionUser.email?.trim() || "Account"}
+                  </span>
+                </span>
+              </Link>
+            ) : (
+              <Link
+                href="/signin"
+                className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+              >
+                <svg
+                  className="w-5 h-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <defs>
+                    <linearGradient
+                      id="nav-ic-grid1"
+                      x1="3"
+                      y1="3"
+                      x2="11"
+                      y2="11"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#a1a1aa" />
+                      <stop offset="1" stopColor="#52525b" />
+                    </linearGradient>
+                    <linearGradient
+                      id="nav-ic-grid2"
+                      x1="13"
+                      y1="3"
+                      x2="21"
+                      y2="11"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#71717a" />
+                      <stop offset="1" stopColor="#3f3f46" />
+                    </linearGradient>
+                    <linearGradient
+                      id="nav-ic-grid3"
+                      x1="3"
+                      y1="13"
+                      x2="11"
+                      y2="21"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#71717a" />
+                      <stop offset="1" stopColor="#3f3f46" />
+                    </linearGradient>
+                    <linearGradient
+                      id="nav-ic-grid4"
+                      x1="13"
+                      y1="13"
+                      x2="21"
+                      y2="21"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#a1a1aa" />
+                      <stop offset="1" stopColor="#52525b" />
+                    </linearGradient>
+                  </defs>
+                  <rect
+                    x="3.5"
+                    y="3.5"
+                    width="7"
+                    height="7"
+                    rx="1.8"
+                    fill="url(#nav-ic-grid1)"
+                  />
+                  <rect
+                    x="13.5"
+                    y="3.5"
+                    width="7"
+                    height="7"
+                    rx="1.8"
+                    fill="url(#nav-ic-grid2)"
+                  />
+                  <rect
+                    x="3.5"
+                    y="13.5"
+                    width="7"
+                    height="7"
+                    rx="1.8"
+                    fill="url(#nav-ic-grid3)"
+                  />
+                  <rect
+                    x="13.5"
+                    y="13.5"
+                    width="7"
+                    height="7"
+                    rx="1.8"
+                    fill="url(#nav-ic-grid4)"
+                  />
 
-                <rect
-                  x="3.5"
-                  y="3.5"
-                  width="7"
-                  height="7"
-                  rx="1.8"
-                  stroke="#a1a1aa"
-                  strokeWidth="0.3"
-                  opacity="0.3"
-                />
-                <rect
-                  x="13.5"
-                  y="3.5"
-                  width="7"
-                  height="7"
-                  rx="1.8"
-                  stroke="#a1a1aa"
-                  strokeWidth="0.3"
-                  opacity="0.3"
-                />
-                <rect
-                  x="3.5"
-                  y="13.5"
-                  width="7"
-                  height="7"
-                  rx="1.8"
-                  stroke="#a1a1aa"
-                  strokeWidth="0.3"
-                  opacity="0.3"
-                />
-                <rect
-                  x="13.5"
-                  y="13.5"
-                  width="7"
-                  height="7"
-                  rx="1.8"
-                  stroke="#a1a1aa"
-                  strokeWidth="0.3"
-                  opacity="0.3"
-                />
-              </svg>
-              Generate
-            </Link>
+                  <rect
+                    x="3.5"
+                    y="3.5"
+                    width="7"
+                    height="7"
+                    rx="1.8"
+                    stroke="#a1a1aa"
+                    strokeWidth="0.3"
+                    opacity="0.3"
+                  />
+                  <rect
+                    x="13.5"
+                    y="3.5"
+                    width="7"
+                    height="7"
+                    rx="1.8"
+                    stroke="#a1a1aa"
+                    strokeWidth="0.3"
+                    opacity="0.3"
+                  />
+                  <rect
+                    x="3.5"
+                    y="13.5"
+                    width="7"
+                    height="7"
+                    rx="1.8"
+                    stroke="#a1a1aa"
+                    strokeWidth="0.3"
+                    opacity="0.3"
+                  />
+                  <rect
+                    x="13.5"
+                    y="13.5"
+                    width="7"
+                    height="7"
+                    rx="1.8"
+                    stroke="#a1a1aa"
+                    strokeWidth="0.3"
+                    opacity="0.3"
+                  />
+                </svg>
+                Generate
+              </Link>
+            )}
           </nav>
         </div>
       </header>
@@ -2652,92 +2746,46 @@ function HomeContent() {
       >
         <TestimonialV2 />
 
-        <footer className="relative pt-16 pb-12 overflow-hidden bg-gray-50">
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(180deg, transparent 0%, rgba(243,244,246,0.5) 50%)",
-            }}
-          />
-          <div className="absolute bottom-0 left-0 right-0 h-80 pointer-events-none">
-            <div className="absolute bottom-0 left-0 w-80 h-64 bg-purple-200/30 rounded-full blur-[100px]" />
-            <div className="absolute bottom-0 left-1/4 w-96 h-72 bg-purple-200/25 rounded-full blur-[120px]" />
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-80 h-56 bg-pink-200/20 rounded-full blur-[100px]" />
-            <div className="absolute bottom-0 right-1/4 w-96 h-72 bg-rose-200/20 rounded-full blur-[120px]" />
-            <div className="absolute bottom-0 right-0 w-80 h-64 bg-indigo-200/20 rounded-full blur-[100px]" />
+        <footer className="relative pt-14 pb-0 bg-[#FAFAFA] overflow-hidden">
+          {/* ── Brand + socials ── */}
+          <div className="text-center px-6 mb-2">
+            <Link
+              href="/"
+              className="inline-block text-6xl sm:text-8xl lg:text-[9rem] font-extrabold tracking-tighter text-gray-900 leading-none hover:opacity-80 transition-opacity select-none"
+              style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
+            >
+              cutline
+            </Link>
+            <p className="text-[13px] text-gray-400 mt-3 mb-6">AI video generation, one sentence at a time.</p>
+            <div className="flex items-center justify-center gap-4">
+              <a href="https://www.linkedin.com/in/parbhat-kapila-a14264202/" target="_blank" rel="noopener noreferrer" className="group w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-400 hover:shadow-sm transition-all" aria-label="LinkedIn">
+                <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+              </a>
+              <a href="https://github.com/parbhatkapila4" target="_blank" rel="noopener noreferrer" className="group w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-400 hover:shadow-sm transition-all" aria-label="GitHub">
+                <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" /></svg>
+              </a>
+              <a href="https://x.com/Parbhat03" target="_blank" rel="noopener noreferrer" className="group w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-400 hover:shadow-sm transition-all" aria-label="X / Twitter">
+                <svg className="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+              </a>
+              <a href="mailto:parbhat@parbhat.dev" className="group w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-400 hover:shadow-sm transition-all" aria-label="Email">
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+              </a>
+            </div>
           </div>
 
-          <div className="relative max-w-6xl mx-auto px-6">
-            <nav className="flex flex-wrap items-center justify-center gap-8 sm:gap-12 text-sm font-medium text-gray-700 mb-20">
-              <Link href="/features" className="hover:text-gray-900 transition-colors">
-                Features
-              </Link>
-              <Link href="/how" className="hover:text-gray-900 transition-colors">
-                How It Works
-              </Link>
-              <Link
-                href="/benefits"
-                className="hover:text-gray-900 transition-colors"
-              >
-                Benefits
-              </Link>
-              <Link
-                href="/contact"
-                className="hover:text-gray-900 transition-colors"
-              >
-                Contact
-              </Link>
-              <Link
-                href="/suggestions"
-                className="hover:text-gray-900 transition-colors"
-              >
-                Suggestion
-              </Link>
-            </nav>
+          {/* ── Pixel-art flower garden ── */}
+          <PixelFlowerGarden />
 
-            <div className="flex items-center justify-center mb-20">
-              <Link
-                href="/"
-                className="text-6xl sm:text-8xl lg:text-[9rem] font-bold text-gray-900 tracking-tighter hover:opacity-90 transition-opacity leading-none"
-              >
-                cutline
-              </Link>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-600">
-              <p>© {new Date().getFullYear()} cutline. All rights reserved.</p>
-              <div className="flex items-center gap-6">
-                <a
-                  href="https://www.linkedin.com/in/parbhat-kapila-a14264202/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-gray-900 transition-colors"
-                >
-                  LinkedIn
-                </a>
-                <a
-                  href="https://github.com/parbhatkapila4"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-gray-900 transition-colors"
-                >
-                  GitHub
-                </a>
-                <a
-                  href="https://x.com/Parbhat03"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-gray-900 transition-colors"
-                >
-                  Twitter
-                </a>
-                <a
-                  href="mailto:parbhat@parbhat.dev"
-                  className="hover:text-gray-900 transition-colors"
-                >
-                  Mail
-                </a>
+          {/* ── Bottom bar ── */}
+          <div className="border-t border-gray-100 px-6 py-4">
+            <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-gray-400">
+              <div className="flex items-center gap-5">
+                <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms &amp; conditions</Link>
+                <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy policy</Link>
+              </div>
+              <div className="flex items-center gap-5">
+                <span>Project by: <a href="https://www.linkedin.com/in/parbhat-kapila-a14264202/" target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-700 hover:text-gray-900 transition-colors">Parbhat</a></span>
+                <span>Powered by: <Link href="/" className="font-semibold text-gray-700 hover:text-gray-900 transition-colors">cutline</Link></span>
               </div>
             </div>
           </div>
