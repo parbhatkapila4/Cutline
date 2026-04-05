@@ -6,6 +6,7 @@ import type { Platform } from "@/lib/platform/types";
 import { analyzeAssets } from "@/lib/assets/analysis";
 import { getAssetFilePath, getAssetMetadata } from "@/lib/assets/storage";
 import type { BrandColors } from "@/lib/assets/types";
+import type { AvatarSelection } from "@/lib/types/avatar";
 import { sourceImages, normalizeImageSpecForRender } from "@/lib/images/source";
 import {
   retry,
@@ -23,6 +24,7 @@ import { generateScript, extendScript } from "@/lib/pipeline/script";
 import { generateSubtitles } from "@/lib/pipeline/subtitles";
 import { refineSubtitles } from "@/lib/pipeline/subtitle-refinement";
 import { generateTTS } from "@/lib/pipeline/tts";
+import { createTalkingVideo } from "@/lib/lipsync/heygen";
 import { composeMotion } from "@/lib/pipeline/motion";
 import { composeVisuals } from "@/lib/pipeline/visuals";
 import { runRemotionRender } from "@/lib/pipeline/renderVideo";
@@ -100,6 +102,7 @@ export type PipelineOptions = {
   textModel?: string;
   captions?: "on" | "off";
   talkingObjectStyle?: "cartoon" | "real";
+  avatar?: AvatarSelection;
   renderMode?: "preview" | "final";
   previewJobId?: string;
   variationCount?: number;
@@ -207,6 +210,24 @@ function splitScriptIntoChunks(
 
 const VEO_CHUNK_SECONDS = 8;
 const VEO_CHUNK_VALIDATE_RETRIES = 2;
+
+/** True only for capacity / throttling — not generic Veo failures (RAI, invalid video, etc.). */
+function isVeoQuotaOrRateLimitError(message: string): boolean {
+  const m = message.toLowerCase();
+  if (m.includes("veo api limit reached")) return true;
+  if (m.includes("resource exhausted") || m.includes("resource_exhausted")) return true;
+  if (m.includes("rate limit") || m.includes("rate_limit") || m.includes("too many requests")) return true;
+  if (/\b429\b/.test(m)) return true;
+  if (
+    m.includes("quota exceeded") ||
+    m.includes("exceeded your quota") ||
+    m.includes("over quota") ||
+    m.includes("out of quota")
+  ) {
+    return true;
+  }
+  return false;
+}
 
 function coerceDurationSeconds(value: unknown, logContext?: { jobId: string }): number | undefined {
   if (value == null) return undefined;
@@ -333,7 +354,7 @@ async function runPipelineOnce(
   costTracker: ReturnType<typeof createCostTracker>
 ): Promise<{ videoPath: string; message?: string; isPreview?: boolean; cost?: CostBreakdown }> {
   const startTime = Date.now();
-  const { input, jobId, requestId, assetIds, brandColors, mode, durationSeconds: optionsDuration, textModel, captions, talkingObjectStyle, renderMode, previewJobId, outputSuffix, variationStrategy, platform, aspectRatio, job } = options;
+  const { input, jobId, requestId, assetIds, brandColors, mode, durationSeconds: optionsDuration, textModel, captions, talkingObjectStyle, avatar, renderMode, previewJobId, outputSuffix, variationStrategy, platform, aspectRatio, job } = options;
   const logEvent = (p: Parameters<typeof logPipelineEvent>[0]) =>
     logPipelineEvent({ ...p, ...(requestId ? { requestId } : {}) });
   const resolvedPlatform: Platform = platform ?? "general";
@@ -498,6 +519,167 @@ async function runPipelineOnce(
   }
 
   if (mode === "talking_object" && !isPreview) {
+    try {
+    const PRESET_AVATAR_FILES: Record<string, string> = {
+      presenter_female_1: "presenter-female-1.jpg",
+      presenter_male_1: "presenter-male-1.jpg",
+      creator_female_1: "creator-female-1.jpg",
+      creator_male_1: "creator-male-1.jpg",
+    };
+
+    let resolvedAvatarPath: string | undefined;
+
+    if (talkingObjectStyle === "real" && avatar?.mode === "preset" && avatar.presetId) {
+      const filename = PRESET_AVATAR_FILES[avatar.presetId];
+      if (filename) {
+        resolvedAvatarPath = path.join(process.cwd(), "public", "avatars", "presets", filename);
+        console.log("[pipeline] jobId=" + jobId + " using preset avatar image: " + resolvedAvatarPath);
+      }
+    }
+
+    if (!resolvedAvatarPath && talkingObjectStyle === "real" && avatar?.mode === "upload") {
+      const uploadedAvatarId = avatar.uploadAssetId;
+      if (uploadedAvatarId) {
+        const uploadedMeta = getAssetMetadata(uploadedAvatarId);
+        if (!uploadedMeta || uploadedMeta.type !== "referenceImage") {
+          throw new Error("Uploaded avatar image is invalid. Please re-upload your photo and try again.");
+        }
+        const uploadedPath = getAssetFilePath(uploadedAvatarId);
+        if (!uploadedPath) {
+          throw new Error("Uploaded avatar image is missing from storage. Please re-upload and try again.");
+        }
+        resolvedAvatarPath = uploadedPath;
+      }
+    }
+
+    if (resolvedAvatarPath) {
+      if (!process.env.HEYGEN_API_KEY || process.env.HEYGEN_API_KEY.trim() === "") {
+        throw new Error(
+          "Avatar video requires HEYGEN_API_KEY on the server. Add it to .env.local or choose the default avatar."
+        );
+      }
+
+      const fullScriptText = script.entries
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .map((e) => e.text)
+        .filter((t): t is string => t != null && t.trim() !== "")
+        .join(" ");
+
+      await checkCancelledAndThrow();
+      logEvent({ jobId, event: "stage_start", stage: "tts" });
+      const ttsResult = await withStageTelemetry(jobId, "tts", () =>
+        retry(
+          () =>
+            generateTTS(script, shotList).then((r) => {
+              costTracker.recordTtsSeconds(r.durationMs / 1000);
+              return r;
+            }),
+          {
+            maxRetries: retryConfig.tts.maxRetries,
+            backoffMs: retryConfig.tts.backoffMs,
+            shouldRetry: shouldRetryForTTS,
+            label: "TTS",
+          }
+        )
+      );
+
+      await checkCancelledAndThrow();
+      logEvent({ jobId, event: "stage_start", stage: "heygen" });
+      await withStageTelemetry(jobId, "heygen", () =>
+        withRetry(
+          () =>
+            createTalkingVideo(
+              resolvedAvatarPath,
+              ttsResult.audioBuffer,
+              ttsResult.audioFormat,
+              jobId,
+              outputPath
+            ),
+          { maxAttempts: 2, baseDelayMs: 1500, maxDelayMs: 8000 }
+        )
+      );
+
+      if (captions !== "off") {
+        try {
+          const durationSec = getDuration(outputPath);
+          if (durationSec > 0 && fullScriptText.trim()) {
+            const wordCountScript = fullScriptText.trim().split(/\s+/).filter(Boolean).length;
+            const minCaptionSec = 1.5;
+            const maxSegments = Math.max(1, Math.floor(durationSec / minCaptionSec));
+            const numSegments = Math.min(maxSegments, Math.min(6, Math.max(2, Math.ceil(wordCountScript / 14))));
+            const phrases = splitScriptIntoChunks(
+              fullScriptText.trim(),
+              Math.max(1, Math.ceil(wordCountScript / numSegments))
+            ).slice(0, numSegments);
+            if (phrases.length === 0) {
+              phrases.push(fullScriptText.trim().slice(0, 200));
+            }
+            const n = Math.max(1, phrases.length);
+            const durationMs = durationSec * 1000;
+            const entries: SubtitleEntry[] = phrases
+              .map((text, i) => ({
+                text,
+                startMs: Math.round((i / n) * durationMs),
+                endMs: Math.round(((i + 1) / n) * durationMs),
+              }))
+              .filter((e) => e.endMs > e.startMs && e.endMs - e.startMs >= 800);
+            if (entries.length > 0) {
+              await checkCancelledAndThrow();
+              logEvent({ jobId, event: "stage_start", stage: "burn_subtitles" });
+              await withStageTelemetry(jobId, "burn_subtitles", async () => {
+                burnSubtitlesIntoVideo(outputPath, entries);
+              });
+            }
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(`Caption burn failed (captions were requested): ${msg}`);
+        }
+      }
+
+      const durationSec = getDuration(outputPath);
+      if (durationSec > 0) costTracker.recordVideoSeconds(durationSec);
+      checkOutputSizeIfConfigured(outputPath);
+      logEvent({
+        jobId,
+        event: "pipeline_completed",
+        durationMs: Date.now() - startTime,
+      });
+      return { videoPath: `/temp/${jobId}${fileSuffix}.mp4`, cost: costTracker.getBreakdown() };
+    }
+
+    const avatarPresetPrompt: Record<string, string> = {
+      presenter_female_1: "Young professional woman presenter, natural makeup, business-casual outfit, warm and confident expression.",
+      presenter_male_1: "Young professional man presenter, clean and modern look, business-casual outfit, confident expression.",
+      creator_female_1: "Female content creator style, casual modern outfit, approachable and energetic expression.",
+      creator_male_1: "Male content creator style, casual modern outfit, friendly and expressive delivery.",
+    };
+    const resolveAvatarPromptSuffix = (): string => {
+      if (!avatar) return "";
+      if (avatar.mode === "default") return "";
+      if (avatar.mode === "preset") {
+        return avatar.presetId ? ` Match this avatar profile: ${avatarPresetPrompt[avatar.presetId] ?? ""}` : "";
+      }
+      if (avatar.mode === "upload") {
+        const uploadedId = avatar.uploadAssetId;
+        if (!uploadedId) return "";
+        const uploadedMeta = getAssetMetadata(uploadedId);
+        if (!uploadedMeta || uploadedMeta.type !== "referenceImage") {
+          console.warn("[pipeline] jobId=" + jobId + " avatar upload is invalid; falling back to default avatar");
+          return "";
+        }
+        const uploadedPath = getAssetFilePath(uploadedId);
+        if (!uploadedPath) {
+          console.warn("[pipeline] jobId=" + jobId + " avatar upload path missing; falling back to default avatar");
+          return "";
+        }
+        return " Match the same person identity and appearance from the uploaded avatar reference image.";
+      }
+      return "";
+    };
+    const avatarPromptSuffix = resolveAvatarPromptSuffix();
+
     let effectiveDuration =
       coerceDurationSeconds(optionsDuration, { jobId }) ?? coerceDurationSeconds(intent.durationSeconds, { jobId });
     if (effectiveDuration == null || effectiveDuration <= VEO_CHUNK_SECONDS) {
@@ -524,14 +706,18 @@ async function runPipelineOnce(
     if (!useMultiClip) {
       const singleClipBase =
         talkingObjectStyle === "real"
-          ? "Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background."
+          ? `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
           : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
       const prompt = `${singleClipBase} Say the following: ${fullScriptText}`;
       await checkCancelledAndThrow();
       logEvent({ jobId, event: "stage_start", stage: "veo" });
       await withStageTelemetry(jobId, "veo", () =>
         withRetry(
-          () => generateTalkingVideoWithVeo(prompt, jobId, outputPath, { talkingObjectStyle }),
+          () =>
+            generateTalkingVideoWithVeo(prompt, jobId, outputPath, {
+              talkingObjectStyle,
+              aspectRatio,
+            }),
           { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
         )
       );
@@ -645,7 +831,7 @@ async function runPipelineOnce(
         const chunkPath = path.join(jobTempDir, `veo_chunk_${i}.mp4`);
         const base =
           talkingObjectStyle === "real"
-            ? "Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background."
+            ? `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
             : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
         const chunkText = textChunks[i]!;
         let flow: string;
@@ -671,7 +857,11 @@ async function runPipelineOnce(
               console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N);
             }
             await withRetry(
-              () => generateTalkingVideoWithVeo(prompt, jobId + "-chunk-" + i, chunkPath, { talkingObjectStyle }),
+              () =>
+                generateTalkingVideoWithVeo(prompt, jobId + "-chunk-" + i, chunkPath, {
+                  talkingObjectStyle,
+                  aspectRatio,
+                }),
               { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
             );
             const validation = validateVideoChunk(chunkPath, VEO_CHUNK_SECONDS);
@@ -774,6 +964,25 @@ async function runPipelineOnce(
       durationMs: Date.now() - startTime,
     });
     return { videoPath: `/temp/${jobId}${fileSuffix}.mp4`, cost: costTracker.getBreakdown(), ...(message ? { message } : {}) };
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      if (!isVeoQuotaOrRateLimitError(errMsg)) {
+        throw e;
+      }
+      console.warn(
+        "[pipeline] jobId=" + jobId + " Veo quota/rate limit; falling back to slideshow. Original: " + errMsg
+      );
+      const fallback = await runPipelineOnce(
+        { ...options, mode: "slideshow" },
+        costTracker
+      );
+      const notice =
+        "Talking object (Veo) hit an API limit or was temporarily throttled, so we generated a slideshow with the same script instead. Try again later, or confirm GEMINI_API_KEY and Veo access on your Google AI project.";
+      return {
+        ...fallback,
+        message: fallback.message ? `${notice} ${fallback.message}` : notice,
+      };
+    }
   }
 
   await checkCancelledAndThrow();
@@ -1007,8 +1216,6 @@ async function runPipelineOnce(
   ));
 
   if (isPreview) {
-    const previewDurationSec = shotList.totalDurationSeconds ?? shotList.shots.reduce((s, sh) => s + (sh.durationSeconds ?? 0), 0);
-    if (previewDurationSec > 0) costTracker.recordVideoSeconds(previewDurationSec);
     checkOutputSizeIfConfigured(effectiveOutputPath);
     await savePreviewArtifacts(jobId, {
       intent,
@@ -1025,8 +1232,6 @@ async function runPipelineOnce(
     return { videoPath: `/temp/${jobId}${fileSuffix}.mp4`, isPreview: true, cost: costTracker.getBreakdown() };
   }
 
-  const slideshowDurationSec = compositionDurationSec > 0 ? compositionDurationSec : (shotList.totalDurationSeconds ?? shotList.shots.reduce((s, sh) => s + (sh.durationSeconds ?? 0), 0));
-  if (slideshowDurationSec > 0) costTracker.recordVideoSeconds(slideshowDurationSec);
   checkOutputSizeIfConfigured(effectiveOutputPath);
   logEvent({
     jobId,
