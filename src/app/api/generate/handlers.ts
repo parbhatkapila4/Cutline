@@ -16,6 +16,7 @@ import { runGenerationFlow, checkDownloadAllowed } from "@/lib/anon";
 import { isDatabaseConfigured } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ensureInProcessWorkerStarted } from "@/lib/queue/autoStartWorker";
+import { validateApiKeyAndGetUserId } from "@/lib/api-keys/service";
 import fs from "fs";
 import path from "path";
 
@@ -146,12 +147,16 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
+  const fromApiKey = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
   let userId: string | undefined;
   try {
     const session = await auth.api.getSession({ headers: request.headers });
     userId = session?.user?.id != null ? String(session.user.id) : undefined;
   } catch {
     userId = undefined;
+  }
+  if (fromApiKey) {
+    userId = fromApiKey.userId;
   }
 
   let anonFlow: Awaited<ReturnType<typeof runGenerationFlow>> | null = null;
@@ -225,7 +230,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(anonFlow?.result.allowed ? { videoJobId: anonFlow.result.job_id } : {}),
       ...(data.assetIds?.length ? { assetIds: data.assetIds } : {}),
       ...(data.brandColors ? { brandColors: data.brandColors } : {}),
-      mode: data.mode ?? "slideshow",
+      mode: data.regenFromJobId ? "slideshow" : (data.mode ?? "slideshow"),
       durationSeconds: data.durationSeconds,
       ...(data.textModel ? { textModel: data.textModel } : {}),
       captions: data.captions,
@@ -237,6 +242,18 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       platform: data.platform ?? DEFAULT_PLATFORM,
       ...(data.aspectRatio ? { aspectRatio: data.aspectRatio } : {}),
       ...(data.callbackUrl ? { callbackUrl: data.callbackUrl } : {}),
+      ...(data.placeholders && Object.keys(data.placeholders).length > 0
+        ? { placeholders: data.placeholders }
+        : {}),
+      ...(data.brandBrain ? { brandBrain: data.brandBrain } : {}),
+      ...(data.scriptFidelity ? { scriptFidelity: data.scriptFidelity } : {}),
+      ...(data.strictScript ? { strictScript: data.strictScript } : {}),
+      ...(data.locale ? { locale: data.locale } : {}),
+      ...(data.ttsVoiceId ? { ttsVoiceId: data.ttsVoiceId } : {}),
+      ...(data.characterLockId ? { characterLockId: data.characterLockId } : {}),
+      ...(data.qualityGateMode ? { qualityGateMode: data.qualityGateMode } : {}),
+      ...(data.regenFromJobId ? { regenFromJobId: data.regenFromJobId } : {}),
+      ...(data.regenerateShotIds?.length ? { regenerateShotIds: data.regenerateShotIds } : {}),
     };
 
     const anonJobId = anonFlow?.result.allowed ? anonFlow.result.job_id : undefined;
@@ -356,6 +373,7 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       isPreview?: boolean;
       cost?: { llm: number; tts: number; video: number; images: number; total: number };
       variations?: Array<{ videoUrl: string; cost?: { llm: number; tts: number; video: number; images: number; total: number } }>;
+      qualityReport?: { passed: boolean; score: number; issues: string[] };
     } = { status };
 
     if (status === "completed") {
@@ -374,6 +392,13 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       }
       if (result?.cost) {
         response.cost = result.cost;
+      }
+      if (result?.qualityReport) {
+        response.qualityReport = {
+          passed: result.qualityReport.passed,
+          score: result.qualityReport.score,
+          issues: result.qualityReport.issues,
+        };
       }
     }
 
