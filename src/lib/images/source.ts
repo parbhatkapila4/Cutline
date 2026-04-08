@@ -92,7 +92,7 @@ function pickUnusedUrl(urls: string[], usedNormalizedUrls: Set<string>): string 
   return null;
 }
 
-async function fetchImageForShot(
+export async function sourceImageForShot(
   shot: Shot,
   script: Script,
   intent: Intent,
@@ -272,7 +272,7 @@ export async function sourceImages(
       continue;
     }
 
-    const result = await fetchImageForShot(shot, script, intent, jobId, stockOnly, usedImageUrls, alreadyUsedForOtherShots);
+    const result = await sourceImageForShot(shot, script, intent, jobId, stockOnly, usedImageUrls, alreadyUsedForOtherShots);
     if (result.searchQuery != null || result.imagePrompt != null) {
       alreadyUsedForOtherShots.push({ searchQuery: result.searchQuery, imagePrompt: result.imagePrompt });
     }
@@ -289,7 +289,7 @@ export async function sourceImages(
     const norm = normalizeImageUrl(entries[j]!.imageUrl);
     if (committedNormalized.has(norm) && entries[j]!.imageUrl !== FALLBACK_IMAGE_PATH) {
       const shot = shots[j]!;
-      const replacement = await fetchImageForShot(shot, script, intent, jobId, stockOnly, new Set(committedNormalized), alreadyUsedForOtherShots);
+      const replacement = await sourceImageForShot(shot, script, intent, jobId, stockOnly, new Set(committedNormalized), alreadyUsedForOtherShots);
       entries[j] = {
         shotId: shot.id,
         imageUrl: replacement.url,
