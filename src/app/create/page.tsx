@@ -112,6 +112,7 @@ export default function CreatePage() {
   const [suggesting, setSuggesting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [userPlan, setUserPlan] = useState<PlanId>("free");
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -156,7 +157,11 @@ export default function CreatePage() {
       const d = await r.json();
       if (!r.ok) { setError(getUserFriendlyErrorMessage(d.error || "Error")); setStatus("failed"); stop(); return; }
       setStatus(d.status);
-      if (d.status === "completed" && d.videoUrl) { setVideoUrl(d.videoUrl); stop(); }
+      if (d.status === "completed" && d.videoUrl) {
+        setVideoUrl(d.videoUrl);
+        setCompletionMessage(typeof d.message === "string" && d.message.trim() ? d.message.trim() : null);
+        stop();
+      }
       if (d.status === "failed") { setError(getUserFriendlyErrorMessage(d.error || "Failed")); stop(); }
     } catch { setError("Connection lost"); setStatus("failed"); stop(); }
   }, [stop]);
@@ -182,7 +187,7 @@ export default function CreatePage() {
       setError("Custom avatars need a Pro plan. Switch to Default or upgrade.");
       return;
     }
-    setError(null); setErrorCode(null); setVideoUrl(null); setStatus(null); setJobId(null); setSubmitting(true);
+    setError(null); setErrorCode(null); setVideoUrl(null); setStatus(null); setJobId(null); setCompletionMessage(null); setSubmitting(true);
     try {
       let assetIds: string[] = [];
       let avatarUploadAssetId: string | undefined;
@@ -415,6 +420,16 @@ export default function CreatePage() {
                 <p className="text-[11px] text-emerald-400/50">Generated successfully</p>
               </div>
             </motion.div>
+
+            {completionMessage && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-5 py-4 text-sm text-amber-100/95 leading-relaxed"
+              >
+                {completionMessage}
+              </motion.div>
+            )}
 
             <div className="grid lg:grid-cols-[1fr_320px] gap-6">
               {/* Video */}
