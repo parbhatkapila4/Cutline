@@ -11,7 +11,6 @@ type SubtitleOverlayProps = {
   chunks: SubtitleChunk[];
   shotId: string;
 };
-
 export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
   chunks,
   shotId,
@@ -38,12 +37,12 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
       <div
         style={{
           fontFamily: "system-ui, sans-serif",
-          fontSize: 42,
-          fontWeight: 600,
+          fontSize: 26,
+          fontWeight: 500,
           color: "white",
-          textShadow: "0 2px 4px rgba(0,0,0,0.8)",
+          textShadow: "0 1px 3px rgba(0,0,0,0.7)",
           textAlign: "center",
-          maxWidth: "80%",
+          maxWidth: "85%",
         }}
       >
         {visible.text}
