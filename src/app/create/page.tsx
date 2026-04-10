@@ -113,6 +113,8 @@ export default function CreatePage() {
   const [copied, setCopied] = useState(false);
   const [userPlan, setUserPlan] = useState<PlanId>("free");
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
+  const [canGenerateByPlan, setCanGenerateByPlan] = useState(true);
+  const [planLimitMessage, setPlanLimitMessage] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -122,7 +124,23 @@ export default function CreatePage() {
   useEffect(() => {
     fetch("/api/dashboard/usage")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.plan) setUserPlan(d.plan as PlanId); })
+      .then((d) => {
+        if (d?.plan) setUserPlan(d.plan as PlanId);
+        const hasVideoCap =
+          typeof d?.videosLimit === "number" && Number.isFinite(d.videosLimit);
+        const used =
+          typeof d?.videosUsed === "number" && Number.isFinite(d.videosUsed)
+            ? d.videosUsed
+            : 0;
+        const limit = hasVideoCap ? d.videosLimit : null;
+        const exhausted = limit != null && used >= limit;
+        setCanGenerateByPlan(!exhausted);
+        setPlanLimitMessage(
+          exhausted
+            ? `You've used ${used} of ${limit} videos this month. Upgrade to continue.`
+            : null
+        );
+      })
       .catch(() => {});
   }, []);
 
@@ -183,6 +201,11 @@ export default function CreatePage() {
 
   const submit = async () => {
     if (!prompt.trim() || prompt.trim().length < 5 || submitting) return;
+    if (!canGenerateByPlan) {
+      setError(planLimitMessage ?? "Your plan limit has been reached. Please upgrade to continue.");
+      setErrorCode("MONTHLY_LIMIT_REACHED");
+      return;
+    }
     if (mode === "talking_object" && objStyle === "real" && PRO_AVATAR_MODES.includes(avatarMode) && !canUseProAvatar(userPlan)) {
       setError("Custom avatars need a Pro plan. Switch to Default or upgrade.");
       return;
@@ -247,6 +270,12 @@ export default function CreatePage() {
         setErrorCode(code);
         if (code === "MONTHLY_LIMIT_REACHED" || code === "ANON_LIMIT_REACHED") {
           setError("Your current plan limit has been reached. Please upgrade to continue creating videos.");
+          setCanGenerateByPlan(false);
+          if (typeof d?.details?.videosUsed === "number" && typeof d?.details?.videosLimit === "number") {
+            setPlanLimitMessage(
+              `You've used ${d.details.videosUsed} of ${d.details.videosLimit} videos this month. Upgrade to continue.`
+            );
+          }
         } else {
           setError(getUserFriendlyErrorMessage(d.error || "Failed"));
         }
@@ -858,7 +887,7 @@ export default function CreatePage() {
                       <button
                         type="button"
                         onClick={submit}
-                        disabled={!prompt.trim() || prompt.trim().length < 5 || submitting}
+                        disabled={!prompt.trim() || prompt.trim().length < 5 || submitting || !canGenerateByPlan}
                         className="inline-flex items-center gap-2 bg-white text-black font-semibold px-6 py-3 rounded-xl hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         {submitting ? (
@@ -876,6 +905,16 @@ export default function CreatePage() {
                           </>
                         )}
                       </button>
+                      {!canGenerateByPlan && (
+                        <div className="basis-full text-right">
+                          <p className="text-xs text-amber-300">
+                            {planLimitMessage ?? "Plan limit reached."}{" "}
+                            <Link href="/pricing" className="underline hover:text-amber-200">
+                              Upgrade plan
+                            </Link>
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
