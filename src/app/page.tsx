@@ -60,6 +60,8 @@ function HomeContent() {
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [canGenerateByPlan, setCanGenerateByPlan] = useState(true);
+  const [planLimitMessage, setPlanLimitMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState(0);
   const [dragActive, setDragActive] = useState(false);
@@ -109,6 +111,28 @@ function HomeContent() {
       )
       .catch(() => { });
   }, []);
+
+  useEffect(() => {
+    fetch("/api/dashboard/usage")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const hasVideoCap =
+          typeof d?.videosLimit === "number" && Number.isFinite(d.videosLimit);
+        const used =
+          typeof d?.videosUsed === "number" && Number.isFinite(d.videosUsed)
+            ? d.videosUsed
+            : 0;
+        const limit = hasVideoCap ? d.videosLimit : null;
+        const exhausted = limit != null && used >= limit;
+        setCanGenerateByPlan(!exhausted);
+        setPlanLimitMessage(
+          exhausted
+            ? `You've used ${used} of ${limit} videos this month. Upgrade to continue.`
+            : null,
+        );
+      })
+      .catch(() => { });
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (!modelDropdownOpen) return;
@@ -188,6 +212,10 @@ function HomeContent() {
 
   const handleSubmit = async () => {
     if (!prompt.trim() || prompt.trim().length < 5 || submitting) return;
+    if (!canGenerateByPlan) {
+      setError(planLimitMessage ?? "Your plan limit has been reached. Please upgrade to continue.");
+      return;
+    }
 
     setError(null);
     setVideoUrl(null);
@@ -241,6 +269,12 @@ function HomeContent() {
           }
           if (parts.length > 0) {
             msg = msg + " " + parts.join(" ");
+          }
+          if (data.videosUsed != null && data.videosLimit != null) {
+            setCanGenerateByPlan(false);
+            setPlanLimitMessage(
+              `You've used ${data.videosUsed} of ${data.videosLimit} videos this month. Upgrade to continue.`,
+            );
           }
         }
         setError(msg);
@@ -1982,7 +2016,8 @@ function HomeContent() {
                           disabled={
                             !prompt.trim() ||
                             prompt.trim().length < 5 ||
-                            submitting
+                            submitting ||
+                            !canGenerateByPlan
                           }
                           className="inline-flex items-center gap-2 bg-white text-black font-semibold px-6 py-3 rounded-xl hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
@@ -2018,6 +2053,16 @@ function HomeContent() {
                             </>
                           )}
                         </button>
+                        {!canGenerateByPlan && (
+                          <div className="basis-full text-right">
+                            <p className="text-xs text-amber-300">
+                              {planLimitMessage ?? "Plan limit reached."}{" "}
+                              <Link href="/pricing" className="underline hover:text-amber-200">
+                                Upgrade plan
+                              </Link>
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
