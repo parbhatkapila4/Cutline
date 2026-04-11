@@ -3,6 +3,7 @@ import type { Script, ScriptEntry } from "@/lib/types";
 import { getVariationPromptSnippet } from "@/lib/variation/strategies";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
+import type { BrandBrainInput } from "@/lib/types/pipelineEnhancements";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
@@ -32,6 +33,8 @@ function buildSystemPrompt(options?: {
   durationSeconds?: number;
   variationStrategy?: string;
   platform?: Platform;
+  brandBrain?: BrandBrainInput;
+  locale?: string;
 }): string {
   let prompt = BASE_SYSTEM_PROMPT;
   const variationSnippet = options?.variationStrategy
@@ -43,6 +46,31 @@ function buildSystemPrompt(options?: {
       ? getPlatformPromptSnippet(options.platform, "script")
       : "";
   if (platformSnippet) prompt += platformSnippet;
+
+  const loc = options?.locale?.trim();
+  if (loc && loc.toLowerCase() !== "en" && !loc.toLowerCase().startsWith("en-")) {
+    prompt += `
+
+LOCALIZATION: Write every spoken line in the language/locale "${loc}" (natural native phrasing).`;
+  }
+
+  const bb = options?.brandBrain;
+  if (bb?.bannedPhrases?.length) {
+    prompt += `
+
+BRAND POLICY — Do not use these phrases anywhere in dialogue: ${bb.bannedPhrases.map((p) => JSON.stringify(p)).join(", ")}`;
+  }
+  if (bb?.requiredPhrases?.length) {
+    prompt += `
+
+BRAND POLICY — You must include each of these phrases verbatim somewhere in the spoken script: ${bb.requiredPhrases.map((p) => JSON.stringify(p)).join(", ")}`;
+  }
+  if (bb?.voiceTone?.trim()) {
+    prompt += `
+
+VOICE / TONE OVERRIDE: ${bb.voiceTone.trim()}`;
+  }
+
   const durationSec = options?.durationSeconds;
   const hasTargetDuration =
     durationSec != null &&
@@ -67,9 +95,20 @@ INTRO AND OUTRO (required): The video must have a clear beginning and a proper e
   return prompt;
 }
 
-function parseAndValidateScript(
+export type ParseScriptOptions = {
+  fidelity?: "creative" | "strict";
+  /** Required when fidelity is strict: validate spoken lines are substrings of this text. */
+  strictSourceText?: string;
+};
+
+function normalizeForStrictCheck(s: string): string {
+  return s.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+export function parseAndValidateScript(
   raw: string,
-  shotList: ShotList
+  shotList: ShotList,
+  parseOptions?: ParseScriptOptions
 ): Script {
   let parsed: unknown;
   try {
@@ -113,7 +152,6 @@ function parseAndValidateScript(
     const text = e?.text;
 
     if (shot.textDensity === 0) {
-      // Model often returns dialogue anyway; silence shots stay null for TTS.
       return { shotId: shot.id, text: null, order: shot.order };
     }
 
@@ -123,7 +161,13 @@ function parseAndValidateScript(
     } else {
       str = "";
     }
+    const strict = parseOptions?.fidelity === "strict";
     if (str.length === 0) {
+      if (strict) {
+        throw new Error(
+          "Strict script mode: every speaking shot must have text taken from your provided script."
+        );
+      }
       str = TEXT_PLACEHOLDER;
     }
     return { shotId: shot.id, text: str, order: shot.order };
@@ -131,12 +175,27 @@ function parseAndValidateScript(
 
   entries.sort((a, b) => a.order - b.order);
 
-  const MAX_LAST_SENTENCE_WORDS = 5;
-  const lastEntry = entries[entries.length - 1];
-  if (lastEntry?.text != null && lastEntry.text.trim() !== "") {
-    const words = lastEntry.text.trim().split(/\s+/).filter(Boolean);
-    if (words.length > MAX_LAST_SENTENCE_WORDS) {
-      lastEntry.text = words.slice(0, MAX_LAST_SENTENCE_WORDS).join(" ").replace(/[.,;:]$/, "") + "!";
+  if (parseOptions?.fidelity === "strict" && parseOptions.strictSourceText) {
+    const pool = normalizeForStrictCheck(parseOptions.strictSourceText);
+    for (const e of entries) {
+      if (e.text == null || e.text.trim() === "") continue;
+      const shot = shotList.shots.find((s) => s.id === e.shotId);
+      if (shot && shot.textDensity === 0) continue;
+      const n = normalizeForStrictCheck(e.text);
+      if (n.length > 0 && !pool.includes(n)) {
+        throw new Error(
+          "Strict script mode: a line was not found verbatim within your provided script. Check whitespace or re-paste the exact copy."
+        );
+      }
+    }
+  } else {
+    const MAX_LAST_SENTENCE_WORDS = 5;
+    const lastEntry = entries[entries.length - 1];
+    if (lastEntry?.text != null && lastEntry.text.trim() !== "") {
+      const words = lastEntry.text.trim().split(/\s+/).filter(Boolean);
+      if (words.length > MAX_LAST_SENTENCE_WORDS) {
+        lastEntry.text = words.slice(0, MAX_LAST_SENTENCE_WORDS).join(" ").replace(/[.,;:]$/, "") + "!";
+      }
     }
   }
 
@@ -149,6 +208,8 @@ export type GenerateScriptOptions = {
   model?: string;
   variationStrategy?: string;
   platform?: Platform;
+  brandBrain?: BrandBrainInput;
+  locale?: string;
 };
 
 export async function generateScript(
@@ -164,7 +225,14 @@ export async function generateScript(
     throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
   }
 
-  const systemPrompt = buildSystemPrompt(options);
+  const systemPrompt = buildSystemPrompt({
+    mode: options?.mode,
+    durationSeconds: options?.durationSeconds,
+    variationStrategy: options?.variationStrategy,
+    platform: options?.platform,
+    brandBrain: options?.brandBrain,
+    locale: options?.locale,
+  });
   const n = shotList.shots.length;
   const userContent = `${JSON.stringify({ intent, plan, shotList })}
 
