@@ -167,7 +167,7 @@ function generatePreviewTTS(script: Script, shotList: ShotList): Promise<TTSResu
   });
 }
 
-export type GenerateTTSOptions = { usePreviewTTS?: boolean };
+export type GenerateTTSOptions = { usePreviewTTS?: boolean; voiceId?: string };
 
 export async function generateTTS(
   script: Script,
@@ -178,7 +178,10 @@ export async function generateTTS(
     return generatePreviewTTS(script, shotList);
   }
   const provider = (process.env.TTS_PROVIDER ?? "elevenlabs") as TTSProvider;
-  const voiceId = process.env.TTS_VOICE_ID ?? DEFAULT_VOICE_ID;
+  const voiceId =
+    options?.voiceId != null && String(options.voiceId).trim() !== ""
+      ? String(options.voiceId).trim()
+      : (process.env.TTS_VOICE_ID ?? DEFAULT_VOICE_ID);
 
   if (provider === "elevenlabs") {
     const apiKey = process.env.ELEVENLABS_API_KEY;
