@@ -2,7 +2,7 @@ import Redis from "ioredis";
 import { RateLimiterRedis } from "rate-limiter-flexible";
 import { createManagedRedis } from "@/lib/redis/managedRedis";
 
-export type RateLimitType = "generate" | "upload" | "status" | "general";
+export type RateLimitType = "generate" | "upload" | "status" | "general" | "apiKeyGenerate";
 
 export type RateLimitResult = {
   allowed: boolean;
@@ -13,6 +13,7 @@ const DEFAULT_GENERATE_PER_HOUR = 5;
 const DEFAULT_UPLOAD_PER_HOUR = 20;
 const DEFAULT_STATUS_PER_MINUTE = 60;
 const DEFAULT_GENERAL_PER_MINUTE = 100;
+const DEFAULT_API_KEY_GENERATE_PER_HOUR = 120;
 const KEY_PREFIX = "cutline:rl:";
 
 let redisClient: Redis | null = null;
@@ -63,6 +64,12 @@ function getConfig(type: RateLimitType): { points: number; durationSeconds: numb
     case "general": {
       const n = Number(process.env.RATE_LIMIT_GENERAL) || DEFAULT_GENERAL_PER_MINUTE;
       return { points: n, durationSeconds: 60 };
+    }
+    case "apiKeyGenerate": {
+      const max =
+        Number(process.env.RATE_LIMIT_API_KEY_GENERATE) || DEFAULT_API_KEY_GENERATE_PER_HOUR;
+      const window = Number(process.env.RATE_LIMIT_API_KEY_WINDOW_SECONDS) || 3600;
+      return { points: max, durationSeconds: window };
     }
     default:
       return { points: DEFAULT_GENERAL_PER_MINUTE, durationSeconds: 60 };
