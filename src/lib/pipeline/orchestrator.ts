@@ -30,7 +30,7 @@ import { composeVisuals } from "@/lib/pipeline/visuals";
 import { runRemotionRender } from "@/lib/pipeline/renderVideo";
 import { cleanupJobArtifacts } from "@/lib/storage/cleanup";
 import { isJobCancelled } from "@/lib/queue/cancelCheck";
-import { generateTalkingVideoWithVeo } from "@/lib/veo";
+import { generateTalkingVideoWithVeo, VeoQuotaOrLimitError } from "@/lib/veo";
 import { concatenateMp4s, isFfmpegAvailable, getDuration, CROSSFADE_DURATION_SECONDS, mixBackgroundMusic } from "@/lib/pipeline/concatMp4";
 import { validateVideoChunk } from "@/lib/pipeline/validateChunk";
 import { burnSubtitlesIntoVideo, type SubtitleEntry } from "@/lib/pipeline/burnSubtitles";
@@ -45,9 +45,19 @@ import {
   recordStageEnd,
 } from "@/lib/telemetry/store";
 import { savePreviewArtifacts, loadPreviewArtifacts } from "@/lib/preview/artifacts";
+import { getCaptionsRenderOption } from "@/lib/pipeline/captionsRenderOption";
 import { createCostTracker } from "@/lib/cost/costEstimator";
 import type { CostBreakdown } from "@/lib/cost/types";
 import type { Job } from "bullmq";
+import { runQualityGate } from "@/lib/pipeline/qualityGate";
+import { mapStrictScriptToShots } from "@/lib/pipeline/strictScriptMap";
+import { saveRegenSnapshot } from "@/lib/regen/snapshotStore";
+import type {
+  BrandBrainInput,
+  QualityReport,
+  RegenSnapshotV1,
+  ScriptFidelityMode,
+} from "@/lib/types/pipelineEnhancements";
 
 const TOKENS_ESTIMATE = {
   intent: 400,
@@ -111,10 +121,26 @@ export type PipelineOptions = {
   platform?: Platform;
   aspectRatio?: string;
   job?: Job;
+  brandBrain?: BrandBrainInput;
+  scriptFidelity?: ScriptFidelityMode;
+  strictScript?: string;
+  locale?: string;
+  ttsVoiceId?: string;
+  characterLockId?: string;
+  qualityGateMode?: "off" | "warn" | "fail";
+  regenSnapshot?: RegenSnapshotV1;
+  regenFromJobId?: string;
+  regenerateShotIds?: string[];
 };
 
 
 const VEO_WORDS_PER_CHUNK = 18;
+
+function veoCharacterLockSuffix(characterLockId?: string): string {
+  const t = characterLockId?.trim();
+  if (!t) return "";
+  return ` Series character identifier "${t}": keep the same character design, face, and styling across videos in this series.`;
+}
 
 function splitScriptIntoChunks(
   fullText: string,
@@ -214,7 +240,7 @@ const VEO_CHUNK_VALIDATE_RETRIES = 2;
 /** True only for capacity / throttling — not generic Veo failures (RAI, invalid video, etc.). */
 function isVeoQuotaOrRateLimitError(message: string): boolean {
   const m = message.toLowerCase();
-  if (m.includes("veo api limit reached")) return true;
+  if (m.includes("veo api limit reached")) return true; // legacy wrapped messages
   if (m.includes("resource exhausted") || m.includes("resource_exhausted")) return true;
   if (m.includes("rate limit") || m.includes("rate_limit") || m.includes("too many requests")) return true;
   if (/\b429\b/.test(m)) return true;
@@ -252,17 +278,7 @@ function checkOutputSizeIfConfigured(outputPath: string): void {
   }
 }
 
-
-export function getCaptionsRenderOption(
-  captions: "on" | "off" | undefined,
-  subtitleTrackRefined: { chunks: Array<{ text: string; startMs: number; endMs: number; shotId: string }> }
-): { showCaptions: boolean; subtitleTrack: { chunks: Array<{ text: string; startMs: number; endMs: number; shotId: string }> } } {
-  const showCaptions = captions !== "off";
-  return {
-    showCaptions,
-    subtitleTrack: showCaptions ? subtitleTrackRefined : { chunks: [] },
-  };
-}
+export { getCaptionsRenderOption };
 
 export type PipelineResult = {
   videoPath: string;
@@ -270,6 +286,7 @@ export type PipelineResult = {
   isPreview?: boolean;
   cost?: CostBreakdown;
   variations?: Array<{ videoUrl: string; cost?: CostBreakdown }>;
+  qualityReport?: QualityReport;
 };
 
 export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
@@ -305,6 +322,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     }
 
     const results: Array<{ videoUrl: string; cost?: CostBreakdown }> = [];
+    let qualityReport: QualityReport | undefined;
     for (let v = 0; v < count; v++) {
       const costTracker = createCostTracker();
       const iterOpts: PipelineOptions = {
@@ -314,6 +332,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       };
       const result = await runPipelineOnce(iterOpts, costTracker);
       results.push({ videoUrl: result.videoPath, cost: costTracker.getBreakdown() });
+      if (v === 0) qualityReport = result.qualityReport;
       if (job?.token) await job.extendLock(job.token, LOCK_DURATION_MS);
     }
     if (jobId) {
@@ -325,6 +344,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     return {
       videoPath: results[0]!.videoUrl,
       variations: results,
+      qualityReport,
     };
   } catch (e) {
     if (jobId) {
@@ -352,9 +372,34 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 async function runPipelineOnce(
   options: PipelineOptions,
   costTracker: ReturnType<typeof createCostTracker>
-): Promise<{ videoPath: string; message?: string; isPreview?: boolean; cost?: CostBreakdown }> {
+): Promise<{
+  videoPath: string;
+  message?: string;
+  isPreview?: boolean;
+  cost?: CostBreakdown;
+  qualityReport?: QualityReport;
+}> {
   const startTime = Date.now();
-  const { input, jobId, requestId, assetIds, brandColors, mode, durationSeconds: optionsDuration, textModel, captions, talkingObjectStyle, avatar, renderMode, previewJobId, outputSuffix, variationStrategy, platform, aspectRatio, job } = options;
+  const {
+    input,
+    jobId,
+    requestId,
+    assetIds,
+    brandColors,
+    mode,
+    durationSeconds: optionsDuration,
+    textModel,
+    captions,
+    talkingObjectStyle,
+    avatar,
+    renderMode,
+    previewJobId,
+    outputSuffix,
+    variationStrategy,
+    platform,
+    aspectRatio,
+    job,
+  } = options;
   const logEvent = (p: Parameters<typeof logPipelineEvent>[0]) =>
     logPipelineEvent({ ...p, ...(requestId ? { requestId } : {}) });
   const resolvedPlatform: Platform = platform ?? "general";
@@ -387,6 +432,70 @@ async function runPipelineOnce(
   }
 
   await checkCancelledAndThrow();
+
+  let regenSnapshot: RegenSnapshotV1 | undefined = options.regenSnapshot;
+  if (options.regenFromJobId && regenSnapshot == null) {
+    const { loadRegenSnapshot } = await import("@/lib/regen/snapshotStore");
+    regenSnapshot = (await loadRegenSnapshot(options.regenFromJobId)) ?? undefined;
+    if (regenSnapshot == null) {
+      throw new Error(
+        "Shot regeneration source is missing or expired. Run a slideshow job first, then retry within 7 days."
+      );
+    }
+  }
+
+  const modeEff = mode ?? "slideshow";
+  if (regenSnapshot && modeEff === "slideshow" && !isPreview && !loadedArtifacts) {
+    const { buildImageSpecForRegen } = await import("@/lib/regen/patchImages");
+    const { runSlideshowTailFromSubtitles } = await import("@/lib/regen/slideshowTailFromSubtitles");
+    const snap = regenSnapshot;
+    const motionSpec =
+      options.brandBrain?.motionStyle && options.brandBrain.motionStyle !== "default"
+        ? composeMotion(snap.shotList, { motionStyle: options.brandBrain.motionStyle })
+        : snap.motionSpec;
+    const visualSpec = snap.visualSpec;
+    const normalizedImageSpec = await buildImageSpecForRegen(
+      snap,
+      jobId,
+      options.regenerateShotIds ?? []
+    );
+    const qgm = options.qualityGateMode ?? "warn";
+    let qualityReport = runQualityGate(snap.script, snap.shotList, options.brandBrain);
+    if (qgm === "off") {
+      qualityReport = { passed: true, score: 100, issues: [] };
+    } else if (qgm === "fail" && !qualityReport.passed) {
+      throw new Error("Quality gate failed: " + qualityReport.issues.join("; "));
+    } else if (qgm === "warn" && !qualityReport.passed) {
+      console.warn("[pipeline] jobId=" + jobId + " quality: " + qualityReport.issues.join("; "));
+    }
+    const r = await runSlideshowTailFromSubtitles({
+      jobId,
+      requestId,
+      script: snap.script,
+      shotList: snap.shotList,
+      intent: snap.intent,
+      narrative: snap.narrative,
+      captions: snap.captions ?? captions ?? "on",
+      motionSpec,
+      visualSpec,
+      normalizedImageSpec,
+      logoUrl: snap.logoUrl,
+      logoPlacement: snap.logoPlacement,
+      outputPath,
+      fileSuffix,
+      aspectRatio: snap.aspectRatio ?? aspectRatio,
+      isPreview: false,
+      ttsVoiceId: options.ttsVoiceId,
+      costTracker,
+      checkCancelledAndThrow,
+      logEvent,
+      job,
+      startTime,
+      brandBrain: options.brandBrain,
+    });
+    return { ...r, qualityReport };
+  }
+
   let intent!: Awaited<ReturnType<typeof interpretIntent>>;
   let plan!: Awaited<ReturnType<typeof planNarrative>>;
   let shotList!: Awaited<ReturnType<typeof planShots>>;
@@ -463,27 +572,64 @@ async function runPipelineOnce(
       ...(textModel ? { model: textModel } : {}),
       ...(variationStrategy ? { variationStrategy } : {}),
       platform: resolvedPlatform,
+      brandBrain: options.brandBrain,
+      locale: options.locale,
     }
     : undefined;
   if (!loadedArtifacts) {
     await checkCancelledAndThrow();
     logEvent({ jobId, event: "stage_start", stage: "script" });
-    script = await withStageTelemetry(jobId, "script", () => retry(
-      () => generateScript(intent, plan, shotList, { durationSeconds: scriptDurationSec, ...scriptOptions }).then((r) => {
-        costTracker.recordLlmTokens(TOKENS_ESTIMATE.script);
-        return r;
-      }),
-      {
-        maxRetries: retryConfig.llm.maxRetries,
-        backoffMs: retryConfig.llm.backoffMs,
-        shouldRetry: shouldRetryForLLM,
-        label: "LLM (Script)",
+    if (options.scriptFidelity === "strict") {
+      const rawStrict = options.strictScript?.trim();
+      if (!rawStrict) {
+        throw new Error('strictScript is required when scriptFidelity is "strict".');
       }
-    ));
+      script = await withStageTelemetry(jobId, "script", () =>
+        retry(
+          () =>
+            mapStrictScriptToShots(intent, plan, shotList, rawStrict, textModel).then((r) => {
+              costTracker.recordLlmTokens(TOKENS_ESTIMATE.script);
+              return r;
+            }),
+          {
+            maxRetries: retryConfig.llm.maxRetries,
+            backoffMs: retryConfig.llm.backoffMs,
+            shouldRetry: shouldRetryForLLM,
+            label: "LLM (Strict script map)",
+          }
+        )
+      );
+    } else {
+      script = await withStageTelemetry(jobId, "script", () =>
+        retry(
+          () =>
+            generateScript(intent, plan, shotList, {
+              durationSeconds: scriptDurationSec,
+              ...scriptOptions,
+            }).then((r) => {
+              costTracker.recordLlmTokens(TOKENS_ESTIMATE.script);
+              return r;
+            }),
+          {
+            maxRetries: retryConfig.llm.maxRetries,
+            backoffMs: retryConfig.llm.backoffMs,
+            shouldRetry: shouldRetryForLLM,
+            label: "LLM (Script)",
+          }
+        )
+      );
+    }
   }
 
   const isSlideshow = mode !== "talking_object" && !isPreview;
-  if (isSlideshow && !loadedArtifacts && script != null && scriptDurationSec != null && scriptDurationSec >= 15) {
+  if (
+    isSlideshow &&
+    !loadedArtifacts &&
+    options.scriptFidelity !== "strict" &&
+    script != null &&
+    scriptDurationSec != null &&
+    scriptDurationSec >= 15
+  ) {
     const wordCount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
     const targetMinWords = Math.floor(scriptDurationSec * 2.5);
     for (let round = 0; round < 2; round++) {
@@ -516,6 +662,16 @@ async function runPipelineOnce(
         script = { entries: sortedEntries };
       }
     }
+  }
+
+  const qgmMain = options.qualityGateMode ?? "warn";
+  let qualityReportMain = runQualityGate(script, shotList, options.brandBrain);
+  if (qgmMain === "off") {
+    qualityReportMain = { passed: true, score: 100, issues: [] };
+  } else if (qgmMain === "fail" && !qualityReportMain.passed) {
+    throw new Error("Quality gate failed: " + qualityReportMain.issues.join("; "));
+  } else if (qgmMain === "warn" && !qualityReportMain.passed) {
+    console.warn("[pipeline] jobId=" + jobId + " quality: " + qualityReportMain.issues.join("; "));
   }
 
   if (mode === "talking_object" && !isPreview) {
@@ -571,7 +727,7 @@ async function runPipelineOnce(
       const ttsResult = await withStageTelemetry(jobId, "tts", () =>
         retry(
           () =>
-            generateTTS(script, shotList).then((r) => {
+            generateTTS(script, shotList, { voiceId: options.ttsVoiceId }).then((r) => {
               costTracker.recordTtsSeconds(r.durationMs / 1000);
               return r;
             }),
@@ -646,7 +802,11 @@ async function runPipelineOnce(
         event: "pipeline_completed",
         durationMs: Date.now() - startTime,
       });
-      return { videoPath: `/temp/${jobId}${fileSuffix}.mp4`, cost: costTracker.getBreakdown() };
+      return {
+        videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
+        cost: costTracker.getBreakdown(),
+        qualityReport: qualityReportMain,
+      };
     }
 
     const avatarPresetPrompt: Record<string, string> = {
@@ -708,7 +868,7 @@ async function runPipelineOnce(
         talkingObjectStyle === "real"
           ? `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
           : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
-      const prompt = `${singleClipBase} Say the following: ${fullScriptText}`;
+      const prompt = `${singleClipBase} Say the following: ${fullScriptText}${veoCharacterLockSuffix(options.characterLockId)}`;
       await checkCancelledAndThrow();
       logEvent({ jobId, event: "stage_start", stage: "veo" });
       await withStageTelemetry(jobId, "veo", () =>
@@ -761,7 +921,11 @@ async function runPipelineOnce(
         event: "pipeline_completed",
         durationMs: Date.now() - startTime,
       });
-      return { videoPath: `/temp/${jobId}${fileSuffix}.mp4`, cost: costTracker.getBreakdown() };
+      return {
+        videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
+        cost: costTracker.getBreakdown(),
+        qualityReport: qualityReportMain,
+      };
     }
 
     const wordsPerChunk = VEO_WORDS_PER_CHUNK;
@@ -845,7 +1009,7 @@ async function runPipelineOnce(
           flow = "This continues directly from the previous clip with no gap. Start immediately, say exactly the following in about 8 seconds, and finish the last word clearly: ";
         }
         const endInstruction = N > 1 && i < N - 1 ? " Do not pause at the end; the next clip will continue from here." : "";
-        const prompt = `${base} ${flow}${chunkText}${endInstruction}`;
+        const prompt = `${base} ${flow}${chunkText}${endInstruction}${veoCharacterLockSuffix(options.characterLockId)}`;
 
         let lastChunkError: Error | null = null;
         for (let attempt = 0; attempt <= VEO_CHUNK_VALIDATE_RETRIES; attempt++) {
@@ -963,21 +1127,28 @@ async function runPipelineOnce(
       event: "pipeline_completed",
       durationMs: Date.now() - startTime,
     });
-    return { videoPath: `/temp/${jobId}${fileSuffix}.mp4`, cost: costTracker.getBreakdown(), ...(message ? { message } : {}) };
+    return {
+      videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
+      cost: costTracker.getBreakdown(),
+      qualityReport: qualityReportMain,
+      ...(message ? { message } : {}),
+    };
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      if (!isVeoQuotaOrRateLimitError(errMsg)) {
+      const isCapacity =
+        e instanceof VeoQuotaOrLimitError || isVeoQuotaOrRateLimitError(errMsg);
+      if (!isCapacity) {
         throw e;
       }
       console.warn(
-        "[pipeline] jobId=" + jobId + " Veo quota/rate limit; falling back to slideshow. Original: " + errMsg
+        "[pipeline] jobId=" + jobId + " talking-character capacity/quota; falling back to slideshow. Detail: " + errMsg
       );
       const fallback = await runPipelineOnce(
         { ...options, mode: "slideshow" },
         costTracker
       );
       const notice =
-        "Talking object (Veo) hit an API limit or was temporarily throttled, so we generated a slideshow with the same script instead. Try again later, or confirm GEMINI_API_KEY and Veo access on your Google AI project.";
+        "We couldn’t finish the talking-character version of your video (the service was busy or temporarily unavailable), so we made a slideshow with images and voiceover using the same script instead. You can try talking-character mode again later.";
       return {
         ...fallback,
         message: fallback.message ? `${notice} ${fallback.message}` : notice,
@@ -993,7 +1164,12 @@ async function runPipelineOnce(
   await checkCancelledAndThrow();
   logEvent({ jobId, event: "stage_start", stage: "tts" });
   const ttsResult = await withStageTelemetry(jobId, "tts", () => retry(
-    () => generateTTS(script, shotList, isPreview ? { usePreviewTTS: true } : undefined).then((r) => {
+    () =>
+      generateTTS(
+        script,
+        shotList,
+        isPreview ? { usePreviewTTS: true } : { voiceId: options.ttsVoiceId }
+      ).then((r) => {
       costTracker.recordTtsSeconds(r.durationMs / 1000);
       return r;
     }),
@@ -1019,7 +1195,7 @@ async function runPipelineOnce(
   await checkCancelledAndThrow();
   logEvent({ jobId, event: "stage_start", stage: "motion" });
   const motionSpec = await withStageTelemetry(jobId, "motion", async () =>
-    composeMotion(shotList)
+    composeMotion(shotList, { motionStyle: options.brandBrain?.motionStyle ?? "default" })
   );
 
   const hasAssets =
@@ -1229,14 +1405,38 @@ async function runPipelineOnce(
       event: "pipeline_completed",
       durationMs: Date.now() - startTime,
     });
-    return { videoPath: `/temp/${jobId}${fileSuffix}.mp4`, isPreview: true, cost: costTracker.getBreakdown() };
+    return {
+      videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
+      isPreview: true,
+      cost: costTracker.getBreakdown(),
+      qualityReport: qualityReportMain,
+    };
   }
 
   checkOutputSizeIfConfigured(effectiveOutputPath);
+  await saveRegenSnapshot(jobId, {
+    version: 1,
+    sourceJobId: jobId,
+    intent,
+    narrative: plan,
+    shotList,
+    script,
+    motionSpec,
+    visualSpec,
+    imageSpec: normalizedImageSpec,
+    captions: captions ?? "on",
+    aspectRatio,
+    platform: resolvedPlatform,
+    ...(logoUrl && logoPlacement ? { logoUrl, logoPlacement } : {}),
+  });
   logEvent({
     jobId,
     event: "pipeline_completed",
     durationMs: Date.now() - startTime,
   });
-  return { videoPath: `/temp/${jobId}${fileSuffix}.mp4`, cost: costTracker.getBreakdown() };
+  return {
+    videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
+    cost: costTracker.getBreakdown(),
+    qualityReport: qualityReportMain,
+  };
 }
