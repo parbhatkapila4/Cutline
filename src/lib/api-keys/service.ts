@@ -31,7 +31,7 @@ export async function insertApiKey(
 
 export async function validateApiKeyAndGetUserId(
   headerValue: string | null
-): Promise<{ userId: string } | null> {
+): Promise<{ userId: string; keyId: string } | null> {
   if (!isDatabaseConfigured()) return null;
   const raw = headerValue?.trim();
   if (!raw || !raw.startsWith("clk_")) return null;
@@ -44,5 +44,5 @@ export async function validateApiKeyAndGetUserId(
   if (!row) return null;
   if (hashKey(raw) !== row.key_hash) return null;
   await sql`UPDATE api_keys SET last_used_at = now() WHERE id = ${row.id}`;
-  return { userId: row.user_id };
+  return { userId: row.user_id, keyId: row.id };
 }
