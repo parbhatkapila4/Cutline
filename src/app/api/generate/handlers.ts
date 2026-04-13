@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { getVideoQueue, cancelJob, listRecentJobs, type VideoJobResult } from "@/lib/queue/videoQueue";
+import {
+  getVideoQueue,
+  cancelJob,
+  listRecentJobs,
+  getQueueWaitMetrics,
+  type VideoJobResult,
+} from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { getRequestIdFromRequest } from "@/lib/requestId";
 import { validateGenerateInput, validateJobId } from "@/lib/validation/input";
@@ -17,6 +23,9 @@ import { isDatabaseConfigured } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ensureInProcessWorkerStarted } from "@/lib/queue/autoStartWorker";
 import { validateApiKeyAndGetUserId } from "@/lib/api-keys/service";
+import { mergeRemixFromJob } from "@/lib/regen/remixFromJob";
+import { brandKitToPipelineFields, getBrandKitForUser } from "@/lib/brand-kits/service";
+import type { BrandColors } from "@/lib/assets/types";
 import fs from "fs";
 import path from "path";
 
@@ -67,17 +76,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     });
   }
   const identifier = getClientIdentifier(request);
-  const limit = await checkRateLimit(identifier, "generate");
-  if (!limit.allowed) {
-    const retryAfter = limit.retryAfter ?? 60;
-    return apiError({
-      code: ErrorCode.RATE_LIMITED,
-      message: "Too Many Requests",
-      status: 429,
-      details: { retryAfter },
-      headers: { ...headers, "Retry-After": String(retryAfter) },
-    });
-  }
 
   let body: unknown;
   try {
@@ -92,6 +90,52 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     });
   }
 
+  const fromApiKeyEarly = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
+  let userIdEarly: string | undefined;
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    userIdEarly = session?.user?.id != null ? String(session.user.id) : undefined;
+  } catch {
+    userIdEarly = undefined;
+  }
+  if (fromApiKeyEarly) {
+    userIdEarly = fromApiKeyEarly.userId;
+  }
+
+  const limit = fromApiKeyEarly
+    ? await checkRateLimit(`apk:${fromApiKeyEarly.keyId}`, "apiKeyGenerate")
+    : await checkRateLimit(identifier, "generate");
+  if (!limit.allowed) {
+    const retryAfter = limit.retryAfter ?? 60;
+    return apiError({
+      code: ErrorCode.RATE_LIMITED,
+      message: "Too Many Requests",
+      status: 429,
+      details: { retryAfter },
+      headers: { ...headers, "Retry-After": String(retryAfter) },
+    });
+  }
+
+  let bodyRecord = body != null && typeof body === "object" ? (body as Record<string, unknown>) : null;
+  let remixSourceJobId: string | undefined;
+  if (bodyRecord && typeof bodyRecord.remixFromJobId === "string" && bodyRecord.remixFromJobId.trim() !== "") {
+    const merged = await mergeRemixFromJob(bodyRecord, {
+      userId: userIdEarly,
+      request,
+    });
+    if (!merged.ok) {
+      return apiError({
+        code: ErrorCode.BAD_REQUEST,
+        message: merged.message,
+        status: 400,
+        headers,
+      });
+    }
+    bodyRecord = merged.merged;
+    remixSourceJobId = merged.remixFromJobId;
+    body = merged.merged;
+  }
+
   const validation = validateGenerateInput(body);
   if (!validation.success) {
     return apiError({
@@ -103,7 +147,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     });
   }
 
-  const data = validation.data;
+  let data = validation.data;
   const previewJobIdStr = data.previewJobId;
   const renderModeValid = data.renderMode;
 
@@ -147,16 +191,49 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
-  const fromApiKey = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
-  let userId: string | undefined;
-  try {
-    const session = await auth.api.getSession({ headers: request.headers });
-    userId = session?.user?.id != null ? String(session.user.id) : undefined;
-  } catch {
-    userId = undefined;
+  const fromApiKey = fromApiKeyEarly;
+  const userId = userIdEarly;
+
+  if (data.brandKitId && !userId) {
+    return apiError({
+      code: ErrorCode.AUTH_REQUIRED,
+      message: "brandKitId requires a signed-in user or API key.",
+      status: 401,
+      headers,
+    });
   }
-  if (fromApiKey) {
-    userId = fromApiKey.userId;
+
+  if (data.brandKitId && !isDatabaseConfigured()) {
+    return apiError({
+      code: ErrorCode.INTERNAL_ERROR,
+      message: "brandKitId requires a configured database.",
+      status: 503,
+      headers,
+    });
+  }
+
+  if (data.brandKitId && userId) {
+    const kit = await getBrandKitForUser(userId, data.brandKitId);
+    if (!kit) {
+      return apiError({
+        code: ErrorCode.BAD_REQUEST,
+        message: "Brand kit not found.",
+        status: 404,
+        headers,
+      });
+    }
+    const kf = brandKitToPipelineFields(kit);
+    const mergedColors: BrandColors | undefined =
+      kf.brandColors || data.brandColors
+        ? ({ ...kf.brandColors, ...data.brandColors } as BrandColors)
+        : undefined;
+    const mergedBrain =
+      kf.brandBrain || data.brandBrain ? { ...kf.brandBrain, ...data.brandBrain } : undefined;
+    data = {
+      ...data,
+      ...(mergedColors ? { brandColors: mergedColors } : {}),
+      ...(mergedBrain && Object.keys(mergedBrain).length ? { brandBrain: mergedBrain } : {}),
+    };
   }
 
   let anonFlow: Awaited<ReturnType<typeof runGenerationFlow>> | null = null;
@@ -254,6 +331,8 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(data.qualityGateMode ? { qualityGateMode: data.qualityGateMode } : {}),
       ...(data.regenFromJobId ? { regenFromJobId: data.regenFromJobId } : {}),
       ...(data.regenerateShotIds?.length ? { regenerateShotIds: data.regenerateShotIds } : {}),
+      ...(data.seriesId ? { seriesId: data.seriesId } : {}),
+      ...(remixSourceJobId ? { remixFromJobId: remixSourceJobId } : {}),
     };
 
     const anonJobId = anonFlow?.result.allowed ? anonFlow.result.job_id : undefined;
@@ -370,11 +449,22 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       videoUrl?: string;
       message?: string;
       error?: string;
+      failureCode?: string;
+      queuePosition?: number | null;
+      queueEtaSeconds?: number | null;
       isPreview?: boolean;
       cost?: { llm: number; tts: number; video: number; images: number; total: number };
       variations?: Array<{ videoUrl: string; cost?: { llm: number; tts: number; video: number; images: number; total: number } }>;
       qualityReport?: { passed: boolean; score: number; issues: string[] };
     } = { status };
+
+    if (status === "pending") {
+      const qm = await getQueueWaitMetrics(jobId);
+      if (qm) {
+        response.queuePosition = qm.queuePosition;
+        response.queueEtaSeconds = qm.queueEtaSeconds;
+      }
+    }
 
     if (status === "completed") {
       const result = job.returnvalue as VideoJobResult | undefined;
@@ -403,8 +493,9 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
     }
 
     if (status === "failed") {
-      const { getUserFriendlyErrorMessage } = await import("@/lib/utils/error");
+      const { getUserFriendlyErrorMessage, mapFailedReasonToFailureCode } = await import("@/lib/utils/error");
       response.error = getUserFriendlyErrorMessage(job.failedReason ?? "Job failed.");
+      response.failureCode = mapFailedReasonToFailureCode(job.failedReason);
     }
 
     return NextResponse.json(response, { headers: corsHeaders });
