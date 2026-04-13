@@ -9,7 +9,7 @@ import {
   getResetDate,
   DEFAULT_TOKENS,
 } from "@/lib/usage";
-import { calculateTokensFromCost, USD_PER_TOKEN } from "@/lib/cost/pricing";
+import { calculateTokensFromCost, estimateTokenCost, USD_PER_TOKEN } from "@/lib/cost/pricing";
 import { getUserPlan } from "@/lib/users/planService";
 
 function titleFromInput(input: string | undefined): string {
@@ -40,6 +40,19 @@ async function resolveDashboardIdentifier(request: Request): Promise<string | nu
 }
 
 export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const modeParam = url.searchParams.get("mode");
+  const durParam = url.searchParams.get("durationSeconds");
+  const estimateMode = modeParam === "talking_object" ? "talking_object" : "slideshow";
+  const estimateDuration =
+    durParam != null && durParam !== ""
+      ? Math.max(1, Math.min(600, Math.round(Number(durParam) || 30)))
+      : 30;
+  const estimatedTokensNextVideo = estimateTokenCost({
+    mode: estimateMode,
+    durationSeconds: estimateDuration,
+  });
+
   const rateLimitIdentifier = getClientIdentifier(request);
   const limit = await checkRateLimit(rateLimitIdentifier, "status");
   if (!limit.allowed) {
@@ -61,6 +74,11 @@ export async function GET(request: Request) {
         videosUsed: 0,
         apiCallsUsed: 0,
         resetDate: getResetDate(),
+        estimate: {
+          mode: estimateMode,
+          durationSeconds: estimateDuration,
+          estimatedTokens: estimatedTokensNextVideo,
+        },
         tokens: {
           unlimited: false,
           initialBalance: DEFAULT_TOKENS,
@@ -186,6 +204,11 @@ export async function GET(request: Request) {
       videosUsed,
       apiCallsUsed,
       resetDate: getResetDate(),
+      estimate: {
+        mode: estimateMode,
+        durationSeconds: estimateDuration,
+        estimatedTokens: estimatedTokensNextVideo,
+      },
       tokens: {
         unlimited: tokensUnlimited,
         initialBalance: tokenCapDisplay,
