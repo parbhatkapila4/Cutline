@@ -77,3 +77,16 @@ CREATE TABLE IF NOT EXISTS job_approvals (
   actor_user_id TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS brand_kits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  logo_url TEXT,
+  primary_color TEXT,
+  secondary_color TEXT,
+  banned_phrases TEXT[] NOT NULL DEFAULT '{}',
+  required_phrases TEXT[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_brand_kits_user_id ON brand_kits (user_id);
