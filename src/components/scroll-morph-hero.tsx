@@ -237,12 +237,12 @@ export default function IntroAnimation() {
         <div ref={containerRef} className="relative w-full h-full bg-[#FAFAFA] overflow-hidden">
             <div className="flex h-full w-full flex-col items-center justify-center perspective-1000">
 
-                <div className="absolute z-0 flex flex-col items-center justify-center text-center pointer-events-none top-1/2 -translate-y-1/2">
+                <div className="absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center justify-center px-4 text-center pointer-events-none sm:px-6">
                     <motion.h1
                         initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
                         animate={introPhase === "circle" && morphValue < 0.5 ? { opacity: 1 - morphValue * 2, y: 0, filter: "blur(0px)" } : { opacity: 0, filter: "blur(10px)" }}
                         transition={{ duration: 1 }}
-                        className="text-2xl font-medium tracking-tight text-gray-800 md:text-4xl"
+                        className="max-w-[min(20rem,calc(100vw-2.5rem))] text-balance text-[clamp(1.05rem,4.2vw+0.4rem,2.25rem)] font-medium leading-[1.15] tracking-tight text-gray-800 sm:max-w-[min(24rem,calc(100vw-3rem))] md:max-w-xl md:text-4xl md:leading-tight"
                     >
                         The future is built on AI.
                     </motion.h1>
@@ -250,7 +250,7 @@ export default function IntroAnimation() {
                         initial={{ opacity: 0 }}
                         animate={introPhase === "circle" && morphValue < 0.5 ? { opacity: 0.5 - morphValue } : { opacity: 0 }}
                         transition={{ duration: 1, delay: 0.2 }}
-                        className="mt-4 text-xs font-bold tracking-[0.2em] text-gray-500"
+                        className="mt-3 max-w-[min(18rem,calc(100vw-2.5rem))] text-[0.65rem] font-bold tracking-[0.18em] text-gray-500 sm:text-xs sm:tracking-[0.2em]"
                     >
                         SCROLL TO EXPLORE
                     </motion.p>
@@ -258,7 +258,7 @@ export default function IntroAnimation() {
 
                 <motion.div
                     style={{ opacity: contentOpacity, y: contentY }}
-                    className="absolute top-[10%] z-10 flex flex-col items-center justify-center text-center pointer-events-none px-4"
+                    className="absolute top-[10%] z-30 flex flex-col items-center justify-center text-center pointer-events-none px-4"
                 >
                     <h2 className="text-3xl md:text-5xl font-semibold text-gray-900 tracking-tight mb-4">
                         Explore Our Vision
@@ -269,7 +269,7 @@ export default function IntroAnimation() {
                     </p>
                 </motion.div>
 
-                <div className="relative flex items-center justify-center w-full h-full">
+                <div className="relative z-0 flex h-full w-full items-center justify-center">
                     {IMAGES.slice(0, TOTAL_IMAGES).map((src, i) => {
                         let target = { x: 0, y: 0, rotation: 0, scale: 1, opacity: 1 };
 
@@ -282,9 +282,11 @@ export default function IntroAnimation() {
                             target = { x: lineX, y: 0, rotation: 0, scale: 1, opacity: 1 };
                         } else {
                             const isMobile = containerSize.width < 768;
+                            const isNarrow = containerSize.width < 480;
                             const minDimension = Math.min(containerSize.width, containerSize.height);
 
-                            const circleRadius = Math.min(minDimension * 0.35, 350);
+                            const radiusFactor = isNarrow ? 0.44 : isMobile ? 0.4 : 0.35;
+                            const circleRadius = Math.min(minDimension * radiusFactor, 350);
 
                             const circleAngle = (i / TOTAL_IMAGES) * 360;
                             const circleRad = (circleAngle * Math.PI) / 180;
