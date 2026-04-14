@@ -2,6 +2,29 @@ import { betterAuth } from "better-auth";
 import { Pool } from "pg";
 
 const connectionString = process.env.DATABASE_URL;
+const pool =
+  connectionString != null && connectionString.trim() !== ""
+    ? new Pool({
+        connectionString,
+        max: 10,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 10_000,
+        allowExitOnIdle: true,
+        keepAlive: true,
+      })
+    : undefined;
+
+pool?.on("error", (err: Error & { code?: string }) => {
+  const code = err.code ?? "UNKNOWN";
+  const transient = code === "ECONNRESET" || code === "ETIMEDOUT" || code === "EPIPE";
+  if (transient) {
+    if (process.env.DB_DEBUG === "true") {
+      console.warn("[auth-db] transient pg pool connection error:", code);
+    }
+    return;
+  }
+  console.error("[auth-db] pg pool error:", code, err.message);
+});
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
@@ -12,7 +35,7 @@ export const auth = betterAuth({
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
   ],
-  database: connectionString ? new Pool({ connectionString }) : undefined,
+  database: pool,
   emailAndPassword: {
     enabled: true,
   },
