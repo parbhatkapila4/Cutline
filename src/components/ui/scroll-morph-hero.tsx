@@ -239,8 +239,15 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
 
   return (
     <div ref={containerRef} className="relative w-full h-full bg-[#FAFAFA] overflow-hidden">
-      <div className="flex h-full w-full flex-col items-center justify-center perspective-1000">
-        <div className="absolute z-0 flex flex-col items-center justify-center text-center pointer-events-none top-1/2 -translate-y-1/2">
+      <div
+        className="flex h-full w-full flex-col items-center justify-center perspective-1000"
+        style={{ transformStyle: "preserve-3d" }}
+      >
+        {/* z-50 + translateZ: Framer 3D transforms on cards otherwise paint over the headline */}
+        <div
+          className="absolute inset-x-0 top-1/2 z-50 flex flex-col items-center justify-center px-5 text-center pointer-events-none sm:px-8"
+          style={{ transform: "translateY(-50%) translateZ(120px)" }}
+        >
           <motion.h1
             initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
             animate={
@@ -249,9 +256,10 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
                 : { opacity: 0, filter: "blur(10px)" }
             }
             transition={{ duration: 1 }}
-            className="text-2xl font-medium tracking-tight text-gray-800 md:text-4xl"
+            className="text-balance font-medium leading-tight tracking-tight text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] max-w-[min(11rem,calc(100vw-4rem))] text-[clamp(0.875rem,4.5vw,1.2rem)] max-md:px-1 md:max-w-xl md:text-4xl"
           >
-            One sentence. A finished video.
+            <span className="md:hidden">One sentence.</span>
+            <span className="hidden md:inline">One sentence. A finished video.</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -261,7 +269,7 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
                 : { opacity: 0 }
             }
             transition={{ duration: 1, delay: 0.2 }}
-            className="mt-4 text-xs font-bold tracking-[0.2em] text-gray-500"
+            className="mt-2 max-w-[min(16rem,calc(100vw-3rem))] text-[0.6rem] font-bold tracking-[0.16em] text-gray-500 md:mt-3 md:text-xs md:tracking-[0.2em]"
           >
             SCROLL TO EXPLORE
           </motion.p>
@@ -269,7 +277,7 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
 
         <motion.div
           style={{ opacity: contentOpacity, y: contentY }}
-          className="absolute top-[10%] z-10 flex flex-col items-center justify-center text-center pointer-events-none px-4"
+          className="absolute top-[10%] z-30 flex flex-col items-center justify-center text-center pointer-events-none px-4"
         >
           <h2 className="text-3xl md:text-5xl font-semibold text-gray-900 tracking-tight mb-4">
             AI-directed video editing
@@ -281,7 +289,10 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
           </p>
         </motion.div>
 
-        <div className="relative flex items-center justify-center w-full h-full">
+        <div
+          className="relative z-0 flex h-full w-full items-center justify-center"
+          style={{ transform: "translateZ(0)" }}
+        >
           {IMAGES.slice(0, TOTAL_IMAGES).map((src, i) => {
             let target = { x: 0, y: 0, rotation: 0, scale: 1, opacity: 1 };
 
@@ -293,10 +304,16 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
               const lineX = i * lineSpacing - lineTotalWidth / 2;
               target = { x: lineX, y: 0, rotation: 0, scale: 1, opacity: 1 };
             } else {
-              const isMobile = containerSize.width < 768;
-              const minDimension = Math.min(containerSize.width, containerSize.height);
+              const cw = Math.max(containerSize.width, 1);
+              const ch = Math.max(containerSize.height, 1);
+              const isMobile = cw < 768;
+              const isNarrow = cw < 480;
+              const minDimension = Math.min(cw, ch);
 
-              const circleRadius = Math.min(minDimension * 0.35, 350);
+              // Push ring outward on small viewports; match md breakpoint used for headline.
+              const radiusFactor = isNarrow ? 0.52 : isMobile ? 0.46 : cw < 1024 ? 0.4 : 0.35;
+              const vwCap = cw * (isNarrow ? 0.46 : isMobile ? 0.42 : 0.38);
+              const circleRadius = Math.min(minDimension * radiusFactor, vwCap, 350);
               const circleAngle = (i / TOTAL_IMAGES) * 360;
               const circleRad = (circleAngle * Math.PI) / 180;
               const circlePos = {
@@ -305,9 +322,9 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
                 rotation: circleAngle + 90,
               };
 
-              const baseRadius = Math.min(containerSize.width, containerSize.height * 1.5);
+              const baseRadius = Math.min(cw, ch * 1.5);
               const arcRadius = baseRadius * (isMobile ? 1.4 : 1.1);
-              const arcApexY = containerSize.height * (isMobile ? 0.35 : 0.25);
+              const arcApexY = ch * (isMobile ? 0.35 : 0.25);
               const arcCenterY = arcApexY + arcRadius;
               const spreadAngle = isMobile ? 100 : 130;
               const startAngle = -90 - spreadAngle / 2;
@@ -324,14 +341,16 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
                 x: Math.cos(arcRad) * arcRadius + parallaxValue,
                 y: Math.sin(arcRad) * arcRadius + arcCenterY,
                 rotation: currentArcAngle + 90,
-                scale: isMobile ? 1.4 : 1.8,
+                scale: isMobile ? 1.25 : 1.8,
               };
+
+              const circleScaleBase = isNarrow ? 0.72 : isMobile ? 0.82 : 1;
 
               target = {
                 x: lerp(circlePos.x, arcPos.x, morphValue),
                 y: lerp(circlePos.y, arcPos.y, morphValue),
                 rotation: lerp(circlePos.rotation, arcPos.rotation, morphValue),
-                scale: lerp(1, arcPos.scale, morphValue),
+                scale: lerp(circleScaleBase, arcPos.scale, morphValue),
                 opacity: 1,
               };
             }
