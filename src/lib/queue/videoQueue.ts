@@ -27,6 +27,11 @@ import type { BrandColors } from "@/lib/assets/types";
 import type { Platform } from "@/lib/platform/types";
 import type { CostBreakdown } from "@/lib/cost/types";
 import type { AvatarSelection } from "@/lib/types/avatar";
+import type {
+  BrandBrainInput,
+  QualityReport,
+  ScriptFidelityMode,
+} from "@/lib/types/pipelineEnhancements";
 
 export type VideoJobData = {
   input: string;
@@ -47,6 +52,19 @@ export type VideoJobData = {
   platform?: Platform;
   aspectRatio?: string;
   callbackUrl?: string;
+  placeholders?: Record<string, string>;
+  brandBrain?: BrandBrainInput;
+  scriptFidelity?: ScriptFidelityMode;
+  strictScript?: string;
+  locale?: string;
+  ttsVoiceId?: string;
+  characterLockId?: string;
+  qualityGateMode?: "off" | "warn" | "fail";
+  regenFromJobId?: string;
+  regenerateShotIds?: string[];
+  /** Analytics / webhook: recurring series identifier */
+  seriesId?: string;
+  remixFromJobId?: string;
 };
 
 export type VideoJobVariation = {
@@ -60,6 +78,7 @@ export type VideoJobResult = {
   isPreview?: boolean;
   cost?: CostBreakdown;
   variations?: VideoJobVariation[];
+  qualityReport?: QualityReport;
 };
 
 export const CLEANUP_JOB_NAME = "cleanup";
@@ -96,6 +115,63 @@ export function getVideoQueue(): Queue<VideoJobData, VideoJobResult> {
       removeOnFail: { count: 500 },
     },
   });
+}
+
+const DEFAULT_AVG_JOB_SECONDS = 120;
+
+/**
+ * Rough queue position (1 = next after currently active batch) and ETA for waiting/delayed jobs.
+ */
+export async function getQueueWaitMetrics(jobId: string): Promise<{
+  queuePosition: number | null;
+  queueEtaSeconds: number | null;
+} | null> {
+  try {
+    const queue = getVideoQueue();
+    const job = await queue.getJob(jobId);
+    if (!job) return null;
+    const state = await job.getState();
+    const avgSec =
+      Number(process.env.QUEUE_AVG_JOB_SECONDS) > 0
+        ? Number(process.env.QUEUE_AVG_JOB_SECONDS)
+        : DEFAULT_AVG_JOB_SECONDS;
+
+    if (state === "active") {
+      return { queuePosition: null, queueEtaSeconds: 0 };
+    }
+    if (state === "waiting") {
+      const waiting = await queue.getWaiting(0, -1);
+      const idx = waiting.findIndex((j) => String(j.id) === String(jobId));
+      if (idx < 0) return { queuePosition: null, queueEtaSeconds: null };
+      const position = idx + 1;
+      return {
+        queuePosition: position,
+        queueEtaSeconds: Math.max(0, Math.round((position - 1) * avgSec)),
+      };
+    }
+    if (state === "delayed") {
+      const [waitingList, delayed] = await Promise.all([
+        queue.getWaiting(0, -1),
+        queue.getDelayed(0, -1),
+      ]);
+      const waitingCount = waitingList.length;
+      const idx = delayed.findIndex((j) => String(j.id) === String(jobId));
+      if (idx < 0) {
+        return {
+          queuePosition: waitingCount + 1,
+          queueEtaSeconds: Math.round(waitingCount * avgSec),
+        };
+      }
+      const position = waitingCount + idx + 1;
+      return {
+        queuePosition: position,
+        queueEtaSeconds: Math.max(0, Math.round((position - 1) * avgSec)),
+      };
+    }
+    return { queuePosition: null, queueEtaSeconds: null };
+  } catch {
+    return null;
+  }
 }
 
 export type JobSummary = {
@@ -223,7 +299,33 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         }
         return { videoPath: "" } as VideoJobResult;
       }
-      const { input, assetIds, brandColors, mode, durationSeconds, textModel, captions, talkingObjectStyle, avatar, renderMode, previewJobId, variationCount, platform, aspectRatio, requestId, callbackUrl } = job.data;
+      const {
+        input,
+        assetIds,
+        brandColors,
+        mode,
+        durationSeconds,
+        textModel,
+        captions,
+        talkingObjectStyle,
+        avatar,
+        renderMode,
+        previewJobId,
+        variationCount,
+        platform,
+        aspectRatio,
+        requestId,
+        callbackUrl,
+        brandBrain,
+        scriptFidelity,
+        strictScript,
+        locale,
+        ttsVoiceId,
+        characterLockId,
+        qualityGateMode,
+        regenFromJobId,
+        regenerateShotIds,
+      } = job.data;
       const jobId = job.id;
       if (!jobId) {
         throw new Error("Job has no id");
@@ -252,6 +354,15 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
           aspectRatio,
           requestId,
           job,
+          ...(brandBrain ? { brandBrain } : {}),
+          ...(scriptFidelity ? { scriptFidelity } : {}),
+          ...(strictScript ? { strictScript } : {}),
+          ...(locale ? { locale } : {}),
+          ...(ttsVoiceId ? { ttsVoiceId } : {}),
+          ...(characterLockId ? { characterLockId } : {}),
+          ...(qualityGateMode ? { qualityGateMode } : {}),
+          ...(regenFromJobId ? { regenFromJobId } : {}),
+          ...(regenerateShotIds?.length ? { regenerateShotIds } : {}),
         });
         return result;
       } catch (e) {
@@ -286,6 +397,15 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
             videoUrl: result?.variations?.[0]?.videoUrl ?? result?.videoPath,
             variations: result?.variations?.map((v) => ({ videoUrl: v.videoUrl })),
             completedAt: new Date().toISOString(),
+            ...(result?.qualityReport
+              ? {
+                qualityReport: {
+                  passed: result.qualityReport.passed,
+                  score: result.qualityReport.score,
+                  issues: result.qualityReport.issues,
+                },
+              }
+              : {}),
           },
         });
       });
