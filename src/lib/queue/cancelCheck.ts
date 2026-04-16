@@ -1,10 +1,11 @@
 import Redis from "ioredis";
+import { createManagedRedis } from "@/lib/redis/managedRedis";
 
 export const CANCELLED_JOBS_KEY = "cutline:job:cancelled";
 
 function getRedisConnection(): Redis {
   const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-  return new Redis(url, { maxRetriesPerRequest: null });
+  return createManagedRedis(url, { maxRetriesPerRequest: null });
 }
 
 export async function isJobCancelled(jobId: string): Promise<boolean> {
