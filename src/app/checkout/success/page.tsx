@@ -99,7 +99,7 @@ function SuccessContent() {
             <h1 className="text-2xl font-bold tracking-tight">Verification issue</h1>
             <p className="text-sm text-zinc-400 mt-3 leading-relaxed">{errorMsg}</p>
             <p className="text-xs text-zinc-500 mt-4">
-              If you were charged and still see this error, please contact support — we will resolve it promptly.
+              If you were charged and still see this error, please contact support. We will resolve it promptly.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Link
