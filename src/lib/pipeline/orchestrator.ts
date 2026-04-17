@@ -237,7 +237,7 @@ function splitScriptIntoChunks(
 const VEO_CHUNK_SECONDS = 8;
 const VEO_CHUNK_VALIDATE_RETRIES = 2;
 
-/** True only for capacity / throttling — not generic Veo failures (RAI, invalid video, etc.). */
+/** True only for capacity / throttling, not generic Veo failures (RAI, invalid video, etc.). */
 function isVeoQuotaOrRateLimitError(message: string): boolean {
   const m = message.toLowerCase();
   if (m.includes("veo api limit reached")) return true; // legacy wrapped messages
