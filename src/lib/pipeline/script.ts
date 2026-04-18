@@ -58,12 +58,12 @@ LOCALIZATION: Write every spoken line in the language/locale "${loc}" (natural n
   if (bb?.bannedPhrases?.length) {
     prompt += `
 
-BRAND POLICY — Do not use these phrases anywhere in dialogue: ${bb.bannedPhrases.map((p) => JSON.stringify(p)).join(", ")}`;
+BRAND POLICY: Do not use these phrases anywhere in dialogue: ${bb.bannedPhrases.map((p) => JSON.stringify(p)).join(", ")}`;
   }
   if (bb?.requiredPhrases?.length) {
     prompt += `
 
-BRAND POLICY — You must include each of these phrases verbatim somewhere in the spoken script: ${bb.requiredPhrases.map((p) => JSON.stringify(p)).join(", ")}`;
+BRAND POLICY: You must include each of these phrases verbatim somewhere in the spoken script: ${bb.requiredPhrases.map((p) => JSON.stringify(p)).join(", ")}`;
   }
   if (bb?.voiceTone?.trim()) {
     prompt += `
