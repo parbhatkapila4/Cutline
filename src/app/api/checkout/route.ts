@@ -53,7 +53,7 @@ export async function POST(request: Request) {
           currency: "usd",
           product_data: {
             name: `Cutline ${planConfig.label} Plan`,
-            description: `${planConfig.label} plan — AI video generation`,
+            description: `${planConfig.label} plan - automated video generation`,
           },
           unit_amount: planConfig.amountCents,
         },
