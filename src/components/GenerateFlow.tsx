@@ -420,7 +420,12 @@ export function GenerateFlow({ embedded = false }: Props) {
             </div>
           ) : null}
 
-          <video src={activeVideoUrl ?? undefined} controls playsInline className="w-full aspect-video bg-black" />
+          <video
+            src={activeVideoUrl ?? undefined}
+            controls
+            playsInline
+            className="w-full aspect-video bg-black object-cover"
+          />
 
           {submitError && isPreview && (
             <div className="px-5 py-2 border-t border-zinc-800 bg-red-500/10">
