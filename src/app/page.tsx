@@ -2821,7 +2821,6 @@ function HomeContent() {
           {/* ── Pixel-art flower garden ── */}
           <PixelFlowerGarden />
 
-          {/* ── Bottom bar ── */}
           <div className="border-t border-gray-100 px-6 py-4">
             <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-gray-400">
               <div className="flex items-center gap-5">
@@ -2829,8 +2828,8 @@ function HomeContent() {
                 <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy policy</Link>
               </div>
               <div className="flex items-center gap-5">
-                <span>Project by: <a href="https://www.linkedin.com/in/parbhat-kapila-a14264202/" target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-700 hover:text-gray-900 transition-colors">Parbhat</a></span>
-                <span>Powered by: <Link href="/" className="font-semibold text-gray-700 hover:text-gray-900 transition-colors">cutline</Link></span>
+                <Link href="/pricing" className="font-semibold text-gray-700 hover:text-gray-900 transition-colors">Pricing</Link>
+                <Link href="/features" className="font-semibold text-gray-700 hover:text-gray-900 transition-colors">Features</Link>
               </div>
             </div>
           </div>
