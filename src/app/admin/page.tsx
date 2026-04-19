@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CutlineLogo } from "@/components/brand/CutlineLogo";
 import { useState, useEffect, useCallback, Fragment } from "react";
 import type { JobTelemetry } from "@/lib/telemetry/types";
 
@@ -212,22 +213,10 @@ export default function AdminPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/"
-              className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-2"
+              className="text-sm text-zinc-400 hover:text-white transition-colors inline-flex items-center gap-2"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-              Back to home
+              <CutlineLogo size="sm" className="max-w-[120px] opacity-90" />
+              <span>Home</span>
             </Link>
             <a
               href="/api/admin/logout"
