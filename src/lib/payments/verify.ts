@@ -11,7 +11,7 @@ export type VerifyResult =
  * Verifies a Stripe checkout session, confirms the payment amount matches the
  * expected plan price, records completion in the `payments` table, and upgrades
  * the user's plan. Both the webhook and the client-side verify endpoint call
- * this function — the `payments.status` column makes it idempotent.
+ * this function; the `payments.status` column makes it idempotent.
  */
 export async function verifyAndUpgrade(sessionId: string): Promise<VerifyResult> {
   const stripe = getStripe();
