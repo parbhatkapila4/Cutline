@@ -70,7 +70,7 @@ export async function GET(request: Request) {
         plan: "free",
         planLabel: "Free",
         videosLimit: 1,
-        apiCallsLimit: 10_000,
+        apiCallsLimit: 1,
         videosUsed: 0,
         apiCallsUsed: 0,
         resetDate: getResetDate(),
