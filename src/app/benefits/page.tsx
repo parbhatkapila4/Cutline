@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 const WHAT_YOU_GET = [
   { title: "One MP4, 10-60 seconds", desc: "A single video file you can download or share. Duration is inferred from your prompt or set by you. No trimming or export steps." },
@@ -29,9 +30,10 @@ export default function BenefitsPage() {
     <div className="min-h-screen bg-black text-white">
       <Link
         href="/"
-        className="fixed top-4 left-4 z-10 text-sm text-zinc-400 hover:text-white transition-colors border border-white/20 rounded-lg px-3 py-2 hover:bg-white/5"
+        className="fixed top-4 left-4 z-10 inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors border border-white/20 rounded-lg px-3 py-2 hover:bg-white/5 bg-black/40 backdrop-blur-sm"
       >
-        Back to home
+        <CutlineLogo size="sm" className="max-w-[120px]" />
+        <span>Home</span>
       </Link>
       <main>
 
