@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import type { DashboardVideoItem } from "@/app/api/dashboard/videos/route";
 import { authClient } from "@/lib/auth-client";
+import { VideoCardFrame } from "@/components/dashboard/VideoCardFrame";
 
 type VideoStatus = "completed" | "processing" | "failed";
 
@@ -53,7 +54,7 @@ const DEFAULT_USAGE: UsageData = {
   plan: "free",
   planLabel: "Free",
   videosLimit: 1,
-  apiCallsLimit: 10_000,
+  apiCallsLimit: 1,
   videosUsed: 0,
   apiCallsUsed: 0,
   resetDate: "",
@@ -79,7 +80,6 @@ export default function DashboardPage() {
   const [usageError, setUsageError] = useState<string | null>(null);
   const [videoFilter, setVideoFilter] = useState<VideoStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const fetchVideos = useCallback(async () => {
     setVideosLoading(true);
@@ -149,8 +149,30 @@ export default function DashboardPage() {
     return matchStatus && matchSearch;
   });
 
+  const freeVideoCapReached =
+    !usageLoading &&
+    !usageError &&
+    usage.plan === "free" &&
+    usage.videosLimit != null &&
+    usage.videosUsed >= usage.videosLimit;
+
   return (
     <div className="h-screen overflow-hidden bg-black text-white flex flex-col">
+      {freeVideoCapReached ? (
+        <div className="shrink-0 z-20 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2.5 sm:px-6">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+            <p className="text-amber-100/95 leading-snug">
+              <span className="font-medium text-amber-200">Free plan:</span> you have used your included video for this month. You can still open and download videos below. Upgrade to create more.
+            </p>
+            <Link
+              href="/pricing"
+              className="shrink-0 inline-flex items-center justify-center rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 transition-colors w-fit"
+            >
+              Upgrade plan
+            </Link>
+          </div>
+        </div>
+      ) : null}
       <div className="flex flex-1 min-h-0 w-full">
         <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-white/10 h-full overflow-hidden py-6 px-4 bg-zinc-950/40 backdrop-blur-sm">
           <div className="flex flex-col flex-1 min-h-0 overflow-y-auto gap-6 scrollbar-hide">
@@ -572,14 +594,6 @@ export default function DashboardPage() {
                     </button>
                   ))}
                 </div>
-                <div className="flex rounded-lg border border-white/10 p-0.5 bg-zinc-900/60">
-                  <button type="button" onClick={() => setViewMode("grid")} className={`p-2 rounded-md transition-all ${viewMode === "grid" ? "bg-amber-400/15 text-amber-200 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.3)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"}`} title="Grid">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                  </button>
-                  <button type="button" onClick={() => setViewMode("list")} className={`p-2 rounded-md transition-all ${viewMode === "list" ? "bg-amber-400/15 text-amber-200 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.3)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"}`} title="List">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -626,56 +640,17 @@ export default function DashboardPage() {
                   Create your first video
                 </Link>
               </div>
-            ) : viewMode === "list" ? (
-              <div className="rounded-xl border border-white/10 bg-zinc-950 overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-white/5 text-left text-sm text-zinc-500">
-                      <th className="py-3 px-4 font-medium">Video</th>
-                      <th className="py-3 px-4 font-medium hidden sm:table-cell">Date</th>
-                      <th className="py-3 px-4 font-medium hidden md:table-cell">Duration</th>
-                      <th className="py-3 px-4 font-medium">Status</th>
-                      <th className="py-3 px-4 font-medium text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredVideos.map((v) => (
-                      <tr key={v.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                        <td className="py-3 px-4">
-                          <p className="font-medium text-white truncate max-w-[200px]">{v.title}</p>
-                          <p className="text-xs text-zinc-500 truncate max-w-[200px] md:hidden">{v.date} · {v.duration}</p>
-                        </td>
-                        <td className="py-3 px-4 text-zinc-400 text-sm hidden sm:table-cell">{v.date}</td>
-                        <td className="py-3 px-4 text-zinc-400 text-sm hidden md:table-cell">{v.duration}</td>
-                        <td className="py-3 px-4">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${statusStyles[v.status]}`}>
-                            {v.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex justify-end gap-1">
-                            <Link href={`/dashboard/videos/${v.id}`} className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 border border-white/10 hover:text-white hover:bg-white/5 transition-colors">View</Link>
-                            {v.status === "completed" && v.videoUrl ? (
-                              <a href={v.videoUrl} download className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-black bg-white hover:bg-zinc-200 transition-colors">Download</a>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
                 {filteredVideos.map((video) => (
                   <div key={video.id} className="rounded-xl border border-white/10 bg-zinc-950 overflow-hidden hover:border-white/20 transition-all duration-300 group hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-20px_rgba(0,0,0,0.9)]">
                     <Link href={`/dashboard/videos/${video.id}`} className="block">
-                      <div className="aspect-video bg-zinc-900 flex items-center justify-center relative overflow-hidden">
-                        <div className="pointer-events-none absolute inset-0 bg-linear-to-tr from-amber-400/5 via-transparent to-teal-400/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <svg className="w-14 h-14 text-zinc-700 group-hover:text-zinc-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className={`absolute top-3 right-3 px-2 py-0.5 rounded text-xs font-medium border ${statusStyles[video.status]}`}>
+                      <div className="aspect-video relative overflow-hidden bg-zinc-900">
+                        <div className="absolute inset-0">
+                          <VideoCardFrame videoUrl={video.videoUrl} status={video.status} />
+                        </div>
+                        <div className="pointer-events-none absolute inset-0 z-1 bg-linear-to-tr from-amber-400/5 via-transparent to-teal-400/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <span className={`absolute top-3 right-3 z-2 px-2 py-0.5 rounded text-xs font-medium border ${statusStyles[video.status]}`}>
                           {video.status}
                         </span>
                       </div>
