@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 export default function FeaturesPage() {
   return (
@@ -6,9 +7,10 @@ export default function FeaturesPage() {
       <div className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex justify-start">
         <Link
           href="/"
-          className="text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-4 py-2 rounded-lg transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
         >
-          Home page
+          <CutlineLogo size="sm" className="max-w-[140px]" />
+          <span>Home</span>
         </Link>
       </div>
 
