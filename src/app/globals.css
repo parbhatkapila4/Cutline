@@ -142,6 +142,33 @@ body {
   }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 @keyframes pulse-dot {
 
   0%,
@@ -473,6 +500,44 @@ html:has(.dashboard-root)::-webkit-scrollbar {
   }
 }
 
+/* ─── Skeleton: traveling sheen across surface ─── */
+@keyframes skeleton-sheen {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-block {
+  position: relative;
+  overflow: hidden;
+  background-color: rgb(39 39 42 / 0.55);
+  border-radius: 0.5rem;
+}
+
+.skeleton-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 35%,
+      rgba(251, 191, 36, 0.08) 50%,
+      rgba(255, 255, 255, 0.06) 65%,
+      transparent 100%);
+  transform: translateX(-100%);
+  animation: skeleton-sheen 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block::after {
+    animation: none;
+  }
+}
+
 /* ─── Hero (new) ─── */
 @keyframes hero-mesh {
 
@@ -677,6 +742,63 @@ html:has(.dashboard-root)::-webkit-scrollbar {
 
 .hero-frame-float {
   animation: hero-frame-float 5s ease-in-out infinite;
+}
+
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50%      { transform: scaleY(1); }
+}
+
+.wave-bar {
+  transform-origin: center;
+  animation: wave-bar 1.1s ease-in-out infinite;
+}
+
+@keyframes playhead-sweep {
+  0%   { left: 6%;  opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { left: 94%; opacity: 0; }
+}
+
+.playhead-sweep {
+  animation: playhead-sweep 4.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes live-dot {
+  0%, 100% { opacity: 1;   box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.6); }
+  50%      { opacity: 0.6; box-shadow: 0 0 0 5px rgba(244, 63, 94, 0); }
+}
+
+.live-dot {
+  animation: live-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes chip-float {
+  0%, 100% { transform: translateY(0)  rotate(-3deg); }
+  50%      { transform: translateY(-8px) rotate(-3deg); }
+}
+
+.chip-float {
+  animation: chip-float 4.5s ease-in-out infinite;
+}
+
+@keyframes chip-float-alt {
+  0%, 100% { transform: translateY(0)   rotate(4deg); }
+  50%      { transform: translateY(-10px) rotate(4deg); }
+}
+
+.chip-float-alt {
+  animation: chip-float-alt 5.2s ease-in-out infinite;
+}
+
+@keyframes scan-sweep {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.scan-sweep {
+  animation: scan-sweep 6s linear infinite;
 }
 
 @keyframes hero-glow-slow {
