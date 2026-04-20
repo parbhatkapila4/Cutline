@@ -3,8 +3,30 @@ import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData } from "@/lib/queue/
 import { validateJobId } from "@/lib/validation/input";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { interpretEdit } from "@/lib/edit/interpreter";
+import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
+import { auth } from "@/lib/auth";
+import { getUserPlan } from "@/lib/users/planService";
+import { isQuickEditPrompt } from "@/lib/dashboard/editQuickPrompts";
 
 type EditBody = { message?: unknown };
+
+/**
+ * Mirror of the list/detail authorization: jobs are stamped with
+ * `userId ?? anonSessionId ?? IP`, so we accept any of those candidates here.
+ */
+async function resolveOwnerCandidates(request: Request): Promise<string[]> {
+  const candidates: string[] = [];
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    const userId = session?.user?.id;
+    if (typeof userId === "string" && userId.trim()) candidates.push(userId);
+  } catch {
+  }
+  const anonId = getAnonSessionIdFromRequest(request);
+  if (anonId) candidates.push(anonId);
+  candidates.push(getClientIdentifier(request));
+  return candidates;
+}
 
 export async function POST(
   request: Request,
@@ -74,7 +96,12 @@ export async function POST(
 
     const data = job.data as VideoJobData | undefined;
     const clientId = data?.clientId;
-    if (clientId === undefined || clientId === null || clientId !== identifier) {
+    const ownerCandidates = await resolveOwnerCandidates(request);
+    if (
+      clientId === undefined ||
+      clientId === null ||
+      !ownerCandidates.includes(String(clientId))
+    ) {
       return NextResponse.json(
         { error: "Video not found" },
         { status: 404 }
@@ -88,6 +115,25 @@ export async function POST(
       return NextResponse.json(
         { error: "Video not found" },
         { status: 404 }
+      );
+    }
+
+    let sessionUserId: string | undefined;
+    try {
+      const session = await auth.api.getSession({ headers: request.headers });
+      const uid = session?.user?.id;
+      if (typeof uid === "string" && uid.trim()) sessionUserId = uid.trim();
+    } catch {
+      // treat as anonymous / free
+    }
+    const plan = await getUserPlan(sessionUserId);
+    if (plan.id === "free" && !isQuickEditPrompt(message)) {
+      return NextResponse.json(
+        {
+          error: "Custom edits require a paid plan. Pick a quick edit or upgrade.",
+          code: "CUSTOM_EDIT_REQUIRES_PLAN",
+        },
+        { status: 403 }
       );
     }
 
