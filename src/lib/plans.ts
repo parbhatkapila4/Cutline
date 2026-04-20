@@ -14,7 +14,7 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     id: "free",
     label: "Free",
     videosPerMonth: 1,
-    apiCallsPerMonth: 10_000,
+    apiCallsPerMonth: 1,
     tokensUnlimited: false,
   },
   beginner: {
@@ -42,5 +42,10 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
 
 export function isPlanId(value: string): value is PlanId {
   return value === "free" || value === "beginner" || value === "professional" || value === "enterprise";
+}
+
+/** Highest paid tier — hide “upgrade” CTAs (there is nothing above Enterprise). */
+export function isEnterprisePlan(plan: string | undefined | null): boolean {
+  return plan === "enterprise";
 }
 
