@@ -29,9 +29,9 @@ export async function mapStrictScriptToShots(
 Rules:
 - Split and assign the user's text across shots in order (shot order 1..N).
 - For shots with textDensity 0 in shotList, use null for text (silence).
-- For other shots, each entry.text must be copied verbatim from the user's script (only trim leading/trailing whitespace). You may split one sentence across shots only by cutting at natural clause boundaries—still using ONLY words from the user script.
+- For other shots, each entry.text must be copied verbatim from the user's script (only trim leading/trailing whitespace). You may split one sentence across shots only by cutting at natural clause boundaries, still using ONLY words from the user script.
 - Do not add hooks, CTAs, or sentences not present in the user script.
-- If the user script is too short for all speaking shots, repeat is NOT allowed—distribute what exists and leave later speaking shots with the minimal remaining substring (may be short).
+- If the user script is too short for all speaking shots, repeat is NOT allowed. Distribute what exists and leave later speaking shots with the minimal remaining substring (may be short).
 - Output JSON: { "entries": [ { "shotId", "text"|null, "order" } ] } with exactly one entry per shot in shot order.
 
 If impossible to satisfy without inventing text, still output best-effort assignment using ONLY substrings of the user script.`;
