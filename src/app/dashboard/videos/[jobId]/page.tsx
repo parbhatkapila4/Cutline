@@ -2,25 +2,77 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type ReactElement,
+  type FormEvent,
+} from "react";
 import type { DashboardVideoDetail } from "@/app/api/dashboard/videos/[jobId]/route";
 import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
+import { isEnterprisePlan, isPlanId, type PlanId } from "@/lib/plans";
+import {
+  EDIT_QUICK_PROMPTS,
+  isQuickEditPrompt,
+  type EditQuickPromptCategory,
+} from "@/lib/dashboard/editQuickPrompts";
 
 type ChatMessage = { role: "user" | "assistant"; text: string };
 
 const POLL_INTERVAL_MS = 2500;
-const DONE_MSG = "Done. Here's your updated video.";
-const EDIT_FAILED_MSG = "Couldn't start edit. Please try again.";
-const RATE_LIMIT_MSG = "Too many requests; try again later.";
+const DONE_MSG = "Done. Here is your updated video.";
+const EDIT_FAILED_MSG = "Could not start the edit. Please try again.";
+const RATE_LIMIT_MSG = "Too many requests. Try again in a minute.";
 
-const SUGGESTED_PROMPTS = [
-  "Make the tone more casual and friendly",
-  "Add more detail about the main topic",
-  "Make it shorter and punchier",
-  "Change to a more professional tone",
-  "Regenerate with a different angle",
-  "Add a clear call to action at the end",
-];
+const CATEGORY_META: Record<
+  EditQuickPromptCategory,
+  { label: string; ring: string; chip: string; icon: ReactElement }
+> = {
+  tone: {
+    label: "Tone",
+    ring: "border-amber-400/25 hover:border-amber-300/50 hover:bg-amber-500/8",
+    chip: "bg-amber-500/12 text-amber-200 border-amber-400/30",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.5a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41M12 2v2M12 20v2" />
+      </svg>
+    ),
+  },
+  length: {
+    label: "Length",
+    ring: "border-teal-400/25 hover:border-teal-300/50 hover:bg-teal-500/8",
+    chip: "bg-teal-500/12 text-teal-200 border-teal-400/30",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h10" />
+      </svg>
+    ),
+  },
+  structure: {
+    label: "Structure",
+    ring: "border-emerald-400/25 hover:border-emerald-300/50 hover:bg-emerald-500/8",
+    chip: "bg-emerald-500/12 text-emerald-200 border-emerald-400/30",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h12M3 18h6" />
+      </svg>
+    ),
+  },
+  angle: {
+    label: "Angle",
+    ring: "border-sky-400/25 hover:border-sky-300/50 hover:bg-sky-500/8",
+    chip: "bg-sky-500/12 text-sky-200 border-sky-400/30",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM12 8v4l2.5 1.5" />
+      </svg>
+    ),
+  },
+};
+
+const MAX_EDIT_CHARS = 280;
 
 export default function DashboardVideoDetailPage() {
   const params = useParams();
@@ -33,7 +85,29 @@ export default function DashboardVideoDetailPage() {
   const [inputValue, setInputValue] = useState("");
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
   const [editInProgress, setEditInProgress] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [usagePlan, setUsagePlan] = useState<PlanId | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Until usage loads, treat custom edits as unavailable (same as free). */
+  const canUseCustomEdits = usagePlan !== null && usagePlan !== "free";
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/dashboard/usage")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d: { plan?: string } | null) => {
+        if (cancelled || !d) return;
+        const p = typeof d.plan === "string" && isPlanId(d.plan) ? d.plan : "free";
+        setUsagePlan(p);
+      })
+      .catch(() => {
+        if (!cancelled) setUsagePlan("free");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!jobId) {
@@ -136,6 +210,16 @@ export default function DashboardVideoDetailPage() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || editInProgress) return;
+      if (!canUseCustomEdits && !isQuickEditPrompt(trimmed)) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text: "Custom edits are included on paid plans. Use a quick edit above, or see Pricing to upgrade.",
+          },
+        ]);
+        return;
+      }
       setMessages((prev) => [...prev, { role: "user", text: trimmed }]);
       setInputValue("");
       setEditInProgress(true);
@@ -152,9 +236,11 @@ export default function DashboardVideoDetailPage() {
           const chatMsg =
             res.status === 429
               ? RATE_LIMIT_MSG
-              : typeof data?.error === "string"
-                ? `${EDIT_FAILED_MSG} ${getUserFriendlyErrorMessage(data.error)}`
-                : EDIT_FAILED_MSG;
+              : res.status === 403 && data?.code === "CUSTOM_EDIT_REQUIRES_PLAN"
+                ? "Custom edits are included on paid plans. Use a quick edit above, or see Pricing to upgrade."
+                : typeof data?.error === "string"
+                  ? `${EDIT_FAILED_MSG} ${getUserFriendlyErrorMessage(data.error)}`
+                  : EDIT_FAILED_MSG;
           setMessages((prev) => [...prev, { role: "assistant", text: chatMsg }]);
           setEditInProgress(false);
           return;
@@ -173,236 +259,656 @@ export default function DashboardVideoDetailPage() {
         setEditInProgress(false);
       }
     },
-    [jobId, editInProgress, pollNewJob]
+    [jobId, editInProgress, pollNewJob, canUseCustomEdits]
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     sendEditMessage(inputValue);
   };
 
-  return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+  const handleCopyLink = useCallback(async () => {
+    const url = currentVideoUrl ?? video?.videoUrl;
+    if (!url) return;
+    try {
+      const absolute = url.startsWith("http") ? url : `${window.location.origin}${url}`;
+      await navigator.clipboard.writeText(absolute);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+    }
+  }, [currentVideoUrl, video?.videoUrl]);
 
-      <div className="fixed inset-0 bg-gradient-to-br from-zinc-950 via-zinc-950 to-zinc-900/80 pointer-events-none" aria-hidden="true" />
-      <header className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/80">
-        <div className="w-full h-14 px-6 lg:px-10 flex items-center justify-between max-w-7xl mx-auto">
-          <Link href="/" className="font-semibold text-white tracking-tight text-lg">
-            cutline
-          </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm">
-            <Link href="/features" className="text-zinc-400 hover:text-white transition-colors">Features</Link>
-            <Link href="/#how" className="text-zinc-400 hover:text-white transition-colors">How it works</Link>
-            <Link href="/#faq" className="text-zinc-400 hover:text-white transition-colors">FAQ</Link>
-            <Link href="/dashboard" className="text-white font-medium">Dashboard</Link>
-          </nav>
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <div
+        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 bg-linear-to-br from-zinc-950 via-black to-zinc-950" />
+        <div
+          className="absolute -top-40 -right-32 h-[480px] w-[480px] rounded-full bg-amber-500/10 blur-3xl opacity-70"
+        />
+        <div
+          className="absolute -bottom-40 -left-32 h-[420px] w-[420px] rounded-full bg-teal-500/10 blur-3xl opacity-60"
+        />
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+          }}
+        />
+      </div>
+
+      <main className="relative w-full pt-6 sm:pt-8 pb-20">
+        <div className="w-full px-4 sm:px-6 lg:px-10 mb-5 sm:mb-6 flex justify-start">
           <Link
             href="/dashboard"
-            className="text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+            className="group relative inline-flex items-center gap-2.5 rounded-full border border-white/12 bg-white/5 backdrop-blur-md pl-2 pr-4 py-2 text-sm font-medium text-zinc-200 hover:text-white hover:border-amber-400/40 hover:bg-amber-500/8 transition-all duration-200 shadow-lg shadow-black/30"
+            aria-label="Back to dashboard"
           >
-            Back to my videos
+            <span className="relative flex items-center justify-center w-7 h-7 rounded-full bg-white text-black shadow-md shadow-black/40 transition-transform duration-200 group-hover:-translate-x-0.5">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </span>
+            <span className="leading-none">Back to dashboard</span>
+            <span
+              className="pointer-events-none absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-linear-to-r from-amber-400/0 via-amber-400/10 to-transparent"
+              aria-hidden="true"
+            />
           </Link>
         </div>
-      </header>
-
-      <main className="relative pt-14 pb-20 px-6 lg:px-10 max-w-7xl mx-auto">
+        <div className="px-4 sm:px-6 lg:px-10 max-w-7xl mx-auto">
         {loading ? (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-20 text-center shadow-2xl shadow-black/30">
-            <div className="w-14 h-14 mx-auto rounded-full border-2 border-zinc-600 border-t-white animate-spin mb-6" />
-            <p className="text-zinc-300 font-medium text-lg">Loading video...</p>
-            <p className="text-sm text-zinc-500 mt-2">Fetching your video details</p>
-          </div>
-        ) : notFound || !video ? (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-20 text-center shadow-2xl shadow-black/30">
-            <div className="w-20 h-20 mx-auto rounded-full bg-zinc-800 flex items-center justify-center mb-6 ring-4 ring-zinc-700/50">
-              <svg className="w-10 h-10 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Video not found</h2>
-            <p className="text-sm text-zinc-500 mb-8 max-w-sm mx-auto">This job may have been removed or the link is invalid.</p>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to my videos
-            </Link>
-          </div>
-        ) : (
-          <div className="md:grid md:grid-cols-[1fr,380px] lg:grid-cols-[1fr,420px] md:gap-6 lg:gap-8 md:items-start min-w-0">
-
-            <section id="edit-section" className="md:order-2 min-w-0 rounded-2xl border-2 border-emerald-500/40 bg-zinc-900/90 overflow-hidden shadow-2xl shadow-black/40 ring-1 ring-emerald-500/20 flex flex-col min-h-[380px] lg:min-h-[calc(100vh-8rem)] scroll-mt-24 z-10">
-              <div className="px-5 py-4 border-b border-zinc-800 bg-linear-to-r from-zinc-800/60 to-zinc-800/30">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
+          <div
+            className="md:grid md:grid-cols-[1fr,400px] lg:grid-cols-[1fr,440px] md:gap-6 lg:gap-8 md:items-start min-w-0"
+            role="status"
+            aria-live="polite"
+            aria-label="Loading your video"
+          >
+            <div className="md:order-1 min-w-0 overflow-hidden">
+              <article className="rounded-2xl border border-white/10 bg-zinc-950/80 overflow-hidden shadow-2xl shadow-black/40">
+                <div className="relative aspect-video bg-zinc-900">
+                  <div className="skeleton-block absolute inset-0 rounded-none" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="relative h-12 w-12 rounded-full border border-white/10 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                      <span className="absolute inset-0 rounded-full border border-amber-400/30 animate-ping" />
+                      <svg
+                        className="h-5 w-5 text-amber-300/90"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="font-semibold text-white text-lg">Edit with AI</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Ask for changes - we’ll regenerate the video.</p>
+                  <div className="absolute top-3 right-3 h-6 w-20 rounded-full skeleton-block" />
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 rounded-full skeleton-block" />
+                    <div className="h-3 w-10 rounded-md skeleton-block" />
+                  </div>
+                </div>
+
+                <div className="p-5 sm:p-6 border-t border-white/10 space-y-4">
+                  <div className="space-y-2">
+                    <div className="h-5 w-3/4 max-w-[420px] skeleton-block" />
+                    <div className="h-3.5 w-11/12 max-w-[520px] skeleton-block" />
+                    <div className="h-3.5 w-2/3 max-w-[360px] skeleton-block" />
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="h-7 w-24 rounded-lg skeleton-block" />
+                    <div className="h-7 w-16 rounded-lg skeleton-block" />
+                    <div className="h-7 w-20 rounded-lg skeleton-block" />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                    <div className="h-10 w-full sm:w-40 rounded-xl skeleton-block" />
+                    <div className="h-10 w-full sm:w-32 rounded-xl skeleton-block" />
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <section className="md:order-2 min-w-0 mt-6 md:mt-0 rounded-2xl border border-white/10 bg-zinc-950/80 overflow-hidden shadow-2xl shadow-black/40 flex flex-col min-h-[420px] lg:min-h-[calc(100vh-9rem)]">
+              <div className="px-5 py-4 border-b border-white/10 bg-linear-to-r from-amber-500/8 via-transparent to-teal-500/8">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl skeleton-block" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-4 w-32 skeleton-block" />
+                    <div className="h-3 w-48 max-w-[60%] skeleton-block" />
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col flex-1 min-h-0">
-                <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-[220px]">
-                  {messages.length === 0 ? (
-                    <div className="space-y-5">
-                      <p className="text-sm text-zinc-400 font-medium">Try asking for a change:</p>
-                      <div className="grid gap-2">
-                        {SUGGESTED_PROMPTS.map((prompt, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => sendEditMessage(prompt)}
-                            disabled={editInProgress}
-                            className="text-left w-full px-4 py-3 rounded-xl border border-zinc-700 bg-zinc-800/50 text-zinc-300 text-sm hover:border-zinc-600 hover:bg-zinc-800 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {prompt}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-zinc-500 pt-2">Or type your own request below.</p>
-                    </div>
-                  ) : (
-                    <>
-                      {messages.map((msg, i) => (
-                        <div
-                          key={i}
-                          className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                        >
-                          <div
-                            className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === "user"
-                              ? "bg-white text-zinc-900 rounded-br-md shadow-lg"
-                              : "bg-zinc-800 text-zinc-200 border border-zinc-700/50 rounded-bl-md"
-                              }`}
-                          >
-                            {msg.text}
-                          </div>
-                        </div>
-                      ))}
-                      {editInProgress && (
-                        <div className="flex justify-start">
-                          <div className="inline-flex items-center gap-3 rounded-2xl rounded-bl-md px-4 py-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-sm">
-                            <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
-                            <span>Regenerating your video…</span>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+                <div className="flex-1 overflow-hidden p-5 space-y-4">
+                  <div className="h-3 w-32 skeleton-block" />
+                  <div className="grid gap-2">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className="h-10 rounded-xl skeleton-block"
+                        style={{
+                          width: `${88 - i * 6}%`,
+                          opacity: 1 - i * 0.07,
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-4 sm:p-5 border-t border-zinc-800 bg-zinc-800/30 shrink-0">
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      placeholder="e.g. “Change the tone” or “Add a section about…”"
-                      disabled={editInProgress}
-                      className="flex-1 min-w-0 rounded-xl bg-zinc-800 border border-zinc-700 px-4 py-3 text-white placeholder:text-zinc-500 text-sm focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!inputValue.trim() || editInProgress}
-                      className="shrink-0 px-5 py-3 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-2"
-                    >
-                      {editInProgress ? (
-                        <>
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                          Sending
-                        </>
-                      ) : (
-                        <>
-                          Send
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                          </svg>
-                        </>
-                      )}
-                    </button>
+                <div className="p-3.5 sm:p-4 border-t border-white/10 bg-black/40 shrink-0">
+                  <div className="flex gap-2.5">
+                    <div className="h-11 flex-1 rounded-xl skeleton-block" />
+                    <div className="h-11 w-20 rounded-xl skeleton-block" />
                   </div>
-                </form>
+                </div>
               </div>
             </section>
-
-
-            <div className="md:order-1 min-w-0 overflow-hidden mt-6 md:mt-0">
-              <nav className="pt-0 md:pt-6 pb-4" aria-label="Breadcrumb">
-                <ol className="flex items-center gap-2 text-sm flex-wrap">
-                  <li>
-                    <Link href="/dashboard" className="text-zinc-500 hover:text-white transition-colors">
-                      Dashboard
-                    </Link>
-                  </li>
-                  <li className="text-zinc-600" aria-hidden="true">/</li>
-                  <li className="text-white font-medium max-w-[min(100%,320px)] truncate sm:max-w-none sm:line-clamp-2" title={video.title}>
-                    {video.title || "Video"}
-                  </li>
-                </ol>
-              </nav>
-              <article className="rounded-2xl border border-zinc-800 bg-zinc-900/80 overflow-hidden shadow-xl shadow-black/20 ring-1 ring-white/5">
-                <div className="relative aspect-video bg-black">
-                  <video
-                    key={currentVideoUrl ?? video.videoUrl}
-                    src={currentVideoUrl ?? video.videoUrl}
-                    controls
-                    playsInline
-                    className="w-full h-full object-contain"
-                  />
-                  <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shadow-lg shadow-black/20">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      {video.status}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-5 sm:p-6 border-t border-zinc-800">
-                  <h1 className="text-xl font-semibold text-white leading-snug line-clamp-2" title={video.title}>
-                    {video.title || "Untitled video"}
-                  </h1>
-                  <p className="mt-2 text-sm text-zinc-400 line-clamp-2" title={video.prompt}>
-                    {video.prompt}
-                  </p>
-                  <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800/80 text-zinc-400 text-xs font-medium">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        {video.date}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800/80 text-zinc-400 text-xs font-medium">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        {video.duration}
-                      </span>
-                    </div>
-                    <a
-                      href={currentVideoUrl ?? video.videoUrl}
-                      download={`cutline-${jobId}.mp4`}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-black/20 w-full sm:w-auto sm:ml-auto shrink-0"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download MP4
-                    </a>
-                  </div>
-                </div>
-              </article>
+            <span className="sr-only">Loading your video and edit panel</span>
+          </div>
+        ) : notFound || !video ? (
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/80 p-12 sm:p-16 text-center shadow-2xl shadow-black/40">
+            <div className="w-16 h-16 mx-auto rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center mb-5">
+              <svg className="w-8 h-8 text-amber-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-white mb-1.5">Video not found</h2>
+            <p className="text-sm text-zinc-500 mb-7 max-w-sm mx-auto leading-relaxed">
+              This render may have expired, been removed, or belongs to a different account. Sign in with the account that created it, or head back to your library.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to my videos
+              </Link>
+              <Link
+                href="/create"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-white/15 text-white font-semibold text-sm hover:bg-white/5 transition-colors"
+              >
+                Create a new video
+              </Link>
             </div>
           </div>
+        ) : (
+          <>
+            <div className="md:grid md:grid-cols-[1fr,400px] lg:grid-cols-[1fr,440px] md:gap-6 lg:gap-8 md:items-start min-w-0">
+              <div className="md:order-1 min-w-0 overflow-hidden">
+                <article className="rounded-2xl border border-white/10 bg-zinc-950/80 overflow-hidden shadow-2xl shadow-black/40">
+                  <div className="relative aspect-video bg-black">
+                    <video
+                      key={currentVideoUrl ?? video.videoUrl}
+                      src={currentVideoUrl ?? video.videoUrl}
+                      controls
+                      playsInline
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                    <div className="absolute top-3 right-3">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Ready
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-5 sm:p-6 border-t border-white/10">
+                    <h1 className="text-lg sm:text-xl font-semibold text-white leading-snug line-clamp-2" title={video.title}>
+                      {video.title || "Untitled video"}
+                    </h1>
+                    {video.prompt ? (
+                      <p
+                        className="mt-2 text-sm text-zinc-400 leading-relaxed line-clamp-3"
+                        title={video.prompt}
+                      >
+                        {video.prompt}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-4 flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-300 text-xs font-medium">
+                        <svg className="w-3.5 h-3.5 text-amber-400/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        {video.date}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-300 text-xs font-medium">
+                        <svg className="w-3.5 h-3.5 text-teal-400/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {video.duration}
+                      </span>
+                      {video.mode ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-300 text-xs font-medium capitalize">
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                          {video.mode === "talking_object" ? "Talking" : "Slideshow"}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-5 flex flex-col sm:flex-row gap-2.5">
+                      <a
+                        href={currentVideoUrl ?? video.videoUrl}
+                        download={`cutline-${jobId}.mp4`}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-black/30"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download MP4
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-white font-semibold text-sm hover:bg-white/5 transition-colors"
+                      >
+                        {copied ? (
+                          <>
+                            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Link copied
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m-1.656 3.656a4 4 0 01-5.656-5.656l3-3a4 4 0 015.656 5.656" />
+                            </svg>
+                            Copy link
+                          </>
+                        )}
+                      </button>
+                      <a
+                        href="#edit-section"
+                        className="inline-flex md:hidden items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 font-semibold text-sm hover:bg-amber-500/15 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit with AI
+                      </a>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <section
+                id="edit-section"
+                className="md:order-2 min-w-0 mt-6 md:mt-0 rounded-2xl border border-white/10 bg-zinc-950/80 overflow-hidden shadow-2xl shadow-black/40 flex flex-col min-h-[460px] lg:min-h-[calc(100vh-9rem)] scroll-mt-24 relative"
+              >
+                <div
+                  className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-amber-500/8 blur-3xl"
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-teal-500/8 blur-3xl"
+                  aria-hidden
+                />
+
+                <div className="relative px-5 py-4 border-b border-white/10 bg-linear-to-r from-amber-500/10 via-transparent to-teal-500/10">
+                  <div className="flex items-start gap-3">
+                    <div className="relative shrink-0">
+                      <div className="absolute inset-0 rounded-xl bg-amber-400/20 blur-md" aria-hidden />
+                      <div className="relative w-10 h-10 rounded-xl bg-linear-to-br from-amber-500/25 to-orange-500/15 border border-amber-400/30 flex items-center justify-center">
+                        <svg
+                          className="w-5 h-5 text-amber-200"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="font-semibold text-white text-base leading-tight">Edit with AI</h2>
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-emerald-500/12 text-emerald-300 border border-emerald-500/25">
+                          <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                          Live
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                        Describe a change. We re-render and replace the video right here.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative flex flex-col flex-1 min-h-0">
+                  <div className="flex-1 overflow-y-auto p-5 min-h-[220px]">
+                    {messages.length === 0 ? (
+                      <div className="space-y-5">
+                        <div className="rounded-xl border border-white/8 bg-white/3 p-3.5">
+                          <div className="flex items-start gap-2.5">
+                            <svg
+                              className="w-4 h-4 mt-0.5 text-amber-300 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.8}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-xs text-zinc-400 leading-relaxed">
+                              <span className="text-zinc-200 font-medium">Be specific.</span>{" "}
+                              You can change tone, length, structure, or angle. Each edit creates a fresh render so the original stays intact.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">Quick edits</p>
+                            <div className="flex-1 h-px bg-linear-to-r from-white/10 to-transparent" />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {EDIT_QUICK_PROMPTS.map((prompt, i) => {
+                              const meta = CATEGORY_META[prompt.category];
+                              return (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => sendEditMessage(prompt.text)}
+                                  disabled={editInProgress}
+                                  className={`group text-left p-3 rounded-xl border bg-zinc-950/60 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-18px_rgba(0,0,0,0.9)] ${meta.ring}`}
+                                >
+                                  <div className="flex items-center justify-between gap-2 mb-2">
+                                    <span
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide border ${meta.chip}`}
+                                    >
+                                      {meta.icon}
+                                      {meta.label}
+                                    </span>
+                                    <svg
+                                      className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-300 group-hover:translate-x-0.5 transition-all"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  </div>
+                                  <p className="text-[13px] text-zinc-300 group-hover:text-white transition-colors leading-snug">
+                                    {prompt.text}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {canUseCustomEdits ? (
+                          <div className="flex items-center gap-2 pt-1">
+                            <div className="flex-1 h-px bg-white/8" />
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-600 font-medium">
+                              Or write your own
+                            </p>
+                            <div className="flex-1 h-px bg-white/8" />
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {messages.map((msg, i) => (
+                          <div
+                            key={i}
+                            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                          >
+                            <div
+                              className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                                msg.role === "user"
+                                  ? "bg-white text-black rounded-br-md shadow-lg shadow-black/30"
+                                  : "bg-white/5 text-zinc-200 border border-white/10 rounded-bl-md"
+                              }`}
+                            >
+                              {msg.text}
+                            </div>
+                          </div>
+                        ))}
+                        {editInProgress && (
+                          <div className="flex justify-start">
+                            <div className="inline-flex items-center gap-2.5 rounded-2xl rounded-bl-md px-3.5 py-2.5 bg-amber-500/10 border border-amber-500/25 text-amber-200 text-sm">
+                              <svg className="w-4 h-4 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              <span>Regenerating your video</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {canUseCustomEdits ? (
+                    <form
+                      onSubmit={handleSubmit}
+                      className="p-3.5 sm:p-4 border-t border-white/10 bg-black/50 backdrop-blur-sm shrink-0"
+                    >
+                      <div
+                        className={`group rounded-2xl border bg-zinc-950 transition-all duration-200 overflow-hidden ${
+                          editInProgress
+                            ? "border-amber-500/30"
+                            : inputValue.trim()
+                              ? "border-amber-400/40 shadow-[0_0_0_3px_rgba(251,191,36,0.08)]"
+                              : "border-white/10 hover:border-white/20 focus-within:border-amber-400/40 focus-within:shadow-[0_0_0_3px_rgba(251,191,36,0.08)]"
+                        }`}
+                      >
+                        <textarea
+                          value={inputValue}
+                          onChange={(e) => {
+                            if (e.target.value.length <= MAX_EDIT_CHARS) {
+                              setInputValue(e.target.value);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              void sendEditMessage(inputValue);
+                            }
+                          }}
+                          rows={2}
+                          placeholder="e.g. Make the intro punchier and add a CTA at the end..."
+                          disabled={editInProgress}
+                          className="block w-full resize-none bg-transparent border-0 px-3.5 pt-3 pb-1.5 text-white placeholder:text-zinc-500 text-sm leading-relaxed focus:outline-none focus:ring-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                        />
+                        <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5 pt-1">
+                          <div className="flex items-center gap-2 text-[11px] text-zinc-500 pl-1.5">
+                            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] font-medium text-zinc-400">
+                              ↵ Enter
+                            </kbd>
+                            <span className="hidden sm:inline">to send</span>
+                            <span
+                              className={`tabular-nums ml-auto sm:ml-2 transition-colors ${
+                                inputValue.length >= MAX_EDIT_CHARS - 30
+                                  ? "text-amber-300"
+                                  : "text-zinc-600"
+                              }`}
+                            >
+                              {inputValue.length}/{MAX_EDIT_CHARS}
+                            </span>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={!inputValue.trim() || editInProgress}
+                            className="shrink-0 px-3.5 py-2 rounded-xl bg-linear-to-br from-white to-zinc-200 text-black font-semibold text-sm hover:from-white hover:to-white disabled:opacity-40 disabled:cursor-not-allowed transition-all inline-flex items-center justify-center gap-1.5 shadow-lg shadow-black/30"
+                          >
+                            {editInProgress ? (
+                              <>
+                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                <span>Sending</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Send</span>
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
+                                </svg>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="p-3.5 sm:p-4 border-t border-white/10 bg-black/50 backdrop-blur-sm shrink-0">
+                      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-linear-to-br from-zinc-950 via-zinc-950 to-zinc-900">
+                        {/* atmospheric glows */}
+                        <div
+                          className="pointer-events-none absolute -top-16 -right-12 h-40 w-40 rounded-full bg-amber-400/14 blur-3xl"
+                          aria-hidden
+                        />
+                        <div
+                          className="pointer-events-none absolute -bottom-20 -left-16 h-44 w-44 rounded-full bg-orange-500/10 blur-3xl"
+                          aria-hidden
+                        />
+                        {/* subtle grid */}
+                        <div
+                          className="pointer-events-none absolute inset-0 opacity-[0.06]"
+                          aria-hidden
+                          style={{
+                            backgroundImage:
+                              "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
+                            backgroundSize: "22px 22px",
+                          }}
+                        />
+                        {/* gradient hairline at top */}
+                        <div
+                          className="pointer-events-none absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-amber-400/45 to-transparent"
+                          aria-hidden
+                        />
+
+                        <div className="relative p-4 sm:p-5">
+                          <div className="flex items-start gap-3.5">
+                            <div className="relative shrink-0">
+                              <div className="absolute inset-0 rounded-xl bg-amber-400/25 blur-md" aria-hidden />
+                              <div className="relative w-10 h-10 rounded-xl bg-linear-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-900/30">
+                                <svg
+                                  className="w-[18px] h-[18px] text-zinc-950"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth={2.2}
+                                  aria-hidden
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M16 11V8a4 4 0 10-8 0v3M6 11h12a1 1 0 011 1v8a1 1 0 01-1 1H6a1 1 0 01-1-1v-8a1 1 0 011-1z"
+                                  />
+                                </svg>
+                              </div>
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="text-[15px] font-semibold text-white leading-tight">
+                                  Write your own edits
+                                </h3>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-400/15 text-amber-200 border border-amber-400/30">
+                                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                                    <path d="M12 2l2.39 7.36H22l-6.19 4.5L18.2 21 12 16.5 5.8 21l2.39-7.14L2 9.36h7.61z" />
+                                  </svg>
+                                  Pro
+                                </span>
+                              </div>
+                              <p className="text-[12.5px] text-zinc-400 mt-1 leading-relaxed">
+                                Describe any change in your own words. Quick edits stay free.
+                              </p>
+                            </div>
+                          </div>
+
+                          <ul className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {[
+                              { label: "Custom prompts", color: "amber" as const },
+                              { label: "Unlimited rewrites", color: "teal" as const },
+                              { label: "Higher monthly cap", color: "emerald" as const },
+                            ].map((item) => (
+                              <li
+                                key={item.label}
+                                className="flex items-center gap-2 rounded-lg border border-white/8 bg-white/3 px-2.5 py-1.5"
+                              >
+                                <span
+                                  className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full ${
+                                    item.color === "amber"
+                                      ? "bg-amber-400/15 text-amber-300"
+                                      : item.color === "teal"
+                                        ? "bg-teal-400/15 text-teal-300"
+                                        : "bg-emerald-400/15 text-emerald-300"
+                                  }`}
+                                >
+                                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.5} aria-hidden>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </span>
+                                <span className="text-[11.5px] font-medium text-zinc-300 truncate">
+                                  {item.label}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+
+                          {!isEnterprisePlan(usagePlan) ? (
+                            <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2.5">
+                              <Link
+                                href="/pricing"
+                                className="group/btn relative inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-zinc-950 bg-linear-to-br from-amber-300 via-amber-400 to-amber-500 shadow-lg shadow-amber-900/30 hover:shadow-amber-700/40 hover:-translate-y-0.5 transition-all overflow-hidden"
+                              >
+                                <span className="absolute inset-0 -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700 bg-linear-to-r from-transparent via-white/35 to-transparent" />
+                                <span className="relative">Upgrade to unlock</span>
+                                <svg
+                                  className="relative w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2.4}
+                                  aria-hidden
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
+                                </svg>
+                              </Link>
+                              <Link
+                                href="/pricing"
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-[12.5px] font-medium text-zinc-400 hover:text-white transition-colors"
+                              >
+                                See what is included
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                              </Link>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          </>
         )}
+        </div>
       </main>
     </div>
   );

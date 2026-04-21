@@ -166,6 +166,15 @@ const PROMPT_CHIPS = [
   { label: "Reel / Short hook", prompt: "Scroll-stopping hook for Reels or Shorts: strong opener, one clear message. Trend-aware and shareable." },
 ];
 
+const PLATFORM_OPTIONS: readonly Platform[] = ["general", "youtube_shorts", "twitter", "linkedin"] as const;
+
+const PLATFORM_ICONS: Record<Platform, React.ReactNode> = {
+  general: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3" /></svg>,
+  youtube_shorts: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" /></svg>,
+  twitter: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>,
+  linkedin: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>,
+};
+
 function ProAvatarGate() {
   return (
     <motion.div
@@ -446,19 +455,12 @@ export default function CreatePage() {
     }
   };
 
-  const pIcons: Record<Platform, React.ReactNode> = {
-    general: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3" /></svg>,
-    youtube_shorts: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" /></svg>,
-    twitter: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>,
-    linkedin: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>,
-  };
-
   return (
-    <div className="min-h-dvh bg-black text-white font-sans relative overflow-hidden">
-      <WarpShaderHero disableWarp={busy || done} />
+    <div className="h-dvh max-h-dvh flex flex-col bg-black text-white font-sans relative overflow-hidden">
+      <WarpShaderHero />
 
       {/* ── Nav ── */}
-      <nav className="relative z-10 flex items-center justify-between px-6 lg:px-10 py-3">
+      <nav className="relative z-10 shrink-0 flex items-center justify-between px-6 lg:px-10 py-3">
         <Link
           href="/"
           className="group inline-flex items-center gap-2.5 shrink-0 py-0.5 rounded-xl px-1 -mx-1 transition-colors hover:bg-white/3"
@@ -478,6 +480,8 @@ export default function CreatePage() {
         </div>
       </nav>
 
+      {/* One scroll surface: no page scroll when the card fits; scroll only when content overflows */}
+      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain">
       <AnimatePresence mode="wait">
         {/* ════════════════ GENERATING ════════════════ */}
         {busy && (
@@ -487,7 +491,7 @@ export default function CreatePage() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 flex items-center justify-center min-h-[calc(100dvh-72px)] px-6"
+            className="relative min-h-full flex items-center justify-center px-6 py-6"
           >
             {(() => {
               const totalStages = STAGES.length;
@@ -764,7 +768,7 @@ export default function CreatePage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-8 sm:py-10"
+            className="relative min-h-full w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8"
           >
             {/* ── Header strip ── */}
             <motion.div
@@ -1079,7 +1083,7 @@ export default function CreatePage() {
 
         {/* ════════════════ CREATION FORM ════════════════ */}
         {!busy && !done && (
-          <motion.main key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100dvh-72px)] px-6 lg:px-10 py-12">
+          <motion.main key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="relative min-h-full flex flex-col items-center justify-center px-6 lg:px-10 py-6 sm:py-8">
             <div className="w-full max-w-5xl mx-auto">
               {/* Landing-style generate card: two-column (images left, form right) */}
               <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-2xl border border-white/10 bg-zinc-950 overflow-hidden">
@@ -1122,14 +1126,14 @@ export default function CreatePage() {
                     <div className="mt-6 pt-6 border-t border-white/5">
                       <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-3">Platform</p>
                       <div className="grid grid-cols-2 gap-2.5">
-                        {(["general", "youtube_shorts", "twitter", "linkedin"] as Platform[]).map((p) => (
+                        {PLATFORM_OPTIONS.map((p) => (
                           <button
                             key={p}
                             type="button"
                             onClick={() => setPlatform(p)}
                             className={`flex items-center justify-center gap-2 w-full min-h-[44px] rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${platform === p ? "border-blue-500/50 bg-blue-500/10 text-white" : "border-zinc-700/80 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300"}`}
                           >
-                            <span className={platform === p ? "text-blue-200" : "text-zinc-500"}>{pIcons[p]}</span>
+                            <span className={platform === p ? "text-blue-200" : "text-zinc-500"}>{PLATFORM_ICONS[p]}</span>
                             <span>{p === "general" ? "General" : p === "youtube_shorts" ? "Shorts" : p === "twitter" ? "X" : "LinkedIn"}</span>
                           </button>
                         ))}
@@ -1516,6 +1520,7 @@ export default function CreatePage() {
           </motion.main>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }
