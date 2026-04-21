@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 type SuggestionCategory = "all" | "correctness" | "clarity" | "engagement";
 
@@ -120,9 +121,10 @@ export default function SuggestionsPage() {
       <div className="fixed top-4 left-4 z-50">
         <Link
           href="/"
-          className="text-sm font-medium text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/50 px-4 py-2 rounded-lg transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/50 px-3 py-2 rounded-lg transition-colors"
         >
-          Home page
+          <CutlineLogo size="sm" className="max-w-[130px]" />
+          <span>Home</span>
         </Link>
       </div>
 
