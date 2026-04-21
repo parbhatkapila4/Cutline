@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { validateJobId } from "@/lib/validation/input";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
+import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
+import { auth } from "@/lib/auth";
+import { purgeUserVideo } from "@/lib/dashboard/purgeUserVideo";
 
 export type DashboardVideoDetail = {
   id: string;
@@ -41,6 +44,26 @@ function titleFromInput(input: string | undefined): string {
   const trimmed = input.trim();
   if (trimmed.length <= 50) return trimmed;
   return trimmed.slice(0, 50);
+}
+
+/**
+ * Resolve the identifier used to authorize access to a job. Mirrors the list route:
+ * prefer the signed-in user id, fall back to the anon session cookie, and finally
+ * the network identifier. This must align with how `clientId` is stamped on jobs
+ * in `src/app/api/generate/handlers.ts` (`userId ?? anonSessionId ?? identifier`).
+ */
+async function resolveOwnerCandidates(request: Request): Promise<string[]> {
+  const candidates: string[] = [];
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    const userId = session?.user?.id;
+    if (typeof userId === "string" && userId.trim()) candidates.push(userId);
+  } catch {
+  }
+  const anonId = getAnonSessionIdFromRequest(request);
+  if (anonId) candidates.push(anonId);
+  candidates.push(getClientIdentifier(request));
+  return candidates;
 }
 
 export async function GET(
@@ -101,7 +124,12 @@ export async function GET(
     }
 
     const clientId = data?.clientId;
-    if (clientId === undefined || clientId === null || clientId !== identifier) {
+    const ownerCandidates = await resolveOwnerCandidates(request);
+    if (
+      clientId === undefined ||
+      clientId === null ||
+      !ownerCandidates.includes(String(clientId))
+    ) {
       return NextResponse.json(
         { error: "Video not found" },
         { status: 404 }
@@ -129,5 +157,38 @@ export async function GET(
       { error: "Video not found" },
       { status: 404 }
     );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ jobId: string }> }
+) {
+  const identifier = getClientIdentifier(request);
+  const limit = await checkRateLimit(identifier, "status");
+  if (!limit.allowed) {
+    const retryAfter = limit.retryAfter ?? 60;
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later.", retryAfter },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    );
+  }
+
+  const { jobId } = await params;
+  const validation = validateJobId(jobId);
+  if (!validation.valid) {
+    return NextResponse.json({ error: "Video not found." }, { status: 404 });
+  }
+
+  try {
+    const ownerCandidates = await resolveOwnerCandidates(request);
+    const result = await purgeUserVideo(jobId, ownerCandidates);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("[api] DELETE /api/dashboard/videos/[jobId]", e);
+    return NextResponse.json({ error: "Failed to delete video." }, { status: 500 });
   }
 }

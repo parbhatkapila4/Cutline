@@ -8,11 +8,68 @@ import { STAGES } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId } from "@/lib/types/avatar";
-import type { PlanId } from "@/lib/plans";
+import { isEnterprisePlan, type PlanId } from "@/lib/plans";
 import WarpShaderHero from "@/components/ui/warp-shader";
+
+/**
+ * Inline brand mark for /create only. Editorial "cut line" identity:
+ *  - Square chip with subtle inner ring + amber/teal corner glow
+ *  - Soft scissor-cut diagonal stroke that severs the wordmark frame
+ *  - Pairs with the CUTLINE wordmark next to it
+ */
+function CreateBrandMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={
+        "relative inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-zinc-950/80 shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset,0_8px_24px_-12px_rgba(0,0,0,0.8)] overflow-hidden " +
+        (className ?? "")
+      }
+      aria-hidden
+    >
+      <span className="pointer-events-none absolute -top-3 -right-3 h-7 w-7 rounded-full bg-amber-400/35 blur-[10px]" />
+      <span className="pointer-events-none absolute -bottom-3 -left-3 h-7 w-7 rounded-full bg-teal-400/25 blur-[10px]" />
+      <svg viewBox="0 0 32 32" fill="none" className="relative h-[18px] w-[18px]">
+        <path
+          d="M9 22V10"
+          stroke="white"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+        />
+        <path
+          d="M14 22h9"
+          stroke="white"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+        />
+        <path
+          d="M5.5 26.5L26.5 5.5"
+          stroke="url(#cutline-mark-cut)"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeDasharray="2.4 3.2"
+        />
+        <defs>
+          <linearGradient
+            id="cutline-mark-cut"
+            x1="5.5"
+            y1="26.5"
+            x2="26.5"
+            y2="5.5"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0" stopColor="#fbbf24" />
+            <stop offset="1" stopColor="#5eead4" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </span>
+  );
+}
 
 type JobStatus = "pending" | "processing" | "completed" | "failed";
 type Mode = "slideshow" | "talking_object";
+/** One UI choice maps to mode + talking style (no nested toggles). */
+type VideoKind = "slideshow" | "talking_cartoon" | "talking_real";
 type Platform = "general" | "linkedin" | "twitter" | "youtube_shorts";
 type AvatarMode = "default" | "preset" | "upload";
 
@@ -22,6 +79,70 @@ function canUseProAvatar(plan: PlanId): boolean {
 }
 
 const POLL_MS = 2500;
+
+type StageMeta = {
+  title: string;
+  description: string;
+  icon: React.ReactElement;
+};
+
+/**
+ * UI metadata for each generation stage (kept aligned with `STAGES` in
+ * `src/constants/landing.tsx`). Only the in-page generating card uses this.
+ */
+const STAGE_META: StageMeta[] = [
+  {
+    title: "Analyzing prompt",
+    description: "Reading your topic and locking the tone.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 6.5v11M14.5 6.5v11M4 9h2M4 15h2M18 9h2M18 15h2M9.5 9h5M9.5 15h5" />
+      </svg>
+    ),
+  },
+  {
+    title: "Writing script",
+    description: "Drafting the narrative beats and copy.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 3.487l3.65 3.65M4 20l4-1 11.86-11.86a1 1 0 000-1.41l-2.59-2.59a1 1 0 00-1.41 0L4 14.86V20z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Sourcing visuals",
+    description: "Pulling shots, b-roll and references.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7l3-3h12l3 3v12a1 1 0 01-1 1H4a1 1 0 01-1-1V7zM3 7h18M9 4v3M15 4v3M9 13l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    title: "Generating voice",
+    description: "Synthesizing the natural voiceover.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10v4M7 7v10M11 4v16M15 7v10M19 10v4" />
+      </svg>
+    ),
+  },
+  {
+    title: "Rendering video",
+    description: "Composing frames and exporting MP4.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h18v14H3V5zM3 9h18M7 5v14M17 5v14M7 9v0M7 15v0M17 9v0M17 15v0" />
+      </svg>
+    ),
+  },
+];
+
+const formatElapsed = (sec: number): string => {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
 /** Stock previews under `/public/avatars/presets` for reliable prod rendering. */
 const AVATAR_PRESETS: Array<{
   id: AvatarPresetId;
@@ -44,23 +165,6 @@ const PROMPT_CHIPS = [
   { label: "LinkedIn post", prompt: "Thought-leadership clip: one sharp insight or takeaway. Professional tone. Optimized for LinkedIn feed and reposts." },
   { label: "Reel / Short hook", prompt: "Scroll-stopping hook for Reels or Shorts: strong opener, one clear message. Trend-aware and shareable." },
 ];
-
-function CutlineMark({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
-  const dim = size === "sm" ? 20 : size === "lg" ? 32 : 24;
-  return (
-    <svg width={dim} height={dim} viewBox="0 0 32 32" fill="none">
-      <defs>
-        <linearGradient id="cmG" x1="0" y1="0" x2="32" y2="32">
-          <stop offset="0%" stopColor="#fb7185" />
-          <stop offset="100%" stopColor="#e11d48" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="4" width="28" height="20" rx="4" stroke="url(#cmG)" strokeWidth="2" fill="none" />
-      <path d="M13 10v8l7-4z" fill="url(#cmG)" />
-      <line x1="2" y1="28" x2="30" y2="28" stroke="url(#cmG)" strokeWidth="2" strokeLinecap="round" strokeDasharray="4 3" />
-    </svg>
-  );
-}
 
 function ProAvatarGate() {
   return (
@@ -109,6 +213,13 @@ export default function CreatePage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [videoDurationSec, setVideoDurationSec] = useState<number | null>(null);
+  const [shareSupported, setShareSupported] = useState(false);
+
+  useEffect(() => {
+    setShareSupported(typeof navigator !== "undefined" && typeof navigator.share === "function");
+  }, []);
   const [suggesting, setSuggesting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [userPlan, setUserPlan] = useState<PlanId>("free");
@@ -162,6 +273,19 @@ export default function CreatePage() {
 
   const busy = submitting || (jobId != null && (status === "pending" || status === "processing"));
   const done = status === "completed" && !!videoUrl;
+
+  useEffect(() => {
+    if (!busy) {
+      setElapsedSec(0);
+      return;
+    }
+    const startedAt = Date.now();
+    setElapsedSec(0);
+    const id = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [busy]);
 
   const stop = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -310,6 +434,18 @@ export default function CreatePage() {
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => setImgs((p) => [...p, ...Array.from(e.target.files || [])].slice(0, 5));
   const rmImg = (i: number) => setImgs((p) => p.filter((_, x) => x !== i));
 
+  const videoKind: VideoKind =
+    mode === "slideshow" ? "slideshow" : objStyle === "real" ? "talking_real" : "talking_cartoon";
+
+  const setVideoKind = (k: VideoKind) => {
+    if (k === "slideshow") {
+      setMode("slideshow");
+    } else {
+      setMode("talking_object");
+      setObjStyle(k === "talking_real" ? "real" : "cartoon");
+    }
+  };
+
   const pIcons: Record<Platform, React.ReactNode> = {
     general: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3" /></svg>,
     youtube_shorts: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" /></svg>,
@@ -319,15 +455,23 @@ export default function CreatePage() {
 
   return (
     <div className="min-h-dvh bg-black text-white font-sans relative overflow-hidden">
-      <WarpShaderHero />
+      <WarpShaderHero disableWarp={busy || done} />
 
       {/* ── Nav ── */}
-      <nav className="relative z-10 flex items-center justify-between px-6 lg:px-10 py-4">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-rose-950/60 border border-rose-500/20 flex items-center justify-center shadow-lg shadow-rose-500/15 group-hover:shadow-rose-500/25 transition-shadow">
-            <CutlineMark size="sm" />
-          </div>
-          <span className="text-base font-semibold tracking-tight text-white">CUTLINE</span>
+      <nav className="relative z-10 flex items-center justify-between px-6 lg:px-10 py-3">
+        <Link
+          href="/"
+          className="group inline-flex items-center gap-2.5 shrink-0 py-0.5 rounded-xl px-1 -mx-1 transition-colors hover:bg-white/3"
+        >
+          <CreateBrandMark className="transition-transform duration-300 group-hover:-rotate-3" />
+          <span className="flex flex-col leading-none">
+            <span className="text-[15px] font-semibold tracking-tight text-white">
+              CUTLINE
+            </span>
+            <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500 group-hover:text-zinc-300 transition-colors hidden sm:inline">
+              Studio
+            </span>
+          </span>
         </Link>
         <div className="flex items-center gap-2">
           <Link href="/dashboard" className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Dashboard</Link>
@@ -337,175 +481,598 @@ export default function CreatePage() {
       <AnimatePresence mode="wait">
         {/* ════════════════ GENERATING ════════════════ */}
         {busy && (
-          <motion.main key="busy" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="relative z-10 flex items-center justify-center min-h-[calc(100dvh-72px)] px-6">
-            <div className="w-full max-w-md">
-              <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.6, ease: [0.22, 1, 0.36, 1] }} className="rounded-3xl border border-white/8 bg-zinc-950/80 backdrop-blur-2xl shadow-2xl shadow-black/60 overflow-hidden">
+          <motion.main
+            key="busy"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 flex items-center justify-center min-h-[calc(100dvh-72px)] px-6"
+          >
+            {(() => {
+              const totalStages = STAGES.length;
+              const progressPct = Math.min(99, Math.round(((stage + 0.5) / totalStages) * 100));
+              const activeMeta = STAGE_META[stage] ?? STAGE_META[0];
+              return (
+                <div className="w-full max-w-lg">
+                  <motion.div
+                    initial={{ opacity: 0, y: 24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.12, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative rounded-3xl border border-white/10 bg-zinc-950/85 backdrop-blur-2xl shadow-2xl shadow-black/70 overflow-hidden"
+                  >
+                    {/* Atmospheric corner glows */}
+                    <div className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-amber-500/14 blur-3xl" aria-hidden />
+                    <div className="pointer-events-none absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-teal-500/12 blur-3xl" aria-hidden />
+                    {/* Top hairline */}
+                    <div className="pointer-events-none absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-amber-400/45 to-transparent" />
+                    {/* Subtle grid */}
+                    <div
+                      className="pointer-events-none absolute inset-0 opacity-[0.045]"
+                      aria-hidden
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
+                        backgroundSize: "26px 26px",
+                      }}
+                    />
 
-                {/* Top glow accent */}
-                <div className="h-px w-full bg-linear-to-r from-transparent via-rose-500/40 to-transparent" />
+                    {/* ── Hero: editorial film loader ── */}
+                    <div className="relative px-7 pt-7 pb-5">
+                      <div className="relative mx-auto h-28 w-full max-w-[360px] rounded-2xl border border-white/10 bg-linear-to-br from-zinc-900/90 via-black to-zinc-900/90 overflow-hidden shadow-inner shadow-black/40">
+                        {/* film perforations */}
+                        <div className="absolute top-1.5 left-0 right-0 flex justify-between px-2.5" aria-hidden>
+                          {Array.from({ length: 9 }).map((_, i) => (
+                            <span key={`t-${i}`} className="block h-1.5 w-2 rounded-[2px] bg-white/8" />
+                          ))}
+                        </div>
+                        <div className="absolute bottom-1.5 left-0 right-0 flex justify-between px-2.5" aria-hidden>
+                          {Array.from({ length: 9 }).map((_, i) => (
+                            <span key={`b-${i}`} className="block h-1.5 w-2 rounded-[2px] bg-white/8" />
+                          ))}
+                        </div>
 
-                <div className="px-8 pt-10 pb-8">
-                  {/* Animated icon */}
-                  <div className="relative w-24 h-24 mx-auto mb-8">
-                    <div className="absolute inset-0 rounded-full bg-rose-500/10 blur-2xl" />
-                    <svg className="absolute inset-0 w-full h-full animate-spin" style={{ animationDuration: "12s" }} viewBox="0 0 96 96">
-                      <circle cx="48" cy="48" r="44" stroke="url(#ringGrad)" strokeWidth="1" fill="none" strokeDasharray="6 8" />
-                      <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="96" y2="96"><stop offset="0%" stopColor="#f43f5e" stopOpacity="0.6" /><stop offset="100%" stopColor="#fb7185" stopOpacity="0.1" /></linearGradient></defs>
-                    </svg>
-                    <svg className="absolute inset-2 w-[calc(100%-16px)] h-[calc(100%-16px)] animate-spin" style={{ animationDuration: "6s", animationDirection: "reverse" }} viewBox="0 0 80 80">
-                      <circle cx="40" cy="40" r="36" stroke="rgba(244,63,94,0.12)" strokeWidth="1" fill="none" />
-                      <circle cx="40" cy="4" r="2.5" fill="#f43f5e"><animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" /></circle>
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-14 h-14 rounded-2xl bg-rose-950/80 border border-rose-500/20 flex items-center justify-center shadow-xl shadow-rose-500/20">
-                        <CutlineMark size="lg" />
+                        {/* center brand chip */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="relative inline-flex items-center gap-2.5 rounded-xl bg-black/55 border border-white/12 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/40">
+                            <CreateBrandMark className="h-6 w-6" />
+                            <span className="text-[12px] font-semibold tracking-tight text-white leading-none">
+                              CUTLINE
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* scanning playhead */}
+                        <motion.div
+                          className="absolute top-3 bottom-3 w-px bg-linear-to-b from-transparent via-amber-400 to-transparent"
+                          initial={{ left: "8%" }}
+                          animate={{ left: ["8%", "92%", "8%"] }}
+                          transition={{ duration: 4.4, repeat: Infinity, ease: "easeInOut" }}
+                          aria-hidden
+                        >
+                          <span className="absolute -inset-x-2 top-0 bottom-0 bg-amber-400/14 blur-md" />
+                        </motion.div>
+
+                        {/* faint waveform along the bottom */}
+                        <div
+                          className="pointer-events-none absolute left-3 right-3 bottom-4 flex items-end gap-[3px] opacity-50"
+                          aria-hidden
+                        >
+                          {Array.from({ length: 28 }).map((_, i) => (
+                            <motion.span
+                              key={`wf-${i}`}
+                              className="block w-[2px] rounded-full bg-linear-to-t from-amber-400/0 via-amber-400/60 to-teal-300/70"
+                              initial={{ height: 4 }}
+                              animate={{ height: [4, 10 + ((i * 7) % 14), 4] }}
+                              transition={{
+                                duration: 1.2 + (i % 5) * 0.18,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                                delay: (i % 7) * 0.07,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Title row */}
+                      <div className="mt-6 flex items-start gap-3">
+                        <div className="relative shrink-0">
+                          <div className="absolute inset-0 rounded-xl bg-amber-400/22 blur-md" aria-hidden />
+                          <div className="relative w-10 h-10 rounded-xl bg-linear-to-br from-amber-400/95 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-900/30">
+                            <span className="text-zinc-950">{activeMeta.icon}</span>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-[17px] font-semibold text-white tracking-tight leading-tight">
+                              {activeMeta.title}
+                            </h2>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-amber-500/12 text-amber-200 border border-amber-400/30">
+                              <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-70" />
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400" />
+                              </span>
+                              In progress
+                            </span>
+                          </div>
+                          <p className="text-[12.5px] text-zinc-400 mt-1 leading-relaxed">
+                            {activeMeta.description}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Title */}
-                  <div className="text-center mb-8">
-                    <h2 className="text-xl font-semibold text-white tracking-tight mb-1.5">Creating your video</h2>
-                    <p className="text-sm text-zinc-500">Usually takes 1-3 minutes</p>
-                  </div>
-
-                  {/* Overall progress bar */}
-                  <div className="mb-8">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <span className="text-xs font-medium text-zinc-400">Progress</span>
-                      <span className="text-xs font-medium tabular-nums text-zinc-400">{Math.round(((stage + 0.5) / STAGES.length) * 100)}%</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-zinc-800/80 overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full bg-linear-to-r from-rose-500 to-rose-400"
-                        initial={{ width: "0%" }}
-                        animate={{ width: `${((stage + 0.5) / STAGES.length) * 100}%` }}
-                        transition={{ duration: 0.8, ease: "easeInOut" }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Pipeline steps */}
-                  <div className="space-y-1">
-                    {STAGES.map((s, i) => {
-                      const active = i === stage;
-                      const past = i < stage;
-                      return (
+                    {/* ── Progress bar ── */}
+                    <div className="px-7 pb-5">
+                      <div className="flex items-center justify-between mb-2 text-[11px] font-medium uppercase tracking-[0.14em]">
+                        <span className="text-zinc-500">
+                          Step <span className="text-zinc-300 tabular-nums">{stage + 1}</span> of <span className="text-zinc-300 tabular-nums">{totalStages}</span>
+                        </span>
+                        <span className="tabular-nums text-zinc-300">{progressPct}%</span>
+                      </div>
+                      <div className="relative h-1.5 w-full rounded-full bg-zinc-800/70 overflow-hidden ring-1 ring-white/5">
                         <motion.div
-                          key={s}
-                          initial={{ opacity: 0, x: -12 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.25 + i * 0.08, duration: 0.4 }}
-                          className={`flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-500 ${active ? "bg-white/4" : ""}`}
+                          className="relative h-full rounded-full bg-linear-to-r from-amber-400 via-amber-300 to-teal-300 overflow-hidden"
+                          initial={{ width: "0%" }}
+                          animate={{ width: `${progressPct}%` }}
+                          transition={{ duration: 0.8, ease: "easeInOut" }}
                         >
-                          <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-semibold transition-all duration-500 ${past ? "bg-emerald-500/15 text-emerald-400" : active ? "bg-rose-500/15 text-rose-400 ring-1 ring-rose-500/25" : "bg-zinc-800/80 text-zinc-600"}`}>
-                            {past ? (
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                            ) : active ? (
-                              <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                            ) : (
-                              <span>{i + 1}</span>
-                            )}
-                          </div>
-                          <span className={`text-sm font-medium transition-colors duration-300 ${past ? "text-zinc-500 line-through decoration-zinc-700" : active ? "text-white" : "text-zinc-600"}`}>{s}</span>
-                          {active && (
-                            <div className="ml-auto flex items-center gap-2">
-                              <span className="text-[11px] font-medium text-rose-400/80">Processing</span>
-                              <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60" />
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
-                              </span>
-                            </div>
-                          )}
-                          {past && <span className="ml-auto text-[11px] font-medium text-emerald-500/60">Done</span>}
+                          <motion.span
+                            className="absolute inset-y-0 w-12 bg-linear-to-r from-transparent via-white/45 to-transparent"
+                            initial={{ left: "-30%" }}
+                            animate={{ left: ["-30%", "120%"] }}
+                            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                          />
                         </motion.div>
-                      );
-                    })}
-                  </div>
-                </div>
+                      </div>
+                    </div>
 
-                {/* Bottom bar */}
-                <div className="px-8 py-4 border-t border-white/5 bg-zinc-900/30 flex items-center justify-between">
-                  <p className="text-xs text-zinc-600">Step {stage + 1} of {STAGES.length}</p>
-                  <button onClick={() => { stop(); setStatus("failed"); setError("Cancelled"); setJobId(null); }} className="text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors">
-                    Cancel
-                  </button>
+                    {/* ── Pipeline steps ── */}
+                    <div className="px-4 sm:px-5 pb-5">
+                      <div className="space-y-1">
+                        {STAGES.map((_, i) => {
+                          const meta = STAGE_META[i] ?? STAGE_META[0];
+                          const active = i === stage;
+                          const past = i < stage;
+                          return (
+                            <motion.div
+                              key={meta.title}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.22 + i * 0.06, duration: 0.4 }}
+                              className={`relative flex items-center gap-3 pl-3 pr-3.5 py-2.5 rounded-xl transition-colors duration-300 ${
+                                active
+                                  ? "bg-amber-500/8 border border-amber-400/20"
+                                  : past
+                                    ? "border border-transparent"
+                                    : "border border-transparent"
+                              }`}
+                            >
+                              {active ? (
+                                <span
+                                  className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r-full bg-linear-to-b from-amber-400 to-teal-300"
+                                  aria-hidden
+                                />
+                              ) : null}
+
+                              <div
+                                className={`relative w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all duration-300 ${
+                                  past
+                                    ? "bg-emerald-500/12 text-emerald-300 ring-1 ring-emerald-500/25"
+                                    : active
+                                      ? "bg-linear-to-br from-amber-400 to-amber-600 text-zinc-950 shadow-md shadow-amber-900/30"
+                                      : "bg-white/4 text-zinc-600 ring-1 ring-white/8"
+                                }`}
+                              >
+                                {past ? (
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.6}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                ) : (
+                                  meta.icon
+                                )}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className={`text-[13px] font-semibold leading-tight transition-colors duration-300 ${
+                                    past
+                                      ? "text-zinc-500"
+                                      : active
+                                        ? "text-white"
+                                        : "text-zinc-500"
+                                  }`}
+                                >
+                                  {meta.title}
+                                </p>
+                                <p
+                                  className={`text-[11px] mt-0.5 leading-snug truncate transition-colors duration-300 ${
+                                    active ? "text-zinc-400" : "text-zinc-600"
+                                  }`}
+                                >
+                                  {meta.description}
+                                </p>
+                              </div>
+
+                              {active ? (
+                                <span className="shrink-0 inline-flex items-center gap-1.5 text-[10.5px] font-medium text-amber-300">
+                                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                    <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                  Working
+                                </span>
+                              ) : past ? (
+                                <span className="shrink-0 text-[10.5px] font-medium text-emerald-400/75">Done</span>
+                              ) : (
+                                <span className="shrink-0 text-[10.5px] font-medium text-zinc-700 tabular-nums">
+                                  0{i + 1}
+                                </span>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* ── Footer bar ── */}
+                    <div className="relative px-6 py-3.5 border-t border-white/8 bg-black/40 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 text-[11px] font-medium text-zinc-500">
+                        <span className="inline-flex items-center gap-1.5">
+                          <svg className="w-3 h-3 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 1.5M12 22a10 10 0 110-20 10 10 0 010 20z" />
+                          </svg>
+                          <span className="tabular-nums text-zinc-300">{formatElapsed(elapsedSec)}</span>
+                          <span className="text-zinc-600 hidden sm:inline">elapsed</span>
+                        </span>
+                        <span className="h-3 w-px bg-white/10" aria-hidden />
+                        <span className="hidden sm:inline">Usually 1-3 min</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          stop();
+                          setStatus("failed");
+                          setError("Cancelled");
+                          setJobId(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium text-zinc-400 hover:text-red-300 hover:bg-red-500/8 border border-transparent hover:border-red-500/20 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Cancel
+                      </button>
+                    </div>
+                  </motion.div>
+
+                  {/* Reassurance line below the card */}
+                  <p className="mt-4 text-center text-[11px] text-zinc-600">
+                    You can leave this tab open. We will keep working in the background.
+                  </p>
                 </div>
-              </motion.div>
-            </div>
+              );
+            })()}
           </motion.main>
         )}
 
         {/* ════════════════ COMPLETE ════════════════ */}
         {done && (
-          <motion.main key="done" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="relative z-10 max-w-5xl mx-auto px-6 lg:px-10 py-10">
-            {/* Success banner */}
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 mb-8 px-5 py-3.5 rounded-2xl bg-emerald-500/[0.07] border border-emerald-500/15">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <motion.main
+            key="done"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-8 sm:py-10"
+          >
+            {/* ── Header strip ── */}
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <div className="absolute inset-0 rounded-xl bg-emerald-400/25 blur-md" aria-hidden />
+                  <div className="relative w-10 h-10 rounded-xl bg-linear-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-900/30">
+                    <svg className="w-5 h-5 text-emerald-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.6} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-lg sm:text-xl font-semibold text-white tracking-tight leading-tight">
+                      Your video is ready
+                    </h1>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-emerald-500/12 text-emerald-300 border border-emerald-500/25">
+                      MP4
+                    </span>
+                  </div>
+                  <p className="text-[12.5px] text-zinc-400 mt-0.5">
+                    Generated successfully. Download it, share it, or refine it on the dashboard.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-emerald-400">Your video is ready</p>
-                <p className="text-[11px] text-emerald-400/50">Generated successfully</p>
-              </div>
+
+              <button
+                onClick={reset}
+                className="group relative inline-flex items-center justify-center gap-2 self-start sm:self-auto rounded-xl border border-white/12 bg-white/3 pl-3 pr-3.5 py-2 text-sm font-medium text-zinc-300 hover:text-white hover:bg-amber-500/8 hover:border-amber-400/35 transition-colors"
+              >
+                <span className="relative flex items-center justify-center w-5 h-5 rounded-md bg-white/6 group-hover:bg-amber-400/20 transition-colors">
+                  <svg className="w-3 h-3 text-zinc-300 group-hover:text-amber-200 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.6} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                </span>
+                Create another
+              </button>
             </motion.div>
 
-            {completionMessage && (
+            {completionMessage ? (
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-5 py-4 text-sm text-amber-100/95 leading-relaxed"
+                transition={{ delay: 0.1 }}
+                className="mb-6 flex items-start gap-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-[13px] text-amber-100/95 leading-relaxed"
               >
-                {completionMessage}
+                <svg className="w-4 h-4 mt-0.5 shrink-0 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{completionMessage}</span>
               </motion.div>
-            )}
+            ) : null}
 
-            <div className="grid lg:grid-cols-[1fr_320px] gap-6">
-              {/* Video */}
-              <div className="rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 shadow-2xl shadow-black/50 min-h-[360px]">
-                <video src={videoUrl} controls autoPlay className="w-full h-full object-contain bg-black" />
-              </div>
+            {/* ── Stage layout ── */}
+            <div className="grid gap-5 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              {/* ── Player card ── */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className="relative rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 shadow-2xl shadow-black/60 isolate"
+              >
+                {/* Top hairline accent */}
+                <div className="pointer-events-none absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-amber-400/55 to-transparent z-10" />
+                {/* Inner ring highlight */}
+                <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/5 z-10" aria-hidden />
 
-              <div className="space-y-4">
-                {/* Actions */}
-                <div className="rounded-2xl border border-white/10 bg-zinc-950/80 backdrop-blur-xl p-5">
-                  <h3 className="text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-4">Actions</h3>
-                  <div className="space-y-2">
-                    <a href={`/api/generate/${jobId}/download`} className="group flex items-center gap-3 w-full px-4 py-3.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-zinc-100 transition-all shadow-lg shadow-white/5">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                      Download MP4
-                      <svg className="w-3.5 h-3.5 ml-auto text-zinc-400 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
-                    </a>
-                    <button onClick={() => { navigator.clipboard.writeText(window.location.origin + videoUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="flex items-center gap-3 w-full px-4 py-3.5 rounded-xl border border-white/10 text-sm text-zinc-300 hover:bg-white/5 hover:text-white transition-all">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
-                      {copied ? "Copied!" : "Copy share link"}
-                    </button>
+                <div className="relative w-full aspect-video bg-black z-1 contain-layout">
+                  <video
+                    src={videoUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                    onLoadedMetadata={(e) => {
+                      const d = e.currentTarget.duration;
+                      if (Number.isFinite(d) && d > 0) {
+                        setVideoDurationSec(Math.round(d));
+                      }
+                    }}
+                    className="absolute inset-0 h-full w-full object-cover transform-gpu"
+                  />
+                  <div className="pointer-events-none absolute top-3 right-3 z-10 flex items-center gap-2">
+                    {videoDurationSec != null ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-black/70 text-zinc-100 border border-white/15 shadow-lg shadow-black/40 tabular-nums">
+                        {formatElapsed(videoDurationSec)}
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-200 border border-emerald-400/30 shadow-lg shadow-black/40">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
+                      </span>
+                      Ready
+                    </span>
                   </div>
                 </div>
 
-                {/* Post-production */}
-                <div className="rounded-2xl border border-white/10 bg-zinc-950/80 backdrop-blur-xl p-5">
-                  <h3 className="text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-4">Post-production</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { label: "Edit", icon: "M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" },
-                      { label: "Slow", icon: "M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" },
-                      { label: "Redo", icon: "M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" },
-                      { label: "Style", icon: "M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" },
-                    ].map(({ label, icon }) => (
-                      <button key={label} className="group flex flex-col items-center gap-2 p-4 rounded-xl border border-white/5 bg-white/2 text-zinc-500 hover:text-white hover:bg-white/5 hover:border-white/10 hover:shadow-lg transition-all">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d={icon} /></svg>
-                        <span className="text-xs font-medium">{label}</span>
-                      </button>
-                    ))}
+                {/* Meta strip under player */}
+                <div className="relative z-1 px-4 sm:px-5 py-3.5 border-t border-white/8 bg-black/70 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11.5px] text-zinc-400">
+                  <span className="inline-flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-amber-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h18v14H3V5zM3 9h18M7 5v14M17 5v14" />
+                    </svg>
+                    <span className="text-zinc-300 font-medium">MP4 · 1080p</span>
+                  </span>
+                  {videoDurationSec != null ? (
+                    <>
+                      <span className="h-3 w-px bg-white/10" aria-hidden />
+                      <span className="inline-flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-amber-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                        <span className="text-zinc-300 tabular-nums font-medium">
+                          {formatElapsed(videoDurationSec)} runtime
+                        </span>
+                      </span>
+                    </>
+                  ) : null}
+                  <span className="h-3 w-px bg-white/10" aria-hidden />
+                  <span className="inline-flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-teal-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM12 8v4l2.5 1.5" />
+                    </svg>
+                    <span className="text-zinc-300 tabular-nums">{formatElapsed(elapsedSec)} render</span>
+                  </span>
+                  <span className="h-3 w-px bg-white/10 hidden sm:inline-block" aria-hidden />
+                  <span className="hidden sm:inline-flex items-center gap-1.5 ml-auto">
+                    <svg className="w-3.5 h-3.5 text-emerald-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-zinc-300">Saved to your library</span>
+                  </span>
+                </div>
+              </motion.div>
+
+              {/* ── Side rail ── */}
+              <motion.aside
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.22 }}
+                className="space-y-4"
+              >
+                {/* Primary actions */}
+                <div className="relative rounded-2xl border border-white/10 bg-zinc-950 overflow-hidden">
+                  <div className="pointer-events-none absolute -top-20 -right-16 h-40 w-40 rounded-full bg-amber-500/8 opacity-60" aria-hidden />
+                  <div className="relative p-4 sm:p-5">
+                    <div className="flex items-center justify-between mb-3.5">
+                      <h3 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-[0.16em] flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-amber-400/15">
+                          <svg className="w-2.5 h-2.5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                        Share &amp; Save
+                      </h3>
+                      <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] font-medium text-zinc-500">
+                        <span className="text-zinc-600">⌘</span>D
+                      </kbd>
+                    </div>
+
+                    <div className="space-y-2">
+                      <a
+                        href={`/api/generate/${jobId}/download`}
+                        className="group relative inline-flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-linear-to-br from-amber-300 via-amber-400 to-amber-500 text-zinc-950 text-sm font-semibold shadow-lg shadow-amber-900/30 hover:shadow-amber-700/40 hover:-translate-y-0.5 transition-all overflow-hidden"
+                      >
+                        <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-linear-to-r from-transparent via-white/35 to-transparent" />
+                        <svg className="relative w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span className="relative">Download MP4</span>
+                        <span className="relative ml-auto inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider opacity-70">
+                          1080p
+                          <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </span>
+                      </a>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!videoUrl) return;
+                            navigator.clipboard.writeText(window.location.origin + videoUrl);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 2000);
+                          }}
+                          className={`group inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-[12.5px] font-medium transition-all ${
+                            copied
+                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                              : "border-white/12 bg-white/3 text-zinc-300 hover:text-white hover:bg-white/6 hover:border-white/20"
+                          }`}
+                          aria-live="polite"
+                        >
+                          {copied ? (
+                            <>
+                              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                              </svg>
+                              Copy link
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!videoUrl) return;
+                            const shareUrl = window.location.origin + videoUrl;
+                            if (shareSupported) {
+                              try {
+                                await navigator.share({
+                                  title: "My Cutline video",
+                                  text: "Made with Cutline.",
+                                  url: shareUrl,
+                                });
+                                return;
+                              } catch {
+                                // user cancelled or share failed; fall through to clipboard
+                              }
+                            }
+                            navigator.clipboard.writeText(shareUrl);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 2000);
+                          }}
+                          className="group inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-white/12 bg-white/3 text-zinc-300 hover:text-white hover:bg-white/6 hover:border-white/20 text-[12.5px] font-medium transition-all"
+                          title={shareSupported ? "Share via system" : "Copy share link"}
+                        >
+                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                          </svg>
+                          Share
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <button onClick={reset} className="flex items-center justify-center gap-2 w-full px-4 py-3.5 rounded-xl border border-dashed border-white/10 text-sm text-zinc-500 hover:text-white hover:border-white/20 hover:bg-white/2 transition-all">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                  Create another video
-                </button>
-              </div>
+                {/* Refine on dashboard */}
+                <Link
+                  href={jobId ? `/dashboard/videos/${jobId}` : "/dashboard"}
+                  className="group relative block rounded-2xl border border-white/10 bg-linear-to-br from-zinc-950 via-zinc-950 to-zinc-900 p-4 sm:p-5 overflow-hidden hover:border-amber-400/30 transition-colors"
+                >
+                  <div className="pointer-events-none absolute -bottom-16 -left-16 h-36 w-36 rounded-full bg-teal-500/8 opacity-50" aria-hidden />
+                  <div className="relative flex items-start gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-xl bg-amber-500/12 border border-amber-400/25 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13.5px] font-semibold text-white leading-tight">
+                        Refine with AI
+                      </p>
+                      <p className="text-[12px] text-zinc-400 mt-1 leading-relaxed">
+                        Tweak the tone, pacing, or angle in your dashboard.
+                      </p>
+                    </div>
+                    <svg
+                      className="w-4 h-4 mt-1 text-zinc-500 group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </Link>
+
+                {/* Quiet utility links */}
+                <div className={`grid gap-2 text-[12px] ${isEnterprisePlan(userPlan) ? "grid-cols-1" : "grid-cols-2"}`}>
+                  <Link
+                    href="/dashboard"
+                    className="group inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-white/8 bg-white/3 text-zinc-400 hover:text-white hover:bg-white/6 hover:border-white/15 transition-all"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+                    </svg>
+                    All my videos
+                  </Link>
+                  {!isEnterprisePlan(userPlan) ? (
+                    <Link
+                      href="/pricing"
+                      className="group inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-amber-400/20 bg-amber-500/6 text-amber-200/90 hover:text-amber-100 hover:bg-amber-500/12 hover:border-amber-400/35 transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.405 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811V8.69zM12.75 8.689c0-.864.933-1.405 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061a1.125 1.125 0 01-1.683-.977V8.69z" />
+                      </svg>
+                      Upgrade plan
+                    </Link>
+                  ) : null}
+                </div>
+              </motion.aside>
             </div>
           </motion.main>
         )}
@@ -670,50 +1237,48 @@ export default function CreatePage() {
                       </div>
 
                       <div className="mt-6">
-                        <label className="block text-sm font-medium text-white mb-3">Video style</label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            onClick={() => setMode("slideshow")}
-                            className={`p-4 rounded-xl border text-left transition-all ${mode === "slideshow" ? "border-blue-500 bg-blue-500/10" : "border-zinc-800 hover:border-zinc-700"}`}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${mode === "slideshow" ? "border-blue-500" : "border-zinc-700"}`}>
-                                {mode === "slideshow" && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                              </div>
-                              <span className="text-sm font-medium text-white">Slideshow</span>
-                            </div>
-                            <p className="text-xs text-gray-500 leading-relaxed">Ken Burns slideshow with images and voiceover</p>
-                          </button>
-                          <button
-                            onClick={() => setMode("talking_object")}
-                            className={`p-4 rounded-xl border text-left transition-all ${mode === "talking_object" ? "border-blue-500 bg-blue-500/10" : "border-zinc-800 hover:border-zinc-700"}`}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${mode === "talking_object" ? "border-blue-500" : "border-zinc-700"}`}>
-                                {mode === "talking_object" && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                              </div>
-                              <span className="text-sm font-medium text-white">Talking object</span>
-                            </div>
-                            <p className="text-xs text-gray-500 leading-relaxed">Object with a face that speaks and lip-syncs</p>
-                          </button>
+                        <label className="block text-sm font-medium text-white mb-1.5">How should this video be made?</label>
+                        <p className="text-xs text-zinc-500 mb-3">Pick one. We build exactly what you pick.</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {(
+                            [
+                              {
+                                id: "slideshow" as const,
+                                title: "Slideshow",
+                                body: "Images + voiceover. Reliable for any topic.",
+                              },
+                              {
+                                id: "talking_cartoon" as const,
+                                title: "Talking (cartoon)",
+                                body: "Character speaks on camera. Works for most prompts.",
+                              },
+                              {
+                                id: "talking_real" as const,
+                                title: "Talking (realistic)",
+                                body: "Looks like a real speaker. The video provider may block some scripts; neutral wording helps.",
+                              },
+                            ] as const
+                          ).map(({ id, title, body }) => {
+                            const selected = videoKind === id;
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => setVideoKind(id)}
+                                className={`p-4 rounded-xl border text-left transition-all h-full ${selected ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/20" : "border-zinc-800 hover:border-zinc-700"}`}
+                              >
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected ? "border-amber-400" : "border-zinc-700"}`}>
+                                    {selected && <div className="w-2 h-2 rounded-full bg-amber-400" />}
+                                  </div>
+                                  <span className="text-sm font-medium text-white">{title}</span>
+                                </div>
+                                <p className="text-xs text-zinc-500 leading-relaxed">{body}</p>
+                              </button>
+                            );
+                          })}
                         </div>
-                        {mode === "talking_object" && (
-                          <div className="mt-3 pl-1">
-                            <p className="text-xs font-medium text-gray-500 mb-2">Talking style</p>
-                            <div className="flex flex-wrap gap-2">
-                              {(["cartoon", "real"] as const).map((s) => (
-                                <button
-                                  key={s}
-                                  type="button"
-                                  onClick={() => setObjStyle(s)}
-                                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${objStyle === s ? "border-amber-500/50 bg-amber-500/10 text-amber-200" : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-600"}`}
-                                >
-                                  {objStyle === s && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
-                                  {s === "cartoon" ? "Cartoon" : "Real person"}
-                                </button>
-                              ))}
-                            </div>
-                            {objStyle === "real" && (
+                        {mode === "talking_object" && objStyle === "real" && (
                               <div className="mt-4">
                                 <p className="text-xs font-medium text-gray-500 mb-2">Avatar</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -835,8 +1400,6 @@ export default function CreatePage() {
                                   )
                                 )}
                               </div>
-                            )}
-                          </div>
                         )}
                       </div>
 
@@ -908,10 +1471,15 @@ export default function CreatePage() {
                       {!canGenerateByPlan && (
                         <div className="basis-full text-right">
                           <p className="text-xs text-amber-300">
-                            {planLimitMessage ?? "Plan limit reached."}{" "}
-                            <Link href="/pricing" className="underline hover:text-amber-200">
-                              Upgrade plan
-                            </Link>
+                            {planLimitMessage ?? "Plan limit reached."}
+                            {!isEnterprisePlan(userPlan) ? (
+                              <>
+                                {" "}
+                                <Link href="/pricing" className="underline hover:text-amber-200">
+                                  Upgrade plan
+                                </Link>
+                              </>
+                            ) : null}
                           </p>
                         </div>
                       )}
@@ -931,7 +1499,8 @@ export default function CreatePage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-red-200">{error}</p>
-                    {(errorCode === "MONTHLY_LIMIT_REACHED" || errorCode === "ANON_LIMIT_REACHED") && (
+                    {(errorCode === "MONTHLY_LIMIT_REACHED" || errorCode === "ANON_LIMIT_REACHED") &&
+                      !isEnterprisePlan(userPlan) && (
                       <Link
                         href="/pricing"
                         className="inline-flex items-center gap-1.5 mt-2.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-colors"

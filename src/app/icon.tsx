@@ -6,7 +6,7 @@ export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
 export default function Icon() {
-  const imgPath = path.join(process.cwd(), "public", "Logo.png");
+  const imgPath = path.join(process.cwd(), "public", "cutline-logo.png");
   const buffer = readFileSync(imgPath);
   const dataUri = `data:image/png;base64,${buffer.toString("base64")}`;
 

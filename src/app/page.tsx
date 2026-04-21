@@ -14,6 +14,7 @@ import {
   PRICING,
 } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
+import { isEnterprisePlan, isPlanId, type PlanId } from "@/lib/plans";
 import IntroAnimation, { HERO_IMAGES } from "@/components/ui/scroll-morph-hero";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -62,6 +63,7 @@ function HomeContent() {
   const [error, setError] = useState<string | null>(null);
   const [canGenerateByPlan, setCanGenerateByPlan] = useState(true);
   const [planLimitMessage, setPlanLimitMessage] = useState<string | null>(null);
+  const [usagePlan, setUsagePlan] = useState<PlanId | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState(0);
   const [dragActive, setDragActive] = useState(false);
@@ -116,6 +118,11 @@ function HomeContent() {
     fetch("/api/dashboard/usage")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
+        if (d?.plan && typeof d.plan === "string" && isPlanId(d.plan)) {
+          setUsagePlan(d.plan);
+        } else {
+          setUsagePlan(null);
+        }
         const hasVideoCap =
           typeof d?.videosLimit === "number" && Number.isFinite(d.videosLimit);
         const used =
@@ -803,7 +810,7 @@ function HomeContent() {
                     src={videoUrl}
                     controls
                     playsInline
-                    className="w-full aspect-video bg-black"
+                    className="w-full aspect-video bg-black object-cover"
                   />
                   <div className="p-6 flex flex-wrap gap-3 border-t border-white/5">
                     <a
@@ -2056,10 +2063,15 @@ function HomeContent() {
                         {!canGenerateByPlan && (
                           <div className="basis-full text-right">
                             <p className="text-xs text-amber-300">
-                              {planLimitMessage ?? "Plan limit reached."}{" "}
-                              <Link href="/pricing" className="underline hover:text-amber-200">
-                                Upgrade plan
-                              </Link>
+                              {planLimitMessage ?? "Plan limit reached."}
+                              {!isEnterprisePlan(usagePlan) ? (
+                                <>
+                                  {" "}
+                                  <Link href="/pricing" className="underline hover:text-amber-200">
+                                    Upgrade plan
+                                  </Link>
+                                </>
+                              ) : null}
                             </p>
                           </div>
                         )}
@@ -2794,13 +2806,6 @@ function HomeContent() {
         <footer className="relative pt-14 pb-0 bg-[#FAFAFA] overflow-hidden">
           {/* ── Brand + socials ── */}
           <div className="text-center px-6 mb-2">
-            <Link
-              href="/"
-              className="inline-block text-6xl sm:text-8xl lg:text-[9rem] font-extrabold tracking-tighter text-gray-900 leading-none hover:opacity-80 transition-opacity select-none"
-              style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
-            >
-              cutline
-            </Link>
             <p className="text-[13px] text-gray-400 mt-3 mb-6">AI video generation, one sentence at a time.</p>
             <div className="flex items-center justify-center gap-4">
               <a href="https://www.linkedin.com/in/parbhat-kapila-a14264202/" target="_blank" rel="noopener noreferrer" className="group w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-400 hover:shadow-sm transition-all" aria-label="LinkedIn">
