@@ -14,6 +14,45 @@ function getFfmpegPath(): string {
   return isWindows ? "ffmpeg.exe" : "ffmpeg";
 }
 
+function getFfprobePath(): string {
+  const envPath = process.env.FFMPEG_PATH;
+  const isWindows = process.platform === "win32";
+  if (typeof envPath === "string" && envPath.trim() !== "") {
+    const dir = path.dirname(envPath.trim());
+    return path.join(dir, isWindows ? "ffprobe.exe" : "ffprobe");
+  }
+  return isWindows ? "ffprobe.exe" : "ffprobe";
+}
+
+type VideoDimensions = { width: number; height: number };
+
+function probeVideoDimensions(videoPath: string): VideoDimensions | null {
+  try {
+    const result = spawnSync(
+      getFfprobePath(),
+      [
+        "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "csv=s=x:p=0",
+        videoPath,
+      ],
+      { encoding: "utf-8", timeout: 10_000 }
+    );
+    if (result.status !== 0 || !result.stdout) return null;
+    const out = result.stdout.trim();
+    const m = /^(\d+)x(\d+)/.exec(out);
+    if (!m) return null;
+    const width = parseInt(m[1]!, 10);
+    const height = parseInt(m[2]!, 10);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+    if (width <= 0 || height <= 0) return null;
+    return { width, height };
+  } catch {
+    return null;
+  }
+}
+
 
 function formatSrtTime(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -74,28 +113,50 @@ export function writeSrtFile(entries: SubtitleEntry[], srtPath: string): void {
   fs.writeFileSync(srtPath, content, "utf-8");
 }
 
-function writeAssFile(entries: SubtitleEntry[], assPath: string): void {
+function writeAssFile(
+  entries: SubtitleEntry[],
+  assPath: string,
+  dims: VideoDimensions
+): void {
   const valid = entries.filter(
     (e) => typeof e.startMs === "number" && typeof e.endMs === "number" && e.endMs > e.startMs && e.endMs - e.startMs >= MIN_SUBTITLE_MS
   );
   if (valid.length === 0) {
     throw new Error("No valid subtitle entries (each needs endMs > startMs and duration >= 400ms)");
   }
+
+  // Without PlayResX/Y libass falls back to 384x288, so a Fontsize of 28
+  // renders as ~10% of frame height and the captions end up dominating the
+  // screen. Declaring PlayResX/Y equal to the real video dims means the
+  // Fontsize/Margin values below map 1:1 to output pixels.
+  const { width, height } = dims;
+
+  // Target ~5% of height per line, clamped so tiny/huge sources stay legible.
+  const fontSize = Math.max(22, Math.min(120, Math.round(height * 0.048)));
+  const outline = Math.max(2, Math.round(height * 0.0025));
+  const shadow = Math.max(0, Math.round(height * 0.0012));
+  const marginV = Math.max(24, Math.round(height * 0.1));
+  const marginH = Math.max(24, Math.round(width * 0.06));
+
   const header = `[Script Info]
 ScriptType: v4.00+
+PlayResX: ${width}
+PlayResY: ${height}
+ScaledBorderAndShadow: yes
+WrapStyle: 2
 
 [V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV
-Style: Default,Arial,28,&H00FFFFFF,&H00000000,1,2,0,2,10,10,20
+Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,${fontSize},&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,${outline},${shadow},2,${marginH},${marginH},${marginV},1
 
 [Events]
-Format: Layer, Start, End, Style, Text
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
   const lines = valid.map(
     (e) =>
-      `Dialogue: 0,${formatAssTime(e.startMs)},${formatAssTime(e.endMs)},Default,${(e.text || "").trim().replace(/\r\n/g, "\\N").replace(/\r/g, "\\N").replace(/\n/g, "\\N")}`
+      `Dialogue: 0,${formatAssTime(e.startMs)},${formatAssTime(e.endMs)},Default,,0,0,0,,${(e.text || "").trim().replace(/\r\n/g, "\\N").replace(/\r/g, "\\N").replace(/\n/g, "\\N")}`
   );
-  fs.writeFileSync(assPath, header + lines.join("\n"), "utf-8");
+  fs.writeFileSync(assPath, header + lines.join("\n") + "\n", "utf-8");
 }
 
 export function burnSubtitlesIntoVideo(
@@ -114,8 +175,12 @@ export function burnSubtitlesIntoVideo(
   const assBasename = `cutline-${ts}.ass`;
   const assPath = path.join(assDir, assBasename);
 
+  // Probe real video dims so the subtitle style can be sized against the
+  // actual output resolution instead of libass's 384x288 default.
+  const dims = probeVideoDimensions(resolvedVideo) ?? { width: 1080, height: 1920 };
+
   try {
-    writeAssFile(entries, assPath);
+    writeAssFile(entries, assPath, dims);
   } catch (e) {
     console.warn("[burnSubtitles] Failed to write ASS:", e);
     throw e;
