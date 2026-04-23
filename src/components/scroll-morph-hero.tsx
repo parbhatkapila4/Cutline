@@ -7,9 +7,6 @@ export type AnimationPhase = "scatter" | "line" | "circle" | "bottom-strip";
 
 interface FlipCardProps {
     src: string;
-    index: number;
-    total: number;
-    phase: AnimationPhase;
     target: { x: number; y: number; rotation: number; scale: number; opacity: number };
 }
 
@@ -18,9 +15,6 @@ const IMG_HEIGHT = 85;
 
 function FlipCard({
     src,
-    index,
-    total,
-    phase,
     target,
 }: FlipCardProps) {
     return (
@@ -59,7 +53,7 @@ function FlipCard({
                 >
                     <img
                         src={src}
-                        alt={`hero-${index}`}
+                        alt=""
                         className="h-full w-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/10 transition-colors group-hover:bg-transparent" />
@@ -106,6 +100,10 @@ const IMAGES = [
 ];
 
 const lerp = (start: number, end: number, t: number) => start * (1 - t) + end * t;
+const seededNoise = (seed: number) => {
+    const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+    return value - Math.floor(value);
+};
 
 export default function IntroAnimation() {
     const [introPhase, setIntroPhase] = useState<AnimationPhase>("scatter");
@@ -206,10 +204,10 @@ export default function IntroAnimation() {
     }, []);
 
     const scatterPositions = useMemo(() => {
-        return IMAGES.map(() => ({
-            x: (Math.random() - 0.5) * 1500,
-            y: (Math.random() - 0.5) * 1000,
-            rotation: (Math.random() - 0.5) * 180,
+        return IMAGES.map((_, i) => ({
+            x: (seededNoise(i + 1) - 0.5) * 1500,
+            y: (seededNoise(i + 101) - 0.5) * 1000,
+            rotation: (seededNoise(i + 1001) - 0.5) * 180,
             scale: 0.6,
             opacity: 0,
         }));
@@ -334,9 +332,6 @@ export default function IntroAnimation() {
                             <FlipCard
                                 key={i}
                                 src={src}
-                                index={i}
-                                total={TOTAL_IMAGES}
-                                phase={introPhase}
                                 target={target}
                             />
                         );

@@ -12,6 +12,7 @@ import type {
   SubtitleTrack,
   VisualSpec,
 } from "@/lib/types";
+import Link from "next/link";
 import { useCallback, useState } from "react";
 
 export default function TestIntentPage() {
@@ -354,9 +355,9 @@ export default function TestIntentPage() {
     <div className="min-h-screen bg-white text-zinc-900">
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex h-14 max-w-2xl items-center px-4">
-          <a href="/" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
+          <Link href="/" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
             ← CUTLINE
-          </a>
+          </Link>
           <span className="ml-4 text-sm text-zinc-400">Stage 1-5: Intent → Narrative → Shots → Script → Subtitles</span>
         </div>
       </header>
@@ -858,7 +859,7 @@ export default function TestIntentPage() {
 
         {ttsAudioBase64 && !ttsLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
-            <p className="text-sm text-zinc-600">TTS audio ready. Use "Render video" to produce MP4.</p>
+            <p className="text-sm text-zinc-600">TTS audio ready. Use &quot;Render video&quot; to produce MP4.</p>
           </div>
         )}
 
