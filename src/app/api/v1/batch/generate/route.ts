@@ -3,10 +3,6 @@ import { handleGeneratePost } from "@/app/api/generate/handlers";
 
 const MAX_ITEMS = 12;
 
-/**
- * Programmatic multi-submit: runs each item through the same pipeline as POST /api/generate.
- * Preserves X-API-Key, cookies, and auth headers from the incoming request.
- */
 export async function POST(request: Request) {
   let body: { items?: unknown };
   try {

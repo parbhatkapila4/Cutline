@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { refineSubtitles } from "@/lib/pipeline/subtitle-refinement";
 import type { Script, ShotList, SubtitleTrack, WordTiming } from "@/lib/types";
