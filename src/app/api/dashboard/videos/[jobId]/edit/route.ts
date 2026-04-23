@@ -10,10 +10,6 @@ import { isQuickEditPrompt } from "@/lib/dashboard/editQuickPrompts";
 
 type EditBody = { message?: unknown };
 
-/**
- * Mirror of the list/detail authorization: jobs are stamped with
- * `userId ?? anonSessionId ?? IP`, so we accept any of those candidates here.
- */
 async function resolveOwnerCandidates(request: Request): Promise<string[]> {
   const candidates: string[] = [];
   try {
@@ -124,7 +120,6 @@ export async function POST(
       const uid = session?.user?.id;
       if (typeof uid === "string" && uid.trim()) sessionUserId = uid.trim();
     } catch {
-      // treat as anonymous / free
     }
     const plan = await getUserPlan(sessionUserId);
     if (plan.id === "free" && !isQuickEditPrompt(message)) {

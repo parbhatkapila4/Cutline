@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { sourceImages } from "@/lib/images/source";
 import type { Intent, ShotList, Script } from "@/lib/types";
