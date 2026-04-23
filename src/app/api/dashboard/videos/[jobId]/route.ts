@@ -45,13 +45,6 @@ function titleFromInput(input: string | undefined): string {
   if (trimmed.length <= 50) return trimmed;
   return trimmed.slice(0, 50);
 }
-
-/**
- * Resolve the identifier used to authorize access to a job. Mirrors the list route:
- * prefer the signed-in user id, fall back to the anon session cookie, and finally
- * the network identifier. This must align with how `clientId` is stamped on jobs
- * in `src/app/api/generate/handlers.ts` (`userId ?? anonSessionId ?? identifier`).
- */
 async function resolveOwnerCandidates(request: Request): Promise<string[]> {
   const candidates: string[] = [];
   try {

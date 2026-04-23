@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { analyzeAssets } from "@/lib/assets/analysis";
 import type { BrandColors } from "@/lib/assets/types";
