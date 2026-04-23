@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import type { DashboardVideoItem } from "@/app/api/dashboard/videos/route";
 import { authClient } from "@/lib/auth-client";
+import { isEnterprisePlan } from "@/lib/plans";
 import { VideoCardFrame } from "@/components/dashboard/VideoCardFrame";
 
 type VideoStatus = "completed" | "processing" | "failed";
@@ -80,6 +81,10 @@ export default function DashboardPage() {
   const [usageError, setUsageError] = useState<string | null>(null);
   const [videoFilter, setVideoFilter] = useState<VideoStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<DashboardVideoItem | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ kind: "success" | "error"; message: string } | null>(null);
 
   const fetchVideos = useCallback(async () => {
     setVideosLoading(true);
@@ -106,6 +111,62 @@ export default function DashboardPage() {
       setVideosLoading(false);
     }
   }, []);
+
+  const requestDelete = useCallback((video: DashboardVideoItem) => {
+    setDeleteError(null);
+    setConfirmTarget(video);
+  }, []);
+
+  const cancelDelete = useCallback(() => {
+    if (deletingId) return;
+    setConfirmTarget(null);
+    setDeleteError(null);
+  }, [deletingId]);
+
+  const confirmDelete = useCallback(async () => {
+    const video = confirmTarget;
+    if (!video) return;
+    setDeletingId(video.id);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/dashboard/videos/${encodeURIComponent(video.id)}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        const msg = typeof data.error === "string" && data.error.trim() ? data.error : "Could not delete the video.";
+        setDeleteError(msg);
+        return;
+      }
+      setVideos((prev) => prev.filter((v) => v.id !== video.id));
+      setConfirmTarget(null);
+      setToast({ kind: "success", message: `“${video.title.trim() || "Video"}” was deleted.` });
+    } catch {
+      setDeleteError("Could not delete the video. Check your connection and try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  }, [confirmTarget]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!confirmTarget) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cancelDelete();
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [confirmTarget, cancelDelete]);
 
   const fetchUsage = useCallback(async () => {
     setUsageLoading(true);
@@ -164,12 +225,14 @@ export default function DashboardPage() {
             <p className="text-amber-100/95 leading-snug">
               <span className="font-medium text-amber-200">Free plan:</span> you have used your included video for this month. You can still open and download videos below. Upgrade to create more.
             </p>
-            <Link
-              href="/pricing"
-              className="shrink-0 inline-flex items-center justify-center rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 transition-colors w-fit"
-            >
-              Upgrade plan
-            </Link>
+            {!isEnterprisePlan(usage.plan) ? (
+              <Link
+                href="/pricing"
+                className="shrink-0 inline-flex items-center justify-center rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 transition-colors w-fit"
+              >
+                Upgrade plan
+              </Link>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -376,12 +439,14 @@ export default function DashboardPage() {
                         ? `${usage.apiCallsLimit / 1000}k API calls`
                         : `${usage.apiCallsLimit} API calls`}
                   </p>
-                  <button
-                    type="button"
-                    className="w-full mt-3 py-2 rounded-lg border border-white/10 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors"
-                  >
-                    Upgrade plan
-                  </button>
+                  {!isEnterprisePlan(usage.plan) ? (
+                    <Link
+                      href="/pricing"
+                      className="w-full mt-3 py-2 rounded-lg border border-white/10 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors text-center block"
+                    >
+                      Upgrade plan
+                    </Link>
+                  ) : null}
                 </>
               )}
             </div>
@@ -392,7 +457,7 @@ export default function DashboardPage() {
               type="button"
               onClick={async () => {
                 try {
-                  await authClient.signOut({ fetchOptions: { onSuccess: () => {} } });
+                  await authClient.signOut({ fetchOptions: { onSuccess: () => { } } });
                 } finally {
                   window.location.href = "/";
                 }
@@ -462,12 +527,14 @@ export default function DashboardPage() {
                         <path d="M5 12h14M12 5l7 7-7 7" />
                       </svg>
                     </Link>
-                    <Link
-                      href="/pricing"
-                      className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-white/10 bg-white/2 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all"
-                    >
-                      Upgrade plan
-                    </Link>
+                    {!isEnterprisePlan(usage.plan) ? (
+                      <Link
+                        href="/pricing"
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-white/10 bg-white/2 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all"
+                      >
+                        Upgrade plan
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
 
@@ -664,7 +731,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </Link>
-                    <div className="px-4 pb-4 flex gap-2">
+                    <div className="px-4 pb-4 flex gap-2 items-center">
                       <Link href={`/dashboard/videos/${video.id}`} className="flex-1 text-center text-sm font-medium text-white bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2 rounded-lg transition-colors">View</Link>
                       {video.status === "completed" && video.videoUrl ? (
                         <a href={video.videoUrl} download className="flex-1 text-center text-sm font-medium text-black bg-white hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors">Download</a>
@@ -676,6 +743,38 @@ export default function DashboardPage() {
                           </svg>
                         </button>
                       ) : null}
+                      <button
+                        type="button"
+                        onClick={() => requestDelete(video)}
+                        disabled={deletingId === video.id}
+                        className="group/del p-2 rounded-lg border border-white/10 text-zinc-400 hover:text-red-300 hover:bg-red-500/10 hover:border-red-500/40 transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none"
+                        title="Delete video"
+                        aria-label={`Delete video ${video.title}`}
+                      >
+                        {deletingId === video.id ? (
+                          <svg className="w-[18px] h-[18px] animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-[18px] h-[18px] transition-transform duration-200 group-hover/del:scale-110 group-hover/del:-rotate-6"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.75}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+                            <path d="M19 6l-.84 13.07A2 2 0 0 1 16.16 21H7.84a2 2 0 0 1-2-1.93L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                          </svg>
+                        )}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -684,6 +783,139 @@ export default function DashboardPage() {
           </section>
         </main>
       </div>
+
+      {confirmTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-video-title"
+        >
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-md animate-[fadeIn_140ms_ease-out]"
+            onClick={cancelDelete}
+            aria-hidden
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950/95 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] overflow-hidden animate-[popIn_180ms_cubic-bezier(0.2,0.9,0.3,1.2)]">
+            <div className="absolute -top-32 -right-24 h-64 w-64 rounded-full bg-red-500/15 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-32 -left-24 h-64 w-64 rounded-full bg-red-500/10 blur-3xl pointer-events-none" />
+            <div className="relative px-6 pt-6 pb-5">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 flex h-11 w-11 items-center justify-center rounded-xl bg-red-500/15 border border-red-500/30">
+                  <svg className="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+                    <path d="M19 6l-.84 13.07A2 2 0 0 1 16.16 21H7.84a2 2 0 0 1-2-1.93L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 id="delete-video-title" className="text-lg font-semibold text-white leading-snug">Delete this video?</h2>
+                  <p className="mt-1.5 text-sm text-zinc-400 leading-relaxed">
+                    You&apos;re about to permanently delete{" "}
+                    <span className="font-medium text-white">
+                      “{(confirmTarget.title.trim() || "Untitled video").length > 60
+                        ? (confirmTarget.title.trim() || "Untitled video").slice(0, 60) + "…"
+                        : (confirmTarget.title.trim() || "Untitled video")}”
+                    </span>
+                    . This removes the file, links, and all related data. This cannot be undone.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelDelete}
+                  disabled={deletingId !== null}
+                  className="shrink-0 -mr-1 -mt-1 p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40"
+                  aria-label="Close dialog"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {deleteError ? (
+                <div className="mt-4 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2 text-xs text-red-300">
+                  {deleteError}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative px-6 py-4 bg-white/2 border-t border-white/5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                disabled={deletingId !== null}
+                className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/4 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-white/8 hover:border-white/20 transition-colors disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDelete()}
+                disabled={deletingId !== null}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-linear-to-b from-red-500 to-red-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-8px_rgba(239,68,68,0.6)] hover:from-red-500 hover:to-red-700 active:from-red-600 active:to-red-700 transition-all disabled:opacity-60 disabled:pointer-events-none"
+              >
+                {deletingId !== null ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Deleting…
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M3 6h18" />
+                      <path d="M19 6l-.84 13.07A2 2 0 0 1 16.16 21H7.84a2 2 0 0 1-2-1.93L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
+                    Delete video
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-[slideUp_220ms_ease-out]">
+          <div
+            className={`flex items-center gap-3 rounded-xl border px-4 py-3 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] backdrop-blur-md ${toast.kind === "success"
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+                : "border-red-500/30 bg-red-500/10 text-red-100"
+              }`}
+            role="status"
+          >
+            <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${toast.kind === "success" ? "bg-emerald-500/20" : "bg-red-500/20"}`}>
+              {toast.kind === "success" ? (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M5 12l5 5L20 7" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                </svg>
+              )}
+            </span>
+            <p className="text-sm font-medium pr-1">{toast.message}</p>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="ml-1 -mr-1 p-1 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Dismiss notification"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

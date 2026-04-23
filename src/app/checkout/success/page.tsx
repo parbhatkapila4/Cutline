@@ -10,13 +10,15 @@ function SuccessContent() {
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
   const [plan, setPlan] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const missingSession = !sessionId;
+  const resolvedStatus = missingSession ? "error" : status;
+  const resolvedErrorMsg =
+    missingSession
+      ? "Missing payment session. Please return to pricing and try again."
+      : errorMsg;
 
   useEffect(() => {
-    if (!sessionId) {
-      setStatus("error");
-      setErrorMsg("Missing payment session. Please return to pricing and try again.");
-      return;
-    }
+    if (!sessionId) return;
 
     let cancelled = false;
 
@@ -51,7 +53,7 @@ function SuccessContent() {
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center px-6">
       <div className="w-full max-w-lg text-center">
-        {status === "verifying" && (
+        {resolvedStatus === "verifying" && (
           <div>
             <div className="mx-auto mb-6 h-12 w-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
             <h1 className="text-xl font-semibold">Verifying your payment&hellip;</h1>
@@ -59,7 +61,7 @@ function SuccessContent() {
           </div>
         )}
 
-        {status === "success" && (
+        {resolvedStatus === "success" && (
           <div>
             <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15">
               <svg className="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -89,7 +91,7 @@ function SuccessContent() {
           </div>
         )}
 
-        {status === "error" && (
+        {resolvedStatus === "error" && (
           <div>
             <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/15">
               <svg className="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -97,7 +99,7 @@ function SuccessContent() {
               </svg>
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Verification issue</h1>
-            <p className="text-sm text-zinc-400 mt-3 leading-relaxed">{errorMsg}</p>
+            <p className="text-sm text-zinc-400 mt-3 leading-relaxed">{resolvedErrorMsg}</p>
             <p className="text-xs text-zinc-500 mt-4">
               If you were charged and still see this error, please contact support. We will resolve it promptly.
             </p>
