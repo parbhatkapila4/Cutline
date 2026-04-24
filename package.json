@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "npm run hero:download && next build",
+    "typecheck": "tsc --noEmit",
     "hero:download": "node scripts/download-hero-images.mjs",
     "start": "next start",
     "test": "vitest",

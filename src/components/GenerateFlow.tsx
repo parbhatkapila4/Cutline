@@ -6,49 +6,19 @@ import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import type { Platform } from "@/lib/platform/types";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import { CopyLinkButton } from "@/components/generate/CopyLinkButton";
-
-type JobStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
-const POLL_INITIAL_DELAY_MS = 2000;
-const POLL_BACKOFF_FACTOR = 2;
-const POLL_MAX_DELAY_MS = 15000;
-const POLL_MAX_TOTAL_MS = 30 * 60 * 1000;
-const SUBMIT_TIMEOUT_MS = 25_000;
-const MIN_INPUT_LENGTH = 5;
-const DURATION_DEFAULT = 30;
-
-const EXAMPLES = [
-  { label: "Explainer", prompt: "Explain why we dream in 30 seconds, friendly tone" },
-  { label: "Product", prompt: "Promote a meditation app with calming visuals" },
-  { label: "Educational", prompt: "How photosynthesis works for middle schoolers" },
-  { label: "Marketing", prompt: "Announce a coffee shop grand opening, warm vibes" },
-];
-
-function getSubmitErrorMessage(status: number): string {
-  if (status === 400) return "Please check your input.";
-  if (status === 429) return "Too many requests. Please try again in a moment.";
-  if (status >= 500) return "Something went wrong. Please try again.";
-  return "Something went wrong. Please try again.";
-}
-
-const FIELD_LABELS: Record<string, string> = {
-  input: "Topic",
-  durationSeconds: "Duration",
-  platform: "Platform",
-  aspectRatio: "Aspect ratio",
-  variationCount: "Number of variants",
-  mode: "Video style",
-  brandColors: "Brand colors",
-};
-
-const STAGES = [
-  { label: "Analyzing your prompt", icon: "🎯" },
-  { label: "Writing the script", icon: "✍️" },
-  { label: "Sourcing visuals", icon: "🖼️" },
-  { label: "Generating voiceover", icon: "🎙️" },
-  { label: "Rendering video", icon: "🎬" },
-];
-
-const STAGE_INTERVAL_MS = 18_000;
+import {
+  DEFAULT_ASPECT_RATIO,
+  DURATION_DEFAULT,
+  EXAMPLES,
+  FIELD_LABELS,
+  MIN_INPUT_LENGTH,
+  STAGES,
+  SUBMIT_TIMEOUT_MS,
+} from "@/components/generate/constants";
+import { getSubmitErrorMessage } from "@/components/generate/errorMapping";
+import { useJobPolling } from "@/components/generate/hooks/useJobPolling";
+import { useRecentJobs } from "@/components/generate/hooks/useRecentJobs";
+import { useStageStepper } from "@/components/generate/hooks/useStageStepper";
 
 type Props = { embedded?: boolean };
 
@@ -58,132 +28,39 @@ export function GenerateFlow({ embedded = false }: Props) {
   const [talkingObjectStyle, setTalkingObjectStyle] = useState<"cartoon" | "real">("cartoon");
   const [durationSeconds, setDurationSeconds] = useState(DURATION_DEFAULT);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [status, setStatus] = useState<JobStatus | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [variations, setVariations] = useState<Array<{ videoUrl: string; cost?: { total: number } }> | null>(null);
+  const {
+    status,
+    setStatus,
+    videoUrl,
+    setVideoUrl,
+    variations,
+    setVariations,
+    isPreview,
+    setIsPreview,
+    error,
+    setError,
+    stopPolling,
+  } = useJobPolling(jobId);
   const [selectedVariationIndex, setSelectedVariationIndex] = useState(0);
   const [variationCount, setVariationCount] = useState(1);
   const [platform, setPlatform] = useState<Platform>("general");
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
-  const [isPreview, setIsPreview] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(DEFAULT_ASPECT_RATIO);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Array<{ field: string; message: string }> | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [stage, setStage] = useState(0);
   const [recentJobsOpen, setRecentJobsOpen] = useState(false);
-  const [recentJobs, setRecentJobs] = useState<Array<{ jobId: string; status: string; createdAt: string; videoUrl?: string; topic?: string; error?: string }> | null>(null);
-  const [recentJobsLoading, setRecentJobsLoading] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { recentJobs, recentJobsLoading } = useRecentJobs(recentJobsOpen);
+  const { stage, stopStageStepper } = useStageStepper(jobId, status, STAGES.length);
   const videoRef = useRef<HTMLElement | null>(null);
 
   const valid = input.trim().length >= MIN_INPUT_LENGTH;
   const inputHasError = !!fieldErrors?.some((e) => e.field === "input");
   const durationHasError = !!fieldErrors?.some((e) => e.field === "durationSeconds");
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearTimeout(pollRef.current);
-      pollRef.current = null;
-    }
-    if (stageRef.current) {
-      clearInterval(stageRef.current);
-      stageRef.current = null;
-    }
-  }, []);
-
-  const poll = useCallback(
-    async (id: string, delayMs: number, pollStartTime: number) => {
-      try {
-        const res = await fetch(`/api/generate/${encodeURIComponent(id)}`);
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.error || "Something went wrong");
-          setStatus("failed");
-          stopPolling();
-          return;
-        }
-        setStatus(data.status);
-        if (data.status === "completed" && data.videoUrl) {
-          setVideoUrl(data.videoUrl);
-          setIsPreview(data.isPreview === true);
-          setVariations(data.variations ?? null);
-          stopPolling();
-          return;
-        }
-        if (data.status === "failed") {
-          setError(data.error || "Generation failed");
-          stopPolling();
-          return;
-        }
-        if (data.status === "cancelled") {
-          stopPolling();
-          return;
-        }
-        const elapsed = Date.now() - pollStartTime;
-        if (elapsed >= POLL_MAX_TOTAL_MS) {
-          setError("Taking longer than expected. You can refresh later.");
-          setStatus("failed");
-          stopPolling();
-          return;
-        }
-        const nextDelay = Math.min(delayMs * POLL_BACKOFF_FACTOR, POLL_MAX_DELAY_MS);
-        pollRef.current = setTimeout(() => {
-          pollRef.current = null;
-          poll(id, nextDelay, pollStartTime);
-        }, nextDelay);
-      } catch {
-        const elapsed = Date.now() - pollStartTime;
-        if (elapsed >= POLL_MAX_TOTAL_MS) {
-          setError("Taking longer than expected. You can refresh later.");
-          setStatus("failed");
-          stopPolling();
-          return;
-        }
-        const nextDelay = Math.min(delayMs * POLL_BACKOFF_FACTOR, POLL_MAX_DELAY_MS);
-        pollRef.current = setTimeout(() => {
-          pollRef.current = null;
-          poll(id, nextDelay, pollStartTime);
-        }, nextDelay);
-      }
-    },
-    [stopPolling]
-  );
-
-  useEffect(() => {
-    if (!jobId) return;
-    const pollStartTime = Date.now();
-    pollRef.current = setTimeout(() => {
-      pollRef.current = null;
-      poll(jobId, POLL_INITIAL_DELAY_MS, pollStartTime);
-    }, POLL_INITIAL_DELAY_MS);
-    return () => stopPolling();
-  }, [jobId, poll, stopPolling]);
-
-  useEffect(() => {
-    if (!recentJobsOpen || recentJobs !== null || recentJobsLoading) return;
-    setRecentJobsLoading(true);
-    fetch("/api/generate/jobs?limit=20")
-      .then((res) => res.json())
-      .then((data: { jobs?: Array<{ jobId: string; status: string; createdAt: string; videoUrl?: string; topic?: string; error?: string }> }) => {
-        setRecentJobs(Array.isArray(data.jobs) ? data.jobs : []);
-      })
-      .catch(() => setRecentJobs([]))
-      .finally(() => setRecentJobsLoading(false));
-  }, [recentJobsOpen, recentJobs, recentJobsLoading]);
-
-  useEffect(() => {
-    if (jobId && (status === "pending" || status === "processing")) {
-      setStage(0);
-      stageRef.current = setInterval(() => {
-        setStage((s) => Math.min(s + 1, STAGES.length - 1));
-      }, STAGE_INTERVAL_MS);
-      return () => {
-        if (stageRef.current) clearInterval(stageRef.current);
-      };
-    }
-  }, [jobId, status]);
+  const stopAllPolling = useCallback(() => {
+    stopPolling();
+    stopStageStepper();
+  }, [stopPolling, stopStageStepper]);
 
   const buildGenerateBody = useCallback(
     (opts: { renderMode?: "preview" | "final"; previewJobId?: string }) => ({
@@ -268,7 +145,16 @@ export function GenerateFlow({ embedded = false }: Props) {
         setSubmitting(false);
       }
     },
-    [valid, submitting, buildGenerateBody]
+    [
+      valid,
+      submitting,
+      buildGenerateBody,
+      setError,
+      setIsPreview,
+      setStatus,
+      setVariations,
+      setVideoUrl,
+    ]
   );
 
   const submit = useCallback(
@@ -322,7 +208,7 @@ export function GenerateFlow({ embedded = false }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [jobId, buildGenerateBody]);
+  }, [jobId, buildGenerateBody, setError, setIsPreview, setStatus, setVideoUrl]);
 
   const submitPreview = useCallback(
     (e: React.MouseEvent) => {
@@ -333,7 +219,7 @@ export function GenerateFlow({ embedded = false }: Props) {
   );
 
   const reset = useCallback(() => {
-    stopPolling();
+    stopAllPolling();
     setJobId(null);
     setStatus(null);
     setVideoUrl(null);
@@ -348,8 +234,8 @@ export function GenerateFlow({ embedded = false }: Props) {
     setDurationSeconds(DURATION_DEFAULT);
     setVariationCount(1);
     setPlatform("general");
-    setAspectRatio("16:9");
-  }, [stopPolling]);
+    setAspectRatio(DEFAULT_ASPECT_RATIO);
+  }, [setError, setIsPreview, setStatus, setVariations, setVideoUrl, stopAllPolling]);
 
   useEffect(() => {
     if (status === "completed" && videoUrl && videoRef.current) {
@@ -560,10 +446,10 @@ export function GenerateFlow({ embedded = false }: Props) {
                   const res = await fetch(`/api/generate/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
                   const data = await res.json();
                   if (res.ok && data.cancelled) {
-                    stopPolling();
+                    stopAllPolling();
                     setStatus("cancelled");
                   } else if (res.status === 409) {
-                    stopPolling();
+                    stopAllPolling();
                     setError("Job already finished");
                   }
                 } catch {
@@ -924,7 +810,7 @@ export function GenerateFlow({ embedded = false }: Props) {
     </form>
   );
 
-  const openJobFromList = useCallback((id: string) => {
+  const openJobFromList = (id: string) => {
     setJobId(id);
     setStatus("pending");
     setError(null);
@@ -932,7 +818,7 @@ export function GenerateFlow({ embedded = false }: Props) {
     setVariations(null);
     setSubmitError(null);
     setFieldErrors(null);
-  }, []);
+  };
 
   if (embedded) {
     return (
