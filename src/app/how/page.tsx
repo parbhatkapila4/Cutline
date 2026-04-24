@@ -302,7 +302,7 @@ export default function HowPage() {
                 <strong className="text-zinc-300">brandColors</strong> - An object <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">{`{ primary: "hex", secondary?: "hex" }`}</code>. Passed into the visual spec so the composition can use your brand colors where appropriate.
               </li>
               <li>
-                <strong className="text-zinc-300">mode</strong> - Either <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">"slideshow"</code> or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">"talking_object"</code>. Default is slideshow.
+                <strong className="text-zinc-300">mode</strong> - Either <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">&quot;slideshow&quot;</code> or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">&quot;talking_object&quot;</code>. Default is slideshow.
               </li>
               <li>
                 <strong className="text-zinc-300">textModel</strong> - An OpenRouter model ID (e.g. <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">google/gemini-2.5-flash-preview-05-20</code>). Overrides <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> for this job only; every LLM stage in that job uses this model.

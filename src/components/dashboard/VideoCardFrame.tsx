@@ -8,15 +8,10 @@ type VideoStatus = "completed" | "processing" | "failed";
 type VideoCardFrameProps = {
   videoUrl?: string;
   status: VideoStatus;
-  /** Compact list-row thumbnail */
   compact?: boolean;
   className?: string;
 };
 
-/**
- * Shows a real frame from the rendered MP4 (seeks to ~1s or ~8% duration).
- * Muted, no controls, pointer-events none so parent links still receive clicks.
- */
 export function VideoCardFrame({ videoUrl, status, compact, className }: VideoCardFrameProps) {
   const ref = useRef<HTMLVideoElement>(null);
   const [frameReady, setFrameReady] = useState(false);
