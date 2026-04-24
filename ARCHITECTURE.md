@@ -54,21 +54,21 @@ Output: public/temp/[jobId].mp4
 
 ## Key modules
 
-| Area | Location | Role |
-|------|----------|------|
-| Pipeline orchestration | `src/lib/pipeline/orchestrator.ts` | Runs all stages in order; wraps LLM/TTS/image/render with retry |
-| Intent | `src/lib/pipeline/intent.ts` | OpenRouter → structured intent |
-| Narrative | `src/lib/pipeline/narrative.ts` | OpenRouter → beats, arc |
-| Shots | `src/lib/pipeline/shots.ts` | OpenRouter → shot list |
-| Script | `src/lib/pipeline/script.ts` | OpenRouter → script entries |
-| Subtitles | `src/lib/pipeline/subtitles.ts` | Chunk script, estimate timing |
-| TTS | `src/lib/pipeline/tts.ts` | ElevenLabs/PlayHT → audio |
-| Motion / Visuals | `src/lib/pipeline/motion.ts`, `visuals.ts` | In-process specs |
-| Image sourcing | `src/lib/images/source.ts` | Per-shot: derive query → Unsplash/DALL·E/Pexels |
-| Render | `src/lib/pipeline/renderVideo.ts` | Remotion CLI → MP4 |
-| Queue | `src/lib/queue/videoQueue.ts` | BullMQ queue + worker definition |
-| Validation | `src/lib/validation/input.ts`, `src/lib/assets/validation.ts` | Input and asset validation |
-| Retry | `src/lib/utils/retry.ts` | Retry with backoff for LLM, TTS, image, render |
+| Area                   | Location                                                      | Role                                                            |
+| ---------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- |
+| Pipeline orchestration | `src/lib/pipeline/orchestrator.ts`                            | Runs all stages in order; wraps LLM/TTS/image/render with retry |
+| Intent                 | `src/lib/pipeline/intent.ts`                                  | OpenRouter → structured intent                                  |
+| Narrative              | `src/lib/pipeline/narrative.ts`                               | OpenRouter → beats, arc                                         |
+| Shots                  | `src/lib/pipeline/shots.ts`                                   | OpenRouter → shot list                                          |
+| Script                 | `src/lib/pipeline/script.ts`                                  | OpenRouter → script entries                                     |
+| Subtitles              | `src/lib/pipeline/subtitles.ts`                               | Chunk script, estimate timing                                   |
+| TTS                    | `src/lib/pipeline/tts.ts`                                     | ElevenLabs/PlayHT → audio                                       |
+| Motion / Visuals       | `src/lib/pipeline/motion.ts`, `visuals.ts`                    | In-process specs                                                |
+| Image sourcing         | `src/lib/images/source.ts`                                    | Per-shot: derive query → Unsplash/DALL·E/Pexels                 |
+| Render                 | `src/lib/pipeline/renderVideo.ts`                             | Remotion CLI → MP4                                              |
+| Queue                  | `src/lib/queue/videoQueue.ts`                                 | BullMQ queue + worker definition                                |
+| Validation             | `src/lib/validation/input.ts`, `src/lib/assets/validation.ts` | Input and asset validation                                      |
+| Retry                  | `src/lib/utils/retry.ts`                                      | Retry with backoff for LLM, TTS, image, render                  |
 
 ---
 
@@ -95,3 +95,34 @@ Output: public/temp/[jobId].mp4
 
 - **Next.js** (API + UI) can run on Vercel. API routes only enqueue jobs and poll; they do not run the pipeline.
 - **Worker + Redis** must run elsewhere (Railway, Render, Fly.io, etc.). Same env vars; worker runs `npm run worker` and connects to the same Redis as the app.
+
+---
+
+## UI and module boundaries
+
+- `src/components/ui/*` is the canonical home for reusable UI blocks used across routes.
+- Feature-specific UI should live next to the feature (`src/components/generate/*`, `src/components/dashboard/*`).
+- Landing-page-only sections belong in `src/app/_landing/*` and should not be imported by non-landing routes.
+- Keep API route handlers thin in `src/app/api/*`; business logic belongs in `src/lib/*`.
+
+### Canonical component locations
+
+- Sign-in page UI: `src/components/ui/sign-in.tsx`
+- Scroll hero: `src/components/ui/scroll-morph-hero.tsx`
+- Testimonial block: `src/components/ui/testimonial-v2.tsx`
+- Brand logo: `src/components/brand/CutlineLogo.tsx`
+
+### Extend safely
+
+#### Add a landing section
+
+1. Add a dedicated section component in `src/app/_landing/`.
+2. Keep styles/local copy inside that section component.
+3. Compose it from `src/app/page.tsx`; avoid cross-importing landing sections into non-landing pages.
+
+#### Add pipeline stage behavior
+
+1. Add/modify stage logic in `src/lib/pipeline/*`.
+2. Keep orchestration sequencing in `src/lib/pipeline/orchestrator.ts`.
+3. Add or update tests in `src/lib/pipeline/*.test.ts`.
+4. Validate with `npm run lint`, `npm run typecheck`, and `npm run test:run` before merge.
