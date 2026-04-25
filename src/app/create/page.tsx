@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
+import { getUserFriendlyErrorMessage, getErrorPresentation } from "@/lib/utils/error";
 import { STAGES } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
@@ -699,7 +699,7 @@ export default function CreatePage() {
                             <span className="text-zinc-600 hidden sm:inline">elapsed</span>
                           </span>
                           <span className="h-3 w-px bg-white/10" aria-hidden />
-                          <span className="hidden sm:inline">Usually 1-3 min</span>
+                          <span className="hidden sm:inline">Usually 1-5 mins</span>
                         </div>
                         <button
                           onClick={() => {
@@ -1440,30 +1440,112 @@ export default function CreatePage() {
                   </div>
                 </motion.div>
 
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 flex items-start gap-3.5 px-5 py-4 rounded-2xl bg-red-500/10 border border-red-500/30"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-red-200">{error}</p>
-                      {(errorCode === "MONTHLY_LIMIT_REACHED" || errorCode === "ANON_LIMIT_REACHED") &&
-                        !isEnterprisePlan(userPlan) && (
-                          <Link
-                            href="/pricing"
-                            className="inline-flex items-center gap-1.5 mt-2.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-colors"
-                          >
-                            Upgrade plan
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
-                          </Link>
-                        )}
-                    </div>
-                  </motion.div>
-                )}
+                {error && (() => {
+                  const presentation = getErrorPresentation(error, errorCode);
+                  const isQuota = presentation.tone === "quota";
+                  const isProvider = presentation.tone === "provider";
+                  const tone = isQuota
+                    ? {
+                      wrap: "bg-amber-500/8 border-amber-500/30",
+                      iconWrap: "bg-amber-500/15 ring-1 ring-amber-500/30",
+                      iconFg: "text-amber-300",
+                      title: "text-amber-100",
+                      body: "text-amber-200/80",
+                      retryBtn: "border-amber-500/30 text-amber-100 hover:bg-amber-500/10",
+                      dismissBtn: "text-amber-300/60 hover:text-amber-200 hover:bg-amber-500/10",
+                    }
+                    : isProvider
+                      ? {
+                        wrap: "bg-orange-500/8 border-orange-500/30",
+                        iconWrap: "bg-orange-500/15 ring-1 ring-orange-500/30",
+                        iconFg: "text-orange-300",
+                        title: "text-orange-100",
+                        body: "text-orange-200/80",
+                        retryBtn: "border-orange-500/30 text-orange-100 hover:bg-orange-500/10",
+                        dismissBtn: "text-orange-300/60 hover:text-orange-200 hover:bg-orange-500/10",
+                      }
+                      : {
+                        wrap: "bg-red-500/8 border-red-500/30",
+                        iconWrap: "bg-red-500/15 ring-1 ring-red-500/30",
+                        iconFg: "text-red-300",
+                        title: "text-red-100",
+                        body: "text-red-200/80",
+                        retryBtn: "border-red-500/30 text-red-100 hover:bg-red-500/10",
+                        dismissBtn: "text-red-300/60 hover:text-red-200 hover:bg-red-500/10",
+                      };
+                  const Icon = isQuota ? (
+                    <svg className={`w-5 h-5 ${tone.iconFg}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                  ) : presentation.tone === "timeout" ? (
+                    <svg className={`w-5 h-5 ${tone.iconFg}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 1.5M12 22a10 10 0 110-20 10 10 0 010 20z" />
+                    </svg>
+                  ) : presentation.tone === "network" ? (
+                    <svg className={`w-5 h-5 ${tone.iconFg}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12 20.25h.008v.008H12v-.008z" />
+                    </svg>
+                  ) : (
+                    <svg className={`w-5 h-5 ${tone.iconFg}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                  );
+                  return (
+                    <motion.div
+                      role="alert"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`mt-4 flex items-start gap-3.5 px-5 py-4 rounded-2xl border ${tone.wrap}`}
+                    >
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${tone.iconWrap}`}>
+                        {Icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${tone.title}`}>{presentation.title}</p>
+                        <p className={`mt-0.5 text-[13px] leading-relaxed ${tone.body}`}>{presentation.message}</p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {presentation.canUpgrade && !isEnterprisePlan(userPlan) && (
+                            <Link
+                              href="/pricing"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-colors"
+                            >
+                              Upgrade plan
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                              </svg>
+                            </Link>
+                          )}
+                          {presentation.canRetry && !busy && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setError(null);
+                                setErrorCode(null);
+                                void submit();
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-transparent transition-colors ${tone.retryBtn}`}
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.183" />
+                              </svg>
+                              Try again
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setError(null); setErrorCode(null); }}
+                        aria-label="Dismiss error"
+                        className={`shrink-0 -mr-1 -mt-1 p-1.5 rounded-lg transition-colors ${tone.dismissBtn}`}
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </motion.div>
+                  );
+                })()}
               </div>
             </motion.main>
           )}

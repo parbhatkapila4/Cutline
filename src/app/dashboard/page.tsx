@@ -452,7 +452,16 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-auto pt-4 shrink-0">
+          <div className="mt-auto pt-4 shrink-0 space-y-2">
+            <Link
+              href="/"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-white/10 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-colors font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 11.5L12 4l9 7.5M5.25 10v9a.75.75 0 00.75.75h3.75v-5.25A1.5 1.5 0 0111.25 13h1.5a1.5 1.5 0 011.5 1.5v5.25H18a.75.75 0 00.75-.75v-9" />
+              </svg>
+              Home
+            </Link>
             <button
               type="button"
               onClick={async () => {
@@ -886,8 +895,8 @@ export default function DashboardPage() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-[slideUp_220ms_ease-out]">
           <div
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] backdrop-blur-md ${toast.kind === "success"
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
-                : "border-red-500/30 bg-red-500/10 text-red-100"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+              : "border-red-500/30 bg-red-500/10 text-red-100"
               }`}
             role="status"
           >
