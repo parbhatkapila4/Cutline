@@ -62,7 +62,6 @@ export type VideoJobData = {
   qualityGateMode?: "off" | "warn" | "fail";
   regenFromJobId?: string;
   regenerateShotIds?: string[];
-  /** Analytics / webhook: recurring series identifier */
   seriesId?: string;
   remixFromJobId?: string;
 };
@@ -119,9 +118,6 @@ export function getVideoQueue(): Queue<VideoJobData, VideoJobResult> {
 
 const DEFAULT_AVG_JOB_SECONDS = 120;
 
-/**
- * Rough queue position (1 = next after currently active batch) and ETA for waiting/delayed jobs.
- */
 export async function getQueueWaitMetrics(jobId: string): Promise<{
   queuePosition: number | null;
   queueEtaSeconds: number | null;

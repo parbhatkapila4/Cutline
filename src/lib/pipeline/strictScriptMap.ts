@@ -6,11 +6,6 @@ import { parseAndValidateScript } from "@/lib/pipeline/script";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
-
-/**
- * Maps user-provided compliance copy to shot boundaries without rewriting wording
- * (aside from trimming whitespace per shot).
- */
 export async function mapStrictScriptToShots(
   intent: Intent,
   plan: NarrativePlan,

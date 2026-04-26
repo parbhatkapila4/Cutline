@@ -31,10 +31,18 @@ import { runRemotionRender } from "@/lib/pipeline/renderVideo";
 import { cleanupJobArtifacts } from "@/lib/storage/cleanup";
 import { isJobCancelled } from "@/lib/queue/cancelCheck";
 import { generateTalkingVideoWithVeo, VeoQuotaOrLimitError } from "@/lib/veo";
-import { concatenateMp4s, isFfmpegAvailable, getDuration, CROSSFADE_DURATION_SECONDS, mixBackgroundMusic } from "@/lib/pipeline/concatMp4";
+import {
+  concatenateMp4s,
+  isFfmpegAvailable,
+  getDuration,
+  CROSSFADE_DURATION_SECONDS,
+  mixBackgroundMusic,
+  trimVideoIfLongerThan,
+  trimAudioBufferIfLongerThan,
+} from "@/lib/pipeline/concatMp4";
 import { validateVideoChunk } from "@/lib/pipeline/validateChunk";
 import { burnSubtitlesIntoVideo, type SubtitleEntry } from "@/lib/pipeline/burnSubtitles";
-import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
+import { DURATION_MIN } from "@/lib/validation/duration";
 import { getDimensionsForAspectRatio, isValidAspectRatio } from "@/lib/validation/aspectRatio";
 import { getMaxDurationSeconds, getMaxOutputMb } from "@/lib/config/limits";
 import { logPipelineEvent } from "@/lib/utils/pipelineLogger";
@@ -70,6 +78,14 @@ const TOKENS_ESTIMATE = {
 } as const;
 
 const LOCK_DURATION_MS = 1_800_000;
+function hashStringToInt(input: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
 
 function withStageTelemetry<T>(
   jobId: string,
@@ -237,10 +253,9 @@ function splitScriptIntoChunks(
 const VEO_CHUNK_SECONDS = 8;
 const VEO_CHUNK_VALIDATE_RETRIES = 2;
 
-/** True only for capacity / throttling, not generic Veo failures (RAI, invalid video, etc.). */
 function isVeoQuotaOrRateLimitError(message: string): boolean {
   const m = message.toLowerCase();
-  if (m.includes("veo api limit reached")) return true; // legacy wrapped messages
+  if (m.includes("veo api limit reached")) return true;
   if (m.includes("resource exhausted") || m.includes("resource_exhausted")) return true;
   if (m.includes("rate limit") || m.includes("rate_limit") || m.includes("too many requests")) return true;
   if (/\b429\b/.test(m)) return true;
@@ -574,6 +589,7 @@ async function runPipelineOnce(
       platform: resolvedPlatform,
       brandBrain: options.brandBrain,
       locale: options.locale,
+      jobId,
     }
     : undefined;
   if (!loadedArtifacts) {
@@ -676,45 +692,246 @@ async function runPipelineOnce(
 
   if (mode === "talking_object" && !isPreview) {
     try {
-    const PRESET_AVATAR_FILES: Record<string, string> = {
-      presenter_female_1: "presenter-female-1.jpg",
-      presenter_male_1: "presenter-male-1.jpg",
-      creator_female_1: "creator-female-1.jpg",
-      creator_male_1: "creator-male-1.jpg",
-    };
+      const PRESET_AVATAR_FILES: Record<string, string> = {
+        presenter_female_1: "presenter-female-1.jpg",
+        presenter_male_1: "presenter-male-1.jpg",
+        creator_female_1: "creator-female-1.jpg",
+        creator_male_1: "creator-male-1.jpg",
+      };
 
-    let resolvedAvatarPath: string | undefined;
+      let resolvedAvatarPath: string | undefined;
 
-    if (talkingObjectStyle === "real" && avatar?.mode === "preset" && avatar.presetId) {
-      const filename = PRESET_AVATAR_FILES[avatar.presetId];
-      if (filename) {
-        resolvedAvatarPath = path.join(process.cwd(), "public", "avatars", "presets", filename);
-        console.log("[pipeline] jobId=" + jobId + " using preset avatar image: " + resolvedAvatarPath);
-      }
-    }
-
-    if (!resolvedAvatarPath && talkingObjectStyle === "real" && avatar?.mode === "upload") {
-      const uploadedAvatarId = avatar.uploadAssetId;
-      if (uploadedAvatarId) {
-        const uploadedMeta = getAssetMetadata(uploadedAvatarId);
-        if (!uploadedMeta || uploadedMeta.type !== "referenceImage") {
-          throw new Error("Uploaded avatar image is invalid. Please re-upload your photo and try again.");
+      if (talkingObjectStyle === "real" && avatar?.mode === "preset" && avatar.presetId) {
+        const filename = PRESET_AVATAR_FILES[avatar.presetId];
+        if (filename) {
+          resolvedAvatarPath = path.join(process.cwd(), "public", "avatars", "presets", filename);
+          console.log("[pipeline] jobId=" + jobId + " using preset avatar image: " + resolvedAvatarPath);
         }
-        const uploadedPath = getAssetFilePath(uploadedAvatarId);
-        if (!uploadedPath) {
-          throw new Error("Uploaded avatar image is missing from storage. Please re-upload and try again.");
-        }
-        resolvedAvatarPath = uploadedPath;
       }
-    }
 
-    if (resolvedAvatarPath) {
-      if (!process.env.HEYGEN_API_KEY || process.env.HEYGEN_API_KEY.trim() === "") {
-        throw new Error(
-          "Avatar video requires HEYGEN_API_KEY on the server. Add it to .env.local or choose the default avatar."
+      if (!resolvedAvatarPath && talkingObjectStyle === "real" && avatar?.mode === "upload") {
+        const uploadedAvatarId = avatar.uploadAssetId;
+        if (uploadedAvatarId) {
+          const uploadedMeta = getAssetMetadata(uploadedAvatarId);
+          if (!uploadedMeta || uploadedMeta.type !== "referenceImage") {
+            throw new Error("Uploaded avatar image is invalid. Please re-upload your photo and try again.");
+          }
+          const uploadedPath = getAssetFilePath(uploadedAvatarId);
+          if (!uploadedPath) {
+            throw new Error("Uploaded avatar image is missing from storage. Please re-upload and try again.");
+          }
+          resolvedAvatarPath = uploadedPath;
+        }
+      }
+
+      if (resolvedAvatarPath) {
+        if (!process.env.HEYGEN_API_KEY || process.env.HEYGEN_API_KEY.trim() === "") {
+          throw new Error(
+            "Avatar video requires HEYGEN_API_KEY on the server. Add it to .env.local or choose the default avatar."
+          );
+        }
+
+        const fullScriptText = script.entries
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map((e) => e.text)
+          .filter((t): t is string => t != null && t.trim() !== "")
+          .join(" ");
+
+        const talkingAvatarMaxSec =
+          coerceDurationSeconds(optionsDuration, { jobId }) ??
+          coerceDurationSeconds(intent.durationSeconds, { jobId });
+
+        await checkCancelledAndThrow();
+        logEvent({ jobId, event: "stage_start", stage: "tts" });
+        let ttsResult = await withStageTelemetry(jobId, "tts", () =>
+          retry(
+            () =>
+              generateTTS(script, shotList, { voiceId: options.ttsVoiceId }).then((r) => {
+                costTracker.recordTtsSeconds(r.durationMs / 1000);
+                return r;
+              }),
+            {
+              maxRetries: retryConfig.tts.maxRetries,
+              backoffMs: retryConfig.tts.backoffMs,
+              shouldRetry: shouldRetryForTTS,
+              label: "TTS",
+            }
+          )
         );
+
+        if (talkingAvatarMaxSec != null) {
+          const trimmedAudio = trimAudioBufferIfLongerThan(
+            ttsResult.audioBuffer,
+            ttsResult.audioFormat,
+            talkingAvatarMaxSec,
+            jobId
+          );
+          if (trimmedAudio.length !== ttsResult.audioBuffer.length) {
+            console.log(
+              "[pipeline] jobId=" +
+              jobId +
+              " TTS audio truncated to max " +
+              talkingAvatarMaxSec +
+              "s for HeyGen (was longer than selected duration)"
+            );
+          }
+          ttsResult = {
+            ...ttsResult,
+            audioBuffer: trimmedAudio,
+            durationMs: Math.min(ttsResult.durationMs, Math.round(talkingAvatarMaxSec * 1000)),
+          };
+        }
+
+        await checkCancelledAndThrow();
+        logEvent({ jobId, event: "stage_start", stage: "heygen" });
+
+        const heygenDimension =
+          aspectRatio && isValidAspectRatio(aspectRatio)
+            ? getDimensionsForAspectRatio(aspectRatio)
+            : { width: 1920, height: 1080 };
+
+        const seed = hashStringToInt(jobId + "|heygen");
+        const expressionPool: Array<"happy" | "default"> = ["happy", "happy", "default"];
+        const heygenExpression = expressionPool[seed % expressionPool.length] ?? "happy";
+        const heygenScale = 0.97 + ((seed >>> 4) % 7) * 0.01;
+        const calmStrategies = new Set(["educational", "minimal"]);
+        const heygenTalkingStyle: "stable" | "expressive" =
+          options.variationStrategy && calmStrategies.has(options.variationStrategy)
+            ? "stable"
+            : "expressive";
+
+        await withStageTelemetry(jobId, "heygen", () =>
+          withRetry(
+            () =>
+              createTalkingVideo(
+                resolvedAvatarPath,
+                ttsResult.audioBuffer,
+                ttsResult.audioFormat,
+                jobId,
+                outputPath,
+                {
+                  dimension: heygenDimension,
+                  talkingStyle: heygenTalkingStyle,
+                  expression: heygenExpression,
+                  superResolution: true,
+                  matting: true,
+                  backgroundColor: "#0f1115",
+                  scale: heygenScale,
+                }
+              ),
+            { maxAttempts: 2, baseDelayMs: 1500, maxDelayMs: 8000 }
+          )
+        );
+
+        if (talkingAvatarMaxSec != null) {
+          trimVideoIfLongerThan(outputPath, talkingAvatarMaxSec, { throwIfCannotTrim: true });
+        }
+
+        if (captions !== "off") {
+          try {
+            const durationSecRaw = getDuration(outputPath);
+            const durationSec =
+              talkingAvatarMaxSec != null
+                ? Math.min(durationSecRaw, talkingAvatarMaxSec)
+                : durationSecRaw;
+            if (durationSec > 0 && fullScriptText.trim()) {
+              const wordCountScript = fullScriptText.trim().split(/\s+/).filter(Boolean).length;
+              const minCaptionSec = 1.5;
+              const maxSegments = Math.max(1, Math.floor(durationSec / minCaptionSec));
+              const numSegments = Math.min(maxSegments, Math.min(6, Math.max(2, Math.ceil(wordCountScript / 14))));
+              const phrases = splitScriptIntoChunks(
+                fullScriptText.trim(),
+                Math.max(1, Math.ceil(wordCountScript / numSegments))
+              ).slice(0, numSegments);
+              if (phrases.length === 0) {
+                phrases.push(fullScriptText.trim().slice(0, 200));
+              }
+              const n = Math.max(1, phrases.length);
+              const durationMs = durationSec * 1000;
+              const entries: SubtitleEntry[] = phrases
+                .map((text, i) => ({
+                  text,
+                  startMs: Math.round((i / n) * durationMs),
+                  endMs: Math.round(((i + 1) / n) * durationMs),
+                }))
+                .filter((e) => e.endMs > e.startMs && e.endMs - e.startMs >= 800);
+              if (entries.length > 0) {
+                await checkCancelledAndThrow();
+                logEvent({ jobId, event: "stage_start", stage: "burn_subtitles" });
+                await withStageTelemetry(jobId, "burn_subtitles", async () => {
+                  burnSubtitlesIntoVideo(outputPath, entries);
+                });
+              }
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            throw new Error(`Caption burn failed (captions were requested): ${msg}`);
+          }
+        }
+
+        const durationSec = getDuration(outputPath);
+        if (durationSec > 0) costTracker.recordVideoSeconds(durationSec);
+        checkOutputSizeIfConfigured(outputPath);
+        logEvent({
+          jobId,
+          event: "pipeline_completed",
+          durationMs: Date.now() - startTime,
+        });
+        return {
+          videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
+          cost: costTracker.getBreakdown(),
+          qualityReport: qualityReportMain,
+        };
       }
 
+      const avatarPresetPrompt: Record<string, string> = {
+        presenter_female_1: "Young professional woman presenter, natural makeup, business-casual outfit, warm and confident expression.",
+        presenter_male_1: "Young professional man presenter, clean and modern look, business-casual outfit, confident expression.",
+        creator_female_1: "Female content creator style, casual modern outfit, approachable and energetic expression.",
+        creator_male_1: "Male content creator style, casual modern outfit, friendly and expressive delivery.",
+      };
+      const resolveAvatarPromptSuffix = (): string => {
+        if (!avatar) return "";
+        if (avatar.mode === "default") return "";
+        if (avatar.mode === "preset") {
+          return avatar.presetId ? ` Match this avatar profile: ${avatarPresetPrompt[avatar.presetId] ?? ""}` : "";
+        }
+        if (avatar.mode === "upload") {
+          const uploadedId = avatar.uploadAssetId;
+          if (!uploadedId) return "";
+          const uploadedMeta = getAssetMetadata(uploadedId);
+          if (!uploadedMeta || uploadedMeta.type !== "referenceImage") {
+            console.warn("[pipeline] jobId=" + jobId + " avatar upload is invalid; falling back to default avatar");
+            return "";
+          }
+          const uploadedPath = getAssetFilePath(uploadedId);
+          if (!uploadedPath) {
+            console.warn("[pipeline] jobId=" + jobId + " avatar upload path missing; falling back to default avatar");
+            return "";
+          }
+          return " Match the same person identity and appearance from the uploaded avatar reference image.";
+        }
+        return "";
+      };
+      const avatarPromptSuffix = resolveAvatarPromptSuffix();
+
+      let effectiveDuration =
+        coerceDurationSeconds(optionsDuration, { jobId }) ?? coerceDurationSeconds(intent.durationSeconds, { jobId });
+      if (effectiveDuration == null || effectiveDuration <= VEO_CHUNK_SECONDS) {
+        effectiveDuration = 60;
+        console.log("[pipeline] jobId=" + jobId + " talking_object duration forced to 60s (safety net)");
+      }
+      const useMultiClip = effectiveDuration > VEO_CHUNK_SECONDS;
+      console.log(
+        "[pipeline] jobId=" + jobId + " talking_object effectiveDuration=" + effectiveDuration +
+        " " + (useMultiClip ? "multi-clip" : "single clip")
+      );
+
+      const mainSubject =
+        intent.mainSubject && intent.mainSubject.trim() !== ""
+          ? intent.mainSubject
+          : "friendly character";
       const fullScriptText = script.entries
         .slice()
         .sort((a, b) => a.order - b.order)
@@ -722,417 +939,278 @@ async function runPipelineOnce(
         .filter((t): t is string => t != null && t.trim() !== "")
         .join(" ");
 
-      await checkCancelledAndThrow();
-      logEvent({ jobId, event: "stage_start", stage: "tts" });
-      const ttsResult = await withStageTelemetry(jobId, "tts", () =>
-        retry(
-          () =>
-            generateTTS(script, shotList, { voiceId: options.ttsVoiceId }).then((r) => {
-              costTracker.recordTtsSeconds(r.durationMs / 1000);
-              return r;
-            }),
-          {
-            maxRetries: retryConfig.tts.maxRetries,
-            backoffMs: retryConfig.tts.backoffMs,
-            shouldRetry: shouldRetryForTTS,
-            label: "TTS",
-          }
-        )
-      );
-
-      await checkCancelledAndThrow();
-      logEvent({ jobId, event: "stage_start", stage: "heygen" });
-      await withStageTelemetry(jobId, "heygen", () =>
-        withRetry(
-          () =>
-            createTalkingVideo(
-              resolvedAvatarPath,
-              ttsResult.audioBuffer,
-              ttsResult.audioFormat,
-              jobId,
-              outputPath
-            ),
-          { maxAttempts: 2, baseDelayMs: 1500, maxDelayMs: 8000 }
-        )
-      );
-
-      if (captions !== "off") {
-        try {
-          const durationSec = getDuration(outputPath);
-          if (durationSec > 0 && fullScriptText.trim()) {
-            const wordCountScript = fullScriptText.trim().split(/\s+/).filter(Boolean).length;
-            const minCaptionSec = 1.5;
-            const maxSegments = Math.max(1, Math.floor(durationSec / minCaptionSec));
-            const numSegments = Math.min(maxSegments, Math.min(6, Math.max(2, Math.ceil(wordCountScript / 14))));
-            const phrases = splitScriptIntoChunks(
-              fullScriptText.trim(),
-              Math.max(1, Math.ceil(wordCountScript / numSegments))
-            ).slice(0, numSegments);
-            if (phrases.length === 0) {
-              phrases.push(fullScriptText.trim().slice(0, 200));
-            }
-            const n = Math.max(1, phrases.length);
-            const durationMs = durationSec * 1000;
-            const entries: SubtitleEntry[] = phrases
-              .map((text, i) => ({
-                text,
-                startMs: Math.round((i / n) * durationMs),
-                endMs: Math.round(((i + 1) / n) * durationMs),
-              }))
-              .filter((e) => e.endMs > e.startMs && e.endMs - e.startMs >= 800);
-            if (entries.length > 0) {
-              await checkCancelledAndThrow();
-              logEvent({ jobId, event: "stage_start", stage: "burn_subtitles" });
-              await withStageTelemetry(jobId, "burn_subtitles", async () => {
-                burnSubtitlesIntoVideo(outputPath, entries);
-              });
-            }
-          }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          throw new Error(`Caption burn failed (captions were requested): ${msg}`);
-        }
-      }
-
-      const durationSec = getDuration(outputPath);
-      if (durationSec > 0) costTracker.recordVideoSeconds(durationSec);
-      checkOutputSizeIfConfigured(outputPath);
-      logEvent({
-        jobId,
-        event: "pipeline_completed",
-        durationMs: Date.now() - startTime,
-      });
-      return {
-        videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
-        cost: costTracker.getBreakdown(),
-        qualityReport: qualityReportMain,
-      };
-    }
-
-    const avatarPresetPrompt: Record<string, string> = {
-      presenter_female_1: "Young professional woman presenter, natural makeup, business-casual outfit, warm and confident expression.",
-      presenter_male_1: "Young professional man presenter, clean and modern look, business-casual outfit, confident expression.",
-      creator_female_1: "Female content creator style, casual modern outfit, approachable and energetic expression.",
-      creator_male_1: "Male content creator style, casual modern outfit, friendly and expressive delivery.",
-    };
-    const resolveAvatarPromptSuffix = (): string => {
-      if (!avatar) return "";
-      if (avatar.mode === "default") return "";
-      if (avatar.mode === "preset") {
-        return avatar.presetId ? ` Match this avatar profile: ${avatarPresetPrompt[avatar.presetId] ?? ""}` : "";
-      }
-      if (avatar.mode === "upload") {
-        const uploadedId = avatar.uploadAssetId;
-        if (!uploadedId) return "";
-        const uploadedMeta = getAssetMetadata(uploadedId);
-        if (!uploadedMeta || uploadedMeta.type !== "referenceImage") {
-          console.warn("[pipeline] jobId=" + jobId + " avatar upload is invalid; falling back to default avatar");
-          return "";
-        }
-        const uploadedPath = getAssetFilePath(uploadedId);
-        if (!uploadedPath) {
-          console.warn("[pipeline] jobId=" + jobId + " avatar upload path missing; falling back to default avatar");
-          return "";
-        }
-        return " Match the same person identity and appearance from the uploaded avatar reference image.";
-      }
-      return "";
-    };
-    const avatarPromptSuffix = resolveAvatarPromptSuffix();
-
-    let effectiveDuration =
-      coerceDurationSeconds(optionsDuration, { jobId }) ?? coerceDurationSeconds(intent.durationSeconds, { jobId });
-    if (effectiveDuration == null || effectiveDuration <= VEO_CHUNK_SECONDS) {
-      effectiveDuration = 60;
-      console.log("[pipeline] jobId=" + jobId + " talking_object duration forced to 60s (safety net)");
-    }
-    const useMultiClip = effectiveDuration > VEO_CHUNK_SECONDS;
-    console.log(
-      "[pipeline] jobId=" + jobId + " talking_object effectiveDuration=" + effectiveDuration +
-      " " + (useMultiClip ? "multi-clip" : "single clip")
-    );
-
-    const mainSubject =
-      intent.mainSubject && intent.mainSubject.trim() !== ""
-        ? intent.mainSubject
-        : "friendly character";
-    const fullScriptText = script.entries
-      .slice()
-      .sort((a, b) => a.order - b.order)
-      .map((e) => e.text)
-      .filter((t): t is string => t != null && t.trim() !== "")
-      .join(" ");
-
-    if (!useMultiClip) {
-      const singleClipBase =
-        talkingObjectStyle === "real"
-          ? `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
-          : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
-      const prompt = `${singleClipBase} Say the following: ${fullScriptText}${veoCharacterLockSuffix(options.characterLockId)}`;
-      await checkCancelledAndThrow();
-      logEvent({ jobId, event: "stage_start", stage: "veo" });
-      await withStageTelemetry(jobId, "veo", () =>
-        withRetry(
-          () =>
-            generateTalkingVideoWithVeo(prompt, jobId, outputPath, {
-              talkingObjectStyle,
-              aspectRatio,
-            }),
-          { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
-        )
-      );
-      if (captions !== "off") {
-        try {
-          const durationSec = getDuration(outputPath);
-          if (durationSec > 0 && fullScriptText.trim()) {
-            const wordCountScript = fullScriptText.trim().split(/\s+/).filter(Boolean).length;
-            const minCaptionSec = 1.5;
-            const maxSegments = Math.max(1, Math.floor(durationSec / minCaptionSec));
-            const numSegments = Math.min(maxSegments, Math.min(4, Math.max(2, Math.ceil(wordCountScript / 15))));
-            const phrases = splitScriptIntoChunks(fullScriptText.trim(), Math.max(1, Math.ceil(wordCountScript / numSegments))).slice(0, numSegments);
-            if (phrases.length === 0) {
-              phrases.push(fullScriptText.trim().slice(0, 200));
-            }
-            const n = Math.max(1, phrases.length);
-            const durationMs = durationSec * 1000;
-            const entries: SubtitleEntry[] = phrases.map((text, i) => ({
-              text,
-              startMs: Math.round((i / n) * durationMs),
-              endMs: Math.round(((i + 1) / n) * durationMs),
-            })).filter((e) => e.endMs > e.startMs && e.endMs - e.startMs >= 800);
-            if (entries.length > 0) {
-              await checkCancelledAndThrow();
-              logEvent({ jobId, event: "stage_start", stage: "burn_subtitles" });
-              await withStageTelemetry(jobId, "burn_subtitles", async () => {
-                burnSubtitlesIntoVideo(outputPath, entries);
-              });
-            }
-          }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          throw new Error(`Caption burn failed (captions were requested): ${msg}`);
-        }
-      }
-      const durationSec = getDuration(outputPath);
-      if (durationSec > 0) costTracker.recordVideoSeconds(durationSec);
-      checkOutputSizeIfConfigured(outputPath);
-      logEvent({
-        jobId,
-        event: "pipeline_completed",
-        durationMs: Date.now() - startTime,
-      });
-      return {
-        videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
-        cost: costTracker.getBreakdown(),
-        qualityReport: qualityReportMain,
-      };
-    }
-
-    const wordsPerChunk = VEO_WORDS_PER_CHUNK;
-    const targetDurationSec = effectiveDuration;
-    const targetChunks = Math.max(1, Math.ceil(targetDurationSec / VEO_CHUNK_SECONDS));
-    const targetTotalWords = targetChunks * wordsPerChunk;
-
-    const wordCount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
-
-    let combinedScript = fullScriptText.trim();
-    let message: string | undefined;
-    if (combinedScript && splitScriptIntoChunks(combinedScript, wordsPerChunk).length < targetChunks) {
-      const maxExtendRounds = 5;
-      for (let round = 0; round < maxExtendRounds; round++) {
-        const chunksNow = splitScriptIntoChunks(combinedScript, wordsPerChunk);
-        if (chunksNow.length >= targetChunks) break;
-        const currentWords = wordCount(combinedScript);
-        const wordsNeeded = targetTotalWords - currentWords;
-        if (wordsNeeded <= 0) break;
-        const extendOptions = textModel ? { model: textModel } : undefined;
-        const extension = await extendScript(combinedScript, intent, wordsNeeded, extendOptions);
-        costTracker.recordLlmTokens(TOKENS_ESTIMATE.scriptExtend);
-        if (!extension || !extension.trim()) {
-          console.log("[pipeline] jobId=" + jobId + " script extension returned empty; using current content");
-          break;
-        }
-        combinedScript = (combinedScript + " " + extension).trim();
-      }
-      const chunksAfterExtend = splitScriptIntoChunks(combinedScript, wordsPerChunk);
-      const wasExtended = combinedScript.length > fullScriptText.trim().length;
-      if (wasExtended) {
-        message = `Your prompt was short; we added more content to match your chosen ${targetDurationSec} seconds.`;
-        console.log(
-          "[pipeline] jobId=" + jobId + " script was short; extended with new content to " + targetDurationSec + "s (" + targetChunks + " chunks)"
-        );
-      } else if (chunksAfterExtend.length < targetChunks) {
-        message = `Your prompt was short; we added content where possible. Video length is shorter than your chosen ${targetDurationSec} seconds.`;
-        console.log(
-          "[pipeline] jobId=" + jobId + " script extension insufficient; using " + chunksAfterExtend.length + " chunks (target " + targetChunks + ")"
-        );
-      }
-    }
-
-    let textChunks = splitScriptIntoChunks(combinedScript, wordsPerChunk).slice(0, targetChunks);
-    await checkCancelledAndThrow();
-    logEvent({ jobId, event: "stage_start", stage: "veo" });
-    const chunkPaths = await withStageTelemetry(jobId, "veo", async (): Promise<string[]> => {
-      if (textChunks.length === 0) {
-        throw new Error("Talking object script produced no text chunks.");
-      }
-      if (!isFfmpegAvailable()) {
-        console.warn(
-          "[pipeline] jobId=" + jobId + " ffmpeg not available; talking_object videos longer than 8s require ffmpeg for concatenation. Set FFMPEG_PATH or add ffmpeg to PATH."
-        );
-        throw new Error(
-          "Video length is over 8 seconds. Multiple clips need to be concatenated; ffmpeg is required. Install ffmpeg and add it to PATH, or set FFMPEG_PATH in .env.local."
-        );
-      }
-      const jobTempDir = path.join(outputDir, jobId);
-      fs.mkdirSync(jobTempDir, { recursive: true });
-      const chunkPaths: string[] = [];
-      const N = textChunks.length;
-      for (let i = 0; i < N; i++) {
-        if (job?.token) {
-          await job.extendLock(job.token, LOCK_DURATION_MS);
-        }
-        const chunkPath = path.join(jobTempDir, `veo_chunk_${i}.mp4`);
-        const base =
+      if (!useMultiClip) {
+        const singleClipBase =
           talkingObjectStyle === "real"
             ? `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
             : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
-        const chunkText = textChunks[i]!;
-        let flow: string;
-        if (N === 1) {
-          flow = "Say exactly the following, naturally and at a steady pace: ";
-        } else if (i === 0) {
-          flow = "This is the opening of a continuous speech. Say exactly the following in about 8 seconds, finish the last word clearly with no long pause: ";
-        } else if (i === N - 1) {
-          flow = "This continues directly from the previous clip with no gap. Start immediately and say exactly the following, then end naturally: ";
-        } else {
-          flow = "This continues directly from the previous clip with no gap. Start immediately, say exactly the following in about 8 seconds, and finish the last word clearly: ";
-        }
-        const endInstruction = N > 1 && i < N - 1 ? " Do not pause at the end; the next clip will continue from here." : "";
-        const prompt = `${base} ${flow}${chunkText}${endInstruction}${veoCharacterLockSuffix(options.characterLockId)}`;
-
-        let lastChunkError: Error | null = null;
-        for (let attempt = 0; attempt <= VEO_CHUNK_VALIDATE_RETRIES; attempt++) {
+        const prompt = `${singleClipBase} Say the following: ${fullScriptText}${veoCharacterLockSuffix(options.characterLockId)}`;
+        await checkCancelledAndThrow();
+        logEvent({ jobId, event: "stage_start", stage: "veo" });
+        await withStageTelemetry(jobId, "veo", () =>
+          withRetry(
+            () =>
+              generateTalkingVideoWithVeo(prompt, jobId, outputPath, {
+                talkingObjectStyle,
+                aspectRatio,
+              }),
+            { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
+          )
+        );
+        trimVideoIfLongerThan(outputPath, effectiveDuration);
+        if (captions !== "off") {
           try {
-            if (attempt > 0) {
-              console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N + " retry " + attempt + "/" + VEO_CHUNK_VALIDATE_RETRIES);
-              if (fs.existsSync(chunkPath)) fs.unlinkSync(chunkPath);
-            } else {
-              console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N);
-            }
-            await withRetry(
-              () =>
-                generateTalkingVideoWithVeo(prompt, jobId + "-chunk-" + i, chunkPath, {
-                  talkingObjectStyle,
-                  aspectRatio,
-                }),
-              { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
-            );
-            const validation = validateVideoChunk(chunkPath, VEO_CHUNK_SECONDS);
-            if (!validation.valid) {
-              throw new Error(validation.reason ?? "Chunk validation failed");
-            }
-            chunkPaths.push(chunkPath);
-            lastChunkError = null;
-            break;
-          } catch (err) {
-            lastChunkError = err instanceof Error ? err : new Error(String(err));
-            if (attempt < VEO_CHUNK_VALIDATE_RETRIES) {
-              const delayMs = (attempt + 1) * 3000;
-              console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " invalid, retrying in " + delayMs + "ms: " + lastChunkError.message);
-              if (fs.existsSync(chunkPath)) {
-                try {
-                  fs.unlinkSync(chunkPath);
-                } catch (unlinkErr) {
-                  console.warn("[pipeline] jobId=" + jobId + " failed to unlink chunk:", unlinkErr instanceof Error ? unlinkErr.message : String(unlinkErr));
-                }
+            const durationSec = getDuration(outputPath);
+            if (durationSec > 0 && fullScriptText.trim()) {
+              const wordCountScript = fullScriptText.trim().split(/\s+/).filter(Boolean).length;
+              const minCaptionSec = 1.5;
+              const maxSegments = Math.max(1, Math.floor(durationSec / minCaptionSec));
+              const numSegments = Math.min(maxSegments, Math.min(4, Math.max(2, Math.ceil(wordCountScript / 15))));
+              const phrases = splitScriptIntoChunks(fullScriptText.trim(), Math.max(1, Math.ceil(wordCountScript / numSegments))).slice(0, numSegments);
+              if (phrases.length === 0) {
+                phrases.push(fullScriptText.trim().slice(0, 200));
               }
-              await new Promise((r) => setTimeout(r, delayMs));
-            } else {
-              throw new Error(
-                `Chunk ${i + 1}/${N} failed validation after ${VEO_CHUNK_VALIDATE_RETRIES + 1} attempts. ` +
-                `All chunks must be valid before concatenation. Last error: ${lastChunkError.message}`
-              );
+              const n = Math.max(1, phrases.length);
+              const durationMs = durationSec * 1000;
+              const entries: SubtitleEntry[] = phrases.map((text, i) => ({
+                text,
+                startMs: Math.round((i / n) * durationMs),
+                endMs: Math.round(((i + 1) / n) * durationMs),
+              })).filter((e) => e.endMs > e.startMs && e.endMs - e.startMs >= 800);
+              if (entries.length > 0) {
+                await checkCancelledAndThrow();
+                logEvent({ jobId, event: "stage_start", stage: "burn_subtitles" });
+                await withStageTelemetry(jobId, "burn_subtitles", async () => {
+                  burnSubtitlesIntoVideo(outputPath, entries);
+                });
+              }
             }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            throw new Error(`Caption burn failed (captions were requested): ${msg}`);
           }
         }
+        const durationSec = getDuration(outputPath);
+        if (durationSec > 0) costTracker.recordVideoSeconds(durationSec);
+        checkOutputSizeIfConfigured(outputPath);
+        logEvent({
+          jobId,
+          event: "pipeline_completed",
+          durationMs: Date.now() - startTime,
+        });
+        return {
+          videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
+          cost: costTracker.getBreakdown(),
+          qualityReport: qualityReportMain,
+        };
       }
 
-      for (let i = 0; i < chunkPaths.length; i++) {
-        const v = validateVideoChunk(chunkPaths[i]!, VEO_CHUNK_SECONDS);
-        if (!v.valid) {
-          throw new Error(
-            `Chunk ${i + 1}/${chunkPaths.length} failed pre-concat validation: ${v.reason ?? "unknown"}. ` +
-            `All chunks must be valid before concatenation.`
+      const wordsPerChunk = VEO_WORDS_PER_CHUNK;
+      const targetDurationSec = effectiveDuration;
+      const targetChunks = Math.max(1, Math.ceil(targetDurationSec / VEO_CHUNK_SECONDS));
+      const targetTotalWords = targetChunks * wordsPerChunk;
+
+      const wordCount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
+
+      let combinedScript = fullScriptText.trim();
+      let message: string | undefined;
+      if (combinedScript && splitScriptIntoChunks(combinedScript, wordsPerChunk).length < targetChunks) {
+        const maxExtendRounds = 5;
+        for (let round = 0; round < maxExtendRounds; round++) {
+          const chunksNow = splitScriptIntoChunks(combinedScript, wordsPerChunk);
+          if (chunksNow.length >= targetChunks) break;
+          const currentWords = wordCount(combinedScript);
+          const wordsNeeded = targetTotalWords - currentWords;
+          if (wordsNeeded <= 0) break;
+          const extendOptions = textModel ? { model: textModel } : undefined;
+          const extension = await extendScript(combinedScript, intent, wordsNeeded, extendOptions);
+          costTracker.recordLlmTokens(TOKENS_ESTIMATE.scriptExtend);
+          if (!extension || !extension.trim()) {
+            console.log("[pipeline] jobId=" + jobId + " script extension returned empty; using current content");
+            break;
+          }
+          combinedScript = (combinedScript + " " + extension).trim();
+        }
+        const chunksAfterExtend = splitScriptIntoChunks(combinedScript, wordsPerChunk);
+        const wasExtended = combinedScript.length > fullScriptText.trim().length;
+        if (wasExtended) {
+          message = `Your prompt was short; we added more content to match your chosen ${targetDurationSec} seconds.`;
+          console.log(
+            "[pipeline] jobId=" + jobId + " script was short; extended with new content to " + targetDurationSec + "s (" + targetChunks + " chunks)"
+          );
+        } else if (chunksAfterExtend.length < targetChunks) {
+          message = `Your prompt was short; we added content where possible. Video length is shorter than your chosen ${targetDurationSec} seconds.`;
+          console.log(
+            "[pipeline] jobId=" + jobId + " script extension insufficient; using " + chunksAfterExtend.length + " chunks (target " + targetChunks + ")"
           );
         }
       }
-      return chunkPaths;
-    });
-    await checkCancelledAndThrow();
-    logEvent({ jobId, event: "stage_start", stage: "concat" });
-    await withStageTelemetry(jobId, "concat", async () => {
-      concatenateMp4s(chunkPaths, outputPath);
-    });
-    try {
-      mixBackgroundMusic(outputPath, outputPath, undefined, 0.22);
-      console.log("[pipeline] jobId=" + jobId + " stage=background-music (mixed if available)");
-    } catch (e) {
-      console.warn("[pipeline] jobId=" + jobId + " background music mix skipped:", e);
-    }
-    if (captions !== "off") {
-      try {
-        const totalVideoSec = getDuration(outputPath);
-        const videoDurationSec = totalVideoSec > 0 ? totalVideoSec : (() => {
-          const chunkDurations = chunkPaths.map((p) => getDuration(p) || 8);
-          const crossfadeSec = CROSSFADE_DURATION_SECONDS;
-          return chunkDurations.reduce((a, b) => a + b, 0) - (textChunks.length - 1) * crossfadeSec;
-        })();
-        if (videoDurationSec <= 0) {
-          throw new Error("Could not get video duration for captions. Captions were requested but cannot be added.");
-        } else {
-          const n = Math.max(1, textChunks.length);
-          const durationMs = videoDurationSec * 1000;
-          const minCaptionMs = 1000;
-          const entries: SubtitleEntry[] = [];
-          for (let i = 0; i < textChunks.length; i++) {
-            const text = (textChunks[i] ?? "").trim();
-            if (!text) continue;
-            const startMs = Math.round((i / n) * durationMs);
-            let endMs = Math.round(((i + 1) / n) * durationMs);
-            if (endMs <= startMs) endMs = startMs + minCaptionMs;
-            if (endMs - startMs < minCaptionMs) endMs = startMs + minCaptionMs;
-            if (endMs > durationMs) endMs = Math.round(durationMs);
-            entries.push({ text, startMs, endMs });
-          }
-          if (entries.length === 0) {
-            throw new Error("No caption segments could be generated. Captions were requested but cannot be added.");
-          }
-          await checkCancelledAndThrow();
-          logEvent({ jobId, event: "stage_start", stage: "burn_subtitles" });
-          await withStageTelemetry(jobId, "burn_subtitles", async () => {
-            burnSubtitlesIntoVideo(outputPath, entries);
-          });
+
+      const textChunks = splitScriptIntoChunks(combinedScript, wordsPerChunk).slice(0, targetChunks);
+      await checkCancelledAndThrow();
+      logEvent({ jobId, event: "stage_start", stage: "veo" });
+      const chunkPaths = await withStageTelemetry(jobId, "veo", async (): Promise<string[]> => {
+        if (textChunks.length === 0) {
+          throw new Error("Talking object script produced no text chunks.");
         }
+        if (!isFfmpegAvailable()) {
+          console.warn(
+            "[pipeline] jobId=" + jobId + " ffmpeg not available; talking_object videos longer than 8s require ffmpeg for concatenation. Set FFMPEG_PATH or add ffmpeg to PATH."
+          );
+          throw new Error(
+            "Video length is over 8 seconds. Multiple clips need to be concatenated; ffmpeg is required. Install ffmpeg and add it to PATH, or set FFMPEG_PATH in .env.local."
+          );
+        }
+        const jobTempDir = path.join(outputDir, jobId);
+        fs.mkdirSync(jobTempDir, { recursive: true });
+        const chunkPaths: string[] = [];
+        const N = textChunks.length;
+        for (let i = 0; i < N; i++) {
+          if (job?.token) {
+            await job.extendLock(job.token, LOCK_DURATION_MS);
+          }
+          const chunkPath = path.join(jobTempDir, `veo_chunk_${i}.mp4`);
+          const base =
+            talkingObjectStyle === "real"
+              ? `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
+              : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
+          const chunkText = textChunks[i]!;
+          let flow: string;
+          if (N === 1) {
+            flow = "Say exactly the following, naturally and at a steady pace: ";
+          } else if (i === 0) {
+            flow = "This is the opening of a continuous speech. Say exactly the following in about 8 seconds, finish the last word clearly with no long pause: ";
+          } else if (i === N - 1) {
+            flow = "This continues directly from the previous clip with no gap. Start immediately and say exactly the following, then end naturally: ";
+          } else {
+            flow = "This continues directly from the previous clip with no gap. Start immediately, say exactly the following in about 8 seconds, and finish the last word clearly: ";
+          }
+          const endInstruction = N > 1 && i < N - 1 ? " Do not pause at the end; the next clip will continue from here." : "";
+          const prompt = `${base} ${flow}${chunkText}${endInstruction}${veoCharacterLockSuffix(options.characterLockId)}`;
+
+          let lastChunkError: Error | null = null;
+          for (let attempt = 0; attempt <= VEO_CHUNK_VALIDATE_RETRIES; attempt++) {
+            try {
+              if (attempt > 0) {
+                console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N + " retry " + attempt + "/" + VEO_CHUNK_VALIDATE_RETRIES);
+                if (fs.existsSync(chunkPath)) fs.unlinkSync(chunkPath);
+              } else {
+                console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N);
+              }
+              await withRetry(
+                () =>
+                  generateTalkingVideoWithVeo(prompt, jobId + "-chunk-" + i, chunkPath, {
+                    talkingObjectStyle,
+                    aspectRatio,
+                  }),
+                { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
+              );
+              const validation = validateVideoChunk(chunkPath, VEO_CHUNK_SECONDS);
+              if (!validation.valid) {
+                throw new Error(validation.reason ?? "Chunk validation failed");
+              }
+              chunkPaths.push(chunkPath);
+              lastChunkError = null;
+              break;
+            } catch (err) {
+              lastChunkError = err instanceof Error ? err : new Error(String(err));
+              if (attempt < VEO_CHUNK_VALIDATE_RETRIES) {
+                const delayMs = (attempt + 1) * 3000;
+                console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " invalid, retrying in " + delayMs + "ms: " + lastChunkError.message);
+                if (fs.existsSync(chunkPath)) {
+                  try {
+                    fs.unlinkSync(chunkPath);
+                  } catch (unlinkErr) {
+                    console.warn("[pipeline] jobId=" + jobId + " failed to unlink chunk:", unlinkErr instanceof Error ? unlinkErr.message : String(unlinkErr));
+                  }
+                }
+                await new Promise((r) => setTimeout(r, delayMs));
+              } else {
+                throw new Error(
+                  `Chunk ${i + 1}/${N} failed validation after ${VEO_CHUNK_VALIDATE_RETRIES + 1} attempts. ` +
+                  `All chunks must be valid before concatenation. Last error: ${lastChunkError.message}`
+                );
+              }
+            }
+          }
+        }
+
+        for (let i = 0; i < chunkPaths.length; i++) {
+          const v = validateVideoChunk(chunkPaths[i]!, VEO_CHUNK_SECONDS);
+          if (!v.valid) {
+            throw new Error(
+              `Chunk ${i + 1}/${chunkPaths.length} failed pre-concat validation: ${v.reason ?? "unknown"}. ` +
+              `All chunks must be valid before concatenation.`
+            );
+          }
+        }
+        return chunkPaths;
+      });
+      await checkCancelledAndThrow();
+      logEvent({ jobId, event: "stage_start", stage: "concat" });
+      await withStageTelemetry(jobId, "concat", async () => {
+        concatenateMp4s(chunkPaths, outputPath);
+      });
+      trimVideoIfLongerThan(outputPath, targetDurationSec);
+      try {
+        mixBackgroundMusic(outputPath, outputPath, undefined, 0.22);
+        console.log("[pipeline] jobId=" + jobId + " stage=background-music (mixed if available)");
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`Caption burn failed (captions were requested): ${msg}`);
+        console.warn("[pipeline] jobId=" + jobId + " background music mix skipped:", e);
       }
-    }
-    const videoDurationSec = getDuration(outputPath);
-    if (videoDurationSec > 0) costTracker.recordVideoSeconds(videoDurationSec);
-    checkOutputSizeIfConfigured(outputPath);
-    logEvent({
-      jobId,
-      event: "pipeline_completed",
-      durationMs: Date.now() - startTime,
-    });
-    return {
-      videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
-      cost: costTracker.getBreakdown(),
-      qualityReport: qualityReportMain,
-      ...(message ? { message } : {}),
-    };
+      if (captions !== "off") {
+        try {
+          const totalVideoSec = getDuration(outputPath);
+          const videoDurationSec = totalVideoSec > 0 ? totalVideoSec : (() => {
+            const chunkDurations = chunkPaths.map((p) => getDuration(p) || 8);
+            const crossfadeSec = CROSSFADE_DURATION_SECONDS;
+            return chunkDurations.reduce((a, b) => a + b, 0) - (textChunks.length - 1) * crossfadeSec;
+          })();
+          if (videoDurationSec <= 0) {
+            throw new Error("Could not get video duration for captions. Captions were requested but cannot be added.");
+          } else {
+            const n = Math.max(1, textChunks.length);
+            const durationMs = videoDurationSec * 1000;
+            const minCaptionMs = 1000;
+            const entries: SubtitleEntry[] = [];
+            for (let i = 0; i < textChunks.length; i++) {
+              const text = (textChunks[i] ?? "").trim();
+              if (!text) continue;
+              const startMs = Math.round((i / n) * durationMs);
+              let endMs = Math.round(((i + 1) / n) * durationMs);
+              if (endMs <= startMs) endMs = startMs + minCaptionMs;
+              if (endMs - startMs < minCaptionMs) endMs = startMs + minCaptionMs;
+              if (endMs > durationMs) endMs = Math.round(durationMs);
+              entries.push({ text, startMs, endMs });
+            }
+            if (entries.length === 0) {
+              throw new Error("No caption segments could be generated. Captions were requested but cannot be added.");
+            }
+            await checkCancelledAndThrow();
+            logEvent({ jobId, event: "stage_start", stage: "burn_subtitles" });
+            await withStageTelemetry(jobId, "burn_subtitles", async () => {
+              burnSubtitlesIntoVideo(outputPath, entries);
+            });
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(`Caption burn failed (captions were requested): ${msg}`);
+        }
+      }
+      const videoDurationSec = getDuration(outputPath);
+      if (videoDurationSec > 0) costTracker.recordVideoSeconds(videoDurationSec);
+      checkOutputSizeIfConfigured(outputPath);
+      logEvent({
+        jobId,
+        event: "pipeline_completed",
+        durationMs: Date.now() - startTime,
+      });
+      return {
+        videoPath: `/temp/${jobId}${fileSuffix}.mp4`,
+        cost: costTracker.getBreakdown(),
+        qualityReport: qualityReportMain,
+        ...(message ? { message } : {}),
+      };
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       const isCapacity =
@@ -1170,9 +1248,9 @@ async function runPipelineOnce(
         shotList,
         isPreview ? { usePreviewTTS: true } : { voiceId: options.ttsVoiceId }
       ).then((r) => {
-      costTracker.recordTtsSeconds(r.durationMs / 1000);
-      return r;
-    }),
+        costTracker.recordTtsSeconds(r.durationMs / 1000);
+        return r;
+      }),
     {
       maxRetries: retryConfig.tts.maxRetries,
       backoffMs: retryConfig.tts.backoffMs,
@@ -1242,8 +1320,7 @@ async function runPipelineOnce(
 
   await checkCancelledAndThrow();
   logEvent({ jobId, event: "stage_start", stage: "image_sourcing" });
-  let imageSpec;
-  imageSpec = await withStageTelemetry(jobId, "image_sourcing", () =>
+  const imageSpec = await withStageTelemetry(jobId, "image_sourcing", () =>
     retry(
       () =>
         sourceImages(
@@ -1390,6 +1467,9 @@ async function runPipelineOnce(
       label: "Remotion render",
     }
   ));
+
+  const slideshowCapSec = Math.max(1, Math.round(compositionDurationSec));
+  trimVideoIfLongerThan(effectiveOutputPath, slideshowCapSec);
 
   if (isPreview) {
     checkOutputSizeIfConfigured(effectiveOutputPath);
