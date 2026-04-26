@@ -84,8 +84,8 @@ CREATE TABLE IF NOT EXISTS brand_kits (
   logo_url TEXT,
   primary_color TEXT,
   secondary_color TEXT,
-  banned_phrases TEXT[] NOT NULL DEFAULT '{}',
-  required_phrases TEXT[] NOT NULL DEFAULT '{}',
+  banned_phrases TEXT [] NOT NULL DEFAULT '{}',
+  required_phrases TEXT [] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

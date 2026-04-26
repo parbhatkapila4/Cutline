@@ -1,4 +1,3 @@
-
 import type { Intent } from "@/lib/types";
 import type { Shot } from "@/lib/types";
 import type { Script } from "@/lib/types";
