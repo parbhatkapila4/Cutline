@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 const GoogleIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 48 48">
@@ -100,6 +102,9 @@ export const SignInPage: React.FC<SignInPageProps> = ({
 
         <div className="w-full max-w-md relative z-10">
           <div className="flex flex-col gap-6">
+            <Link href="/" className="animate-element inline-block w-fit">
+              <CutlineLogo size="md" className="max-w-[220px]" />
+            </Link>
             <h1 className="animate-element animate-delay-100 text-4xl md:text-5xl font-semibold leading-tight">
               {title}
             </h1>

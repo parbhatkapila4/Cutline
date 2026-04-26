@@ -5,13 +5,13 @@ const connectionString = process.env.DATABASE_URL;
 const pool =
   connectionString != null && connectionString.trim() !== ""
     ? new Pool({
-        connectionString,
-        max: 10,
-        idleTimeoutMillis: 30_000,
-        connectionTimeoutMillis: 10_000,
-        allowExitOnIdle: true,
-        keepAlive: true,
-      })
+      connectionString,
+      max: 10,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+      allowExitOnIdle: true,
+      keepAlive: true,
+    })
     : undefined;
 
 pool?.on("error", (err: Error & { code?: string }) => {

@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactElement } from "react";
+
 const S = 7;
 const D = 5;
 
@@ -322,7 +324,6 @@ const FLOWERS: FlowerDef[] = [
 ];
 
 const VIEW_W = 1500;
-/** Tight to flower height (~18 rows × 7px) + pad for hover scale / sway */
 const VIEW_H = 188;
 const GROUND = VIEW_H;
 
@@ -334,7 +335,7 @@ function FlowerGroup({ flower, index }: { flower: FlowerDef; index: number }) {
   const pivotX = flower.x + (maxW * S) / 2;
   const pivotY = GROUND;
 
-  const rects: JSX.Element[] = [];
+  const rects: ReactElement[] = [];
   let k = 0;
 
   for (let ry = 0; ry < totalRows; ry++) {
