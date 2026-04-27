@@ -5,7 +5,6 @@ export type PlanConfig = {
   label: string;
   videosPerMonth: number | null;
   apiCallsPerMonth: number | null;
-  /** Dashboard: no fixed token cap (paid tiers). */
   tokensUnlimited: boolean;
 };
 
@@ -44,7 +43,6 @@ export function isPlanId(value: string): value is PlanId {
   return value === "free" || value === "beginner" || value === "professional" || value === "enterprise";
 }
 
-/** Highest paid tier — hide “upgrade” CTAs (there is nothing above Enterprise). */
 export function isEnterprisePlan(plan: string | undefined | null): boolean {
   return plan === "enterprise";
 }

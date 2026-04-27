@@ -1,26 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Warp } from "@paper-design/shaders-react";
 
 export type WarpShaderHeroProps = {
-  /**
-   * When true, skips the WebGL `Warp` layer (CSS-only background).
-   * Use while generating or when an HD video is playing on top — the shader
-   * competes for GPU with decoding and tanks scroll / playback frame rate.
-   */
   disableWarp?: boolean;
 };
 
-/**
- * Full-bleed background: CSS gradient + soft orbs (always visible), then optional
- * Warp shader on top when WebGL works. If the shader fails to paint, you still
- * get a live editorial gradient instead of flat black.
- */
-export default function WarpShaderHero({ disableWarp = false }: WarpShaderHeroProps) {
+function WarpShaderHero({ disableWarp = false }: WarpShaderHeroProps) {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const [lowPerfDevice, setLowPerfDevice] = useState(false);
-  const [isPageVisible, setIsPageVisible] = useState(true);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -30,42 +18,41 @@ export default function WarpShaderHero({ disableWarp = false }: WarpShaderHeroPr
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  useEffect(() => {
-    const nav = navigator as Navigator & { deviceMemory?: number };
-    const cores = typeof nav.hardwareConcurrency === "number" ? nav.hardwareConcurrency : 8;
-    const memory = typeof nav.deviceMemory === "number" ? nav.deviceMemory : 8;
-    // Guardrail for older / low-power machines where full-screen WebGL + blur layers
-    // can tank scroll FPS on long pages.
-    setLowPerfDevice(cores <= 6 || memory <= 4);
-  }, []);
-
-  useEffect(() => {
-    const onVisibilityChange = () => setIsPageVisible(!document.hidden);
-    onVisibilityChange();
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, []);
-
-  const showWarp =
-    !disableWarp &&
-    !prefersReducedMotion &&
-    !lowPerfDevice &&
-    isPageVisible;
+  const showWarp = !disableWarp && !prefersReducedMotion;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      {/* Base + animated orbs: never depends on WebGL */}
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden contain-[paint]">
+
       <div className="absolute inset-0 bg-linear-to-br from-zinc-950 via-black to-zinc-950" aria-hidden />
+
+
+      {!showWarp ? (
+        <div
+          className="absolute inset-0"
+          style={{
+            opacity: 0.72,
+            background: [
+              `radial-gradient(ellipse 120% 75% at 82% 8%, hsl(38 95% 58% / 0.22) 0%, transparent 58%)`,
+              `radial-gradient(ellipse 95% 65% at 12% 92%, hsl(172 70% 42% / 0.18) 0%, transparent 52%)`,
+              `radial-gradient(ellipse 80% 55% at 48% 55%, hsl(24 80% 22% / 0.2) 0%, transparent 62%)`,
+              `linear-gradient(128deg, hsl(20 60% 6% / 0.55) 0%, transparent 42%, hsl(172 70% 42% / 0.08) 100%)`,
+            ].join(", "),
+          }}
+          aria-hidden
+        />
+      ) : null}
+
+
       <div
-        className="absolute -top-28 -right-28 h-[min(100vw,520px)] w-[min(100vw,520px)] rounded-full bg-linear-to-br from-amber-500/22 via-orange-500/10 to-transparent blur-3xl opacity-85"
-        style={{ willChange: showWarp ? "transform, opacity" : "auto" }}
+        className="absolute -top-28 -right-28 h-[min(100vw,520px)] w-[min(100vw,520px)] rounded-full bg-linear-to-br from-amber-500/22 via-orange-500/10 to-transparent blur-3xl opacity-90"
         aria-hidden
       />
       <div
-        className="absolute -bottom-36 -left-28 h-[min(100vw,440px)] w-[min(100vw,440px)] rounded-full bg-linear-to-tr from-teal-500/18 via-emerald-600/8 to-transparent blur-3xl opacity-75"
-        style={{ willChange: showWarp ? "transform, opacity" : "auto" }}
+        className="absolute -bottom-36 -left-28 h-[min(100vw,440px)] w-[min(100vw,440px)] rounded-full bg-linear-to-tr from-teal-500/18 via-emerald-600/8 to-transparent blur-3xl opacity-80"
         aria-hidden
       />
+
+
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{
@@ -76,7 +63,7 @@ export default function WarpShaderHero({ disableWarp = false }: WarpShaderHeroPr
         aria-hidden
       />
 
-      {/* Shader layer: only when not disabled — avoids GPU contention with video decode */}
+
       {showWarp ? (
         <div className="absolute inset-0 z-1 min-h-full w-full opacity-65 mix-blend-screen">
           <Warp
@@ -90,7 +77,8 @@ export default function WarpShaderHero({ disableWarp = false }: WarpShaderHeroPr
             shapeScale={0.1}
             scale={1}
             rotation={0}
-            speed={0.55}
+            speed={0}
+            frame={0}
             colors={[
               "hsl(20, 60%, 6%)",
               "hsl(38, 95%, 58%)",
@@ -101,7 +89,7 @@ export default function WarpShaderHero({ disableWarp = false }: WarpShaderHeroPr
         </div>
       ) : null}
 
-      {/* Vignette: deeper at edges to ground the cards on top */}
+
       <div
         className="absolute inset-0 z-2"
         style={{
@@ -113,3 +101,5 @@ export default function WarpShaderHero({ disableWarp = false }: WarpShaderHeroPr
     </div>
   );
 }
+
+export default memo(WarpShaderHero);
