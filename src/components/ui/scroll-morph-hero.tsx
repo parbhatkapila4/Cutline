@@ -8,9 +8,6 @@ export type AnimationPhase = "scatter" | "line" | "circle" | "bottom-strip";
 interface FlipCardProps {
   src: string;
   nextSrc: string | null;
-  index: number;
-  total: number;
-  phase: AnimationPhase;
   target: { x: number; y: number; rotation: number; scale: number; opacity: number };
 }
 
@@ -26,9 +23,6 @@ const FALLBACK_IMAGE =
 function FlipCard({
   src,
   nextSrc,
-  index,
-  total,
-  phase,
   target,
 }: FlipCardProps) {
   const [imgSrc, setImgSrc] = React.useState(src);
@@ -92,6 +86,10 @@ const IMAGES = Array.from({ length: TOTAL_IMAGES }, (_, i) => `/hero/${i + 1}.jp
 export const HERO_IMAGES = IMAGES;
 
 const lerp = (start: number, end: number, t: number) => start * (1 - t) + end * t;
+const seededNoise = (seed: number) => {
+  const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return value - Math.floor(value);
+};
 
 export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps) {
   const [introPhase, setIntroPhase] = useState<AnimationPhase>("scatter");
@@ -210,10 +208,10 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
   }, []);
 
   const scatterPositions = useMemo(() => {
-    return IMAGES.map(() => ({
-      x: (Math.random() - 0.5) * 1500,
-      y: (Math.random() - 0.5) * 1000,
-      rotation: (Math.random() - 0.5) * 180,
+    return IMAGES.map((_, i) => ({
+      x: (seededNoise(i + 1) - 0.5) * 1500,
+      y: (seededNoise(i + 101) - 0.5) * 1000,
+      rotation: (seededNoise(i + 1001) - 0.5) * 180,
       scale: 0.6,
       opacity: 0,
     }));
@@ -243,7 +241,6 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
         className="flex h-full w-full flex-col items-center justify-center perspective-1000"
         style={{ transformStyle: "preserve-3d" }}
       >
-        {/* z-50 + translateZ: Framer 3D transforms on cards otherwise paint over the headline */}
         <div
           className="absolute inset-x-0 top-1/2 z-50 flex flex-col items-center justify-center px-5 text-center pointer-events-none sm:px-8"
           style={{ transform: "translateY(-50%) translateZ(120px)" }}
@@ -256,10 +253,15 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
                 : { opacity: 0, filter: "blur(10px)" }
             }
             transition={{ duration: 1 }}
-            className="text-balance font-medium leading-tight tracking-tight text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] max-w-[min(11rem,calc(100vw-4rem))] text-[clamp(0.875rem,4.5vw,1.2rem)] max-md:px-1 md:max-w-xl md:text-4xl"
+            className="text-balance font-medium leading-tight tracking-tight text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] max-w-[min(11rem,calc(100vw-4rem))] text-[clamp(0.875rem,4.5vw,1.2rem)] max-md:px-1 md:max-w-[min(22rem,calc(100vw-9rem))] md:text-3xl lg:max-w-[min(28rem,calc(100vw-10rem))] lg:text-4xl xl:max-w-4xl"
           >
             <span className="md:hidden">One sentence.</span>
-            <span className="hidden md:inline">One sentence. A finished video.</span>
+            <span className="hidden md:inline xl:hidden">
+              One sentence.
+              <br />
+              A finished video.
+            </span>
+            <span className="hidden xl:inline">One sentence. A finished video.</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -310,7 +312,6 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
               const isNarrow = cw < 480;
               const minDimension = Math.min(cw, ch);
 
-              // Push ring outward on small viewports; match md breakpoint used for headline.
               const radiusFactor = isNarrow ? 0.52 : isMobile ? 0.46 : cw < 1024 ? 0.4 : 0.35;
               const vwCap = cw * (isNarrow ? 0.46 : isMobile ? 0.42 : 0.38);
               const circleRadius = Math.min(minDimension * radiusFactor, vwCap, 350);
@@ -360,9 +361,6 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
                 key={i}
                 src={src}
                 nextSrc={IMAGES[(i + 1) % IMAGES.length]}
-                index={i}
-                total={TOTAL_IMAGES}
-                phase={introPhase}
                 target={target}
               />
             );
