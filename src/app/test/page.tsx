@@ -15,6 +15,29 @@ import type {
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
+function StageLoading({ message }: { message: string }) {
+  return (
+    <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
+      <span
+        className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
+        aria-hidden
+      />
+      {message}
+    </div>
+  );
+}
+
+function StageError({ message }: { message: string }) {
+  return (
+    <div
+      className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+      role="alert"
+    >
+      {message}
+    </div>
+  );
+}
+
 export default function TestIntentPage() {
   const [input, setInput] = useState("");
   const [intent, setIntent] = useState<Intent | null>(null);
@@ -392,24 +415,9 @@ export default function TestIntentPage() {
           </button>
         </form>
 
-        {loading && (
-          <div className="mt-8 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Analyzing…
-          </div>
-        )}
+        {loading && <StageLoading message="Analyzing…" />}
 
-        {error && (
-          <div
-            className="mt-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {error}
-          </div>
-        )}
+        {error && <StageError message={error} />}
 
         {intent && !loading && (
           <div className="mt-8 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
@@ -453,24 +461,9 @@ export default function TestIntentPage() {
           </div>
         )}
 
-        {planLoading && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Planning narrative…
-          </div>
-        )}
+        {planLoading && <StageLoading message="Planning narrative…" />}
 
-        {planError && (
-          <div
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {planError}
-          </div>
-        )}
+        {planError && <StageError message={planError} />}
 
         {plan && !planLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
@@ -518,24 +511,9 @@ export default function TestIntentPage() {
           </div>
         )}
 
-        {shotsLoading && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Planning shots…
-          </div>
-        )}
+        {shotsLoading && <StageLoading message="Planning shots…" />}
 
-        {shotsError && (
-          <div
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {shotsError}
-          </div>
-        )}
+        {shotsError && <StageError message={shotsError} />}
 
         {shotList && !shotsLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
@@ -587,24 +565,9 @@ export default function TestIntentPage() {
           </div>
         )}
 
-        {visualsLoading && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Composing visuals…
-          </div>
-        )}
+        {visualsLoading && <StageLoading message="Composing visuals…" />}
 
-        {visualsError && (
-          <div
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {visualsError}
-          </div>
-        )}
+        {visualsError && <StageError message={visualsError} />}
 
         {visualSpec && !visualsLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
@@ -675,24 +638,9 @@ export default function TestIntentPage() {
           </div>
         )}
 
-        {motionLoading && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Composing motion…
-          </div>
-        )}
+        {motionLoading && <StageLoading message="Composing motion…" />}
 
-        {motionError && (
-          <div
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {motionError}
-          </div>
-        )}
+        {motionError && <StageError message={motionError} />}
 
         {motionSpec && !motionLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
@@ -721,24 +669,9 @@ export default function TestIntentPage() {
           </div>
         )}
 
-        {scriptLoading && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Generating script…
-          </div>
-        )}
+        {scriptLoading && <StageLoading message="Generating script…" />}
 
-        {scriptError && (
-          <div
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {scriptError}
-          </div>
-        )}
+        {scriptError && <StageError message={scriptError} />}
 
         {script && !scriptLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
@@ -771,24 +704,9 @@ export default function TestIntentPage() {
           </div>
         )}
 
-        {subtitlesLoading && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Generating subtitles…
-          </div>
-        )}
+        {subtitlesLoading && <StageLoading message="Generating subtitles…" />}
 
-        {subtitlesError && (
-          <div
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {subtitlesError}
-          </div>
-        )}
+        {subtitlesError && <StageError message={subtitlesError} />}
 
         {subtitleTrack && !subtitlesLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
@@ -838,24 +756,9 @@ export default function TestIntentPage() {
           </div>
         )}
 
-        {ttsLoading && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Generating TTS…
-          </div>
-        )}
+        {ttsLoading && <StageLoading message="Generating TTS…" />}
 
-        {ttsError && (
-          <div
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {ttsError}
-          </div>
-        )}
+        {ttsError && <StageError message={ttsError} />}
 
         {ttsAudioBase64 && !ttsLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">
@@ -863,24 +766,9 @@ export default function TestIntentPage() {
           </div>
         )}
 
-        {renderLoading && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-              aria-hidden
-            />
-            Rendering… this may take a minute.
-          </div>
-        )}
+        {renderLoading && <StageLoading message="Rendering… this may take a minute." />}
 
-        {renderError && (
-          <div
-            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
-          >
-            {renderError}
-          </div>
-        )}
+        {renderError && <StageError message={renderError} />}
 
         {renderVideoUrl && !renderLoading && (
           <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-5">

@@ -253,15 +253,10 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
                 : { opacity: 0, filter: "blur(10px)" }
             }
             transition={{ duration: 1 }}
-            className="text-balance font-medium leading-tight tracking-tight text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] max-w-[min(11rem,calc(100vw-4rem))] text-[clamp(0.875rem,4.5vw,1.2rem)] max-md:px-1 md:max-w-[min(22rem,calc(100vw-9rem))] md:text-3xl lg:max-w-[min(28rem,calc(100vw-10rem))] lg:text-4xl xl:max-w-4xl"
+            className="text-balance font-medium leading-tight tracking-tight text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] max-w-[min(11rem,calc(100vw-4rem))] text-[clamp(0.875rem,4.5vw,1.2rem)] max-md:px-1 md:max-w-[min(20rem,calc(100vw-9rem))] md:text-2xl lg:max-w-[min(24rem,calc(100vw-10rem))] lg:text-3xl xl:max-w-3xl xl:text-4xl"
           >
-            <span className="md:hidden">One sentence.</span>
-            <span className="hidden md:inline xl:hidden">
-              One sentence.
-              <br />
-              A finished video.
-            </span>
-            <span className="hidden xl:inline">One sentence. A finished video.</span>
+            <span className="md:hidden">Prompt. Cut. Delivered.</span>
+            <span className="hidden md:inline">Prompt. Cut. Delivered.</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
