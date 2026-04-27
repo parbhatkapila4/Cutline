@@ -1,4 +1,3 @@
-
 export type AssetType =
   | "logo"
   | "productPhoto"

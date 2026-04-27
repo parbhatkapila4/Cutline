@@ -1,7 +1,3 @@
-/**
- * Quick-edit suggestions for the dashboard video "Edit with AI" panel.
- * Free plan users may only trigger edits whose message exactly matches one of these strings (server-enforced).
- */
 export type EditQuickPromptCategory = "tone" | "length" | "structure" | "angle";
 
 export type EditQuickPrompt = {
