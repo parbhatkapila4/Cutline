@@ -1,5 +1,8 @@
 import type { VideoJob, VideoJobInsert, VideoJobStatus, OwnerType } from "@/lib/db/types";
-import { getSql } from "@/lib/db/client";
+import { getSql, isDatabaseConfigured } from "@/lib/db/client";
+
+const OWNER_ID_UUID_RE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 type VideoJobRow = {
   id: string;
@@ -102,6 +105,43 @@ export async function migrateAnonJobsToUser(
     RETURNING id
   `;
   return { migrated: Array.isArray(rows) ? rows.length : 0 };
+}
+
+export async function deleteVideoJobRelatedDbRows(
+  bullJobId: string,
+  clientId: string
+): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  const sql = getSql();
+  try {
+    await sql`DELETE FROM job_comments WHERE job_id = ${bullJobId}`;
+  } catch (e) {
+    console.warn(
+      "[videoJobService] delete job_comments failed:",
+      e instanceof Error ? e.message : String(e)
+    );
+  }
+  try {
+    await sql`DELETE FROM job_approvals WHERE job_id = ${bullJobId}`;
+  } catch (e) {
+    console.warn(
+      "[videoJobService] delete job_approvals failed:",
+      e instanceof Error ? e.message : String(e)
+    );
+  }
+  if (!OWNER_ID_UUID_RE.test(clientId)) return;
+  try {
+    await sql`
+      DELETE FROM video_jobs
+      WHERE (queue_job_id = ${bullJobId} OR id::text = ${bullJobId})
+        AND owner_id = ${clientId}::uuid
+    `;
+  } catch (e) {
+    console.warn(
+      "[videoJobService] delete video_jobs failed:",
+      e instanceof Error ? e.message : String(e)
+    );
+  }
 }
 
 export async function updateVideoJobStatus(

@@ -1,4 +1,3 @@
-
 import fs from "fs";
 import path from "path";
 import type { Intent, ShotList, Script } from "@/lib/types";
@@ -58,7 +57,8 @@ function assignUserPhotosToShots(
   return assigned;
 }
 
-function toImageUrl(filePath: string, _jobId?: string): string {
+function toImageUrl(filePath: string, jobId?: string): string {
+  void jobId;
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
     return filePath;
   }
@@ -127,8 +127,6 @@ export async function sourceImageForShot(
   };
 
   let url: string | null = null;
-  let source: ImageSource = "stock";
-  let fallbackUsed = false;
 
   const unsplashMultiple = await retry(
     () => searchUnsplashMultiple(searchQuery, 15),
@@ -170,7 +168,6 @@ export async function sourceImageForShot(
     return { url, source: "stock", fallbackUsed: true, searchQuery, imagePrompt };
   }
 
-  fallbackUsed = true;
   if (!stockOnly) {
     const dalleOpts = outputDir && filename ? { outputDir, filename } : undefined;
     const dalleResult = await retry(
@@ -313,7 +310,7 @@ export function normalizeImageSpecForRender(
   const publicDir = path.join(cwd, "public");
   const imagesDir = path.join(publicDir, "temp", jobId, "images");
   const entries = imageSpec.entries.map((entry) => {
-    let url = entry.imageUrl;
+    const url = entry.imageUrl;
     if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) {
       return entry;
     }
