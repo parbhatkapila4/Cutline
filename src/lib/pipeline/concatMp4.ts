@@ -1,5 +1,6 @@
 import { spawnSync } from "child_process";
 import fs from "fs";
+import os from "os";
 import path from "path";
 
 
@@ -47,6 +48,178 @@ export function isFfmpegAvailable(): boolean {
     timeout: 5000,
   });
   return result.status === 0;
+}
+
+export function trimVideoIfLongerThan(
+  filePath: string,
+  maxDurationSec: number,
+  options?: { epsilonSec?: number; throwIfCannotTrim?: boolean }
+): void {
+  const epsilon = options?.epsilonSec ?? 0.08;
+  if (!Number.isFinite(maxDurationSec) || maxDurationSec <= 0.5) return;
+  const resolved = path.resolve(filePath);
+  if (!fs.existsSync(resolved)) return;
+  const d = getDuration(resolved);
+  if (d <= 0 || d <= maxDurationSec + epsilon) return;
+
+  if (!isFfmpegAvailable()) {
+    const msg =
+      `[ffmpeg] Output is ${d.toFixed(1)}s but the chosen length is ${maxDurationSec}s. ` +
+      "Install ffmpeg on the worker (PATH) or set FFMPEG_PATH to trim.";
+    if (options?.throwIfCannotTrim) {
+      throw new Error(msg);
+    }
+    console.warn(msg + " Skipping trim.");
+    return;
+  }
+
+  const dir = path.dirname(resolved);
+  const tag = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tempCopy = path.join(dir, `trim-copy-${tag}.mp4`);
+  const tempReenc = path.join(dir, `trim-reenc-${tag}.mp4`);
+  const ffmpeg = getFfmpegPath();
+
+  const replaceWith = (tempPath: string): void => {
+    const outDur = getDuration(tempPath);
+    if (outDur <= 0) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+      }
+      throw new Error("Trim produced an unreadable file.");
+    }
+    try {
+      if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
+    } catch {
+    }
+    fs.renameSync(tempPath, resolved);
+    console.log(
+      `[ffmpeg] Trimmed video from ${d.toFixed(1)}s to ${outDur.toFixed(1)}s (max ${maxDurationSec}s)`
+    );
+  };
+
+  const copyResult = spawnSync(
+    ffmpeg,
+    [
+      "-y",
+      "-i",
+      resolved,
+      "-t",
+      String(maxDurationSec),
+      "-c",
+      "copy",
+      "-movflags",
+      "+faststart",
+      tempCopy,
+    ],
+    { encoding: "utf-8", timeout: 300_000 }
+  );
+
+  const copyDur = copyResult.status === 0 && fs.existsSync(tempCopy) ? getDuration(tempCopy) : 0;
+  if (copyResult.status === 0 && copyDur > 0 && copyDur <= maxDurationSec + 0.15) {
+    replaceWith(tempCopy);
+    return;
+  }
+  try {
+    if (fs.existsSync(tempCopy)) fs.unlinkSync(tempCopy);
+  } catch {
+  }
+
+  const reencResult = spawnSync(
+    ffmpeg,
+    [
+      "-y",
+      "-i",
+      resolved,
+      "-t",
+      String(maxDurationSec),
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "20",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      "-movflags",
+      "+faststart",
+      tempReenc,
+    ],
+    { encoding: "utf-8", timeout: 300_000 }
+  );
+
+  if (reencResult.status !== 0) {
+    try {
+      if (fs.existsSync(tempReenc)) fs.unlinkSync(tempReenc);
+    } catch {
+    }
+    const msg = reencResult.stderr || reencResult.stdout || "";
+    throw new Error(`ffmpeg re-encode trim failed (exit ${reencResult.status}). ${msg}`.slice(0, 2000));
+  }
+
+  replaceWith(tempReenc);
+}
+
+export function trimAudioBufferIfLongerThan(
+  buffer: Buffer,
+  format: "mp3" | "wav",
+  maxDurationSec: number,
+  jobId: string
+): Buffer {
+  if (!Number.isFinite(maxDurationSec) || maxDurationSec <= 0.5) return buffer;
+  if (!isFfmpegAvailable()) return buffer;
+
+  const dir = path.join(os.tmpdir(), `cutline-tts-trim-${jobId}-${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  const ext = format === "mp3" ? "mp3" : "wav";
+  const inPath = path.join(dir, `in.${ext}`);
+  const outPath = path.join(dir, `out.${ext}`);
+  try {
+    fs.writeFileSync(inPath, buffer);
+    const d = getDuration(inPath);
+    if (d <= 0 || d <= maxDurationSec + 0.06) return buffer;
+
+    const ffmpeg = getFfmpegPath();
+    const args =
+      format === "mp3"
+        ? [
+          "-y",
+          "-i",
+          inPath,
+          "-t",
+          String(maxDurationSec),
+          "-c:a",
+          "libmp3lame",
+          "-b:a",
+          "192k",
+          outPath,
+        ]
+        : [
+          "-y",
+          "-i",
+          inPath,
+          "-t",
+          String(maxDurationSec),
+          "-c:a",
+          "pcm_s16le",
+          outPath,
+        ];
+
+    const r = spawnSync(ffmpeg, args, { encoding: "utf-8", timeout: 300_000 });
+    if (r.status !== 0 || !fs.existsSync(outPath)) {
+      return buffer;
+    }
+    const outDur = getDuration(outPath);
+    if (outDur <= 0) return buffer;
+    return fs.readFileSync(outPath);
+  } finally {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+    }
+  }
 }
 
 function runFfmpegCrossfade(
