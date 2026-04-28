@@ -1,7 +1,5 @@
 export type OwnerType = "anon" | "user";
-
 export type VideoJobStatus = "queued" | "processing" | "completed" | "failed";
-
 export type AnonSession = {
   id: string;
   created_at: Date;
