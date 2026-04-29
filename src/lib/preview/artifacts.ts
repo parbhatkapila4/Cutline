@@ -53,6 +53,19 @@ export async function savePreviewArtifacts(
   }
 }
 
+export async function deletePreviewArtifactsFromRedis(previewJobId: string): Promise<void> {
+  if (!previewJobId || typeof previewJobId !== "string") return;
+  try {
+    const redis = getRedis();
+    await redis.del(REDIS_KEY_PREFIX + previewJobId);
+  } catch (e) {
+    console.warn(
+      "[preview] deletePreviewArtifactsFromRedis failed jobId=" + previewJobId,
+      e instanceof Error ? e.message : String(e)
+    );
+  }
+}
+
 export async function loadPreviewArtifacts(
   previewJobId: string
 ): Promise<PreviewArtifacts | null> {

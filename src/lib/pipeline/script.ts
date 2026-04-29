@@ -97,7 +97,6 @@ INTRO AND OUTRO (required): The video must have a clear beginning and a proper e
 
 export type ParseScriptOptions = {
   fidelity?: "creative" | "strict";
-  /** Required when fidelity is strict: validate spoken lines are substrings of this text. */
   strictSourceText?: string;
 };
 
@@ -128,8 +127,6 @@ export function parseAndValidateScript(
 
   const shotById = new Map(shotList.shots.map((s) => [s.id, s]));
   const TEXT_PLACEHOLDER = "...";
-
-  /** One map entry per shot id (first wins). Ignore unknown ids and duplicates. */
   const entryByShotId = new Map<string, Record<string, unknown>>();
   for (const item of entriesRaw) {
     if (item === null || typeof item !== "object" || Array.isArray(item)) continue;
@@ -210,6 +207,7 @@ export type GenerateScriptOptions = {
   platform?: Platform;
   brandBrain?: BrandBrainInput;
   locale?: string;
+  jobId?: string;
 };
 
 export async function generateScript(
@@ -234,7 +232,21 @@ export async function generateScript(
     locale: options?.locale,
   });
   const n = shotList.shots.length;
-  const userContent = `${JSON.stringify({ intent, plan, shotList })}
+
+  const isTalkingObject = options?.mode === "talking_object";
+  const seed = options?.jobId
+    ? options.jobId.slice(0, 8)
+    : Math.random().toString(36).slice(2, 10);
+  const variationDirective = isTalkingObject
+    ? `
+
+CREATIVE VARIATION (run seed: ${seed}):
+- This is a talking-photo avatar delivery. Write the script as if a real, charismatic person were speaking it on camera.
+- Vary the opening hook, phrasing, sentence rhythm and connective beats slightly compared to a generic version of the same idea, but keep meaning, structure and shot count exactly aligned.
+- Prefer natural spoken cadence (contractions, short clauses, mid-sentence pivots) over formal written prose.
+- Add micro-cues for delivery in punctuation only: commas for breath, em-dashes for emphasis, ellipses sparingly for pauses. Never add stage directions or brackets.`
+    : "";
+  const userContent = `${JSON.stringify({ intent, plan, shotList })}${variationDirective}
 
 CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have exactly ${n} objects, in the same order as shots (order 1..${n}). Each entry.shotId must equal shotList.shots[i].id for that index. Do not merge shots, skip shots, or add extra entries.`;
   const url = `${OPENROUTER_BASE}/chat/completions`;
@@ -244,7 +256,8 @@ CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have 
       { role: "system" as const, content: systemPrompt },
       { role: "user" as const, content: userContent },
     ],
-    temperature: 0,
+
+    temperature: isTalkingObject ? 0.65 : 0,
     max_tokens: 4096,
     response_format: { type: "json_object" as const },
   };

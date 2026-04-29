@@ -1,4 +1,3 @@
-
 const PEXELS_SEARCH = "https://api.pexels.com/v1/search";
 
 export type PexelsResult = { url: string } | null;
