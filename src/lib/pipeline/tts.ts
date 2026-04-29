@@ -4,8 +4,30 @@ import { createSilenceWav, pcmToWav, SAMPLE_RATE } from "@/lib/tts/wav";
 
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
+const DEFAULT_ELEVENLABS_MODEL = "eleven_multilingual_v2";
 
 type TTSProvider = "elevenlabs" | "playht";
+function getElevenLabsVoiceSettings() {
+  const num = (key: string, fallback: number, min: number, max: number) => {
+    const raw = process.env[key];
+    if (!raw) return fallback;
+    const v = Number(raw);
+    if (!Number.isFinite(v)) return fallback;
+    return Math.min(max, Math.max(min, v));
+  };
+  return {
+    stability: num("ELEVENLABS_STABILITY", 0.4, 0, 1),
+    similarity_boost: num("ELEVENLABS_SIMILARITY", 0.85, 0, 1),
+    style: num("ELEVENLABS_STYLE", 0.55, 0, 1),
+    use_speaker_boost: process.env.ELEVENLABS_SPEAKER_BOOST !== "false",
+  };
+}
+
+function getElevenLabsModel(): string {
+  const raw = process.env.ELEVENLABS_MODEL_ID;
+  if (typeof raw === "string" && raw.trim() !== "") return raw.trim();
+  return DEFAULT_ELEVENLABS_MODEL;
+}
 
 interface Segment {
   text: string | null;
@@ -37,7 +59,8 @@ async function synthesizeElevenLabsPcm(
     },
     body: JSON.stringify({
       text,
-      model_id: "eleven_multilingual_v2",
+      model_id: getElevenLabsModel(),
+      voice_settings: getElevenLabsVoiceSettings(),
     }),
   });
 
@@ -68,7 +91,8 @@ async function synthesizeElevenLabsMp3(
     },
     body: JSON.stringify({
       text,
-      model_id: "eleven_multilingual_v2",
+      model_id: getElevenLabsModel(),
+      voice_settings: getElevenLabsVoiceSettings(),
     }),
   });
 

@@ -124,14 +124,7 @@ function writeAssFile(
   if (valid.length === 0) {
     throw new Error("No valid subtitle entries (each needs endMs > startMs and duration >= 400ms)");
   }
-
-  // Without PlayResX/Y libass falls back to 384x288, so a Fontsize of 28
-  // renders as ~10% of frame height and the captions end up dominating the
-  // screen. Declaring PlayResX/Y equal to the real video dims means the
-  // Fontsize/Margin values below map 1:1 to output pixels.
   const { width, height } = dims;
-
-  // Target ~5% of height per line, clamped so tiny/huge sources stay legible.
   const fontSize = Math.max(22, Math.min(120, Math.round(height * 0.048)));
   const outline = Math.max(2, Math.round(height * 0.0025));
   const shadow = Math.max(0, Math.round(height * 0.0012));
@@ -175,8 +168,6 @@ export function burnSubtitlesIntoVideo(
   const assBasename = `cutline-${ts}.ass`;
   const assPath = path.join(assDir, assBasename);
 
-  // Probe real video dims so the subtitle style can be sized against the
-  // actual output resolution instead of libass's 384x288 default.
   const dims = probeVideoDimensions(resolvedVideo) ?? { width: 1080, height: 1920 };
 
   try {
