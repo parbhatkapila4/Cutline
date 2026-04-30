@@ -359,50 +359,8 @@ function HomeContent() {
             }}
           >
             <Link
-              href="/"
-              className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
-            >
-              <svg
-                className="w-5 h-5 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <defs>
-                  <linearGradient
-                    id="nav-ic-home"
-                    x1="4"
-                    y1="2"
-                    x2="20"
-                    y2="22"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#a1a1aa" />
-                    <stop offset="1" stopColor="#52525b" />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M3.5 20.5l11-11m0 0l1.5-1.5 3 3-1.5 1.5m-3-3l3 3"
-                  stroke="url(#nav-ic-home)"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M9.5 2.5v2m0-2l1 1m-1-1l-1 1m5.5 1.5l1.5 1m-1.5-1l.75-.75m-.75.75l-.75-.75M5 7.5l1.5 1M5 7.5l.75-.75M5 7.5l-.75-.75"
-                  stroke="url(#nav-ic-home)"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                />
-                <circle cx="9.5" cy="3.5" r="0.6" fill="#d4d4d8" />
-                <circle cx="15" cy="5" r="0.5" fill="#d4d4d8" />
-                <circle cx="5" cy="8.5" r="0.5" fill="#d4d4d8" />
-              </svg>
-              Home
-            </Link>
-            <Link
               href="/features"
-              className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+              className="flex min-w-[170px] items-center justify-center gap-3 px-6 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
             >
               <svg
                 className="w-5 h-5 shrink-0"
@@ -477,8 +435,30 @@ function HomeContent() {
               Features
             </Link>
             <Link
+              href="/pricing"
+              className="flex min-w-[170px] items-center justify-center gap-3 px-6 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+            >
+              <svg
+                className="w-5 h-5 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <defs>
+                  <linearGradient id="nav-ic-price-card" x1="3" y1="4" x2="21" y2="20" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#a1a1aa" />
+                    <stop offset="1" stopColor="#52525b" />
+                  </linearGradient>
+                </defs>
+                <rect x="3.5" y="6" width="17" height="12" rx="2.5" stroke="url(#nav-ic-price-card)" strokeWidth="1.4" />
+                <path d="M3.5 10h17" stroke="url(#nav-ic-price-card)" strokeWidth="1.2" strokeLinecap="round" />
+                <rect x="6.5" y="13" width="4.5" height="2" rx="1" fill="#a1a1aa" opacity="0.8" />
+              </svg>
+              Pricing
+            </Link>
+            <Link
               href="/how"
-              className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+              className="flex min-w-[170px] items-center justify-center gap-3 px-6 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
             >
               <svg
                 className="w-5 h-5 shrink-0"
@@ -624,7 +604,7 @@ function HomeContent() {
             ) : (
               <Link
                 href="/signin"
-                className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+                className="flex min-w-[170px] items-center justify-center gap-3 px-6 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
               >
                 <svg
                   className="w-5 h-5 shrink-0"
