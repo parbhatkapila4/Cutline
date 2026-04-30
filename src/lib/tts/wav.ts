@@ -1,4 +1,3 @@
-
 const SAMPLE_RATE = 44100;
 const BITS_PER_SAMPLE = 16;
 const NUM_CHANNELS = 1;
