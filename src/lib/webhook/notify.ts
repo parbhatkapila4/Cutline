@@ -5,6 +5,7 @@ export type WebhookPayload = {
   variations?: { videoUrl: string }[];
   completedAt: string;
   error?: string;
+  qualityReport?: { passed: boolean; score: number; issues: string[] };
 };
 
 const WEBHOOK_TIMEOUT_MS = 5000;
