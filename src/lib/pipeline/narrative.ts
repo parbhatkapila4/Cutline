@@ -4,6 +4,8 @@ import { type BeatPacing } from "@/lib/types";
 import { getVariationPromptSnippet } from "@/lib/variation/strategies";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
+import { shouldRetryForLLM } from "@/lib/utils/retry";
+import { getModelCandidates } from "@/lib/pipeline/modelFallback";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
@@ -13,6 +15,74 @@ export type PlanNarrativeOptions = {
   variationStrategy?: string;
   platform?: Platform;
 };
+
+async function requestNarrativePlanFromModel(
+  intent: Intent,
+  apiKey: string,
+  model: string,
+  systemContent: string
+): Promise<NarrativePlan> {
+  const userContent = JSON.stringify(intent);
+  const url = `${OPENROUTER_BASE}/chat/completions`;
+  const body = {
+    model,
+    messages: [
+      { role: "system" as const, content: systemContent },
+      { role: "user" as const, content: userContent },
+    ],
+    temperature: 0,
+    max_tokens: 4096,
+    response_format: { type: "json_object" as const },
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error) {
+      if (err.name === "AbortError") {
+        throw new Error("Narrative planning timed out. Try again.");
+      }
+      throw new Error(`Narrative planning failed: ${err.message}`);
+    }
+    throw new Error("Narrative planning failed: unknown error");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Narrative planning failed: API returned ${response.status}. ${response.status === 401 ? "Check your API key." : text || ""}`
+    );
+  }
+
+  let data: { choices?: Array<{ message?: { content?: string } }> };
+  try {
+    data = (await response.json()) as typeof data;
+  } catch {
+    throw new Error("Narrative planning failed: invalid response from API");
+  }
+
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content !== "string" || content.trim() === "") {
+    throw new Error("Narrative planning failed: empty response from model");
+  }
+
+  return parseAndValidatePlan(content.trim(), intent.durationSeconds);
+}
 
 const SYSTEM_PROMPT = `You are a narrative planner for a short video (30-45 seconds). Given a structured Intent, output a single JSON object with exactly these keys (no other keys, no markdown, no explanation):
 
@@ -122,7 +192,7 @@ export async function planNarrative(
   options?: PlanNarrativeOptions
 ): Promise<NarrativePlan> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
+  const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
 
   if (!apiKey || apiKey.trim() === "") {
     throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
@@ -136,64 +206,25 @@ export async function planNarrative(
       ? getPlatformPromptSnippet(options.platform, "narrative")
       : "";
   const systemContent = SYSTEM_PROMPT + variationSnippet + platformSnippet;
-  const userContent = JSON.stringify(intent);
-  const url = `${OPENROUTER_BASE}/chat/completions`;
-  const body = {
-    model,
-    messages: [
-      { role: "system" as const, content: systemContent },
-      { role: "user" as const, content: userContent },
-    ],
-    temperature: 0,
-    max_tokens: 4096,
-    response_format: { type: "json_object" as const },
-  };
+  const modelCandidates = getModelCandidates(primaryModel);
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error) {
-      if (err.name === "AbortError") {
-        throw new Error("Narrative planning timed out. Try again.");
+  let lastError: unknown;
+  for (let i = 0; i < modelCandidates.length; i++) {
+    const model = modelCandidates[i]!;
+    try {
+      return await requestNarrativePlanFromModel(intent, apiKey, model, systemContent);
+    } catch (err) {
+      lastError = err;
+      const shouldFallback = shouldRetryForLLM(err);
+      const hasNext = i < modelCandidates.length - 1;
+      if (!shouldFallback || !hasNext) {
+        throw err;
       }
-      throw new Error(`Narrative planning failed: ${err.message}`);
+      console.warn(
+        `[narrative] Primary model failed (${model}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
-    throw new Error("Narrative planning failed: unknown error");
-  } finally {
-    clearTimeout(timeoutId);
   }
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Narrative planning failed: API returned ${response.status}. ${response.status === 401 ? "Check your API key." : text || ""}`
-    );
-  }
-
-  let data: { choices?: Array<{ message?: { content?: string } }> };
-  try {
-    data = (await response.json()) as typeof data;
-  } catch {
-    throw new Error("Narrative planning failed: invalid response from API");
-  }
-
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || content.trim() === "") {
-    throw new Error("Narrative planning failed: empty response from model");
-  }
-
-  return parseAndValidatePlan(content.trim(), intent.durationSeconds);
+  throw lastError instanceof Error ? lastError : new Error("Narrative planning failed");
 }
