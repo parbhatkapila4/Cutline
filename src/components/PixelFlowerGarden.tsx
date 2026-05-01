@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 const S = 7;
 const D = 5;
+const OFFSET_X = 28;
 
 const PAL: Record<string, string> = {
   P: "#EC4899",
@@ -332,7 +333,7 @@ function FlowerGroup({ flower, index }: { flower: FlowerDef; index: number }) {
   const startY = GROUND - totalRows * S;
 
   const maxW = Math.max(...flower.rows.map((r) => r.length));
-  const pivotX = flower.x + (maxW * S) / 2;
+  const pivotX = flower.x + OFFSET_X + (maxW * S) / 2;
   const pivotY = GROUND;
 
   const rects: ReactElement[] = [];
@@ -346,7 +347,7 @@ function FlowerGroup({ flower, index }: { flower: FlowerDef; index: number }) {
         rects.push(
           <rect
             key={k++}
-            x={flower.x + rx * S}
+            x={flower.x + OFFSET_X + rx * S}
             y={startY + ry * S}
             width={D}
             height={D}

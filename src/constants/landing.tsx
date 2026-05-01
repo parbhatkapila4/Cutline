@@ -1,3 +1,5 @@
+import { DODO_PAYMENT_URL } from "@/lib/payments/links";
+
 export const POLL_INTERVAL_MS = 2500;
 
 export const DEFAULT_TEXT_MODEL = "anthropic/claude-3.5-haiku";
@@ -402,7 +404,7 @@ export const PRICING = [
       "Email support",
     ],
     cta: "Get Started",
-    href: "#create",
+    href: DODO_PAYMENT_URL,
     highlighted: false,
     icon: "beginner",
   },
@@ -422,7 +424,7 @@ export const PRICING = [
       "Priority email support",
     ],
     cta: "Get Started",
-    href: "#create",
+    href: DODO_PAYMENT_URL,
     highlighted: true,
     icon: "professional",
   },
@@ -442,7 +444,7 @@ export const PRICING = [
       "24/7 dedicated support",
     ],
     cta: "Get Started",
-    href: "#create",
+    href: DODO_PAYMENT_URL,
     highlighted: false,
     icon: "enterprise",
   },
