@@ -4,6 +4,8 @@ import { getVariationPromptSnippet } from "@/lib/variation/strategies";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
 import type { BrandBrainInput } from "@/lib/types/pipelineEnhancements";
+import { shouldRetryForLLM } from "@/lib/utils/retry";
+import { getModelCandidates } from "@/lib/pipeline/modelFallback";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
@@ -210,45 +212,14 @@ export type GenerateScriptOptions = {
   jobId?: string;
 };
 
-export async function generateScript(
-  intent: Intent,
-  plan: NarrativePlan,
+async function requestScriptFromModel(
   shotList: ShotList,
-  options?: GenerateScriptOptions
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userContent: string,
+  isTalkingObject: boolean
 ): Promise<Script> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
-  }
-
-  const systemPrompt = buildSystemPrompt({
-    mode: options?.mode,
-    durationSeconds: options?.durationSeconds,
-    variationStrategy: options?.variationStrategy,
-    platform: options?.platform,
-    brandBrain: options?.brandBrain,
-    locale: options?.locale,
-  });
-  const n = shotList.shots.length;
-
-  const isTalkingObject = options?.mode === "talking_object";
-  const seed = options?.jobId
-    ? options.jobId.slice(0, 8)
-    : Math.random().toString(36).slice(2, 10);
-  const variationDirective = isTalkingObject
-    ? `
-
-CREATIVE VARIATION (run seed: ${seed}):
-- This is a talking-photo avatar delivery. Write the script as if a real, charismatic person were speaking it on camera.
-- Vary the opening hook, phrasing, sentence rhythm and connective beats slightly compared to a generic version of the same idea, but keep meaning, structure and shot count exactly aligned.
-- Prefer natural spoken cadence (contractions, short clauses, mid-sentence pivots) over formal written prose.
-- Add micro-cues for delivery in punctuation only: commas for breath, em-dashes for emphasis, ellipses sparingly for pauses. Never add stage directions or brackets.`
-    : "";
-  const userContent = `${JSON.stringify({ intent, plan, shotList })}${variationDirective}
-
-CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have exactly ${n} objects, in the same order as shots (order 1..${n}). Each entry.shotId must equal shotList.shots[i].id for that index. Do not merge shots, skip shots, or add extra entries.`;
   const url = `${OPENROUTER_BASE}/chat/completions`;
   const body = {
     model,
@@ -256,7 +227,6 @@ CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have 
       { role: "system" as const, content: systemPrompt },
       { role: "user" as const, content: userContent },
     ],
-
     temperature: isTalkingObject ? 0.65 : 0,
     max_tokens: 4096,
     response_format: { type: "json_object" as const },
@@ -311,6 +281,75 @@ CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have 
   return parseAndValidateScript(content.trim(), shotList);
 }
 
+export async function generateScript(
+  intent: Intent,
+  plan: NarrativePlan,
+  shotList: ShotList,
+  options?: GenerateScriptOptions
+): Promise<Script> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
+
+  if (!apiKey || apiKey.trim() === "") {
+    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  }
+
+  const systemPrompt = buildSystemPrompt({
+    mode: options?.mode,
+    durationSeconds: options?.durationSeconds,
+    variationStrategy: options?.variationStrategy,
+    platform: options?.platform,
+    brandBrain: options?.brandBrain,
+    locale: options?.locale,
+  });
+  const n = shotList.shots.length;
+
+  const isTalkingObject = options?.mode === "talking_object";
+  const seed = options?.jobId
+    ? options.jobId.slice(0, 8)
+    : Math.random().toString(36).slice(2, 10);
+  const variationDirective = isTalkingObject
+    ? `
+
+CREATIVE VARIATION (run seed: ${seed}):
+- This is a talking-photo avatar delivery. Write the script as if a real, charismatic person were speaking it on camera.
+- Vary the opening hook, phrasing, sentence rhythm and connective beats slightly compared to a generic version of the same idea, but keep meaning, structure and shot count exactly aligned.
+- Prefer natural spoken cadence (contractions, short clauses, mid-sentence pivots) over formal written prose.
+- Add micro-cues for delivery in punctuation only: commas for breath, em-dashes for emphasis, ellipses sparingly for pauses. Never add stage directions or brackets.`
+    : "";
+  const userContent = `${JSON.stringify({ intent, plan, shotList })}${variationDirective}
+
+CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have exactly ${n} objects, in the same order as shots (order 1..${n}). Each entry.shotId must equal shotList.shots[i].id for that index. Do not merge shots, skip shots, or add extra entries.`;
+  const modelCandidates = getModelCandidates(primaryModel);
+
+  let lastError: unknown;
+  for (let i = 0; i < modelCandidates.length; i++) {
+    const model = modelCandidates[i]!;
+    try {
+      return await requestScriptFromModel(
+        shotList,
+        apiKey,
+        model,
+        systemPrompt,
+        userContent,
+        isTalkingObject
+      );
+    } catch (err) {
+      lastError = err;
+      const shouldFallback = shouldRetryForLLM(err);
+      const hasNext = i < modelCandidates.length - 1;
+      if (!shouldFallback || !hasNext) {
+        throw err;
+      }
+      console.warn(
+        `[script] Primary model failed (${model}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Script generation failed");
+}
+
 const EXTEND_SCRIPT_SYSTEM_PROMPT = `You extend a video script with new dialogue. You will be given the current script, the video topic, tone, and how many more words to add.
 
 Rules:
@@ -328,7 +367,7 @@ export async function extendScript(
   options?: ExtendScriptOptions
 ): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
+  const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
 
   if (!apiKey || apiKey.trim() === "") {
     return "";
@@ -345,41 +384,52 @@ ${currentScriptText.trim()}
 
 Write approximately ${targetWords} words of NEW dialogue on the same topic, same tone. Do not repeat any line from the current script. Output only the new sentences.`;
 
-  const url = `${OPENROUTER_BASE}/chat/completions`;
-  const body = {
-    model,
-    messages: [
-      { role: "system" as const, content: EXTEND_SCRIPT_SYSTEM_PROMPT },
-      { role: "user" as const, content: userContent },
-    ],
-    temperature: 0.3,
-    max_tokens: 512,
-  };
+  const modelCandidates = getModelCandidates(primaryModel);
+  for (let i = 0; i < modelCandidates.length; i++) {
+    const model = modelCandidates[i]!;
+    const url = `${OPENROUTER_BASE}/chat/completions`;
+    const body = {
+      model,
+      messages: [
+        { role: "system" as const, content: EXTEND_SCRIPT_SYSTEM_PROMPT },
+        { role: "user" as const, content: userContent },
+      ],
+      temperature: 0.3,
+      max_tokens: 512,
+    };
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
+      if (!response.ok) {
+        const err = new Error(`Script extension failed: API returned ${response.status}`);
+        const shouldFallback = shouldRetryForLLM(err) && i < modelCandidates.length - 1;
+        if (!shouldFallback) return "";
+        continue;
+      }
 
-    if (!response.ok) return "";
-
-    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = data.choices?.[0]?.message?.content;
-    if (typeof content !== "string") return "";
-    const trimmed = content.trim();
-    return trimmed.length > 0 ? trimmed : "";
-  } catch {
-    clearTimeout(timeoutId);
-    return "";
+      const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const content = data.choices?.[0]?.message?.content;
+      if (typeof content !== "string") return "";
+      const trimmed = content.trim();
+      if (trimmed.length > 0) return trimmed;
+      return "";
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const shouldFallback = shouldRetryForLLM(err) && i < modelCandidates.length - 1;
+      if (!shouldFallback) return "";
+    }
   }
+  return "";
 }
