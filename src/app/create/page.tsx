@@ -63,6 +63,7 @@ function CreateBrandMark({ className }: { className?: string }) {
 type JobStatus = "pending" | "processing" | "completed" | "failed";
 type Mode = "slideshow" | "talking_object";
 type VideoKind = "slideshow" | "talking_cartoon" | "talking_real";
+type TalkingRealMode = "studio" | "scenario";
 type Platform = "general" | "linkedin" | "twitter" | "youtube_shorts";
 type AvatarMode = "default" | "preset" | "upload";
 
@@ -196,6 +197,7 @@ export default function CreatePage() {
   const [dur, setDur] = useState(30);
   const [cc, setCc] = useState(true);
   const [objStyle, setObjStyle] = useState<"cartoon" | "real">("cartoon");
+  const [talkingRealMode, setTalkingRealMode] = useState<TalkingRealMode>("studio");
   const [avatarMode, setAvatarMode] = useState<AvatarMode>("default");
   const [avatarPresetId, setAvatarPresetId] = useState<AvatarPresetId>("presenter_female_1");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -370,7 +372,9 @@ export default function CreatePage() {
           captions: cc ? "on" : "off",
           ...(assetIds.length ? { assetIds } : {}),
           ...(mode === "talking_object" ? { talkingObjectStyle: objStyle } : {}),
+          ...(mode === "talking_object" && objStyle === "real" ? { talkingRealMode } : {}),
           ...(mode === "talking_object" && objStyle === "real"
+            && talkingRealMode !== "scenario"
             ? {
               avatar:
                 avatarMode === "preset"
@@ -411,6 +415,7 @@ export default function CreatePage() {
     stop(); setJobId(null); setStatus(null); setVideoUrl(null); setError(null); setErrorCode(null);
     setPrompt(""); setImgs([]); setMode("slideshow"); setPlatform("general"); setAspectRatio("16:9");
     setDur(30); setCc(true); setObjStyle("cartoon");
+    setTalkingRealMode("studio");
     setAvatarMode("default"); setAvatarPresetId("presenter_female_1"); setAvatarFile(null);
   };
 
@@ -1234,6 +1239,28 @@ export default function CreatePage() {
                           </div>
                           {mode === "talking_object" && objStyle === "real" && (
                             <div className="mt-4">
+                              <p className="text-xs font-medium text-gray-500 mb-2">Realistic style</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setTalkingRealMode("studio")}
+                                  className={`p-3 rounded-xl border text-left transition-all ${talkingRealMode === "studio" ? "border-blue-500/50 bg-blue-500/10 text-blue-200" : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"}`}
+                                >
+                                  <p className="text-sm font-medium">Studio talk (current)</p>
+                                  <p className="text-[11px] mt-1 text-zinc-500">Clean talking-head look with subtle background.</p>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setTalkingRealMode("scenario")}
+                                  className={`p-3 rounded-xl border text-left transition-all ${talkingRealMode === "scenario" ? "border-blue-500/50 bg-blue-500/10 text-blue-200" : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"}`}
+                                >
+                                  <p className="text-sm font-medium">Influencer scene (new)</p>
+                                  <p className="text-[11px] mt-1 text-zinc-500">Real-life movement + context-driven environment (VEO style).</p>
+                                </button>
+                              </div>
+
+                              {talkingRealMode === "studio" ? (
+                                <>
                               <p className="text-xs font-medium text-gray-500 mb-2">Avatar</p>
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 {(["default", "preset", "upload"] as const).map((m) => {
@@ -1350,6 +1377,14 @@ export default function CreatePage() {
                                 ) : (
                                   <ProAvatarGate />
                                 )
+                              )}
+                                </>
+                              ) : (
+                                <div className="mt-3 rounded-xl border border-blue-500/25 bg-blue-500/8 px-3 py-2.5">
+                                  <p className="text-[11px] text-blue-200">
+                                    Influencer scene uses cinematic real-world generation and ignores avatar presets/uploads.
+                                  </p>
+                                </div>
                               )}
                             </div>
                           )}

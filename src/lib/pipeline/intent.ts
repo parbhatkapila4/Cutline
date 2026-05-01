@@ -1,6 +1,8 @@
 import type { Intent } from "@/lib/types";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
+import { shouldRetryForLLM } from "@/lib/utils/retry";
+import { getModelCandidates } from "@/lib/pipeline/modelFallback";
 import {
   INTENT_DURATION_MAX,
   INTENT_DURATION_MIN,
@@ -152,23 +154,12 @@ function parseAndValidateIntent(raw: string, rawInput: string): Intent {
 
 export type InterpretIntentOptions = { model?: string; platform?: Platform };
 
-export async function interpretIntent(
+async function requestIntentFromModel(
   input: string,
-  options?: InterpretIntentOptions
+  apiKey: string,
+  model: string,
+  systemContent: string
 ): Promise<Intent> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
-  }
-
-  const platformSnippet =
-    options?.platform && options.platform !== "general"
-      ? getPlatformPromptSnippet(options.platform, "intent")
-      : "";
-  const systemContent = SYSTEM_PROMPT + platformSnippet;
-
   const url = `${OPENROUTER_BASE}/chat/completions`;
   const body = {
     model,
@@ -228,4 +219,43 @@ export async function interpretIntent(
   }
 
   return parseAndValidateIntent(content.trim(), input);
+}
+
+export async function interpretIntent(
+  input: string,
+  options?: InterpretIntentOptions
+): Promise<Intent> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
+
+  if (!apiKey || apiKey.trim() === "") {
+    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  }
+
+  const platformSnippet =
+    options?.platform && options.platform !== "general"
+      ? getPlatformPromptSnippet(options.platform, "intent")
+      : "";
+  const systemContent = SYSTEM_PROMPT + platformSnippet;
+  const modelCandidates = getModelCandidates(primaryModel);
+
+  let lastError: unknown;
+  for (let i = 0; i < modelCandidates.length; i++) {
+    const model = modelCandidates[i]!;
+    try {
+      return await requestIntentFromModel(input, apiKey, model, systemContent);
+    } catch (err) {
+      lastError = err;
+      const shouldFallback = shouldRetryForLLM(err);
+      const hasNext = i < modelCandidates.length - 1;
+      if (!shouldFallback || !hasNext) {
+        throw err;
+      }
+      console.warn(
+        `[intent] Primary model failed (${model}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Intent interpretation failed");
 }
