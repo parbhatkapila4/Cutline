@@ -19,7 +19,6 @@ type HeyGenUploadPhotoResponse = {
 type HeyGenUploadAssetResponse = {
   code: number;
   data?: {
-    /** Current API returns `id`; older responses used `audio_asset_id`. */
     id?: string;
     audio_asset_id?: string;
     url?: string;
@@ -30,7 +29,6 @@ type HeyGenUploadAssetResponse = {
   msg?: string | null;
 };
 
-/** V2 generate often returns `{ error: null, data: { video_id } }` without top-level `code`. */
 type HeyGenCreateVideoResponse = {
   code?: number;
   data?: {
@@ -92,12 +90,28 @@ type HeyGenVideoStatusResponse = {
   message?: string;
 };
 
+export type TalkingPhotoStyle = "stable" | "expressive";
+export type TalkingPhotoExpression = "default" | "happy";
+
+export type CreateTalkingVideoOptions = {
+  dimension?: { width: number; height: number };
+  talkingStyle?: TalkingPhotoStyle;
+  expression?: TalkingPhotoExpression;
+  superResolution?: boolean;
+  matting?: boolean;
+  backgroundColor?: string;
+  backgroundImageUrl?: string;
+  scale?: number;
+  offsetY?: number;
+};
+
 export async function createTalkingVideo(
   imagePathOrUrl: string,
   audioBuffer: Buffer,
   audioFormat: "mp3" | "wav",
   jobId: string,
-  outputPath: string
+  outputPath: string,
+  options?: CreateTalkingVideoOptions
 ): Promise<void> {
   const apiKey = process.env.HEYGEN_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
@@ -106,6 +120,33 @@ export async function createTalkingVideo(
     );
   }
 
+  const opts: Required<Omit<CreateTalkingVideoOptions, "backgroundImageUrl" | "offsetY">> & {
+    backgroundImageUrl?: string;
+    offsetY?: number;
+  } = {
+    dimension: options?.dimension ?? { width: 1920, height: 1080 },
+    talkingStyle: options?.talkingStyle ?? "expressive",
+    expression: options?.expression ?? "happy",
+    superResolution: options?.superResolution ?? true,
+    matting: options?.matting ?? true,
+    backgroundColor: options?.backgroundColor ?? "#1a1a1a",
+    scale: options?.scale ?? 1.0,
+    backgroundImageUrl: options?.backgroundImageUrl,
+    offsetY: options?.offsetY,
+  };
+
+  console.log(
+    `[heygen] jobId=${jobId} options=` +
+    JSON.stringify({
+      dimension: opts.dimension,
+      talkingStyle: opts.talkingStyle,
+      expression: opts.expression,
+      superResolution: opts.superResolution,
+      matting: opts.matting,
+      scale: opts.scale,
+    })
+  );
+
   console.log(`[heygen] jobId=${jobId} stage=upload-photo`);
   const talkingPhotoId = await uploadTalkingPhoto(imagePathOrUrl, apiKey, jobId);
 
@@ -113,23 +154,32 @@ export async function createTalkingVideo(
   const audioAssetId = await uploadAudioAsset(audioBuffer, audioFormat, apiKey, jobId);
 
   console.log(`[heygen] jobId=${jobId} stage=create-video`);
-  const videoId = await createVideo(talkingPhotoId, audioAssetId, apiKey, jobId);
+  const videoId = await createVideo(talkingPhotoId, audioAssetId, apiKey, jobId, opts);
 
   console.log(`[heygen] jobId=${jobId} stage=poll-status videoId=${videoId}`);
   const videoUrl = await pollVideoStatus(videoId, apiKey, jobId);
 
   console.log(`[heygen] jobId=${jobId} stage=download videoUrl=${videoUrl}`);
-  const tempPath = outputPath.replace(/\.mp4$/, "_heygen_temp.mp4");
-  await downloadVideo(videoUrl, tempPath, jobId);
-
-  console.log(`[heygen] jobId=${jobId} stage=chroma-key-removal`);
-  const chromaKeySuccess = await removeGreenScreen(tempPath, outputPath, jobId);
-
-  if (chromaKeySuccess && fs.existsSync(tempPath)) {
-    try {
-      fs.unlinkSync(tempPath);
-    } catch (e) {
-      console.warn(`[heygen] jobId=${jobId} failed to delete temp file: ${tempPath}`);
+  if (opts.matting) {
+    await downloadVideo(videoUrl, outputPath, jobId);
+    console.log(`[heygen] jobId=${jobId} matting=on skipped chroma-key pass`);
+  } else {
+    const tempPath = outputPath.replace(/\.mp4$/, "_heygen_temp.mp4");
+    await downloadVideo(videoUrl, tempPath, jobId);
+    console.log(`[heygen] jobId=${jobId} stage=chroma-key-removal`);
+    const chromaKeySuccess = await removeGreenScreen(
+      tempPath,
+      outputPath,
+      jobId,
+      opts.dimension,
+      opts.backgroundColor
+    );
+    if (chromaKeySuccess && fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        console.warn(`[heygen] jobId=${jobId} failed to delete temp file: ${tempPath}`);
+      }
     }
   }
 
@@ -262,25 +312,49 @@ async function createVideo(
   talkingPhotoId: string,
   audioAssetId: string,
   apiKey: string,
-  jobId: string
+  jobId: string,
+  opts: {
+    dimension: { width: number; height: number };
+    talkingStyle: TalkingPhotoStyle;
+    expression: TalkingPhotoExpression;
+    superResolution: boolean;
+    matting: boolean;
+    backgroundColor: string;
+    backgroundImageUrl?: string;
+    scale: number;
+    offsetY?: number;
+  }
 ): Promise<string> {
   const url = `${HEYGEN_API_BASE}/v2/video/generate`;
 
+  const character: Record<string, unknown> = {
+    type: "talking_photo",
+    talking_photo_id: talkingPhotoId,
+    talking_style: opts.talkingStyle,
+    expression: opts.expression,
+    super_resolution: opts.superResolution,
+    matting: opts.matting,
+    scale: opts.scale,
+  };
+  if (typeof opts.offsetY === "number" && Number.isFinite(opts.offsetY)) {
+    character.offset = { x: 0, y: opts.offsetY };
+  }
+
+  const background: Record<string, unknown> = opts.backgroundImageUrl
+    ? { type: "image", url: opts.backgroundImageUrl, fit: "cover" }
+    : { type: "color", value: opts.backgroundColor };
+
   const body = {
+    caption: false,
+    dimension: { width: opts.dimension.width, height: opts.dimension.height },
     video_inputs: [
       {
-        character: {
-          type: "talking_photo",
-          talking_photo_id: talkingPhotoId,
-        },
+        character,
         voice: {
           type: "audio",
           audio_asset_id: audioAssetId,
         },
-        background: {
-          type: "color",
-          value: "#1a1a1a",
-        },
+        background,
       },
     ],
   };
@@ -461,7 +535,9 @@ async function downloadVideo(
 async function removeGreenScreen(
   inputPath: string,
   outputPath: string,
-  jobId: string
+  jobId: string,
+  dimension: { width: number; height: number } = { width: 1920, height: 1080 },
+  backgroundColor: string = "#1a1a1a"
 ): Promise<boolean> {
   const ffmpegPath = process.env.FFMPEG_PATH?.trim() || "ffmpeg";
 
@@ -477,17 +553,19 @@ async function removeGreenScreen(
     return false;
   }
 
+  const sizeArg = `${dimension.width}x${dimension.height}`;
   const result = spawnSync(
     ffmpegPath,
     [
       "-i", inputPath,
       "-filter_complex",
-      "[0:v]colorkey=0x00FF00:0.3:0.2[ckout];color=c=#1a1a1a:s=1920x1080:d=60[bg];[bg][ckout]overlay[out]",
+      `[0:v]colorkey=0x00FF00:0.3:0.2[ckout];color=c=${backgroundColor}:s=${sizeArg}:d=60[bg];[bg][ckout]overlay=(W-w)/2:(H-h)/2[out]`,
       "-map", "[out]",
       "-map", "0:a?",
       "-c:a", "copy",
       "-c:v", "libx264",
-      "-preset", "fast",
+      "-preset", "medium",
+      "-crf", "18",
       "-y",
       outputPath,
     ],
