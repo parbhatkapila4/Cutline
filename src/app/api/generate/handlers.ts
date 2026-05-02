@@ -312,6 +312,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(data.textModel ? { textModel: data.textModel } : {}),
       captions: data.captions,
       ...(data.talkingObjectStyle ? { talkingObjectStyle: data.talkingObjectStyle } : {}),
+      ...(data.talkingRealMode ? { talkingRealMode: data.talkingRealMode } : {}),
       ...(data.avatar ? { avatar: data.avatar } : {}),
       ...(data.renderMode ? { renderMode: data.renderMode } : {}),
       ...(data.previewJobId ? { previewJobId: data.previewJobId } : {}),

@@ -1,6 +1,8 @@
 import type { Intent, NarrativePlan } from "@/lib/types";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
+import { shouldRetryForLLM } from "@/lib/utils/retry";
+import { getModelCandidates } from "@/lib/pipeline/modelFallback";
 import type {
   EmotionalIntent,
   MotionType,
@@ -189,24 +191,13 @@ function parseAndValidateShotList(
 
 export type PlanShotsOptions = { model?: string; platform?: Platform };
 
-export async function planShots(
+async function requestShotPlanFromModel(
   intent: Intent,
   plan: NarrativePlan,
-  options?: PlanShotsOptions
+  apiKey: string,
+  model: string,
+  systemContent: string
 ): Promise<ShotList> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
-  }
-
-  const platformSnippet =
-    options?.platform && options.platform !== "general"
-      ? getPlatformPromptSnippet(options.platform, "shots")
-      : "";
-  const systemContent = SYSTEM_PROMPT + platformSnippet;
-
   const userContent = JSON.stringify({ intent, plan });
   const url = `${OPENROUTER_BASE}/chat/completions`;
   const body = {
@@ -267,4 +258,44 @@ export async function planShots(
   }
 
   return parseAndValidateShotList(content.trim(), plan, plan.totalDurationSeconds);
+}
+
+export async function planShots(
+  intent: Intent,
+  plan: NarrativePlan,
+  options?: PlanShotsOptions
+): Promise<ShotList> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
+
+  if (!apiKey || apiKey.trim() === "") {
+    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  }
+
+  const platformSnippet =
+    options?.platform && options.platform !== "general"
+      ? getPlatformPromptSnippet(options.platform, "shots")
+      : "";
+  const systemContent = SYSTEM_PROMPT + platformSnippet;
+  const modelCandidates = getModelCandidates(primaryModel);
+
+  let lastError: unknown;
+  for (let i = 0; i < modelCandidates.length; i++) {
+    const model = modelCandidates[i]!;
+    try {
+      return await requestShotPlanFromModel(intent, plan, apiKey, model, systemContent);
+    } catch (err) {
+      lastError = err;
+      const shouldFallback = shouldRetryForLLM(err);
+      const hasNext = i < modelCandidates.length - 1;
+      if (!shouldFallback || !hasNext) {
+        throw err;
+      }
+      console.warn(
+        `[shots] Primary model failed (${model}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Shot reasoning failed");
 }
