@@ -22,7 +22,6 @@ export async function getUserPlan(userId: string | undefined): Promise<PlanConfi
       return PLAN_CONFIGS[planRaw];
     }
   } catch {
-    // Fall back to free when table doesn't exist or DB query fails.
   }
   return PLAN_CONFIGS.free;
 }
