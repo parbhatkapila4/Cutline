@@ -5,6 +5,8 @@ import { PLATFORMS } from "@/lib/platform/types";
 import type { BrandColors } from "@/lib/assets/types";
 import { ASPECT_RATIOS, type AspectRatio, isValidAspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId, AvatarSelection } from "@/lib/types/avatar";
+import type { BrandBrainInput, ScriptFidelityMode } from "@/lib/types/pipelineEnhancements";
+import { applyProgrammaticPlaceholders } from "@/lib/utils/programmatic";
 
 const MIN_INPUT_LENGTH = 5;
 const MAX_INPUT_LENGTH = 500;
@@ -36,13 +38,14 @@ export type InputValidationResult =
   | { valid: true }
   | { valid: false; error: string };
 
-export type ValidateInputOptions = { maxLength?: number };
+export type ValidateInputOptions = { maxLength?: number; minLength?: number };
 
 export function validateInput(
   input: unknown,
   options?: ValidateInputOptions
 ): InputValidationResult {
   const maxLen = options?.maxLength ?? MAX_INPUT_LENGTH;
+  const minLen = options?.minLength ?? MIN_INPUT_LENGTH;
   if (typeof input !== "string") {
     return { valid: false, error: "Input cannot be empty." };
   }
@@ -50,7 +53,7 @@ export function validateInput(
   if (trimmed.length === 0) {
     return { valid: false, error: "Input cannot be empty." };
   }
-  if (trimmed.length < MIN_INPUT_LENGTH) {
+  if (trimmed.length < minLen) {
     return {
       valid: false,
       error: "Input is too short. Please describe what you want in a sentence.",
@@ -66,7 +69,7 @@ export function validateInput(
   if (sanitized.length === 0) {
     return { valid: false, error: "Input cannot be empty." };
   }
-  if (sanitized.length < MIN_INPUT_LENGTH) {
+  if (sanitized.length < minLen) {
     return {
       valid: false,
       error: "Input is too short. Please describe what you want in a sentence.",
@@ -187,10 +190,23 @@ export type ValidatedGenerateInput = {
   textModel?: string;
   captions?: "on" | "off";
   talkingObjectStyle?: "cartoon" | "real";
+  talkingRealMode?: "studio" | "scenario";
   avatar?: AvatarSelection;
   renderMode?: "preview" | "final";
   previewJobId?: string;
   callbackUrl?: string;
+  placeholders?: Record<string, string>;
+  brandBrain?: BrandBrainInput;
+  scriptFidelity?: ScriptFidelityMode;
+  strictScript?: string;
+  locale?: string;
+  ttsVoiceId?: string;
+  characterLockId?: string;
+  qualityGateMode?: "off" | "warn" | "fail";
+  regenFromJobId?: string;
+  regenerateShotIds?: string[];
+  brandKitId?: string;
+  seriesId?: string;
 };
 
 export type ValidateGenerateInputResult =
@@ -234,6 +250,10 @@ export function validateGenerateInput(
 
   const obj = body as Record<string, unknown>;
 
+  const rawRegenFromJobId = obj.regenFromJobId;
+  const regenFromJobIdStr =
+    typeof rawRegenFromJobId === "string" ? rawRegenFromJobId.trim() : "";
+
   const rawInput = obj.input;
   const topic =
     typeof rawInput === "string"
@@ -241,12 +261,16 @@ export function validateGenerateInput(
       : rawInput != null
         ? String(rawInput).trim()
         : "";
+  const inputMinLen = regenFromJobIdStr ? 3 : MIN_INPUT_LENGTH;
   if (!topic) {
     errors.push({ field: "input", message: "Topic is required" });
-  } else if (topic.length < MIN_INPUT_LENGTH) {
+  } else if (topic.length < inputMinLen) {
     errors.push({
       field: "input",
-      message: "Topic is too short. Please describe what you want in a sentence.",
+      message:
+        regenFromJobIdStr && inputMinLen === 3
+          ? "Topic is too short (min 3 characters for regeneration jobs)."
+          : "Topic is too short. Please describe what you want in a sentence.",
     });
   } else if (topic.length > MAX_TOPIC_LENGTH) {
     errors.push({
@@ -254,7 +278,10 @@ export function validateGenerateInput(
       message: `Topic must be at most ${MAX_TOPIC_LENGTH} characters`,
     });
   } else {
-    const inputValidation = validateInput(topic, { maxLength: MAX_TOPIC_LENGTH });
+    const inputValidation = validateInput(topic, {
+      maxLength: MAX_TOPIC_LENGTH,
+      minLength: inputMinLen,
+    });
     if (!inputValidation.valid) {
       errors.push({ field: "input", message: inputValidation.error });
     }
@@ -369,6 +396,17 @@ export function validateGenerateInput(
     }
   }
 
+  const rawTalkingRealMode = obj.talkingRealMode;
+  if (rawTalkingRealMode !== undefined && rawTalkingRealMode !== null) {
+    const mode = typeof rawTalkingRealMode === "string" ? rawTalkingRealMode.trim() : "";
+    if (mode !== "studio" && mode !== "scenario") {
+      errors.push({
+        field: "talkingRealMode",
+        message: 'talkingRealMode must be "studio" or "scenario"',
+      });
+    }
+  }
+
   const rawBrandColors = obj.brandColors;
   if (rawBrandColors !== undefined && rawBrandColors !== null && typeof rawBrandColors === "object") {
     const brandResult = validateBrandColors(rawBrandColors as BrandColorsInput);
@@ -385,11 +423,179 @@ export function validateGenerateInput(
     }
   }
 
+  if (regenFromJobIdStr) {
+    const jv = validateJobId(regenFromJobIdStr);
+    if (!jv.valid) {
+      errors.push({ field: "regenFromJobId", message: jv.error });
+    }
+  }
+
+  const rawRegenShotIds = obj.regenerateShotIds;
+  if (rawRegenShotIds !== undefined && rawRegenShotIds !== null) {
+    if (!Array.isArray(rawRegenShotIds)) {
+      errors.push({ field: "regenerateShotIds", message: "regenerateShotIds must be an array of strings" });
+    } else if (rawRegenShotIds.length > 24) {
+      errors.push({ field: "regenerateShotIds", message: "At most 24 shot ids" });
+    } else if (!rawRegenShotIds.every((x) => typeof x === "string" && x.trim() !== "")) {
+      errors.push({ field: "regenerateShotIds", message: "Each entry must be a non-empty string" });
+    }
+  }
+
+  const rawScriptFidelity = obj.scriptFidelity;
+  if (rawScriptFidelity !== undefined && rawScriptFidelity !== null) {
+    const sf = typeof rawScriptFidelity === "string" ? rawScriptFidelity.trim() : "";
+    if (sf !== "creative" && sf !== "strict") {
+      errors.push({ field: "scriptFidelity", message: 'scriptFidelity must be "creative" or "strict"' });
+    }
+  }
+
+  const rawStrictScript = obj.strictScript;
+  if (typeof rawStrictScript === "string" && rawStrictScript.length > 12000) {
+    errors.push({ field: "strictScript", message: "strictScript is too long (max 12000 chars)" });
+  }
+  const scriptFidelityCheck =
+    typeof rawScriptFidelity === "string" ? rawScriptFidelity.trim() : "";
+  if (scriptFidelityCheck === "strict") {
+    const ss = typeof rawStrictScript === "string" ? rawStrictScript.trim() : "";
+    if (ss.length < 10) {
+      errors.push({
+        field: "strictScript",
+        message: "strictScript is required (min 10 characters) when scriptFidelity is strict",
+      });
+    }
+  }
+
+  const rawLocale = obj.locale;
+  if (rawLocale !== undefined && rawLocale !== null) {
+    const loc = typeof rawLocale === "string" ? rawLocale.trim() : "";
+    if (loc.length > 40) {
+      errors.push({ field: "locale", message: "locale is too long" });
+    }
+  }
+
+  const rawTtsVoice = obj.ttsVoiceId;
+  if (rawTtsVoice !== undefined && rawTtsVoice !== null) {
+    const v = typeof rawTtsVoice === "string" ? rawTtsVoice.trim() : "";
+    if (v.length > 80) {
+      errors.push({ field: "ttsVoiceId", message: "ttsVoiceId is too long" });
+    }
+  }
+
+  const rawCharLock = obj.characterLockId;
+  if (rawCharLock !== undefined && rawCharLock !== null) {
+    const c = typeof rawCharLock === "string" ? rawCharLock.trim() : "";
+    if (c.length > 160) {
+      errors.push({ field: "characterLockId", message: "characterLockId is too long" });
+    }
+  }
+
+  const rawQg = obj.qualityGateMode;
+  if (rawQg !== undefined && rawQg !== null) {
+    const q = typeof rawQg === "string" ? rawQg.trim() : "";
+    if (q !== "off" && q !== "warn" && q !== "fail") {
+      errors.push({ field: "qualityGateMode", message: 'qualityGateMode must be "off", "warn", or "fail"' });
+    }
+  }
+
+  const rawBrandKitId = obj.brandKitId;
+  if (rawBrandKitId !== undefined && rawBrandKitId !== null && String(rawBrandKitId).trim() !== "") {
+    const bid = typeof rawBrandKitId === "string" ? rawBrandKitId.trim() : "";
+    if (!UUID_REGEX.test(bid)) {
+      errors.push({ field: "brandKitId", message: "brandKitId must be a valid UUID" });
+    }
+  }
+
+  const rawSeriesId = obj.seriesId;
+  if (rawSeriesId !== undefined && rawSeriesId !== null && String(rawSeriesId).trim() !== "") {
+    const sid = typeof rawSeriesId === "string" ? rawSeriesId.trim() : "";
+    if (sid.length > 160) {
+      errors.push({ field: "seriesId", message: "seriesId must be at most 160 characters" });
+    }
+  }
+
+  const rawPlaceholders = obj.placeholders;
+  if (rawPlaceholders !== undefined && rawPlaceholders !== null) {
+    if (typeof rawPlaceholders !== "object" || Array.isArray(rawPlaceholders)) {
+      errors.push({ field: "placeholders", message: "placeholders must be an object of string keys to string values" });
+    } else {
+      const entries = Object.entries(rawPlaceholders as Record<string, unknown>);
+      if (entries.length > 40) {
+        errors.push({ field: "placeholders", message: "At most 40 placeholder keys" });
+      }
+      for (const [k, v] of entries) {
+        if (typeof k !== "string" || k.length > 64 || typeof v !== "string" || v.length > 2000) {
+          errors.push({ field: "placeholders", message: "Invalid placeholder key or value" });
+          break;
+        }
+      }
+    }
+  }
+
+  const rawBrandBrain = obj.brandBrain;
+  if (rawBrandBrain !== undefined && rawBrandBrain !== null) {
+    if (typeof rawBrandBrain !== "object" || Array.isArray(rawBrandBrain)) {
+      errors.push({ field: "brandBrain", message: "brandBrain must be an object" });
+    } else {
+      const bb = rawBrandBrain as Record<string, unknown>;
+      const banned = bb.bannedPhrases;
+      const required = bb.requiredPhrases;
+      const tone = bb.voiceTone;
+      const ms = bb.motionStyle;
+      if (banned !== undefined && banned !== null) {
+        if (!Array.isArray(banned) || !banned.every((x) => typeof x === "string") || banned.length > 24) {
+          errors.push({ field: "brandBrain.bannedPhrases", message: "bannedPhrases must be an array of at most 24 strings" });
+        }
+      }
+      if (required !== undefined && required !== null) {
+        if (!Array.isArray(required) || !required.every((x) => typeof x === "string") || required.length > 24) {
+          errors.push({ field: "brandBrain.requiredPhrases", message: "requiredPhrases must be an array of at most 24 strings" });
+        }
+      }
+      if (tone !== undefined && tone !== null && (typeof tone !== "string" || String(tone).length > 500)) {
+        errors.push({ field: "brandBrain.voiceTone", message: "voiceTone is too long" });
+      }
+      if (ms !== undefined && ms !== null) {
+        const m = typeof ms === "string" ? ms.trim() : "";
+        if (m !== "default" && m !== "subtle" && m !== "dynamic") {
+          errors.push({
+            field: "brandBrain.motionStyle",
+            message: 'motionStyle must be "default", "subtle", or "dynamic"',
+          });
+        }
+      }
+    }
+  }
+
   if (errors.length > 0) {
     return { success: false, errors };
   }
 
-  const sanitizedTopic = sanitizeInput(topic);
+  const placeholdersParsed =
+    rawPlaceholders != null && typeof rawPlaceholders === "object" && !Array.isArray(rawPlaceholders)
+      ? (() => {
+        const o: Record<string, string> = {};
+        for (const [k, v] of Object.entries(rawPlaceholders as Record<string, unknown>)) {
+          if (typeof k === "string" && typeof v === "string") {
+            const kk = k.trim();
+            if (kk) o[kk] = v;
+          }
+        }
+        return o;
+      })()
+      : undefined;
+
+  const sanitizedTopic = sanitizeInput(
+    placeholdersParsed && Object.keys(placeholdersParsed).length > 0
+      ? applyProgrammaticPlaceholders(topic, placeholdersParsed)
+      : topic
+  );
+  const postIv = validateInput(sanitizedTopic, {
+    maxLength: MAX_TOPIC_LENGTH,
+    minLength: regenFromJobIdStr ? 3 : MIN_INPUT_LENGTH,
+  });
+  if (!postIv.valid) {
+    return { success: false, errors: [{ field: "input", message: postIv.error }] };
+  }
   const durationNum = coerceNumber(rawDuration);
   const durationSeconds = durationNum.ok ? Math.round(durationNum.value) : DURATION_MIN;
 
@@ -449,6 +655,11 @@ export function validateGenerateInput(
       ? obj.talkingObjectStyle
       : undefined;
 
+  const talkingRealMode =
+    obj.talkingRealMode === "studio" || obj.talkingRealMode === "scenario"
+      ? obj.talkingRealMode
+      : undefined;
+
   const avatar = (() => {
     const raw = obj.avatar;
     if (raw == null || typeof raw !== "object") return undefined;
@@ -496,6 +707,78 @@ export function validateGenerateInput(
       : undefined;
   const aspectRatioValid = aspectRatio && isValidAspectRatio(aspectRatio) ? aspectRatio : undefined;
 
+  const brandBrainParsed: BrandBrainInput | undefined = (() => {
+    if (rawBrandBrain == null || typeof rawBrandBrain !== "object" || Array.isArray(rawBrandBrain)) {
+      return undefined;
+    }
+    const bb = rawBrandBrain as Record<string, unknown>;
+    const out: BrandBrainInput = {};
+    if (Array.isArray(bb.bannedPhrases)) {
+      const arr = bb.bannedPhrases
+        .filter((x): x is string => typeof x === "string")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 24);
+      if (arr.length) out.bannedPhrases = arr;
+    }
+    if (Array.isArray(bb.requiredPhrases)) {
+      const arr = bb.requiredPhrases
+        .filter((x): x is string => typeof x === "string")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 24);
+      if (arr.length) out.requiredPhrases = arr;
+    }
+    if (typeof bb.voiceTone === "string" && bb.voiceTone.trim() !== "") {
+      out.voiceTone = bb.voiceTone.trim();
+    }
+    if (bb.motionStyle === "default" || bb.motionStyle === "subtle" || bb.motionStyle === "dynamic") {
+      out.motionStyle = bb.motionStyle;
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  })();
+
+  const scriptFidelityParsed: ScriptFidelityMode | undefined =
+    rawScriptFidelity === "strict" || rawScriptFidelity === "creative"
+      ? rawScriptFidelity
+      : undefined;
+
+  const strictScriptParsed =
+    typeof rawStrictScript === "string" && rawStrictScript.trim() !== ""
+      ? rawStrictScript.trim()
+      : undefined;
+
+  const localeParsed =
+    typeof rawLocale === "string" && rawLocale.trim() !== "" ? rawLocale.trim() : undefined;
+
+  const ttsVoiceIdParsed =
+    typeof rawTtsVoice === "string" && rawTtsVoice.trim() !== ""
+      ? rawTtsVoice.trim()
+      : undefined;
+
+  const characterLockIdParsed =
+    typeof rawCharLock === "string" && rawCharLock.trim() !== ""
+      ? rawCharLock.trim()
+      : undefined;
+
+  const qualityGateModeParsed =
+    rawQg === "off" || rawQg === "warn" || rawQg === "fail" ? rawQg : undefined;
+
+  const regenFromJobIdParsed = regenFromJobIdStr || undefined;
+
+  const brandKitIdParsed =
+    typeof rawBrandKitId === "string" && rawBrandKitId.trim() !== ""
+      ? rawBrandKitId.trim()
+      : undefined;
+
+  const seriesIdParsed =
+    typeof rawSeriesId === "string" && rawSeriesId.trim() !== "" ? rawSeriesId.trim() : undefined;
+
+  const regenerateShotIdsParsed =
+    Array.isArray(rawRegenShotIds) && rawRegenShotIds.length > 0
+      ? (rawRegenShotIds as string[]).map((s) => s.trim()).filter(Boolean)
+      : undefined;
+
   const data: ValidatedGenerateInput = {
     input: sanitizedTopic,
     durationSeconds,
@@ -507,11 +790,26 @@ export function validateGenerateInput(
     ...(modeValid ? { mode: modeValid } : {}),
     ...(textModel ? { textModel } : {}),
     ...(talkingObjectStyle ? { talkingObjectStyle } : {}),
+    ...(talkingRealMode ? { talkingRealMode } : {}),
     ...(avatar ? { avatar } : {}),
     ...(renderMode ? { renderMode } : {}),
     ...(previewJobId ? { previewJobId } : {}),
     ...(callbackUrl ? { callbackUrl } : {}),
     ...(aspectRatioValid ? { aspectRatio: aspectRatioValid } : {}),
+    ...(placeholdersParsed && Object.keys(placeholdersParsed).length > 0
+      ? { placeholders: placeholdersParsed }
+      : {}),
+    ...(brandBrainParsed ? { brandBrain: brandBrainParsed } : {}),
+    ...(scriptFidelityParsed ? { scriptFidelity: scriptFidelityParsed } : {}),
+    ...(strictScriptParsed ? { strictScript: strictScriptParsed } : {}),
+    ...(localeParsed ? { locale: localeParsed } : {}),
+    ...(ttsVoiceIdParsed ? { ttsVoiceId: ttsVoiceIdParsed } : {}),
+    ...(characterLockIdParsed ? { characterLockId: characterLockIdParsed } : {}),
+    ...(qualityGateModeParsed ? { qualityGateMode: qualityGateModeParsed } : {}),
+    ...(regenFromJobIdParsed ? { regenFromJobId: regenFromJobIdParsed } : {}),
+    ...(regenerateShotIdsParsed?.length ? { regenerateShotIds: regenerateShotIdsParsed } : {}),
+    ...(brandKitIdParsed ? { brandKitId: brandKitIdParsed } : {}),
+    ...(seriesIdParsed ? { seriesId: seriesIdParsed } : {}),
   };
 
   return { success: true, data };
