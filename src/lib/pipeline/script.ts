@@ -356,6 +356,7 @@ Rules:
 - Output ONLY the new sentences-no repetition of the existing script, no preamble, no "Here is more dialogue:".
 - Same topic and tone as the original. Stay on topic (match the user's intent).
 - Natural, conversational. One or more short sentences that continue the video.
+- End your added lines with a complete sentence (. ? !)-nothing dangling mid-thought-so the clip can end cleanly.
 - Plain text only. No JSON, no bullet points, no labels.`;
 
 export type ExtendScriptOptions = { model?: string };

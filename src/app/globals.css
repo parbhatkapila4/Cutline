@@ -41,6 +41,9 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
   --elegant-font: 'Great Vibes';
+  /* Text highlight — crisp contrast, not browser-default mush */
+  --selection-bg: #2563eb;
+  --selection-fg: #ffffff;
 }
 
 @theme inline {
@@ -126,8 +129,17 @@ body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
 
+/* Premium text selection: solid brand fill + inverted text (works on light & dark surfaces) */
 ::selection {
-  background: rgba(59, 130, 246, 0.3);
+  background-color: var(--selection-bg);
+  color: var(--selection-fg);
+  text-shadow: none;
+}
+
+::-moz-selection {
+  background-color: var(--selection-bg);
+  color: var(--selection-fg);
+  text-shadow: none;
 }
 
 @keyframes in {
@@ -852,6 +864,8 @@ html:has(.dashboard-root)::-webkit-scrollbar {
 }
 
 .dark {
+  --selection-bg: #3b82f6;
+  --selection-fg: #fafafa;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
