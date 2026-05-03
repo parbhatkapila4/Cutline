@@ -220,17 +220,40 @@ export default function DashboardPage() {
   return (
     <div className="h-screen overflow-hidden bg-black text-white flex flex-col">
       {freeVideoCapReached ? (
-        <div className="shrink-0 z-20 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2.5 sm:px-6">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
-            <p className="text-amber-100/95 leading-snug">
-              <span className="font-medium text-amber-200">Free plan:</span> you have used your included video for this month. You can still open and download videos below. Upgrade to create more.
-            </p>
+        <div className="relative shrink-0 z-20 overflow-hidden border-b border-amber-400/20 bg-linear-to-b from-zinc-950 via-zinc-950 to-black px-4 py-3.5 sm:px-6">
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_140%_at_100%_-30%,rgba(251,191,36,0.14),transparent_50%)]"
+            aria-hidden
+          />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-amber-400/35 to-transparent" aria-hidden />
+          <div className="relative mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="flex min-w-0 gap-3 sm:gap-4">
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-500/9 text-amber-200 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                aria-hidden
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <p className="text-[13px] font-semibold leading-snug tracking-tight text-white sm:text-sm">
+                  Monthly limit reached
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-zinc-400 sm:text-[13px]">
+                  Your included Free-plan video for this month is already used. Your library below is unchanged. Upgrade anytime to generate more.
+                </p>
+              </div>
+            </div>
             {!isEnterprisePlan(usage.plan) ? (
               <Link
                 href="/pricing"
-                className="shrink-0 inline-flex items-center justify-center rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 transition-colors w-fit"
+                className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-[0_12px_28px_-14px_rgba(0,0,0,0.85)] ring-1 ring-white/25 transition-colors hover:bg-zinc-100 hover:ring-white/40 sm:w-auto"
               >
-                Upgrade plan
+                View plans
+                <svg className="h-4 w-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
               </Link>
             ) : null}
           </div>
