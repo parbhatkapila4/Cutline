@@ -62,7 +62,7 @@ export async function purgeUserVideo(
           ok: false,
           status: 409,
           error:
-            "This video is still processing. We’ve cancelled it—wait a few seconds, then try deleting again.",
+            "This video is still processing. We’ve cancelled it. Wait a few seconds, then try deleting again.",
         };
       }
       return {

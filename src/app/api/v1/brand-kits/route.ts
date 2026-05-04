@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   }
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (name.length < 1 || name.length > 120) {
-    return NextResponse.json({ error: "name is required (1–120 characters)." }, { status: 400 });
+    return NextResponse.json({ error: "name is required (1-120 characters)." }, { status: 400 });
   }
   const banned = Array.isArray(body.bannedPhrases)
     ? body.bannedPhrases.filter((x): x is string => typeof x === "string").slice(0, 24)
