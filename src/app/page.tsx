@@ -22,6 +22,7 @@ import { ImagePlayer } from "@/components/image-player";
 import TestimonialV2 from "@/components/ui/testimonial-v2";
 import { authClient } from "@/lib/auth-client";
 import { HomeFooter } from "@/app/_landing/HomeFooter";
+import { SUBMIT_TIMEOUT_MS } from "@/components/generate/constants";
 
 const HOW_IT_WORKS_IMAGES = [
   "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1494&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
@@ -74,6 +75,7 @@ function HomeContent() {
     null,
   );
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [heroScrollComplete, setHeroScrollComplete] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -83,6 +85,7 @@ function HomeContent() {
   promptRef.current = prompt;
   const promptFromSuggestionRef = useRef(false);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const howSectionRef = useRef<HTMLElement | null>(null);
   const [howInView, setHowInView] = useState(false);
 
@@ -96,6 +99,25 @@ function HomeContent() {
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const onDocPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (accountMenuRef.current?.contains(target)) return;
+      setAccountMenuOpen(false);
+    };
+    const onDocKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccountMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDocPointerDown);
+    document.addEventListener("keydown", onDocKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocPointerDown);
+      document.removeEventListener("keydown", onDocKeyDown);
+    };
+  }, [accountMenuOpen]);
 
   useEffect(() => {
     const urls = images.map((f) => URL.createObjectURL(f));
@@ -247,7 +269,7 @@ function HomeContent() {
       }
 
       const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 25_000);
+      timeoutId = setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -341,7 +363,7 @@ function HomeContent() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-gray-900 relative overflow-x-clip">
-      <header className="fixed top-5 left-0 right-0 z-50 flex justify-center px-6 pointer-events-none">
+      <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
         <div className="relative pointer-events-auto">
           <div
             className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[90%] h-24 pointer-events-none"
@@ -352,7 +374,7 @@ function HomeContent() {
             }}
           />
           <nav
-            className="relative z-10 flex items-center gap-6 bg-white/90 backdrop-blur-2xl border border-gray-200 rounded-[22px] px-8 py-3 min-w-[560px] max-w-[90vw] shadow-lg shadow-gray-200/50"
+            className="relative z-10 flex items-center gap-1.5 sm:gap-3 md:gap-6 bg-white/90 backdrop-blur-2xl border border-gray-200 rounded-[18px] sm:rounded-[22px] px-2.5 sm:px-4 md:px-8 py-2 sm:py-3 w-full max-w-[96vw] sm:max-w-[90vw] sm:min-w-[560px] shadow-lg shadow-gray-200/50"
             style={{
               boxShadow:
                 "0 8px 40px -8px rgba(0,0,0,0.08), 0 1px 0 rgba(0,0,0,0.04) inset",
@@ -360,7 +382,7 @@ function HomeContent() {
           >
             <Link
               href="/features"
-              className="flex min-w-[170px] items-center justify-center gap-3 px-6 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+              className="hidden md:flex min-w-0 sm:min-w-[170px] items-center justify-center gap-2 sm:gap-3 px-2.5 sm:px-6 py-2 sm:py-2.5 rounded-[12px] sm:rounded-[16px] text-[13px] sm:text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
             >
               <svg
                 className="w-5 h-5 shrink-0"
@@ -436,7 +458,7 @@ function HomeContent() {
             </Link>
             <Link
               href="/pricing"
-              className="flex min-w-[170px] items-center justify-center gap-3 px-6 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+              className="hidden md:flex min-w-0 sm:min-w-[170px] items-center justify-center gap-2 sm:gap-3 px-2.5 sm:px-6 py-2 sm:py-2.5 rounded-[12px] sm:rounded-[16px] text-[13px] sm:text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
             >
               <svg
                 className="w-5 h-5 shrink-0"
@@ -458,7 +480,7 @@ function HomeContent() {
             </Link>
             <Link
               href="/how"
-              className="flex min-w-[170px] items-center justify-center gap-3 px-6 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+              className="hidden md:flex min-w-0 sm:min-w-[170px] items-center justify-center gap-2 sm:gap-3 px-2.5 sm:px-6 py-2 sm:py-2.5 rounded-[12px] sm:rounded-[16px] text-[13px] sm:text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
             >
               <svg
                 className="w-5 h-5 shrink-0"
@@ -518,70 +540,84 @@ function HomeContent() {
                 <span className="h-5 w-28 bg-gray-100 rounded-md animate-pulse" />
               </div>
             ) : isLoggedIn && sessionUser ? (
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-3 pl-6 pr-5 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 max-w-[min(320px,34vw)]"
+              <div
+                ref={accountMenuRef}
+                className="relative flex items-center gap-1.5 pl-2 pr-2 py-1.5 rounded-[16px] border border-gray-200 bg-white/90 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset]"
               >
-                <svg
-                  className="w-5 h-5 shrink-0"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-3 px-3 py-1.5 rounded-[12px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
                 >
-                  <defs>
-                    <linearGradient
-                      id="nav-ic-dash1"
-                      x1="3"
-                      y1="3"
-                      x2="11"
-                      y2="11"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop stopColor="#a1a1aa" />
-                      <stop offset="1" stopColor="#52525b" />
-                    </linearGradient>
-                    <linearGradient
-                      id="nav-ic-dash2"
-                      x1="13"
-                      y1="3"
-                      x2="21"
-                      y2="11"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop stopColor="#71717a" />
-                      <stop offset="1" stopColor="#3f3f46" />
-                    </linearGradient>
-                    <linearGradient
-                      id="nav-ic-dash3"
-                      x1="3"
-                      y1="13"
-                      x2="11"
-                      y2="21"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop stopColor="#71717a" />
-                      <stop offset="1" stopColor="#3f3f46" />
-                    </linearGradient>
-                    <linearGradient
-                      id="nav-ic-dash4"
-                      x1="13"
-                      y1="13"
-                      x2="21"
-                      y2="21"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop stopColor="#a1a1aa" />
-                      <stop offset="1" stopColor="#52525b" />
-                    </linearGradient>
-                  </defs>
-                  <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash1)" />
-                  <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash2)" />
-                  <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash3)" />
-                  <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash4)" />
-                </svg>
-                <span className="shrink-0">Dashboard</span>
-                <span className="flex items-center gap-2 min-w-0 ml-1 border-l border-gray-200 pl-3">
+                  <svg
+                    className="w-5 h-5 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden
+                  >
+                    <defs>
+                      <linearGradient
+                        id="nav-ic-dash1"
+                        x1="3"
+                        y1="3"
+                        x2="11"
+                        y2="11"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop stopColor="#a1a1aa" />
+                        <stop offset="1" stopColor="#52525b" />
+                      </linearGradient>
+                      <linearGradient
+                        id="nav-ic-dash2"
+                        x1="13"
+                        y1="3"
+                        x2="21"
+                        y2="11"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop stopColor="#71717a" />
+                        <stop offset="1" stopColor="#3f3f46" />
+                      </linearGradient>
+                      <linearGradient
+                        id="nav-ic-dash3"
+                        x1="3"
+                        y1="13"
+                        x2="11"
+                        y2="21"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop stopColor="#71717a" />
+                        <stop offset="1" stopColor="#3f3f46" />
+                      </linearGradient>
+                      <linearGradient
+                        id="nav-ic-dash4"
+                        x1="13"
+                        y1="13"
+                        x2="21"
+                        y2="21"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop stopColor="#a1a1aa" />
+                        <stop offset="1" stopColor="#52525b" />
+                      </linearGradient>
+                    </defs>
+                    <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash1)" />
+                    <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash2)" />
+                    <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash3)" />
+                    <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash4)" />
+                  </svg>
+                  <span className="shrink-0">Dashboard</span>
+                </Link>
+
+                <span className="h-6 w-px bg-gray-200" aria-hidden />
+
+                <button
+                  type="button"
+                  onClick={() => setAccountMenuOpen((v) => !v)}
+                  aria-expanded={accountMenuOpen}
+                  aria-haspopup="menu"
+                  className="flex items-center gap-2 min-w-0 rounded-[12px] px-2.5 py-1.5 text-[13px] sm:text-[14px] text-gray-800 hover:bg-gray-100 transition-colors max-w-[min(220px,36vw)] sm:max-w-[min(180px,28vw)]"
+                >
                   {typeof sessionUser.image === "string" && sessionUser.image.trim() ? (
                     <img
                       src={sessionUser.image}
@@ -596,15 +632,38 @@ function HomeContent() {
                       {(sessionUser.name?.trim()?.[0] ?? sessionUser.email?.trim()?.[0] ?? "?").toUpperCase()}
                     </span>
                   )}
-                  <span className="truncate text-[14px] text-gray-800">
+                  <span className="truncate">
                     {sessionUser.name?.trim() || sessionUser.email?.trim() || "Account"}
                   </span>
-                </span>
-              </Link>
+                </button>
+
+                {accountMenuOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-[calc(100%+8px)] z-40 min-w-[180px] rounded-xl border border-gray-200 bg-white p-1.5 shadow-[0_16px_32px_-20px_rgba(0,0,0,0.55)]"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={async () => {
+                        setAccountMenuOpen(false);
+                        try {
+                          await authClient.signOut({ fetchOptions: { onSuccess: () => { } } });
+                        } finally {
+                          window.location.href = "/";
+                        }
+                      }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <Link
                 href="/signin"
-                className="flex min-w-[170px] items-center justify-center gap-3 px-6 py-2.5 rounded-[16px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+                className="flex min-w-0 sm:min-w-[170px] items-center justify-center gap-2 sm:gap-3 px-2.5 sm:px-6 py-2 sm:py-2.5 rounded-[12px] sm:rounded-[16px] text-[13px] sm:text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
               >
                 <svg
                   className="w-5 h-5 shrink-0"
@@ -753,8 +812,8 @@ function HomeContent() {
           className="min-h-screen"
         >
           <div id="create" />
-          <section id="create" className="pt-28 pb-40 px-6 relative hidden">
-            <div className="max-w-5xl mx-auto relative z-10">
+          <section id="create" className="pt-28 pb-40 px-4 sm:px-6 xl:px-10 2xl:px-14 relative hidden">
+            <div className="max-w-[min(1680px,96vw)] mx-auto relative z-10">
               {status === "completed" && videoUrl ? (
                 <div className="rounded-2xl border border-white/10 bg-zinc-950 overflow-hidden">
                   <div className="flex items-center gap-3 px-6 py-4 border-b border-white/5 bg-emerald-500/10">
@@ -2087,8 +2146,8 @@ function HomeContent() {
             </div>
           </section>
 
-          <section id="features" className="pt-32 pb-32 px-6">
-            <div className="max-w-6xl mx-auto">
+          <section id="features" className="pt-32 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14">
+            <div className="max-w-[min(1680px,96vw)] mx-auto">
               <div className="flex justify-center mb-8">
                 <div className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full border border-gray-200 bg-white text-[13px] font-semibold tracking-wider text-gray-700 uppercase">
                   <svg
@@ -2368,9 +2427,9 @@ function HomeContent() {
           <section
             ref={howSectionRef}
             id="how"
-            className="pt-32 pb-36 px-6 bg-[#F9FAFB]"
+            className="pt-32 pb-36 px-4 sm:px-6 xl:px-10 2xl:px-14 bg-[#F9FAFB]"
           >
-            <div className="max-w-6xl mx-auto text-center">
+            <div className="max-w-[min(1680px,96vw)] mx-auto text-center">
               <div className="mb-8">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-1">
                   How it works
@@ -2400,7 +2459,7 @@ function HomeContent() {
 
           <section
             id="pricing"
-            className="pt-36 pb-32 px-6 relative overflow-hidden"
+            className="pt-36 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14 relative overflow-hidden"
           >
             <div
               className="absolute inset-0 flex items-start justify-center pointer-events-none select-none"
@@ -2414,7 +2473,7 @@ function HomeContent() {
               </span>
             </div>
 
-            <div className="max-w-6xl mx-auto relative z-10">
+            <div className="max-w-[min(1680px,96vw)] mx-auto relative z-10">
               <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-8 items-start mb-16">
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight">
@@ -2573,8 +2632,8 @@ function HomeContent() {
             </div>
           </section>
 
-          <section className="pt-32 pb-32 px-6">
-            <div className="max-w-6xl mx-auto">
+          <section className="pt-32 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14">
+            <div className="max-w-[min(1680px,96vw)] mx-auto">
               <div className="rounded-3xl bg-white border border-gray-200 overflow-hidden px-6 sm:px-12 lg:px-20 py-16 sm:py-20 shadow-sm">
                 <div className="text-center mb-14">
                   <div className="inline-flex items-center gap-2 text-teal-600 text-sm font-semibold tracking-wider uppercase mb-5">
