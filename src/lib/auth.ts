@@ -6,9 +6,13 @@ const pool =
   connectionString != null && connectionString.trim() !== ""
     ? new Pool({
       connectionString,
-      max: 10,
+      max: Math.min(25, Math.max(5, Number(process.env.PG_POOL_MAX ?? "12") || 12)),
       idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
+      /** Neon / remote Postgres can exceed 10s under load; failing fast is handled in getSessionSafe. */
+      connectionTimeoutMillis: Math.min(
+        60_000,
+        Math.max(5000, Number(process.env.PG_CONNECTION_TIMEOUT_MS ?? "15000") || 15_000)
+      ),
       allowExitOnIdle: true,
       keepAlive: true,
     })
