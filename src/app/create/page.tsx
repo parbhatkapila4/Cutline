@@ -3,9 +3,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { CircleUserRound, Clapperboard, Info } from "lucide-react";
 import { getUserFriendlyErrorMessage, getErrorPresentation } from "@/lib/utils/error";
 import { STAGES } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
+import { SUBMIT_TIMEOUT_MS } from "@/components/generate/constants";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId } from "@/lib/types/avatar";
 import { isEnterprisePlan, type PlanId } from "@/lib/plans";
@@ -69,6 +71,9 @@ type AvatarMode = "default" | "preset" | "upload";
 
 const PRO_AVATAR_MODES: AvatarMode[] = ["preset", "upload"];
 function canUseProAvatar(plan: PlanId): boolean {
+  return plan === "professional" || plan === "enterprise";
+}
+function canUseCinematicScenes(plan: PlanId): boolean {
   return plan === "professional" || plan === "enterprise";
 }
 
@@ -224,6 +229,7 @@ export default function CreatePage() {
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [canGenerateByPlan, setCanGenerateByPlan] = useState(true);
   const [planLimitMessage, setPlanLimitMessage] = useState<string | null>(null);
+  const canUseCinematicMode = canUseCinematicScenes(userPlan);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -258,6 +264,12 @@ export default function CreatePage() {
     setImgUrls(u);
     return () => u.forEach((x) => URL.revokeObjectURL(x));
   }, [imgs]);
+
+  useEffect(() => {
+    if (!canUseCinematicMode && talkingRealMode === "scenario") {
+      setTalkingRealMode("studio");
+    }
+  }, [canUseCinematicMode, talkingRealMode]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -328,7 +340,22 @@ export default function CreatePage() {
       setErrorCode("MONTHLY_LIMIT_REACHED");
       return;
     }
-    if (mode === "talking_object" && objStyle === "real" && PRO_AVATAR_MODES.includes(avatarMode) && !canUseProAvatar(userPlan)) {
+    if (
+      mode === "talking_object" &&
+      objStyle === "real" &&
+      talkingRealMode === "scenario" &&
+      !canUseCinematicMode
+    ) {
+      setError("Cinematic scenes are available on Pro and Enterprise plans. Upgrade to use this mode.");
+      return;
+    }
+    if (
+      mode === "talking_object" &&
+      objStyle === "real" &&
+      talkingRealMode !== "scenario" &&
+      PRO_AVATAR_MODES.includes(avatarMode) &&
+      !canUseProAvatar(userPlan)
+    ) {
       setError("Custom avatars need a Pro plan. Switch to Default or upgrade.");
       return;
     }
@@ -363,31 +390,35 @@ export default function CreatePage() {
         avatarUploadAssetId = String(uploadData.assetIds[0]);
       }
       const ac = new AbortController();
-      const t = setTimeout(() => ac.abort(), 25_000);
-      const r = await fetch("/api/generate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input: prompt.trim(), mode, platform, aspectRatio,
-          durationSeconds: Math.min(DURATION_MAX, Math.max(DURATION_MIN, dur)),
-          captions: cc ? "on" : "off",
-          ...(assetIds.length ? { assetIds } : {}),
-          ...(mode === "talking_object" ? { talkingObjectStyle: objStyle } : {}),
-          ...(mode === "talking_object" && objStyle === "real" ? { talkingRealMode } : {}),
-          ...(mode === "talking_object" && objStyle === "real"
-            && talkingRealMode !== "scenario"
-            ? {
-              avatar:
-                avatarMode === "preset"
-                  ? { mode: "preset", presetId: avatarPresetId }
-                  : avatarMode === "upload" && avatarUploadAssetId
-                    ? { mode: "upload", uploadAssetId: avatarUploadAssetId }
-                    : { mode: "default" },
-            }
-            : {}),
-        }),
-        signal: ac.signal,
-      });
-      clearTimeout(t);
+      const t = setTimeout(() => ac.abort(), SUBMIT_TIMEOUT_MS);
+      let r: Response;
+      try {
+        r = await fetch("/api/generate", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            input: prompt.trim(), mode, platform, aspectRatio,
+            durationSeconds: Math.min(DURATION_MAX, Math.max(DURATION_MIN, dur)),
+            captions: cc ? "on" : "off",
+            ...(assetIds.length ? { assetIds } : {}),
+            ...(mode === "talking_object" ? { talkingObjectStyle: objStyle } : {}),
+            ...(mode === "talking_object" && objStyle === "real" ? { talkingRealMode } : {}),
+            ...(mode === "talking_object" && objStyle === "real"
+              && talkingRealMode !== "scenario"
+              ? {
+                avatar:
+                  avatarMode === "preset"
+                    ? { mode: "preset", presetId: avatarPresetId }
+                    : avatarMode === "upload" && avatarUploadAssetId
+                      ? { mode: "upload", uploadAssetId: avatarUploadAssetId }
+                      : { mode: "default" },
+              }
+              : {}),
+          }),
+          signal: ac.signal,
+        });
+      } finally {
+        clearTimeout(t);
+      }
       const d = await r.json();
       if (!r.ok) {
         const code = typeof d?.code === "string" ? d.code : null;
@@ -624,10 +655,10 @@ export default function CreatePage() {
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.22 + i * 0.06, duration: 0.4 }}
                                 className={`relative flex items-center gap-3 pl-3 pr-3.5 py-2.5 rounded-xl transition-colors duration-300 ${active
-                                    ? "bg-amber-500/8 border border-amber-400/20"
-                                    : past
-                                      ? "border border-transparent"
-                                      : "border border-transparent"
+                                  ? "bg-amber-500/8 border border-amber-400/20"
+                                  : past
+                                    ? "border border-transparent"
+                                    : "border border-transparent"
                                   }`}
                               >
                                 {active ? (
@@ -639,10 +670,10 @@ export default function CreatePage() {
 
                                 <div
                                   className={`relative w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all duration-300 ${past
-                                      ? "bg-emerald-500/12 text-emerald-300 ring-1 ring-emerald-500/25"
-                                      : active
-                                        ? "bg-linear-to-br from-amber-400 to-amber-600 text-zinc-950 shadow-md shadow-amber-900/30"
-                                        : "bg-white/4 text-zinc-600 ring-1 ring-white/8"
+                                    ? "bg-emerald-500/12 text-emerald-300 ring-1 ring-emerald-500/25"
+                                    : active
+                                      ? "bg-linear-to-br from-amber-400 to-amber-600 text-zinc-950 shadow-md shadow-amber-900/30"
+                                      : "bg-white/4 text-zinc-600 ring-1 ring-white/8"
                                     }`}
                                 >
                                   {past ? (
@@ -657,10 +688,10 @@ export default function CreatePage() {
                                 <div className="min-w-0 flex-1">
                                   <p
                                     className={`text-[13px] font-semibold leading-tight transition-colors duration-300 ${past
-                                        ? "text-zinc-500"
-                                        : active
-                                          ? "text-white"
-                                          : "text-zinc-500"
+                                      ? "text-zinc-500"
+                                      : active
+                                        ? "text-white"
+                                        : "text-zinc-500"
                                       }`}
                                   >
                                     {meta.title}
@@ -739,7 +770,7 @@ export default function CreatePage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="relative min-h-full w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8"
+              className="relative min-h-full w-full max-w-[min(1680px,96vw)] mx-auto px-4 sm:px-6 xl:px-10 2xl:px-14 py-6 sm:py-8"
             >
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
@@ -798,7 +829,7 @@ export default function CreatePage() {
                 </motion.div>
               ) : null}
 
-              <div className="grid gap-5 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="grid gap-5 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -926,8 +957,8 @@ export default function CreatePage() {
                               setTimeout(() => setCopied(false), 2000);
                             }}
                             className={`group inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-[12.5px] font-medium transition-all ${copied
-                                ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                                : "border-white/12 bg-white/3 text-zinc-300 hover:text-white hover:bg-white/6 hover:border-white/20"
+                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                              : "border-white/12 bg-white/3 text-zinc-300 hover:text-white hover:bg-white/6 hover:border-white/20"
                               }`}
                             aria-live="polite"
                           >
@@ -1042,9 +1073,9 @@ export default function CreatePage() {
 
           {!busy && !done && (
             <motion.main key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="relative min-h-full flex flex-col items-center justify-center px-6 lg:px-10 py-6 sm:py-8">
-              <div className="w-full max-w-5xl mx-auto">
+              <div className="w-full max-w-[min(1660px,96vw)] mx-auto">
                 <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-2xl border border-white/10 bg-zinc-950 overflow-hidden">
-                  <div className="grid md:grid-cols-[280px_1fr]">
+                  <div className="grid md:grid-cols-[300px_1fr] xl:grid-cols-[340px_1fr] 2xl:grid-cols-[380px_1fr]">
                     <div className="p-6 md:p-7 border-b md:border-b-0 md:border-r border-white/5 bg-zinc-900/50">
                       <div className="flex items-center justify-between mb-4">
                         <p className="text-sm font-medium text-white">Your images (optional)</p>
@@ -1238,154 +1269,260 @@ export default function CreatePage() {
                             })}
                           </div>
                           {mode === "talking_object" && objStyle === "real" && (
-                            <div className="mt-4">
-                              <p className="text-xs font-medium text-gray-500 mb-2">Realistic style</p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setTalkingRealMode("studio")}
-                                  className={`p-3 rounded-xl border text-left transition-all ${talkingRealMode === "studio" ? "border-blue-500/50 bg-blue-500/10 text-blue-200" : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"}`}
-                                >
-                                  <p className="text-sm font-medium">Studio talk (current)</p>
-                                  <p className="text-[11px] mt-1 text-zinc-500">Clean talking-head look with subtle background.</p>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setTalkingRealMode("scenario")}
-                                  className={`p-3 rounded-xl border text-left transition-all ${talkingRealMode === "scenario" ? "border-blue-500/50 bg-blue-500/10 text-blue-200" : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"}`}
-                                >
-                                  <p className="text-sm font-medium">Influencer scene (new)</p>
-                                  <p className="text-[11px] mt-1 text-zinc-500">Real-life movement + context-driven environment (VEO style).</p>
-                                </button>
+                            <div className="mt-5">
+                              <div className="rounded-2xl border border-zinc-800/90 bg-linear-to-b from-zinc-900/45 to-zinc-950/90 p-4 sm:p-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+                                <div className="mb-4 sm:mb-5">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                                    Realistic speaker
+                                  </p>
+                                  <h4 className="mt-1.5 text-base font-semibold text-white tracking-tight">
+                                    Look and setting
+                                  </h4>
+                                  <p className="mt-1.5 text-[13px] leading-snug text-zinc-400 max-w-xl">
+                                    Same realistic pipeline: pick a controlled studio frame or a moving, environment-driven take.
+                                  </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => setTalkingRealMode("studio")}
+                                    className={`group relative rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${talkingRealMode === "studio"
+                                      ? "border-amber-500/40 bg-amber-500/6 shadow-[0_0_0_1px_rgba(245,158,11,0.12)]"
+                                      : "border-zinc-800/90 bg-zinc-950/30 hover:border-zinc-600/80 hover:bg-zinc-900/40"
+                                      }`}
+                                  >
+                                    <div className="flex gap-3.5 p-4">
+                                      <span
+                                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${talkingRealMode === "studio"
+                                          ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
+                                          : "border-zinc-700/80 bg-zinc-900/50 text-zinc-500 group-hover:text-zinc-400"
+                                          }`}
+                                        aria-hidden
+                                      >
+                                        <CircleUserRound className="h-5 w-5" strokeWidth={1.6} />
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-start justify-between gap-2">
+                                          <span className="text-[15px] font-semibold text-white leading-tight">
+                                            Studio framing
+                                          </span>
+                                          <span
+                                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${talkingRealMode === "studio"
+                                              ? "border-amber-400"
+                                              : "border-zinc-600"
+                                              }`}
+                                            aria-hidden
+                                          >
+                                            {talkingRealMode === "studio" && (
+                                              <span className="h-2 w-2 rounded-full bg-amber-400" />
+                                            )}
+                                          </span>
+                                        </div>
+                                        <p className="mt-2 text-xs leading-relaxed text-zinc-500 group-hover:text-zinc-400">
+                                          Talking-head composition with a calm backdrop. Avatar presets and image uploads apply.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!canUseCinematicMode) return;
+                                      setTalkingRealMode("scenario");
+                                    }}
+                                    disabled={!canUseCinematicMode}
+                                    className={`group relative rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${talkingRealMode === "scenario"
+                                      ? "border-amber-500/40 bg-amber-500/6 shadow-[0_0_0_1px_rgba(245,158,11,0.12)]"
+                                      : !canUseCinematicMode
+                                        ? "border-zinc-800/90 bg-zinc-950/20 opacity-55 cursor-not-allowed"
+                                        : "border-zinc-800/90 bg-zinc-950/30 hover:border-zinc-600/80 hover:bg-zinc-900/40"
+                                      }`}
+                                  >
+                                    <div className="flex gap-3.5 p-4">
+                                      <span
+                                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${talkingRealMode === "scenario"
+                                          ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
+                                          : !canUseCinematicMode
+                                            ? "border-zinc-700/80 bg-zinc-900/40 text-zinc-500"
+                                            : "border-zinc-700/80 bg-zinc-900/50 text-zinc-500 group-hover:text-zinc-400"
+                                          }`}
+                                        aria-hidden
+                                      >
+                                        <Clapperboard className="h-5 w-5" strokeWidth={1.6} />
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-start justify-between gap-2">
+                                          <span className="text-[15px] font-semibold text-white leading-tight">
+                                            Cinematic scenes
+                                          </span>
+                                          {!canUseCinematicMode && (
+                                            <span className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/8 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                                              Pro
+                                            </span>
+                                          )}
+                                          <span
+                                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${talkingRealMode === "scenario"
+                                              ? "border-amber-400"
+                                              : "border-zinc-600"
+                                              }`}
+                                            aria-hidden
+                                          >
+                                            {talkingRealMode === "scenario" && (
+                                              <span className="h-2 w-2 rounded-full bg-amber-400" />
+                                            )}
+                                          </span>
+                                        </div>
+                                        <p className="mt-2 text-xs leading-relaxed text-zinc-500 group-hover:text-zinc-400">
+                                          On-location motion and context tied to your topic, closer to a polished reel. Generation focuses on full scenes.
+                                        </p>
+                                        {!canUseCinematicMode && (
+                                          <p className="mt-2 text-[11px] leading-relaxed text-amber-300/90">
+                                            Available on Professional and Enterprise plans.
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </button>
+                                </div>
+
+                                {talkingRealMode === "scenario" && (
+                                  <div className="mt-4 flex gap-3 rounded-xl border border-zinc-700/60 bg-zinc-950/50 px-3.5 py-3 sm:px-4">
+                                    <Info
+                                      className="h-4 w-4 shrink-0 text-zinc-500 mt-0.5"
+                                      strokeWidth={2}
+                                      aria-hidden
+                                    />
+                                    <p className="text-[12px] leading-relaxed text-zinc-400">
+                                      <span className="text-zinc-300 font-medium">Note.</span>{" "}
+                                      This mode uses full-scene video generation. Custom avatar presets and uploads are not applied; look and setting follow your prompt and topic.
+                                    </p>
+                                  </div>
+                                )}
                               </div>
 
                               {talkingRealMode === "studio" ? (
                                 <>
-                              <p className="text-xs font-medium text-gray-500 mb-2">Avatar</p>
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                {(["default", "preset", "upload"] as const).map((m) => {
-                                  const isPro = PRO_AVATAR_MODES.includes(m);
-                                  const locked = isPro && !canUseProAvatar(userPlan);
-                                  return (
-                                    <button
-                                      key={m}
-                                      type="button"
-                                      onClick={() => setAvatarMode(m)}
-                                      className={`relative px-3 py-2 rounded-lg border text-sm transition-all ${avatarMode === m
-                                          ? "border-blue-500/50 bg-blue-500/10 text-blue-200"
-                                          : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"
-                                        }`}
-                                    >
-                                      {locked && (
-                                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-1.5 py-px text-[9px] font-semibold tracking-wide text-amber-400 bg-zinc-900 border border-amber-500/30 rounded-full leading-none">
-                                          ✦ Pro
-                                        </span>
-                                      )}
-                                      {m === "default" ? "Default" : m === "preset" ? "Preset" : "Upload"}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              {avatarMode === "preset" && (
-                                canUseProAvatar(userPlan) ? (
-                                  <motion.div
-                                    layout
-                                    initial={{ opacity: 0.85, y: 6 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="mt-4 rounded-2xl border border-zinc-700/90 bg-linear-to-b from-zinc-900/80 to-black/40 p-2.5 sm:p-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
-                                  >
-                                    <div className="grid grid-cols-2 gap-2.5">
-                                      {AVATAR_PRESETS.map((preset) => (
+                                  <p className="text-xs font-medium text-gray-500 mb-2 mt-5">Avatar</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    {(["default", "preset", "upload"] as const).map((m) => {
+                                      const isPro = PRO_AVATAR_MODES.includes(m);
+                                      const locked = isPro && !canUseProAvatar(userPlan);
+                                      return (
                                         <button
-                                          key={preset.id}
+                                          key={m}
                                           type="button"
-                                          onClick={() => setAvatarPresetId(preset.id)}
-                                          className={`group relative aspect-square w-full rounded-lg border-2 overflow-hidden text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${avatarPresetId === preset.id
-                                              ? "border-amber-400 ring-2 ring-amber-500/35 shadow-lg shadow-amber-950/40"
-                                              : "border-zinc-700 hover:border-zinc-500"
+                                          onClick={() => setAvatarMode(m)}
+                                          className={`relative px-3 py-2 rounded-lg border text-sm transition-all ${avatarMode === m
+                                            ? "border-blue-500/50 bg-blue-500/10 text-blue-200"
+                                            : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"
                                             }`}
                                         >
-                                          <img
-                                            src={preset.imageSrc}
-                                            alt={preset.label}
-                                            className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-                                            loading="lazy"
-                                            onError={(e) => {
-                                              const img = e.currentTarget;
-                                              img.onerror = null;
-                                              img.src = "/avatars/presets/fallback.svg";
-                                            }}
-                                          />
-                                          <div
-                                            className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent"
-                                            aria-hidden
-                                          />
-                                          <div className="absolute bottom-0 left-0 right-0 p-2">
-                                            <p className="text-xs font-semibold text-white drop-shadow-md leading-tight">
-                                              {preset.label}
-                                            </p>
-                                            <p className="text-[10px] text-zinc-200/80 mt-0.5 drop-shadow leading-tight">
-                                              {preset.hint}
-                                            </p>
-                                          </div>
+                                          {locked && (
+                                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-1.5 py-px text-[9px] font-semibold tracking-wide text-amber-400 bg-zinc-900 border border-amber-500/30 rounded-full leading-none">
+                                              ✦ Pro
+                                            </span>
+                                          )}
+                                          {m === "default" ? "Default" : m === "preset" ? "Preset" : "Upload"}
                                         </button>
-                                      ))}
-                                    </div>
-                                  </motion.div>
-                                ) : (
-                                  <ProAvatarGate />
-                                )
-                              )}
+                                      );
+                                    })}
+                                  </div>
 
-                              {avatarMode === "upload" && (
-                                canUseProAvatar(userPlan) ? (
-                                  <div className="mt-3">
-                                    <input
-                                      ref={avatarFileRef}
-                                      type="file"
-                                      accept="image/*"
-                                      className="hidden"
-                                      onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => avatarFileRef.current?.click()}
-                                      className="w-full rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-300 transition-colors"
-                                    >
-                                      {avatarFile ? "Change avatar image" : "Upload avatar image"}
-                                    </button>
-                                    {avatarFileUrl ? (
-                                      <div className="mt-2 flex items-center gap-3">
-                                        <img src={avatarFileUrl} alt="Avatar preview" className="w-12 h-12 rounded-lg object-cover border border-zinc-700" />
-                                        <div className="min-w-0">
-                                          <p className="text-xs text-zinc-400 truncate">{avatarFile?.name}</p>
-                                          <button
-                                            type="button"
-                                            onClick={() => setAvatarFile(null)}
-                                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                                          >
-                                            Remove
-                                          </button>
+                                  {avatarMode === "preset" && (
+                                    canUseProAvatar(userPlan) ? (
+                                      <motion.div
+                                        layout
+                                        initial={{ opacity: 0.85, y: 6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="mt-4 rounded-2xl border border-zinc-700/90 bg-linear-to-b from-zinc-900/80 to-black/40 p-2.5 sm:p-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
+                                      >
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                          {AVATAR_PRESETS.map((preset) => (
+                                            <button
+                                              key={preset.id}
+                                              type="button"
+                                              onClick={() => setAvatarPresetId(preset.id)}
+                                              className={`group relative aspect-square w-full rounded-lg border-2 overflow-hidden text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${avatarPresetId === preset.id
+                                                ? "border-amber-400 ring-2 ring-amber-500/35 shadow-lg shadow-amber-950/40"
+                                                : "border-zinc-700 hover:border-zinc-500"
+                                                }`}
+                                            >
+                                              <img
+                                                src={preset.imageSrc}
+                                                alt={preset.label}
+                                                className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                                                loading="lazy"
+                                                onError={(e) => {
+                                                  const img = e.currentTarget;
+                                                  img.onerror = null;
+                                                  img.src = "/avatars/presets/fallback.svg";
+                                                }}
+                                              />
+                                              <div
+                                                className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent"
+                                                aria-hidden
+                                              />
+                                              <div className="absolute bottom-0 left-0 right-0 p-2">
+                                                <p className="text-xs font-semibold text-white drop-shadow-md leading-tight">
+                                                  {preset.label}
+                                                </p>
+                                                <p className="text-[10px] text-zinc-200/80 mt-0.5 drop-shadow leading-tight">
+                                                  {preset.hint}
+                                                </p>
+                                              </div>
+                                            </button>
+                                          ))}
                                         </div>
+                                      </motion.div>
+                                    ) : (
+                                      <ProAvatarGate />
+                                    )
+                                  )}
+
+                                  {avatarMode === "upload" && (
+                                    canUseProAvatar(userPlan) ? (
+                                      <div className="mt-3">
+                                        <input
+                                          ref={avatarFileRef}
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => avatarFileRef.current?.click()}
+                                          className="w-full rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-300 transition-colors"
+                                        >
+                                          {avatarFile ? "Change avatar image" : "Upload avatar image"}
+                                        </button>
+                                        {avatarFileUrl ? (
+                                          <div className="mt-2 flex items-center gap-3">
+                                            <img src={avatarFileUrl} alt="Avatar preview" className="w-12 h-12 rounded-lg object-cover border border-zinc-700" />
+                                            <div className="min-w-0">
+                                              <p className="text-xs text-zinc-400 truncate">{avatarFile?.name}</p>
+                                              <button
+                                                type="button"
+                                                onClick={() => setAvatarFile(null)}
+                                                className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                              >
+                                                Remove
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <p className="text-[11px] text-zinc-600 mt-2">Use a clear face photo for best results.</p>
+                                        )}
                                       </div>
                                     ) : (
-                                      <p className="text-[11px] text-zinc-600 mt-2">Use a clear face photo for best results.</p>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <ProAvatarGate />
-                                )
-                              )}
+                                      <ProAvatarGate />
+                                    )
+                                  )}
                                 </>
-                              ) : (
-                                <div className="mt-3 rounded-xl border border-blue-500/25 bg-blue-500/8 px-3 py-2.5">
-                                  <p className="text-[11px] text-blue-200">
-                                    Influencer scene uses cinematic real-world generation and ignores avatar presets/uploads.
-                                  </p>
-                                </div>
-                              )}
+                              ) : null}
                             </div>
                           )}
                         </div>
