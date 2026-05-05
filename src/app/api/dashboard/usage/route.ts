@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
-import { auth } from "@/lib/auth";
+import { getSessionSafe } from "@/lib/auth/getSessionSafe";
 import {
   getTokens,
   getApiCallsThisMonth,
@@ -29,14 +29,18 @@ function relativeTime(ms: number | undefined): string {
   return `${Math.floor(sec / 86400)} days ago`;
 }
 
-async function resolveDashboardIdentifier(request: Request): Promise<string | null> {
-  try {
-    const session = await auth.api.getSession({ headers: request.headers });
-    const userId = session?.user?.id;
-    if (typeof userId === "string" && userId.trim()) return userId;
-  } catch {
+async function resolveUsageContext(
+  request: Request
+): Promise<{ identifier: string; planUserId: string | undefined } | null> {
+  const session = await getSessionSafe(request.headers);
+  const userId = session?.user?.id;
+  if (typeof userId === "string" && userId.trim()) {
+    const id = userId.trim();
+    return { identifier: id, planUserId: id };
   }
-  return getAnonSessionIdFromRequest(request);
+  const anon = getAnonSessionIdFromRequest(request);
+  if (anon) return { identifier: anon, planUserId: undefined };
+  return null;
 }
 
 export async function GET(request: Request) {
@@ -64,8 +68,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const identifier = await resolveDashboardIdentifier(request);
-    if (!identifier) {
+    const ctx = await resolveUsageContext(request);
+    if (!ctx) {
       return NextResponse.json({
         plan: "free",
         planLabel: "Free",
@@ -98,6 +102,8 @@ export async function GET(request: Request) {
         },
       });
     }
+
+    const { identifier, planUserId } = ctx;
 
     const queue = getVideoQueue();
     const d = new Date();
@@ -174,14 +180,17 @@ export async function GET(request: Request) {
       return sum;
     }, 0);
 
-    const session = await auth.api.getSession({ headers: request.headers }).catch(() => null);
-    const userId = session?.user?.id ? String(session.user.id) : undefined;
-    const plan = await getUserPlan(userId);
+    const plan = await getUserPlan(planUserId);
 
-    const [tokensRemaining, apiCallsUsed] = await Promise.all([
-      getTokens(identifier),
-      getApiCallsThisMonth(identifier),
-    ]);
+    let tokensRemaining: number = DEFAULT_TOKENS;
+    let apiCallsUsed = 0;
+    try {
+      const [t, a] = await Promise.all([getTokens(identifier), getApiCallsThisMonth(identifier)]);
+      tokensRemaining = t;
+      apiCallsUsed = a;
+    } catch (redisErr) {
+      console.warn("[api/dashboard/usage] usage counters unavailable (redis):", redisErr);
+    }
 
     const tokensUnlimited = plan.tokensUnlimited;
     const tokenCapDisplay = tokensUnlimited
