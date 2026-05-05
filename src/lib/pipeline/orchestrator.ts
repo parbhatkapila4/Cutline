@@ -128,6 +128,7 @@ export type PipelineOptions = {
   textModel?: string;
   captions?: "on" | "off";
   talkingObjectStyle?: "cartoon" | "real";
+  talkingRealMode?: "studio" | "scenario";
   avatar?: AvatarSelection;
   renderMode?: "preview" | "final";
   previewJobId?: string;
@@ -151,11 +152,35 @@ export type PipelineOptions = {
 
 
 const VEO_WORDS_PER_CHUNK = 18;
+const VEO_CHUNK_SECONDS = 8;
+const VEO_CHUNK_VALIDATE_RETRIES = 2;
 
-function veoCharacterLockSuffix(characterLockId?: string): string {
+function maxVeoChunksForTargetDuration(targetSec: number): number {
+  const L = VEO_CHUNK_SECONDS;
+  const c = CROSSFADE_DURATION_SECONDS;
+  if (!Number.isFinite(targetSec) || targetSec <= 0) return 1;
+  if (targetSec < L * 0.75) return 1;
+  const maxN = Math.floor((targetSec - c + 1e-6) / (L - c));
+  return Math.max(1, maxN);
+}
+
+function veoCharacterLockSuffix(characterLockId?: string, opts?: { variant?: "default" | "wardrobeAndSetOk" }): string {
   const t = characterLockId?.trim();
   if (!t) return "";
-  return ` Series character identifier "${t}": keep the same character design, face, and styling across videos in this series.`;
+  if (opts?.variant === "wardrobeAndSetOk") {
+    return ` Series character identifier "${t}": keep the same real person (face, age, body type) across clips; refresh outfit layers and background per segment so shots do not look duplicated, without switching to a different individual.`;
+  }
+  return ` Series character identifier "${t}": keep the same character design and face across videos in this series.`;
+}
+
+function scenarioVisualBeatForChunk(chunkIndex: number): string {
+  const beats = [
+    "This segment: change location, wardrobe layer, or camera distance so it is not a visual repeat of the prior clip; same person.",
+    "This segment: new backdrop or angle; vary jacket, colors, or accessories while keeping the same speaker.",
+    "This segment: different area within the scene, fresher lighting or framing; outfit may shift subtly; same individual.",
+    "This segment: alternate real-world context tied to the topic; update styling and environment from the last beat.",
+  ];
+  return ` ${beats[chunkIndex % beats.length]}`;
 }
 
 function splitScriptIntoChunks(
@@ -249,9 +274,6 @@ function splitScriptIntoChunks(
   if (current.length > 0) chunks.push(current.join(" ").trim());
   return chunks;
 }
-
-const VEO_CHUNK_SECONDS = 8;
-const VEO_CHUNK_VALIDATE_RETRIES = 2;
 
 function isVeoQuotaOrRateLimitError(message: string): boolean {
   const m = message.toLowerCase();
@@ -406,6 +428,7 @@ async function runPipelineOnce(
     textModel,
     captions,
     talkingObjectStyle,
+    talkingRealMode,
     avatar,
     renderMode,
     previewJobId,
@@ -701,7 +724,7 @@ async function runPipelineOnce(
 
       let resolvedAvatarPath: string | undefined;
 
-      if (talkingObjectStyle === "real" && avatar?.mode === "preset" && avatar.presetId) {
+      if (talkingRealMode !== "scenario" && talkingObjectStyle === "real" && avatar?.mode === "preset" && avatar.presetId) {
         const filename = PRESET_AVATAR_FILES[avatar.presetId];
         if (filename) {
           resolvedAvatarPath = path.join(process.cwd(), "public", "avatars", "presets", filename);
@@ -709,7 +732,7 @@ async function runPipelineOnce(
         }
       }
 
-      if (!resolvedAvatarPath && talkingObjectStyle === "real" && avatar?.mode === "upload") {
+      if (!resolvedAvatarPath && talkingRealMode !== "scenario" && talkingObjectStyle === "real" && avatar?.mode === "upload") {
         const uploadedAvatarId = avatar.uploadAssetId;
         if (uploadedAvatarId) {
           const uploadedMeta = getAssetMetadata(uploadedAvatarId);
@@ -942,9 +965,15 @@ async function runPipelineOnce(
       if (!useMultiClip) {
         const singleClipBase =
           talkingObjectStyle === "real"
-            ? `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
+            ? talkingRealMode === "scenario"
+              ? `Ultra-real influencer-style vertical video in a believable real-world environment. The presenter is naturally moving through context-relevant locations tied to the topic (e.g. product setting, office, street, studio, gym, garage) while speaking directly to camera. Include subtle environmental storytelling, practical camera movement, depth, and real-life details so it feels like a genuine creator reel, not a static talking head.${avatarPromptSuffix}`
+              : `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
             : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
-        const prompt = `${singleClipBase} Say the following: ${fullScriptText}${veoCharacterLockSuffix(options.characterLockId)}`;
+        const singleLock =
+          talkingObjectStyle === "real" && talkingRealMode === "scenario"
+            ? veoCharacterLockSuffix(options.characterLockId, { variant: "wardrobeAndSetOk" })
+            : veoCharacterLockSuffix(options.characterLockId);
+        const prompt = `${singleClipBase} Say the following: ${fullScriptText}${singleLock}`;
         await checkCancelledAndThrow();
         logEvent({ jobId, event: "stage_start", stage: "veo" });
         await withStageTelemetry(jobId, "veo", () =>
@@ -1007,7 +1036,15 @@ async function runPipelineOnce(
 
       const wordsPerChunk = VEO_WORDS_PER_CHUNK;
       const targetDurationSec = effectiveDuration;
-      const targetChunks = Math.max(1, Math.ceil(targetDurationSec / VEO_CHUNK_SECONDS));
+      const naiveChunkBudget = Math.max(1, Math.ceil(targetDurationSec / VEO_CHUNK_SECONDS));
+      const maxChunksFitDuration = maxVeoChunksForTargetDuration(targetDurationSec);
+      const targetChunks = Math.min(naiveChunkBudget, maxChunksFitDuration);
+      if (naiveChunkBudget > maxChunksFitDuration) {
+        console.log(
+          "[pipeline] jobId=" + jobId + " clip budget capped " + naiveChunkBudget + " → " + targetChunks +
+          " so concatenated runtime fits ~" + targetDurationSec + "s (avoids trimming mid-speech)."
+        );
+      }
       const targetTotalWords = targetChunks * wordsPerChunk;
 
       const wordCount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
@@ -1046,6 +1083,12 @@ async function runPipelineOnce(
         }
       }
 
+      if (naiveChunkBudget > maxChunksFitDuration) {
+        const capMsg =
+          `To finish cleanly within about ${targetDurationSec} seconds, we use ${targetChunks} segments so speech is not cut off at the end.`;
+        message = message ? `${message} ${capMsg}` : capMsg;
+      }
+
       const textChunks = splitScriptIntoChunks(combinedScript, wordsPerChunk).slice(0, targetChunks);
       await checkCancelledAndThrow();
       logEvent({ jobId, event: "stage_start", stage: "veo" });
@@ -1072,21 +1115,44 @@ async function runPipelineOnce(
           const chunkPath = path.join(jobTempDir, `veo_chunk_${i}.mp4`);
           const base =
             talkingObjectStyle === "real"
-              ? `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
+              ? talkingRealMode === "scenario"
+                ? `Ultra-real influencer-style vertical video in a believable real-world environment. The presenter is naturally moving through context-relevant locations tied to the topic (e.g. product setting, office, street, studio, gym, garage) while speaking directly to camera. Include subtle environmental storytelling, practical camera movement, depth, and real-life details so it feels like a genuine creator reel, not a static talking head.${avatarPromptSuffix}`
+                : `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
               : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
+          const multiRealBeat =
+            talkingObjectStyle === "real" && N > 1
+              ? talkingRealMode === "scenario"
+                ? scenarioVisualBeatForChunk(i)
+                : " This segment: shift background or wardrobe slightly from the prior clip so it does not look duplicated; same person."
+              : "";
+          const baseAugmented = `${base}${multiRealBeat}`;
           const chunkText = textChunks[i]!;
+          const lockVariant =
+            talkingObjectStyle === "real" && (talkingRealMode === "scenario" || N > 1)
+              ? ("wardrobeAndSetOk" as const)
+              : ("default" as const);
+          const lockSuffix =
+            lockVariant === "wardrobeAndSetOk"
+              ? veoCharacterLockSuffix(options.characterLockId, { variant: "wardrobeAndSetOk" })
+              : veoCharacterLockSuffix(options.characterLockId);
           let flow: string;
           if (N === 1) {
             flow = "Say exactly the following, naturally and at a steady pace: ";
           } else if (i === 0) {
             flow = "This is the opening of a continuous speech. Say exactly the following in about 8 seconds, finish the last word clearly with no long pause: ";
           } else if (i === N - 1) {
-            flow = "This continues directly from the previous clip with no gap. Start immediately and say exactly the following, then end naturally: ";
+            flow =
+              "This continues directly from the previous clip with no gap. Start immediately; say exactly the following as the closing segment. Complete the final sentence fully, then stop speaking with no extra clause or trailing thought: ";
           } else {
             flow = "This continues directly from the previous clip with no gap. Start immediately, say exactly the following in about 8 seconds, and finish the last word clearly: ";
           }
-          const endInstruction = N > 1 && i < N - 1 ? " Do not pause at the end; the next clip will continue from here." : "";
-          const prompt = `${base} ${flow}${chunkText}${endInstruction}${veoCharacterLockSuffix(options.characterLockId)}`;
+          const endInstruction =
+            N > 1 && i < N - 1
+              ? " Do not pause at the end; the next clip will continue from here."
+              : N > 1 && i === N - 1
+                ? " Do not add another sentence after the final line."
+                : "";
+          const prompt = `${baseAugmented} ${flow}${chunkText}${endInstruction}${lockSuffix}`;
 
           let lastChunkError: Error | null = null;
           for (let attempt = 0; attempt <= VEO_CHUNK_VALIDATE_RETRIES; attempt++) {
