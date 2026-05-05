@@ -253,10 +253,9 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
                 : { opacity: 0, filter: "blur(10px)" }
             }
             transition={{ duration: 1 }}
-            className="text-balance font-medium leading-tight tracking-tight text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] max-w-[min(11rem,calc(100vw-4rem))] text-[clamp(0.875rem,4.5vw,1.2rem)] max-md:px-1 md:max-w-[min(20rem,calc(100vw-9rem))] md:text-2xl lg:max-w-[min(24rem,calc(100vw-10rem))] lg:text-3xl xl:max-w-3xl xl:text-4xl"
+            className="text-balance font-medium leading-tight tracking-tight text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] w-full max-w-[calc(100vw-2.5rem)] px-1 text-[clamp(1rem,4.6vw,1.35rem)] sm:max-w-xl sm:text-[clamp(1.05rem,3.8vw,1.5rem)] md:max-w-2xl md:text-2xl lg:max-w-3xl lg:text-3xl xl:max-w-4xl xl:text-4xl"
           >
-            <span className="md:hidden">Prompt. Cut. Delivered.</span>
-            <span className="hidden md:inline">Prompt. Cut. Delivered.</span>
+            Brief. Assembly. Master.
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -268,7 +267,7 @@ export default function IntroAnimation({ onScrollComplete }: IntroAnimationProps
             transition={{ duration: 1, delay: 0.2 }}
             className="mt-2 max-w-[min(16rem,calc(100vw-3rem))] text-[0.6rem] font-bold tracking-[0.16em] text-gray-500 md:mt-3 md:text-xs md:tracking-[0.2em]"
           >
-            SCROLL TO EXPLORE
+            SCROLL ON
           </motion.p>
         </div>
 

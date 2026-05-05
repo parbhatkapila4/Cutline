@@ -68,6 +68,34 @@ function formatSrtTime(ms: number): string {
   ].join(":");
 }
 
+function wrapSubtitleLines(text: string, maxCharsPerLine: number): string {
+  const t = (text || "").trim().replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!t) return "";
+  const limit = Math.max(18, Math.min(42, maxCharsPerLine));
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  const lines: string[] = [];
+  let line = "";
+  for (const w of words) {
+    const candidate = line ? `${line} ${w}` : w;
+    if (candidate.length <= limit) {
+      line = candidate;
+      continue;
+    }
+    if (line) lines.push(line);
+    if (w.length <= limit) {
+      line = w;
+    } else {
+      for (let i = 0; i < w.length; i += limit) {
+        lines.push(w.slice(i, i + limit));
+      }
+      line = "";
+    }
+  }
+  if (line) lines.push(line);
+  return lines.join("\\N");
+}
+
 function formatAssTime(ms: number): string {
   const totalSec = ms / 1000;
   const hours = Math.floor(totalSec / 3600);
@@ -125,18 +153,20 @@ function writeAssFile(
     throw new Error("No valid subtitle entries (each needs endMs > startMs and duration >= 400ms)");
   }
   const { width, height } = dims;
-  const fontSize = Math.max(22, Math.min(120, Math.round(height * 0.048)));
+  const fontSize = Math.max(22, Math.min(110, Math.round(height * 0.046)));
   const outline = Math.max(2, Math.round(height * 0.0025));
   const shadow = Math.max(0, Math.round(height * 0.0012));
-  const marginV = Math.max(24, Math.round(height * 0.1));
-  const marginH = Math.max(24, Math.round(width * 0.06));
+  const marginV = Math.max(28, Math.round(height * 0.11));
+  const marginH = Math.max(32, Math.round(width * 0.085));
+  const innerWidth = Math.max(200, width - 2 * marginH);
+  const approxCharsPerLine = Math.max(18, Math.floor(innerWidth / (fontSize * 0.52)));
 
   const header = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${width}
 PlayResY: ${height}
 ScaledBorderAndShadow: yes
-WrapStyle: 2
+WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
@@ -147,7 +177,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
   const lines = valid.map(
     (e) =>
-      `Dialogue: 0,${formatAssTime(e.startMs)},${formatAssTime(e.endMs)},Default,,0,0,0,,${(e.text || "").trim().replace(/\r\n/g, "\\N").replace(/\r/g, "\\N").replace(/\n/g, "\\N")}`
+      `Dialogue: 0,${formatAssTime(e.startMs)},${formatAssTime(e.endMs)},Default,,0,0,0,,${wrapSubtitleLines((e.text || "").trim(), approxCharsPerLine)}`
   );
   fs.writeFileSync(assPath, header + lines.join("\n") + "\n", "utf-8");
 }
