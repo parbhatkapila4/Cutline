@@ -130,7 +130,7 @@ export function getErrorPresentation(
     return {
       title: "Service temporarily unavailable",
       message:
-        "Our video service is briefly out of credits. Please try again in a few minutes — we're on it.",
+        "Our video service is briefly out of credits. Please try again in a few minutes. We're on it.",
       tone: "provider",
       canRetry: true,
       canUpgrade: false,
@@ -160,7 +160,7 @@ export function getErrorPresentation(
     return {
       title: "Authentication issue",
       message:
-        "We couldn't authenticate with an upstream service. Please try again — if this keeps happening, contact support.",
+        "We couldn't authenticate with an upstream service. Please try again. If this keeps happening, contact support.",
       tone: "auth",
       canRetry: true,
       canUpgrade: false,
