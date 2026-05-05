@@ -804,7 +804,7 @@ export default function DashboardVideoDetailPage() {
                                 ))}
                               </div>
                               <p className="text-[10.5px] text-zinc-600 leading-snug pt-0.5">
-                                Each edit re-renders from your original script — nothing is destructive.
+                                Each edit re-renders from your original script; nothing is destructive.
                               </p>
                             </div>
                           ) : null}
@@ -958,7 +958,7 @@ export default function DashboardVideoDetailPage() {
                                         </ul>
 
                                         <p className="mt-2.5 text-[10.5px] text-amber-200/55 leading-snug">
-                                          Usually 1–5 mins. You can leave this tab open — we&apos;ll update it the moment it&apos;s ready.
+                                          Usually 1-5 mins. You can leave this tab open; we&apos;ll update it the moment it&apos;s ready.
                                         </p>
                                       </div>
                                     </div>
