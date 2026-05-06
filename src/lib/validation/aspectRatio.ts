@@ -1,8 +1,3 @@
-/**
- * Supported aspect ratios for video output.
- * Dimensions use 1080 as base (height for landscape, width for portrait/square).
- * All values are even for encoder compatibility.
- */
 export const ASPECT_RATIOS = [
   "16:9",
   "9:16",
