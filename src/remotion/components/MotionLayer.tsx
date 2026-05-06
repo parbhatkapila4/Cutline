@@ -28,7 +28,7 @@ export const MotionLayer: React.FC<MotionLayerProps> = ({
 
   let scale = 1;
   let translateX = 0;
-  let translateY = 0;
+  const translateY = 0;
 
   if (
     motionType === "push" ||
