@@ -45,6 +45,7 @@ export type VideoJobData = {
   textModel?: string;
   captions?: "on" | "off";
   talkingObjectStyle?: "cartoon" | "real";
+  talkingRealMode?: "studio" | "scenario";
   avatar?: AvatarSelection;
   renderMode?: "preview" | "final";
   previewJobId?: string;
@@ -304,6 +305,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         textModel,
         captions,
         talkingObjectStyle,
+        talkingRealMode,
         avatar,
         renderMode,
         previewJobId,
@@ -342,6 +344,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
           textModel,
           captions,
           talkingObjectStyle,
+          talkingRealMode,
           avatar,
           renderMode,
           previewJobId,
