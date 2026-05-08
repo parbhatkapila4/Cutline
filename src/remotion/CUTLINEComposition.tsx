@@ -72,8 +72,12 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
     ? `data:${audioMime};base64,${audioBase64}`
     : undefined;
 
-  let fromFrame = 0;
   const totalShots = shots.length;
+  const shotStartFrames = shots.map((_, index) =>
+    shots
+      .slice(0, index)
+      .reduce((sum, s) => sum + Math.ceil((s.durationSeconds ?? 0) * fps), 0)
+  );
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
@@ -81,6 +85,7 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
         <Audio src={audioSrc} volume={1} />
       )}
       {shots.map((shot, index) => {
+        const fromFrame = shotStartFrames[index] ?? 0;
         const durationInFrames = Math.ceil(
           (shot.durationSeconds ?? 0) * fps
         );
@@ -121,7 +126,6 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
           </Sequence>
         );
 
-        fromFrame += durationInFrames;
         return seq;
       })}
       {showCaptions && captionsForTimeline.length > 0 && (
