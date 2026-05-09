@@ -387,6 +387,430 @@ export const FEATURE_TAB_DATA = [
   },
 ];
 
+type PreviewTone = "emerald" | "sky" | "rose" | "violet" | "amber";
+type PipelineStatus = "done" | "active" | "pending";
+type SettingIcon = "resolution" | "format" | "captions" | "fps";
+
+export type FeatureTabPreview = {
+  card1: {
+    filename: string;
+    status: { label: string; tone: PreviewTone };
+    tags: [string, string, string, string];
+    lines: { text: string; emphasis?: boolean }[];
+    readTime: string;
+    aiHint: { label: string; body: string };
+    stat: { value: string; label: string };
+    variations: number;
+  };
+  card2: {
+    perf: string;
+    status: { label: string; tone: PreviewTone };
+    tiles: { image: string; label: string; meta?: string; active?: boolean }[];
+    sourceTag: string;
+    scene: { name: string; detail: string; badge: string };
+    summary: { label: string; value: string };
+    palette?: string[];
+  };
+  card3: {
+    status: { label: string; tone: PreviewTone };
+    presets: { label: string; active?: boolean }[];
+    settings: { icon: SettingIcon; label: string; value: string }[];
+    progress: number;
+    eta: string;
+    pipeline: { label: string; status: PipelineStatus }[];
+    ctaLabel: string;
+    shortcut: string;
+  };
+};
+
+export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
+  // 0 — Content Creators
+  {
+    card1: {
+      filename: "vlog-ep-12.md",
+      status: { label: "drafting", tone: "emerald" },
+      tags: ["Hook", "Pacing", "Tone", "Structure"],
+      lines: [
+        { text: "Three things changed how I edit." },
+        { text: "First, I stopped chasing perfect." },
+        { text: "Then I wrote for the scroll, not the script.", emphasis: true },
+        { text: "And I leaned into the silence." },
+        { text: "That last one is what unlocks retention." },
+      ],
+      readTime: "1m 12s",
+      aiHint: {
+        label: "AI rewrite",
+        body: "Tighten the hook — open with the question viewers are already asking.",
+      },
+      stat: { value: "+30%", label: "watch-through" },
+      variations: 3,
+    },
+    card2: {
+      perf: "0.4s",
+      status: { label: "auto-matching", tone: "sky" },
+      tiles: [
+        { image: "https://images.unsplash.com/photo-1499092346589-b9b6be3e94b2?w=320&h=240&fit=crop&auto=format&q=70", label: "City Aesthetic", meta: "0:03" },
+        { image: "https://images.unsplash.com/photo-1452587925148-ce544e77e70d?w=320&h=240&fit=crop&auto=format&q=70", label: "Studio Light", meta: "0:05" },
+        { image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=320&h=240&fit=crop&auto=format&q=70", label: "Sunset Frame", meta: "0:04", active: true },
+        { image: "https://images.unsplash.com/photo-1493612276216-ee3925520721?w=320&h=240&fit=crop&auto=format&q=70", label: "B-roll Stack", meta: "0:02" },
+      ],
+      sourceTag: "primary",
+      scene: {
+        name: "Sunset Skyline · 4K",
+        detail: "Sourced from your reference deck.",
+        badge: "HD 1080p",
+      },
+      summary: { label: "Style match", value: "94%" },
+    },
+    card3: {
+      status: { label: "rendering", tone: "rose" },
+      presets: [
+        { label: "1080p", active: true },
+        { label: "4K" },
+        { label: "Square" },
+        { label: "9:16" },
+      ],
+      settings: [
+        { icon: "resolution", label: "Resolution", value: "1920 × 1080" },
+        { icon: "format", label: "Format", value: "MP4 · H.264" },
+        { icon: "captions", label: "Captions", value: "Auto · ON" },
+        { icon: "fps", label: "Frame rate", value: "30 fps" },
+      ],
+      progress: 68,
+      eta: "~ 19s left",
+      pipeline: [
+        { label: "Script", status: "done" },
+        { label: "Visuals", status: "done" },
+        { label: "Compose", status: "active" },
+        { label: "Encode", status: "pending" },
+      ],
+      ctaLabel: "Export MP4",
+      shortcut: "⌘ E",
+    },
+  },
+  // 1 — Marketers
+  {
+    card1: {
+      filename: "q4-launch-ad.md",
+      status: { label: "approved", tone: "emerald" },
+      tags: ["Hook", "CTA", "Funnel", "Brand voice"],
+      lines: [
+        { text: "Cut your CAC by 40% in 14 days.", emphasis: true },
+        { text: "Here's what we changed." },
+        { text: "First, we killed every ad above $80 CPA." },
+        { text: "Then we doubled down on the top three." },
+        { text: "Margins up. Spend down. Story below." },
+      ],
+      readTime: "0m 54s",
+      aiHint: {
+        label: "AI lift",
+        body: "Lead with the metric — readers anchor on the number, not the claim.",
+      },
+      stat: { value: "+45%", label: "vs control" },
+      variations: 4,
+    },
+    card2: {
+      perf: "0.6s",
+      status: { label: "on-brand", tone: "sky" },
+      tiles: [
+        { image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=320&h=240&fit=crop&auto=format&q=70", label: "Hero Banner", meta: "v3 · A/B", active: true },
+        { image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=320&h=240&fit=crop&auto=format&q=70", label: "Lifestyle", meta: "v1" },
+        { image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=320&h=240&fit=crop&auto=format&q=70", label: "Product Shot", meta: "v2" },
+        { image: "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=320&h=240&fit=crop&auto=format&q=70", label: "Logo Lockup", meta: "v1" },
+      ],
+      sourceTag: "on-brand",
+      scene: {
+        name: "Hero · Product Reveal",
+        detail: "Color-matched to brand palette #4F46E5.",
+        badge: "4K Ready",
+      },
+      summary: { label: "Brand palette", value: "4 colors locked" },
+      palette: ["#4F46E5", "#0F172A", "#F97316", "#F1F5F9"],
+    },
+    card3: {
+      status: { label: "shipping", tone: "rose" },
+      presets: [
+        { label: "1:1" },
+        { label: "16:9", active: true },
+        { label: "9:16" },
+        { label: "4:5" },
+      ],
+      settings: [
+        { icon: "resolution", label: "Resolution", value: "1920 × 1080" },
+        { icon: "format", label: "Format", value: "MP4 · Meta Ads" },
+        { icon: "captions", label: "Captions", value: "Brand caps · ON" },
+        { icon: "fps", label: "Frame rate", value: "30 fps" },
+      ],
+      progress: 82,
+      eta: "~ 11s left",
+      pipeline: [
+        { label: "Brief", status: "done" },
+        { label: "Variants", status: "done" },
+        { label: "Approve", status: "active" },
+        { label: "Ship", status: "pending" },
+      ],
+      ctaLabel: "Publish campaign",
+      shortcut: "⌘ ↵",
+    },
+  },
+  // 2 — Educators
+  {
+    card1: {
+      filename: "biology-ch08.md",
+      status: { label: "outline ready", tone: "emerald" },
+      tags: ["Pace", "Clarity", "Recap", "Cues"],
+      lines: [
+        { text: "Today we'll break down photosynthesis." },
+        { text: "There are three steps to remember.", emphasis: true },
+        { text: "Step one — light hits the chloroplasts." },
+        { text: "Step two — the Calvin cycle fixes carbon." },
+        { text: "Step three — sugar feeds the plant." },
+      ],
+      readTime: "2m 04s",
+      aiHint: {
+        label: "AI tutor",
+        body: "Add a recap before the next concept — students retain 38% more on the second pass.",
+      },
+      stat: { value: "+52%", label: "retention" },
+      variations: 2,
+    },
+    card2: {
+      perf: "0.5s",
+      status: { label: "labeled", tone: "sky" },
+      tiles: [
+        { image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=320&h=240&fit=crop&auto=format&q=70", label: "Cell Diagram", meta: "8 callouts", active: true },
+        { image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=320&h=240&fit=crop&auto=format&q=70", label: "Concept Map", meta: "5 callouts" },
+        { image: "https://images.unsplash.com/photo-1567427018141-0584cfcbf1b8?w=320&h=240&fit=crop&auto=format&q=70", label: "Lab Photo", meta: "3 callouts" },
+        { image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=320&h=240&fit=crop&auto=format&q=70", label: "Slide Mock", meta: "12 callouts" },
+      ],
+      sourceTag: "diagram",
+      scene: {
+        name: "Chloroplast cross-section",
+        detail: "Annotated diagram with 8 callouts.",
+        badge: "HD 720p",
+      },
+      summary: { label: "Annotated", value: "28 callouts · 4 figures" },
+    },
+    card3: {
+      status: { label: "captioning", tone: "rose" },
+      presets: [
+        { label: "720p", active: true },
+        { label: "1080p" },
+        { label: "LMS" },
+        { label: "16:9" },
+      ],
+      settings: [
+        { icon: "resolution", label: "Resolution", value: "1280 × 720" },
+        { icon: "format", label: "Format", value: "WebM · LMS-ready" },
+        { icon: "captions", label: "Captions", value: "SDH · ON" },
+        { icon: "fps", label: "Frame rate", value: "24 fps" },
+      ],
+      progress: 54,
+      eta: "~ 28s left",
+      pipeline: [
+        { label: "Outline", status: "done" },
+        { label: "Diagrams", status: "done" },
+        { label: "Voice", status: "active" },
+        { label: "Caption", status: "pending" },
+      ],
+      ctaLabel: "Publish lesson",
+      shortcut: "⌘ ↵",
+    },
+  },
+  // 3 — E-commerce
+  {
+    card1: {
+      filename: "drop-22-launch.md",
+      status: { label: "drafting", tone: "emerald" },
+      tags: ["Hook", "USP", "Social proof", "CTA"],
+      lines: [
+        { text: "Made for the way you actually move." },
+        { text: "Lightweight foam. Zero break-in." },
+        { text: "Free returns for 60 days.", emphasis: true },
+        { text: "Limited drop. Only 800 pairs." },
+        { text: "Shop the drop on the homepage." },
+      ],
+      readTime: "0m 38s",
+      aiHint: {
+        label: "AI hook",
+        body: "Front-load the return policy — it lifts add-to-cart 18% on first-time buyers.",
+      },
+      stat: { value: "+38%", label: "conversion" },
+      variations: 5,
+    },
+    card2: {
+      perf: "0.3s",
+      status: { label: "catalog-matched", tone: "sky" },
+      tiles: [
+        { image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=320&h=240&fit=crop&auto=format&q=70", label: "Hero Shot", meta: "SKU-204" },
+        { image: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=320&h=240&fit=crop&auto=format&q=70", label: "Lifestyle", meta: "SKU-204", active: true },
+        { image: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=320&h=240&fit=crop&auto=format&q=70", label: "Detail Macro", meta: "SKU-204" },
+        { image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=320&h=240&fit=crop&auto=format&q=70", label: "Pack Shot", meta: "SKU-204" },
+      ],
+      sourceTag: "catalog",
+      scene: {
+        name: "Lifestyle · Hero #04",
+        detail: "Sized for Shopify hero banners.",
+        badge: "4K Ready",
+      },
+      summary: { label: "Catalog", value: "84 SKUs · $24 – $280" },
+    },
+    card3: {
+      status: { label: "publishing", tone: "rose" },
+      presets: [
+        { label: "1:1", active: true },
+        { label: "9:16" },
+        { label: "4:5" },
+        { label: "16:9" },
+      ],
+      settings: [
+        { icon: "resolution", label: "Resolution", value: "1080 × 1080" },
+        { icon: "format", label: "Format", value: "MP4 · Shopify" },
+        { icon: "captions", label: "Captions", value: "Burned-in" },
+        { icon: "fps", label: "Frame rate", value: "30 fps" },
+      ],
+      progress: 76,
+      eta: "~ 14s left",
+      pipeline: [
+        { label: "Hero", status: "done" },
+        { label: "Variants", status: "done" },
+        { label: "Sizes", status: "active" },
+        { label: "Publish", status: "pending" },
+      ],
+      ctaLabel: "Publish to Shopify",
+      shortcut: "⌘ ↵",
+    },
+  },
+  // 4 — Social Media
+  {
+    card1: {
+      filename: "reel-trend-08.md",
+      status: { label: "viral-ready", tone: "emerald" },
+      tags: ["Hook", "Loop", "Pattern", "Hashtag"],
+      lines: [
+        { text: "Wait — don't scroll yet.", emphasis: true },
+        { text: "This is the trend everyone is missing." },
+        { text: "It works because the algo now…" },
+        { text: "…ranks 3-second saves over watch time." },
+        { text: "Save this so you don't lose it." },
+      ],
+      readTime: "0m 22s",
+      aiHint: {
+        label: "AI hook",
+        body: "Promise a save in the first 1.5 seconds — saves rank higher than likes on Reels.",
+      },
+      stat: { value: "+62%", label: "share rate" },
+      variations: 6,
+    },
+    card2: {
+      perf: "0.2s",
+      status: { label: "trending", tone: "sky" },
+      tiles: [
+        { image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=320&h=240&fit=crop&auto=format&q=70", label: "Reel Cover", meta: "12.4k saves", active: true },
+        { image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=320&h=240&fit=crop&auto=format&q=70", label: "Trend Frame", meta: "8.1k saves" },
+        { image: "https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=320&h=240&fit=crop&auto=format&q=70", label: "Loop Pattern", meta: "5.7k saves" },
+        { image: "https://images.unsplash.com/photo-1635776062764-e025521e3df3?w=320&h=240&fit=crop&auto=format&q=70", label: "Sticker Pack", meta: "3.2k saves" },
+      ],
+      sourceTag: "trending",
+      scene: {
+        name: "Reel Cover · Trend #08",
+        detail: "Auto-cropped for Reels and Shorts.",
+        badge: "9:16 HD",
+      },
+      summary: { label: "Trending now", value: "Top 3% · this week" },
+    },
+    card3: {
+      status: { label: "scheduling", tone: "rose" },
+      presets: [
+        { label: "9:16", active: true },
+        { label: "1:1" },
+        { label: "4:5" },
+        { label: "16:9" },
+      ],
+      settings: [
+        { icon: "resolution", label: "Resolution", value: "1080 × 1920" },
+        { icon: "format", label: "Format", value: "MP4 · Reels" },
+        { icon: "captions", label: "Captions", value: "Karaoke · word" },
+        { icon: "fps", label: "Frame rate", value: "60 fps" },
+      ],
+      progress: 91,
+      eta: "~ 4s left",
+      pipeline: [
+        { label: "Hook", status: "done" },
+        { label: "Cuts", status: "done" },
+        { label: "Captions", status: "done" },
+        { label: "Reel", status: "active" },
+      ],
+      ctaLabel: "Schedule Reel",
+      shortcut: "⌘ S",
+    },
+  },
+  // 5 — Agencies
+  {
+    card1: {
+      filename: "acme-q4-master.md",
+      status: { label: "client-ready", tone: "emerald" },
+      tags: ["Brief", "Approval", "Brand", "Delivery"],
+      lines: [
+        { text: "Acme — Q4 product launch." },
+        { text: "Approved scripts. Approved palette.", emphasis: true },
+        { text: "Six variants, three regions, one queue." },
+        { text: "Delivery: Friday, 4 PM PT." },
+        { text: "Master ships to client locker." },
+      ],
+      readTime: "1m 48s",
+      aiHint: {
+        label: "AI brief",
+        body: "Match Acme's tone — 80% of approved copy uses 'we' over 'you'.",
+      },
+      stat: { value: "−28%", label: "delivery time" },
+      variations: 6,
+    },
+    card2: {
+      perf: "0.5s",
+      status: { label: "white-label", tone: "sky" },
+      tiles: [
+        { image: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=320&h=240&fit=crop&auto=format&q=70", label: "Client Asset", meta: "ACME · v2", active: true },
+        { image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=320&h=240&fit=crop&auto=format&q=70", label: "Licensed B-roll", meta: "Getty · 4K" },
+        { image: "https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=320&h=240&fit=crop&auto=format&q=70", label: "Brand Lockup", meta: "ACME · v2" },
+        { image: "https://images.unsplash.com/photo-1606857521015-7f9fcf423740?w=320&h=240&fit=crop&auto=format&q=70", label: "Variant 03", meta: "EU · DE" },
+      ],
+      sourceTag: "client",
+      scene: {
+        name: "Acme · Brand Intro 4K",
+        detail: "White-label master ready for any client.",
+        badge: "4K Master",
+      },
+      summary: { label: "Acme · client locker", value: "24 assets · 6 variants" },
+    },
+    card3: {
+      status: { label: "delivering", tone: "rose" },
+      presets: [
+        { label: "Master", active: true },
+        { label: "Web" },
+        { label: "Social" },
+        { label: "Broadcast" },
+      ],
+      settings: [
+        { icon: "resolution", label: "Resolution", value: "3840 × 2160" },
+        { icon: "format", label: "Format", value: "ProRes 422" },
+        { icon: "captions", label: "Captions", value: "Multi-language" },
+        { icon: "fps", label: "Frame rate", value: "24 fps" },
+      ],
+      progress: 64,
+      eta: "~ 42s left",
+      pipeline: [
+        { label: "Brief", status: "done" },
+        { label: "Build", status: "done" },
+        { label: "Review", status: "active" },
+        { label: "Deliver", status: "pending" },
+      ],
+      ctaLabel: "Deliver batch",
+      shortcut: "⌘ D",
+    },
+  },
+];
+
 export const PRICING = [
   {
     planId: "beginner" as const,
