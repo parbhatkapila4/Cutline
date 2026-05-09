@@ -11,6 +11,7 @@ import {
   FEATURES,
   FEATURE_TABS,
   FEATURE_TAB_DATA,
+  FEATURE_TAB_PREVIEWS,
   PRICING,
 } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
@@ -20,7 +21,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { ImagePlayer } from "@/components/image-player";
 import TestimonialV2 from "@/components/ui/testimonial-v2";
-import { authClient } from "@/lib/auth-client";
+import { authClient, useCachedSession } from "@/lib/auth-client";
 import { HomeFooter } from "@/app/_landing/HomeFooter";
 import { SUBMIT_TIMEOUT_MS } from "@/components/generate/constants";
 
@@ -35,7 +36,7 @@ type JobStatus = "pending" | "processing" | "completed" | "failed";
 
 function HomeContent() {
   const searchParams = useSearchParams();
-  const { data: sessionData, isPending: sessionPending } = authClient.useSession();
+  const { data: sessionData, isPending: sessionPending } = useCachedSession();
   const sessionUser = sessionData?.user;
   const isLoggedIn = !sessionPending && !!sessionData;
   const [prompt, setPrompt] = useState("");
@@ -70,7 +71,6 @@ function HomeContent() {
   const [dragActive, setDragActive] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [activeFeatureTab, setActiveFeatureTab] = useState(0);
-  const [activePainPoint, setActivePainPoint] = useState(0);
   const [defaultScriptModel, setDefaultScriptModel] = useState<string | null>(
     null,
   );
@@ -2146,277 +2146,505 @@ function HomeContent() {
             </div>
           </section>
 
-          <section id="features" className="pt-32 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14">
+          <section id="features" className="relative pt-32 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14 overflow-hidden">
+            <div
+              className="absolute inset-0 -z-10 pointer-events-none"
+              aria-hidden
+              style={{
+                background:
+                  "radial-gradient(ellipse 80% 55% at 50% 0%, rgba(99,102,241,0.06), transparent 65%)",
+              }}
+            />
             <div className="max-w-[min(1680px,96vw)] mx-auto">
-              <div className="flex justify-center mb-8">
-                <div className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full border border-gray-200 bg-white text-[13px] font-semibold tracking-wider text-gray-700 uppercase">
-                  <svg
-                    className="w-4 h-4 text-gray-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  Built In Features
+              <div className="flex justify-center mb-7">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200 bg-white/80 backdrop-blur-sm text-[11px] font-semibold tracking-[0.18em] text-gray-600 uppercase shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-60 animate-ping" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500" />
+                  </span>
+                  Built-in features
                 </div>
               </div>
 
               <h2
-                className="text-center text-3xl sm:text-4xl md:text-[46px] italic font-normal text-gray-900 leading-tight max-w-3xl mx-auto mb-12"
+                className="text-center text-[2rem] sm:text-[2.75rem] md:text-[3.25rem] font-normal text-gray-900 leading-[1.08] max-w-3xl mx-auto mb-5 tracking-[-0.025em]"
                 style={{
                   fontFamily: 'Georgia, "Times New Roman", ui-serif, serif',
                 }}
               >
                 An entire stack of tools that turn your{" "}
-                <span className="not-italic inline-flex items-center justify-center p-2 rounded-lg border border-purple-400/30 bg-purple-500/10 shadow-[0_0_15px_rgba(168,85,247,0.4),0_0_30px_rgba(168,85,247,0.15)] align-middle mx-1">
-                  🎬
-                </span>{" "}
-                ideas into videos
-              </h2>
-
-              <div className="flex flex-wrap justify-center gap-2 mb-14">
-                {FEATURE_TABS.map((tab, i) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveFeatureTab(i)}
-                    className={`px-5 py-2.5 rounded-full text-sm transition-all duration-200 ${activeFeatureTab === i
-                      ? "bg-gray-900 text-white font-semibold"
-                      : "text-gray-500 hover:text-gray-900"
-                      }`}
+                <span className="italic">ideas</span> into{" "}
+                <span className="italic relative whitespace-nowrap">
+                  videos
+                  <svg
+                    className="absolute left-0 -bottom-2 w-full h-2"
+                    viewBox="0 0 120 8"
+                    preserveAspectRatio="none"
+                    aria-hidden
                   >
-                    {tab}
-                  </button>
-                ))}
+                    <defs>
+                      <linearGradient id="features-underline" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0" stopColor="#a78bfa" />
+                        <stop offset="1" stopColor="#6366f1" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M 2 5 Q 60 1 118 5"
+                      stroke="url(#features-underline)"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </svg>
+                </span>
+                .
+              </h2>
+              <p className="text-center text-[15px] text-gray-500 max-w-xl mx-auto mb-12 leading-relaxed">
+                Pick your role — every stage of the pipeline tunes itself for what you actually ship.
+              </p>
+
+              <div className="flex justify-center mb-14">
+                <div className="inline-flex flex-wrap items-center justify-center gap-1 p-1 rounded-full bg-gray-100/80 border border-gray-200/70 backdrop-blur-sm">
+                  {FEATURE_TABS.map((tab, i) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveFeatureTab(i)}
+                      className="relative px-4 py-2 rounded-full text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                    >
+                      {activeFeatureTab === i && (
+                        <motion.span
+                          layoutId="feature-tab-pill"
+                          className="absolute inset-0 bg-gray-900 rounded-full shadow-[0_2px_10px_rgba(15,23,42,0.18)]"
+                          transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                        />
+                      )}
+                      <span
+                        className={`relative z-10 transition-colors ${activeFeatureTab === i ? "text-white" : "text-gray-600 hover:text-gray-900"}`}
+                      >
+                        {tab}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {(() => {
                 const d = FEATURE_TAB_DATA[activeFeatureTab];
+                const p = FEATURE_TAB_PREVIEWS[activeFeatureTab];
+                const cardBase =
+                  "group relative rounded-3xl border border-gray-200/80 bg-white p-6 flex flex-col transition-all duration-300 hover:border-gray-300 hover:shadow-[0_24px_48px_-24px_rgba(15,23,42,0.18)] hover:-translate-y-0.5";
+                const toneClasses: Record<typeof p.card1.status.tone, { bg: string; border: string; text: string; dot: string }> = {
+                  emerald: { bg: "bg-emerald-50", border: "border-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
+                  sky: { bg: "bg-sky-50", border: "border-sky-100", text: "text-sky-700", dot: "bg-sky-500" },
+                  rose: { bg: "bg-rose-50", border: "border-rose-100", text: "text-rose-700", dot: "bg-rose-500" },
+                  violet: { bg: "bg-violet-50", border: "border-violet-100", text: "text-violet-700", dot: "bg-violet-500" },
+                  amber: { bg: "bg-amber-50", border: "border-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
+                };
+                const settingIcon: Record<"resolution" | "format" | "captions" | "fps", string> = {
+                  resolution: "M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15",
+                  format: "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M9 16.5v.75m3-3v3M15 12v5.25M5.25 21h13.5A2.25 2.25 0 0021 18.75V8.625a2.25 2.25 0 00-.659-1.591L14.41 1.859A2.25 2.25 0 0012.659 1.5H5.25A2.25 2.25 0 003 3.75v15A2.25 2.25 0 005.25 21z",
+                  captions: "M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z",
+                  fps: "M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z",
+                };
+                const variationGradients = [
+                  "from-violet-300 to-indigo-400",
+                  "from-pink-300 to-rose-400",
+                  "from-amber-300 to-orange-400",
+                  "from-emerald-300 to-teal-400",
+                  "from-sky-300 to-blue-400",
+                  "from-fuchsia-300 to-purple-400",
+                ];
+                const card1Tone = toneClasses[p.card1.status.tone];
+                const card2Tone = toneClasses[p.card2.status.tone];
+                const card3Tone = toneClasses[p.card3.status.tone];
                 return (
                   <div
                     key={activeFeatureTab}
                     className="grid md:grid-cols-3 gap-5 animate-fade-in"
                   >
-                    <div className="rounded-3xl border border-gray-200 bg-white p-8 pb-6 flex flex-col min-h-[540px]">
-                      <span className="text-[40px] font-extralight leading-none text-gray-400 mb-5">
-                        1
-                      </span>
-                      <h3 className="text-[22px] font-bold text-gray-900 mb-3 leading-snug">
-                        {d.card1.title}
-                      </h3>
-                      <p className="text-[14px] text-gray-500 leading-relaxed">
+                    {/* Card 1 — Script */}
+                    <div className={cardBase}>
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col gap-[3px] w-10 h-10 rounded-[9px] bg-white border border-gray-200 shadow-[0_2px_6px_-1px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] p-2">
+                            <div className="flex items-center gap-[2px]">
+                              <span className="w-[3px] h-[3px] rounded-full bg-red-300" />
+                              <span className="w-[3px] h-[3px] rounded-full bg-amber-300" />
+                              <span className="w-[3px] h-[3px] rounded-full bg-emerald-300" />
+                            </div>
+                            <div className="flex-1 flex flex-col justify-center gap-[2.5px]">
+                              <span className="h-[1.5px] rounded-full bg-gray-200 w-full" />
+                              <span className="h-[1.5px] rounded-full bg-violet-500 w-[70%]" />
+                              <span className="h-[1.5px] rounded-full bg-gray-200 w-[85%]" />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Stage 01</div>
+                            <h3 className="text-[1.0625rem] font-semibold text-gray-900 leading-tight tracking-[-0.01em] mt-0.5">
+                              {d.card1.title}
+                            </h3>
+                          </div>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${card1Tone.bg} border ${card1Tone.border} text-[10px] font-bold ${card1Tone.text}`}>
+                          <span className={`w-1 h-1 rounded-full ${card1Tone.dot} animate-pulse`} />
+                          {p.card1.status.label}
+                        </span>
+                      </div>
+
+                      <p className="text-[13px] text-gray-500 leading-relaxed mb-4">
                         {d.card1.desc}
                       </p>
 
-                      <div className="mt-auto pt-10 relative h-[260px]">
-                        <div className="absolute left-0 bottom-0 w-[82%] min-h-[140px] bg-gray-100 border border-gray-200 rounded-2xl p-5 shadow-lg flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-gray-200 flex items-center justify-center shrink-0">
-                            <svg
-                              className="w-6 h-6 text-gray-600"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                              />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="text-[11px] text-gray-500">
-                              {d.card1.mainLabel}
-                            </p>
-                            <p className="text-[22px] font-bold text-gray-900 tracking-tight leading-none mt-0.5">
-                              {d.card1.mainValue}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="absolute right-2 bottom-[100px] z-10 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-lg flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-                            <svg
-                              className="w-4 h-4 text-emerald-600"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M4.5 12.75l6 6 9-13.5"
-                              />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="text-[17px] font-bold text-gray-900 leading-none">
-                              {d.card1.statValue}
-                            </p>
-                            <p className="text-[11px] text-gray-500 mt-0.5">
-                              {d.card1.statLabel}
-                            </p>
-                          </div>
-                        </div>
+                      <div className="flex flex-wrap gap-1.5 mb-4">
+                        {p.card1.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 border border-gray-200 text-[10.5px] font-medium text-gray-600"
+                          >
+                            <span className="w-1 h-1 rounded-full bg-violet-400" />
+                            {tag}
+                          </span>
+                        ))}
                       </div>
-                    </div>
 
-                    <div className="rounded-3xl border border-gray-200 bg-white p-8 pb-6 flex flex-col min-h-[540px]">
-                      <span className="text-[40px] font-extralight leading-none text-gray-400 mb-5">
-                        2
-                      </span>
-                      <h3 className="text-[22px] font-bold text-gray-900 mb-3 leading-snug whitespace-pre-line">
-                        {d.card2.title}
-                      </h3>
-                      <p className="text-[14px] text-gray-500 leading-relaxed">
-                        {d.card2.desc}
-                      </p>
+                      <div className="relative flex-1 rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 via-white to-gray-50/60 overflow-hidden shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+                        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200/70 bg-white/60">
+                          <span className="w-2 h-2 rounded-full bg-red-300/70" />
+                          <span className="w-2 h-2 rounded-full bg-amber-300/70" />
+                          <span className="w-2 h-2 rounded-full bg-emerald-300/70" />
+                          <div className="ml-2.5 flex items-center gap-0.5">
+                            <span className="px-1.5 text-[10px] font-bold text-gray-500 rounded">B</span>
+                            <span className="px-1.5 text-[10px] italic text-gray-500 rounded">I</span>
+                            <span className="px-1.5 text-[10px] font-medium text-gray-500 rounded underline">U</span>
+                          </div>
+                          <span className="ml-auto text-[10px] font-mono text-gray-400 truncate max-w-[55%]">{p.card1.filename}</span>
+                        </div>
 
-                      <div className="mt-auto pt-10 relative h-[200px]">
-                        <div className="absolute left-0 top-0 w-[62%] bg-gray-100 border border-gray-200 rounded-2xl overflow-hidden shadow-lg z-10">
-                          {d.card2.list.map((item, li) => (
-                            <div
-                              key={li}
-                              className={`flex items-center justify-between px-4 py-2.5 ${li < d.card2.list.length - 1 ? "border-b border-gray-200" : ""}`}
-                            >
-                              <span
-                                className={`text-[13px] ${li === 0 ? "font-medium text-gray-900" : item.count ? "text-gray-500" : "text-gray-500"}`}
-                              >
-                                {item.name}
+                        <div className="px-3.5 py-3 space-y-1.5">
+                          {p.card1.lines.map((line, i) => (
+                            <div key={i} className="flex items-baseline gap-2.5">
+                              <span className="text-[9.5px] tabular-nums text-gray-300 w-3 shrink-0 text-right">
+                                {String(i + 1).padStart(2, "0")}
                               </span>
-                              {item.count && (
-                                <span
-                                  className={`w-[22px] h-[22px] rounded-full text-[10px] font-bold flex items-center justify-center ${item.active ? "bg-emerald-500/20 text-emerald-400" : "bg-zinc-700 text-gray-600"}`}
-                                >
-                                  {item.count}
-                                </span>
-                              )}
+                              <span
+                                className={
+                                  line.emphasis
+                                    ? "text-[11px] leading-snug text-violet-700 italic"
+                                    : "text-[11px] leading-snug text-gray-700"
+                                }
+                              >
+                                {line.text}
+                              </span>
                             </div>
                           ))}
                         </div>
 
-                        <div className="absolute right-0 bottom-0 w-[72%] bg-white border border-gray-200 rounded-2xl p-3.5 shadow-lg">
-                          <div className="flex items-start gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 mt-0.5">
-                              <svg
-                                className="w-5 h-5 text-blue-600"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z"
-                                />
-                              </svg>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[13px] font-semibold text-gray-900 leading-tight">
-                                {d.card2.product.name}
-                              </p>
-                              <p className="text-[11px] text-gray-500 leading-snug mt-1">
-                                {d.card2.product.detail}
-                              </p>
-                              <p className="text-[14px] font-bold text-gray-900 mt-2">
-                                {d.card2.product.badge}
-                              </p>
-                            </div>
+                        <div className="px-3.5 py-2 border-t border-gray-200/70 bg-white/60 flex items-center gap-2 text-[10px]">
+                          <div className="flex items-center gap-1">
+                            <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                            <span className="font-semibold text-gray-900 tabular-nums">{d.card1.mainValue}</span>
                           </div>
+                          <span className="text-gray-200">·</span>
+                          <span className="text-gray-500 tabular-nums">{p.card1.readTime}</span>
+                          <span className="ml-auto inline-flex items-center gap-1 text-emerald-600 font-semibold tabular-nums">
+                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3l7.5 7.5M12 3v18" /></svg>
+                            {p.card1.stat.value}
+                          </span>
                         </div>
+                      </div>
+
+                      <div className="mt-3 rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/60 to-white p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <svg className="w-3 h-3 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.847.814a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
+                          <span className="text-[10px] font-semibold text-violet-700">{p.card1.aiHint.label}</span>
+                        </div>
+                        <p className="text-[11px] text-gray-700 leading-snug">{p.card1.aiHint.body}</p>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-1">
+                            {variationGradients.slice(0, Math.min(p.card1.variations, 3)).map((g, i) => (
+                              <div key={i} className={`w-5 h-5 rounded-full ring-2 ring-white bg-gradient-to-br ${g}`} />
+                            ))}
+                          </div>
+                          <span className="text-[11px] text-gray-500 tabular-nums">{p.card1.variations} variations</span>
+                        </div>
+                        <span className="text-[11px] font-medium text-gray-500 tabular-nums">{p.card1.stat.label}</span>
                       </div>
                     </div>
 
-                    <div className="rounded-3xl border border-gray-200 bg-white p-8 pb-6 flex flex-col min-h-[540px]">
-                      <span className="text-[40px] font-extralight leading-none text-gray-400 mb-5">
-                        3
-                      </span>
-                      <h3 className="text-[22px] font-bold text-gray-900 mb-3 leading-snug">
-                        {d.card3.title}
-                      </h3>
-                      <p className="text-[14px] text-gray-500 leading-relaxed">
+                    {/* Card 2 — Visuals */}
+                    <div className={cardBase}>
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-10 h-10">
+                            <span className="absolute inset-0 rounded-[8px] bg-gradient-to-br from-amber-200 via-orange-300 to-rose-300 ring-1 ring-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] origin-bottom-left -rotate-[10deg] translate-x-[2px] translate-y-[1px]" />
+                            <span className="absolute inset-0 rounded-[8px] bg-gradient-to-br from-violet-300 via-indigo-300 to-purple-400 ring-1 ring-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] origin-bottom-left -rotate-[3deg]" />
+                            <span className="absolute inset-0 rounded-[8px] bg-gradient-to-br from-emerald-200 via-teal-300 to-cyan-400 ring-1 ring-white shadow-[0_2px_6px_-1px_rgba(15,23,42,0.18)] rotate-[5deg] -translate-x-[1px]" />
+                            <span className="absolute inset-0 rounded-[8px] bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.55),transparent_55%)] rotate-[5deg] -translate-x-[1px]" />
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Stage 02</div>
+                            <h3 className="text-[1.0625rem] font-semibold text-gray-900 leading-tight tracking-[-0.01em] mt-0.5">
+                              {d.card2.title.replace("\n", " ")}
+                            </h3>
+                          </div>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${card2Tone.bg} border ${card2Tone.border} text-[10px] font-bold ${card2Tone.text} tabular-nums`}>
+                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 4a1 1 0 011 1v3.59l2.3 2.3a1 1 0 11-1.4 1.42l-2.6-2.6A1 1 0 019 11V7a1 1 0 011-1z"/></svg>
+                          {p.card2.perf}
+                        </span>
+                      </div>
+
+                      <p className="text-[13px] text-gray-500 leading-relaxed mb-4">
+                        {d.card2.desc}
+                      </p>
+
+                      <div className="grid grid-cols-4 gap-1.5 mb-3">
+                        {p.card2.tiles.map((tile, i) => (
+                          <div
+                            key={i}
+                            className={`relative aspect-[4/3] rounded-lg overflow-hidden ring-1 ${tile.active ? "ring-2 ring-sky-500 ring-offset-1 ring-offset-white" : "ring-gray-200/70"}`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={tile.image}
+                              alt={tile.label}
+                              loading="lazy"
+                              className="absolute inset-0 w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                            <span className="absolute bottom-1 left-1.5 right-1.5 text-[8.5px] font-semibold text-white truncate drop-shadow">
+                              {tile.label}
+                            </span>
+                            {tile.meta && (
+                              <span className="absolute top-1 left-1 text-[8.5px] font-bold tabular-nums text-white px-1 py-px rounded bg-black/55 backdrop-blur-sm">
+                                {tile.meta}
+                              </span>
+                            )}
+                            {tile.active && (
+                              <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-sky-500 flex items-center justify-center shadow ring-1 ring-white/40">
+                                <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {p.card2.palette ? (
+                        <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white">
+                          <span className="text-[10.5px] font-medium text-gray-500">{p.card2.summary.label}</span>
+                          <div className="flex items-center gap-1.5">
+                            {p.card2.palette.map((hex) => (
+                              <div key={hex} className="flex items-center gap-1">
+                                <span className="w-3 h-3 rounded-full ring-1 ring-gray-200" style={{ background: hex }} />
+                                <span className="text-[9.5px] font-mono text-gray-600 tabular-nums">{hex}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white">
+                          <span className="text-[10.5px] font-medium text-gray-500">{p.card2.summary.label}</span>
+                          <span className="text-[11px] font-semibold text-gray-900 tabular-nums">{p.card2.summary.value}</span>
+                        </div>
+                      )}
+
+                      <div className="flex-1 rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-1.5 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+                        {d.card2.list.map((item, li) => (
+                          <div
+                            key={li}
+                            className={`flex items-center justify-between px-3 py-2 rounded-xl ${item.active ? "bg-white border border-gray-100 shadow-[0_1px_2px_rgba(15,23,42,0.04)]" : ""}`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span className={`w-1.5 h-1.5 rounded-full ${item.active ? "bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.18)]" : "bg-gray-300"}`} />
+                              <span className={`text-[12.5px] ${item.active ? "font-semibold text-gray-900" : "text-gray-500"}`}>
+                                {item.name}
+                              </span>
+                              {item.active && (
+                                <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-600 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-100">
+                                  {p.card2.sourceTag}
+                                </span>
+                              )}
+                            </div>
+                            {item.count ? (
+                              <span className={`text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-full ${item.active ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-gray-100 text-gray-500"}`}>
+                                {item.count}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-400">—</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-2.5 p-2.5 rounded-2xl border border-gray-200 bg-white shadow-[0_10px_24px_-16px_rgba(15,23,42,0.2)]">
+                        <div className="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 ring-1 ring-gray-200/60">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={(p.card2.tiles.find((t) => t.active) ?? p.card2.tiles[0]).image}
+                            alt=""
+                            loading="lazy"
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                          <svg className="absolute inset-0 m-auto w-4 h-4 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[12.5px] font-semibold text-gray-900 truncate">{p.card2.scene.name}</div>
+                          <div className="text-[10.5px] text-gray-500 truncate mt-0.5">{p.card2.scene.detail}</div>
+                        </div>
+                        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-900 text-white text-[10px] font-bold uppercase tracking-[0.08em]">
+                          <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                          {p.card2.scene.badge}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card 3 — Studio */}
+                    <div className={cardBase}>
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex flex-col w-10 h-10 rounded-[9px] bg-gradient-to-b from-gray-900 to-gray-950 shadow-[0_2px_6px_-1px_rgba(15,23,42,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] overflow-hidden">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.06),transparent_60%)]" />
+                            <div className="flex-1 flex items-center justify-center">
+                              <div className="w-4 h-4 rounded-full bg-white/95 flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+                                <svg className="w-2 h-2 text-gray-900 translate-x-[0.5px]" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="px-1.5 pb-1.5">
+                              <div className="h-[2px] rounded-full bg-white/15 overflow-hidden">
+                                <div className="h-full w-[68%] rounded-full bg-gradient-to-r from-emerald-400 to-teal-300" />
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Stage 03</div>
+                            <h3 className="text-[1.0625rem] font-semibold text-gray-900 leading-tight tracking-[-0.01em] mt-0.5">
+                              {d.card3.title}
+                            </h3>
+                          </div>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${card3Tone.bg} border ${card3Tone.border} text-[10px] font-bold ${card3Tone.text}`}>
+                          <span className={`w-1 h-1 rounded-full ${card3Tone.dot} animate-pulse`} />
+                          {p.card3.status.label}
+                        </span>
+                      </div>
+
+                      <p className="text-[13px] text-gray-500 leading-relaxed mb-4">
                         {d.card3.desc}
                       </p>
 
-                      <div className="mt-auto pt-10 flex flex-col gap-2.5">
-                        <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
-                          <span className="text-[13px] text-gray-900">
-                            {d.card3.dd1}
-                          </span>
-                          <svg
-                            className="w-4 h-4 text-gray-500"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
+                      <div className="grid grid-cols-4 gap-1 mb-4 p-1 rounded-[10px] bg-gray-100/80 border border-gray-200/70">
+                        {p.card3.presets.map((preset) => (
+                          <span
+                            key={preset.label}
+                            className={`text-center px-2 py-1.5 rounded-md text-[11px] font-semibold tabular-nums transition-colors ${preset.active ? "bg-white text-gray-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)] ring-1 ring-gray-900/5" : "text-gray-500"}`}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                        </div>
-                        <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
-                          <span className="text-[13px] text-gray-900">
-                            {d.card3.dd2}
+                            {preset.label}
                           </span>
-                          <svg
-                            className="w-4 h-4 text-gray-500"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                        </div>
+                        ))}
+                      </div>
 
-                        <div className="mt-1">
-                          <p className="text-[15px] font-bold text-gray-900 mb-1">
-                            {d.card3.infoTitle}
-                          </p>
-                          <p className="text-[12px] text-gray-500 leading-relaxed">
-                            {d.card3.infoDesc}
-                          </p>
-                        </div>
-
-                        <div className="flex justify-end mt-1">
-                          <div className="inline-flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-[13px] text-white font-medium shadow-md">
-                            <svg
-                              className="w-3.5 h-3.5 text-gray-500"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                              />
-                            </svg>
-                            {d.card3.btn}
+                      <div className="flex-1 rounded-2xl border border-gray-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] divide-y divide-gray-100">
+                        {p.card3.settings.map((row) => (
+                          <div key={row.label} className="flex items-center justify-between px-3.5 py-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d={settingIcon[row.icon]} />
+                              </svg>
+                              <span className="text-[11.5px] text-gray-500">{row.label}</span>
+                            </div>
+                            <span className="text-[12px] font-semibold text-gray-900 tabular-nums">{row.value}</span>
                           </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+                              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            </span>
+                            <span className="text-[11.5px] font-semibold text-gray-900">{d.card3.infoTitle}</span>
+                          </div>
+                          <span className="text-[10.5px] font-semibold text-gray-500 tabular-nums">
+                            <span className="text-gray-900">{p.card3.progress}%</span> · {p.card3.eta}
+                          </span>
+                        </div>
+                        <div className="h-[5px] rounded-full bg-gray-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
+                            style={{ width: `${p.card3.progress}%` }}
+                          />
+                        </div>
+
+                        <div className="mt-3 flex items-center">
+                          {p.card3.pipeline.map((step, i) => {
+                            const isLast = i === p.card3.pipeline.length - 1;
+                            const next = p.card3.pipeline[i + 1];
+                            const connectorDone = !isLast && next && next.status !== "pending";
+                            return (
+                              <div key={step.label} className={`flex items-center ${isLast ? "" : "flex-1"}`}>
+                                <div className="flex flex-col items-center gap-1 shrink-0">
+                                  <div
+                                    className={
+                                      step.status === "done"
+                                        ? "w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center"
+                                        : step.status === "active"
+                                          ? "w-4 h-4 rounded-full bg-white ring-2 ring-emerald-500 flex items-center justify-center"
+                                          : "w-4 h-4 rounded-full bg-gray-100 ring-1 ring-gray-200 flex items-center justify-center"
+                                    }
+                                  >
+                                    {step.status === "done" ? (
+                                      <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                      </svg>
+                                    ) : step.status === "active" ? (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    ) : (
+                                      <span className="text-[8px] font-bold text-gray-400 tabular-nums">{i + 1}</span>
+                                    )}
+                                  </div>
+                                  <span
+                                    className={
+                                      step.status === "done"
+                                        ? "text-[9.5px] font-semibold text-gray-700"
+                                        : step.status === "active"
+                                          ? "text-[9.5px] font-semibold text-emerald-600"
+                                          : "text-[9.5px] font-medium text-gray-400"
+                                    }
+                                  >
+                                    {step.label}
+                                  </span>
+                                </div>
+                                {!isLast && (
+                                  <div className={`flex-1 h-px mx-1.5 -mt-3 ${connectorDone ? "bg-emerald-500" : "bg-gray-200"}`} />
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
+
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-hidden
+                        className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-gray-900 hover:bg-black rounded-xl px-4 py-3 text-[13px] text-white font-semibold shadow-[0_8px_20px_-8px_rgba(15,23,42,0.4)] transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        {p.card3.ctaLabel}
+                        <span className="ml-auto inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white/10 text-[9.5px] font-mono text-white/70 tracking-wider">{p.card3.shortcut}</span>
+                      </button>
                     </div>
                   </div>
                 );
@@ -2427,39 +2655,57 @@ function HomeContent() {
           <section
             ref={howSectionRef}
             id="how"
-            className="pt-32 pb-36 px-4 sm:px-6 xl:px-10 2xl:px-14 bg-[#F9FAFB]"
+            className="pt-32 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14 bg-[#F9FAFB]"
           >
             <div className="max-w-[min(1680px,96vw)] mx-auto text-center">
-              <div className="mb-8">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-1">
+              <div className="mb-14">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 bg-white/80 backdrop-blur-sm text-[10.5px] font-semibold tracking-[0.18em] text-gray-600 uppercase shadow-[0_1px_2px_rgba(15,23,42,0.04)] mb-6">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500" />
                   How it works
-                </p>
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                  From idea to video in minutes
+                </div>
+                <h2
+                  className="text-[2.25rem] sm:text-[3rem] md:text-[3.5rem] font-normal text-gray-900 leading-[1.04] tracking-[-0.03em] max-w-[24ch] mx-auto"
+                  style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                >
+                  From idea to <span className="italic">video</span> in minutes.
                 </h2>
+                <p className="text-[15px] text-gray-500 max-w-[44ch] mx-auto mt-6 leading-relaxed">
+                  One sentence in. A directed, captioned, music-cut MP4 out — every shot sourced, scripted, and rendered in a single pass.
+                </p>
               </div>
 
-              <div className="w-full max-w-2xl aspect-video rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-md flex items-center justify-center mx-auto">
-                <ImagePlayer
-                  images={HOW_IT_WORKS_IMAGES}
-                  interval={200}
-                  renderImage={(src) => (
-                    <Image
-                      src={src}
-                      width={400}
-                      height={300}
-                      className="size-full h-auto max-h-full max-w-full object-cover inline-block align-middle"
-                      alt="How Cutline works"
-                    />
-                  )}
+              <div className="relative max-w-6xl mx-auto">
+                <div
+                  className="absolute -inset-x-12 -inset-y-8 -z-10 rounded-[3rem] opacity-60 pointer-events-none"
+                  aria-hidden
+                  style={{
+                    background:
+                      "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(99,102,241,0.12), transparent 70%)",
+                  }}
                 />
+                <div className="aspect-video rounded-[28px] border border-gray-200 bg-white overflow-hidden shadow-[0_40px_80px_-30px_rgba(15,23,42,0.35),0_18px_40px_-24px_rgba(15,23,42,0.18)] ring-1 ring-black/5">
+                  <ImagePlayer
+                    images={HOW_IT_WORKS_IMAGES}
+                    interval={200}
+                    renderImage={(src) => (
+                      <Image
+                        src={src}
+                        width={1600}
+                        height={900}
+                        className="w-full h-full object-cover block"
+                        alt="How Cutline works"
+                        priority
+                      />
+                    )}
+                  />
+                </div>
               </div>
             </div>
           </section>
 
           <section
             id="pricing"
-            className="pt-36 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14 relative overflow-hidden"
+            className="pt-32 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14 relative overflow-hidden"
           >
             <div
               className="absolute inset-0 flex items-start justify-center pointer-events-none select-none"
@@ -2632,199 +2878,299 @@ function HomeContent() {
             </div>
           </section>
 
-          <section className="pt-32 pb-32 px-4 sm:px-6 xl:px-10 2xl:px-14">
-            <div className="max-w-[min(1680px,96vw)] mx-auto">
-              <div className="rounded-3xl bg-white border border-gray-200 overflow-hidden px-6 sm:px-12 lg:px-20 py-16 sm:py-20 shadow-sm">
-                <div className="text-center mb-14">
-                  <div className="inline-flex items-center gap-2 text-teal-600 text-sm font-semibold tracking-wider uppercase mb-5">
-                    <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+          <section className="pt-32 pb-32 px-4 sm:px-6">
+            <div className="max-w-[64rem] mx-auto">
+              <div className="text-center mb-14">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-rose-100 bg-rose-50/70 text-[10.5px] font-semibold tracking-[0.18em] text-rose-700 uppercase mb-6">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60 animate-ping" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-rose-500" />
+                  </span>
+                  The pain point
+                </div>
+                <h2
+                  className="text-[2.25rem] sm:text-[3rem] md:text-[3.5rem] font-normal text-gray-900 leading-[1.04] tracking-[-0.03em] max-w-[28ch] mx-auto"
+                  style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                >
+                  Video creation is{" "}
+                  <span className="italic relative whitespace-nowrap">
+                    slower
+                    <svg className="absolute left-0 -bottom-2 w-full h-2" viewBox="0 0 120 8" preserveAspectRatio="none" aria-hidden>
+                      <defs>
+                        <linearGradient id="painpoint-underline" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0" stopColor="#fb7185" />
+                          <stop offset="1" stopColor="#e11d48" />
+                        </linearGradient>
+                      </defs>
+                      <path d="M 2 5 Q 60 1 118 5" stroke="url(#painpoint-underline)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
                     </svg>
-                    PAIN POINT
-                  </div>
-                  <h2 className="text-3xl sm:text-4xl md:text-[42px] font-bold text-gray-900 leading-tight">
-                    Video Creation Is Slower
-                    <br />
-                    Than It Should Be
-                  </h2>
+                  </span>
+                  {" "}than it should be.
+                </h2>
+                <p className="text-[15px] text-gray-500 max-w-[44ch] mx-auto mt-6 leading-relaxed">
+                  A single brief routes through five tools and four people. We collapse the whole pipeline into one prompt.
+                </p>
+              </div>
+
+              <div className="relative grid grid-cols-2 rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-[0_2px_4px_rgba(15,23,42,0.04)] mb-4">
+                <div className="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-px bg-gray-100 pointer-events-none" aria-hidden />
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 hidden sm:flex items-center justify-center w-7 h-7 rounded-full bg-white border border-gray-200 shadow-[0_2px_8px_rgba(15,23,42,0.08)]" aria-hidden>
+                  <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
                 </div>
 
-                <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start">
-                  <div className="relative">
-                    <div
-                      className="rounded-2xl overflow-hidden"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #0d9488 0%, #14b8a6 30%, #2dd4bf 60%, #5eead4 100%)",
-                      }}
-                    >
-                      <div className="p-6 pt-5 pb-0 relative">
-                        <div className="flex justify-center mb-5">
-                          <div className="inline-flex items-center gap-2 bg-white/95 backdrop-blur-sm text-gray-900 text-xs font-semibold px-4 py-2 rounded-full shadow-sm">
-                            <span className="text-base">🎬</span>
-                            Speed up workflow
-                          </div>
+                <div className="p-7 sm:p-9">
+                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold tracking-[0.16em] text-rose-700/80 uppercase mb-7">
+                    <span className="w-1 h-1 rounded-full bg-rose-400" />
+                    The old way
+                  </div>
+                  <div className="space-y-5">
+                    {[
+                      { label: "Total time", value: "4 days", sub: "five sequential stages" },
+                      { label: "Headcount", value: "5 people", sub: "brief, copy, voice, visuals, edit" },
+                      { label: "Cost / video", value: "$3,400+", sub: "freelance, tools, overhead" },
+                    ].map((row) => (
+                      <div key={row.label}>
+                        <div className="text-[10.5px] font-medium tracking-[0.14em] text-gray-400 uppercase">{row.label}</div>
+                        <div
+                          className="text-[1.875rem] sm:text-[2.125rem] font-normal text-gray-900 leading-none mt-1.5 tabular-nums"
+                          style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                        >
+                          {row.value}
                         </div>
-
-                        <div className="bg-white rounded-t-xl shadow-2xl shadow-black/30 mx-auto max-w-sm">
-                          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm">✦</span>
-                              <span className="text-sm font-bold text-zinc-900">
-                                AI Director
-                              </span>
-                            </div>
-                            <button className="text-gray-500 hover:text-gray-600 text-lg leading-none">
-                              &times;
-                            </button>
-                          </div>
-
-                          <div className="px-4 py-4 space-y-4">
-                            <p className="text-xs font-semibold text-gray-500">
-                              You
-                            </p>
-
-                            <div className="flex items-start gap-2 justify-end">
-                              <div className="bg-zinc-100 rounded-xl rounded-tr-sm px-3.5 py-2.5 max-w-[220px]">
-                                <p className="text-sm text-zinc-800 leading-snug">
-                                  Create a product demo for our new SaaS platform.
-                                </p>
-                              </div>
-                              <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0 text-xs">
-                                🎥
-                              </div>
-                            </div>
-
-                            <p className="text-xs font-semibold text-gray-500">
-                              AI Director
-                            </p>
-
-                            <div className="flex items-start gap-2">
-                              <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
-                                <span className="text-gray-700 text-xs">✦</span>
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-1.5 bg-teal-200 rounded-full w-16"></div>
-                                  <div className="h-1.5 bg-teal-100 rounded-full w-10"></div>
-                                  <span className="text-xs text-teal-600 italic">
-                                    writing...
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-3 text-gray-500 pt-1 pb-2">
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 01-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 10.203 4.167 9.75 5 9.75h1.053c.472 0 .745.556.5.96a8.958 8.958 0 00-1.302 4.665c0 1.194.232 2.333.654 3.375z"
-                                />
-                              </svg>
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M7.5 15h2.25m8.024-9.75c.011.05.028.1.052.148.591 1.2.924 2.55.924 3.977a8.96 8.96 0 01-.999 4.125m.023-8.25c-.076-.365.183-.75.575-.75h.908c.889 0 1.713.518 1.972 1.368.339 1.11.521 2.287.521 3.507 0 1.553-.295 3.036-.831 4.398C20.613 14.547 19.833 15 19 15h-1.053c-.472 0-.745-.556-.5-.96a8.95 8.95 0 001.302-4.665c0-1.194-.232-2.333-.654-3.375z"
-                                />
-                              </svg>
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"
-                                />
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
+                        <div className="text-[11.5px] text-gray-500 mt-1.5">{row.sub}</div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-7 sm:p-9 bg-gradient-to-br from-emerald-50/30 via-white to-white">
+                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold tracking-[0.16em] text-emerald-700 uppercase mb-7">
+                    <span className="relative flex h-1 w-1">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
+                      <span className="relative inline-flex h-1 w-1 rounded-full bg-emerald-500" />
+                    </span>
+                    With Cutline
+                  </div>
+                  <div className="space-y-5">
+                    {[
+                      { label: "Total time", value: "60 seconds", sub: "end to end, in one render" },
+                      { label: "Headcount", value: "1 prompt", sub: "you, typing one sentence" },
+                      { label: "Cost / video", value: "$0.24", sub: "all-in, on the standard plan" },
+                    ].map((row) => (
+                      <div key={row.label}>
+                        <div className="text-[10.5px] font-medium tracking-[0.14em] text-gray-400 uppercase">{row.label}</div>
+                        <div
+                          className="text-[1.875rem] sm:text-[2.125rem] font-normal leading-none mt-1.5 tabular-nums bg-clip-text text-transparent bg-gradient-to-br from-emerald-600 to-teal-600"
+                          style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                        >
+                          {row.value}
+                        </div>
+                        <div className="text-[11.5px] text-gray-500 mt-1.5">{row.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center text-[11px] font-semibold tracking-[0.16em] text-gray-400 uppercase mb-10 tabular-nums">
+                <span className="text-emerald-600">5,760×</span> faster · <span className="text-emerald-600">14,000×</span> cheaper
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                {/* Pain 01 — Linear-style timeline */}
+                <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Pain 01 · Time</span>
+                    <span className="text-[10px] font-mono text-gray-300">⌥1</span>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-[0_2px_4px_rgba(15,23,42,0.04)] mb-5 overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                        <span className="text-[10.5px] font-semibold text-gray-700">CUT-204 · Product demo</span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-gray-400 tabular-nums">5 issues</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {[
+                        { stage: "Brief & alignment", who: "PM", whoColor: "from-violet-300 to-indigo-400", time: "18h", status: "done" },
+                        { stage: "Script writing", who: "SH", whoColor: "from-pink-300 to-rose-400", time: "22h", status: "done" },
+                        { stage: "Voiceover record", who: "BC", whoColor: "from-amber-300 to-orange-400", time: "16h", status: "active" },
+                        { stage: "Visual sourcing", who: "MV", whoColor: "from-emerald-300 to-teal-400", time: "24h", status: "blocked" },
+                        { stage: "Edit & compose", who: "JT", whoColor: "from-sky-300 to-blue-400", time: "20h", status: "blocked" },
+                      ].map((row, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-1.5">
+                          <span
+                            className={
+                              row.status === "done"
+                                ? "w-2.5 h-2.5 rounded-full border border-emerald-500 bg-emerald-500 flex items-center justify-center shrink-0"
+                                : row.status === "active"
+                                  ? "w-2.5 h-2.5 rounded-full border-[1.5px] border-amber-500 flex items-center justify-center shrink-0"
+                                  : "w-2.5 h-2.5 rounded-full border border-gray-300 flex items-center justify-center shrink-0"
+                            }
+                          >
+                            {row.status === "done" && (
+                              <svg className="w-1.5 h-1.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            )}
+                            {row.status === "active" && <span className="w-1 h-1 rounded-full bg-amber-500" />}
+                          </span>
+                          <span className="text-[10.5px] text-gray-700 flex-1 truncate">{row.stage}</span>
+                          <span className={`w-4 h-4 rounded-full bg-gradient-to-br ${row.whoColor} ring-1 ring-white text-[7.5px] font-bold text-white/95 flex items-center justify-center shrink-0`}>
+                            {row.who[0]}
+                          </span>
+                          <span className="text-[9.5px] font-mono text-gray-500 tabular-nums w-7 text-right shrink-0">{row.time}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/60">
+                      <span className="text-[9.5px] font-semibold tracking-wider uppercase text-gray-400">Total</span>
+                      <span className="text-[10.5px] font-mono font-semibold text-gray-900 tabular-nums">4d · 100h</span>
                     </div>
                   </div>
 
-                  <div className="space-y-3 pt-2">
-                    {[
-                      {
-                        icon: "M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.047 8.287 8.287 0 009 9.601a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z",
-                        iconBg: "bg-orange-500/20 text-orange-400",
-                        title: "Manual video editing eats up hours",
-                        desc: "Writing scripts, sourcing visuals, and editing timelines is time-consuming. Our AI generates polished, ready-to-share videos instantly from a single prompt.",
-                      },
-                      {
-                        icon: "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z",
-                        iconBg: "bg-gray-200 text-gray-700",
-                        title: "Multi-format output is confusing",
-                        desc: "Different platforms need different sizes, lengths, and formats. Cutline auto-exports for every channel in one click - no manual cropping needed.",
-                      },
-                      {
-                        icon: "M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418",
-                        iconBg: "bg-gray-200 text-gray-700",
-                        title: "Scaling content requires extra resources",
-                        desc: "Hiring editors, voiceover artists, and motion designers is expensive. Cutline replaces the entire production team with a single AI pipeline.",
-                      },
-                    ].map((point, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setActivePainPoint(i)}
-                        className={`w-full text-left rounded-xl border transition-all duration-300 ${activePainPoint === i
-                          ? "border-gray-200 bg-gray-100 p-5"
-                          : "border-transparent bg-transparent px-5 py-4 hover:bg-gray-50"
-                          }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${activePainPoint === i ? point.iconBg : "bg-gray-200 text-gray-500"}`}
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d={point.icon}
-                              />
-                            </svg>
-                          </div>
-                          <span
-                            className={`font-semibold text-[15px] ${activePainPoint === i ? "text-gray-900" : "text-gray-500"}`}
-                          >
-                            {point.title}
+                  <h3
+                    className="text-[17px] font-normal text-gray-900 leading-tight tracking-[-0.015em] mb-2"
+                    style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                  >
+                    Manual editing eats your week.
+                  </h3>
+                  <p className="text-[12.5px] text-gray-500 leading-relaxed mb-5 flex-1">
+                    The brief sits on someone&rsquo;s desk while five owners wait their turn. One stage blocks the next.
+                  </p>
+
+                  <div className="pt-3 border-t border-gray-100 flex items-baseline justify-between gap-2">
+                    <span className="text-[9.5px] font-semibold tracking-[0.16em] text-gray-400 uppercase">Cutline ships in</span>
+                    <span
+                      className="text-[20px] font-normal tabular-nums bg-clip-text text-transparent bg-gradient-to-br from-emerald-600 to-teal-600 leading-none"
+                      style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                    >
+                      60 seconds
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pain 02 — Premiere-style export queue */}
+                <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Pain 02 · Formats</span>
+                    <span className="text-[10px] font-mono text-gray-300">⌥2</span>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-[0_2px_4px_rgba(15,23,42,0.04)] mb-5 overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-3 h-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        <span className="text-[10.5px] font-semibold text-gray-700">Export Queue</span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-gray-400 tabular-nums">5 jobs</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {[
+                        { ratio: "9:16", platform: "Reels", res: "1080×1920", size: "12.4 MB" },
+                        { ratio: "1:1", platform: "Square", res: "1080×1080", size: "8.2 MB" },
+                        { ratio: "16:9", platform: "YouTube", res: "1920×1080", size: "18.6 MB" },
+                        { ratio: "9:16", platform: "Stories", res: "1080×1920", size: "9.8 MB" },
+                        { ratio: "4:5", platform: "Meta Ads", res: "1080×1350", size: "11.2 MB" },
+                      ].map((row, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-1.5">
+                          <span className="w-9 px-1 py-0.5 rounded text-[8.5px] font-bold tabular-nums text-center bg-gray-100 text-gray-700 shrink-0">
+                            {row.ratio}
                           </span>
+                          <span className="text-[10.5px] text-gray-700 flex-1 truncate">{row.platform}</span>
+                          <span className="text-[9.5px] font-mono text-gray-400 tabular-nums shrink-0">{row.res}</span>
+                          <span className="text-[9.5px] font-mono text-gray-500 tabular-nums w-12 text-right shrink-0">{row.size}</span>
                         </div>
-                        {activePainPoint === i && (
-                          <p className="text-sm text-gray-500 leading-relaxed mt-3 ml-11 animate-fade-in">
-                            {point.desc}
-                          </p>
-                        )}
-                      </button>
-                    ))}
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/60">
+                      <span className="text-[9.5px] font-semibold tracking-wider uppercase text-gray-400">Re-render</span>
+                      <span className="text-[10.5px] font-mono font-semibold text-gray-900 tabular-nums">~ 2h 14m</span>
+                    </div>
+                  </div>
+
+                  <h3
+                    className="text-[17px] font-normal text-gray-900 leading-tight tracking-[-0.015em] mb-2"
+                    style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                  >
+                    Multi-format export is a maze.
+                  </h3>
+                  <p className="text-[12.5px] text-gray-500 leading-relaxed mb-5 flex-1">
+                    Each platform is its own crop, its own re-render, its own QA pass. Five jobs for the same idea.
+                  </p>
+
+                  <div className="pt-3 border-t border-gray-100 flex items-baseline justify-between gap-2">
+                    <span className="text-[9.5px] font-semibold tracking-[0.16em] text-gray-400 uppercase">Cutline ships in</span>
+                    <span
+                      className="text-[20px] font-normal tabular-nums bg-clip-text text-transparent bg-gradient-to-br from-emerald-600 to-teal-600 leading-none"
+                      style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                    >
+                      One render
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pain 03 — Stripe-style invoice */}
+                <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Pain 03 · Cost</span>
+                    <span className="text-[10px] font-mono text-gray-300">⌥3</span>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-[0_2px_4px_rgba(15,23,42,0.04)] mb-5 overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-gray-400">Inv-2403</span>
+                        <span className="text-[10.5px] font-semibold text-gray-700">Per video</span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-gray-400 tabular-nums">5 lines</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {[
+                        { role: "Copywriter", hours: "8h", rate: "$120", line: "$960" },
+                        { role: "Voice talent", hours: "4h", rate: "$200", line: "$800" },
+                        { role: "Researcher", hours: "6h", rate: "$80", line: "$480" },
+                        { role: "Editor", hours: "6h", rate: "$150", line: "$900" },
+                        { role: "Producer", hours: "1.5h", rate: "$180", line: "$270" },
+                      ].map((row) => (
+                        <div key={row.role} className="flex items-center gap-2 px-3 py-1.5">
+                          <span className="text-[10.5px] text-gray-700 flex-1 truncate">{row.role}</span>
+                          <span className="text-[9.5px] font-mono text-gray-400 tabular-nums w-8 text-right shrink-0">{row.hours}</span>
+                          <span className="text-[9.5px] font-mono text-gray-400 tabular-nums w-10 text-right shrink-0">{row.rate}</span>
+                          <span className="text-[10.5px] font-mono font-semibold text-gray-900 tabular-nums w-12 text-right shrink-0">{row.line}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/60">
+                      <span className="text-[9.5px] font-semibold tracking-wider uppercase text-gray-400">Total</span>
+                      <span className="text-[12px] font-mono font-bold text-gray-900 tabular-nums">$3,410.00</span>
+                    </div>
+                  </div>
+
+                  <h3
+                    className="text-[17px] font-normal text-gray-900 leading-tight tracking-[-0.015em] mb-2"
+                    style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                  >
+                    Scaling means hiring more humans.
+                  </h3>
+                  <p className="text-[12.5px] text-gray-500 leading-relaxed mb-5 flex-1">
+                    More videos used to mean more editors, more voice talent, more producers. The unit economics fall apart.
+                  </p>
+
+                  <div className="pt-3 border-t border-gray-100 flex items-baseline justify-between gap-2">
+                    <span className="text-[9.5px] font-semibold tracking-[0.16em] text-gray-400 uppercase">Cutline ships at</span>
+                    <span
+                      className="text-[20px] font-normal tabular-nums bg-clip-text text-transparent bg-gradient-to-br from-emerald-600 to-teal-600 leading-none"
+                      style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                    >
+                      $0.24
+                    </span>
                   </div>
                 </div>
               </div>
