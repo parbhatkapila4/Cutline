@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { TopProgress } from "@/components/ui/top-progress";
 
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
 
@@ -16,9 +18,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CUTLINE: AI-directed video editing",
+  metadataBase: new URL("https://cutline.cloud"),
+  title: "Cutline: AI-directed video, one sentence in",
   description:
-    "One sentence of intent. CUTLINE decides narrative, pacing, motion, and subtitles-and delivers a finished video. No scripts. No assets.",
+    "Cutline turns a single sentence into a finished 30-60 second MP4: script, voice, captions, b-roll, and score, rendered in a single pass.",
+  applicationName: "Cutline",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "https://cutline.cloud",
+    siteName: "Cutline",
+    title: "Cutline: AI-directed video, one sentence in",
+    description:
+      "Cutline turns a single sentence into a finished 30-60 second MP4: script, voice, captions, b-roll, and score, rendered in a single pass.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cutline: AI-directed video, one sentence in",
+    description:
+      "One sentence in, one finished MP4 out. Script, voice, captions, b-roll, and score in a single render.",
+  },
 };
 
 export default function RootLayout({
@@ -31,6 +50,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Suspense fallback={null}>
+          <TopProgress />
+        </Suspense>
         {children}
       </body>
     </html>
