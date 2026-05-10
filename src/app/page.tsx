@@ -16,7 +16,7 @@ import {
 } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import { isEnterprisePlan, isPlanId, type PlanId } from "@/lib/plans";
-import IntroAnimation, { HERO_IMAGES } from "@/components/ui/scroll-morph-hero";
+import { HERO_IMAGES } from "@/components/ui/scroll-morph-hero";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { ImagePlayer } from "@/components/image-player";
@@ -76,7 +76,7 @@ function HomeContent() {
   );
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [heroScrollComplete, setHeroScrollComplete] = useState(false);
+  const [heroScrollComplete] = useState(true);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -363,444 +363,346 @@ function HomeContent() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-gray-900 relative overflow-x-clip">
-      <header className="fixed top-4 sm:top-5 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none">
-        <div className="relative pointer-events-auto">
-          <div
-            className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[90%] h-24 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(ellipse 70% 100% at center top, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.02) 30%, transparent 60%, transparent 100%)",
-              filter: "blur(16px)",
-            }}
-          />
-          <nav
-            className="relative z-10 flex items-center gap-1.5 sm:gap-3 md:gap-6 bg-white/90 backdrop-blur-2xl border border-gray-200 rounded-[18px] sm:rounded-[22px] px-2.5 sm:px-4 md:px-8 py-2 sm:py-3 w-full max-w-[96vw] sm:max-w-[90vw] sm:min-w-[560px] shadow-lg shadow-gray-200/50"
-            style={{
-              boxShadow:
-                "0 8px 40px -8px rgba(0,0,0,0.08), 0 1px 0 rgba(0,0,0,0.04) inset",
-            }}
-          >
-            <Link
-              href="/features"
-              className="hidden md:flex min-w-0 sm:min-w-[170px] items-center justify-center gap-2 sm:gap-3 px-2.5 sm:px-6 py-2 sm:py-2.5 rounded-[12px] sm:rounded-[16px] text-[13px] sm:text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
-            >
-              <svg
-                className="w-5 h-5 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <defs>
-                  <linearGradient
-                    id="nav-ic-cube-top"
-                    x1="6"
-                    y1="3"
-                    x2="18"
-                    y2="10"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#a1a1aa" />
-                    <stop offset="1" stopColor="#71717a" />
-                  </linearGradient>
-                  <linearGradient
-                    id="nav-ic-cube-left"
-                    x1="3"
-                    y1="9"
-                    x2="12"
-                    y2="22"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#71717a" />
-                    <stop offset="1" stopColor="#3f3f46" />
-                  </linearGradient>
-                  <linearGradient
-                    id="nav-ic-cube-right"
-                    x1="12"
-                    y1="9"
-                    x2="21"
-                    y2="22"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#52525b" />
-                    <stop offset="1" stopColor="#27272a" />
-                  </linearGradient>
-                </defs>
-
-                <path
-                  d="M12 3L4.5 7.5 12 12l7.5-4.5L12 3z"
-                  fill="url(#nav-ic-cube-top)"
-                />
-
-                <path
-                  d="M4.5 7.5L12 12v9l-7.5-4.5V7.5z"
-                  fill="url(#nav-ic-cube-left)"
-                />
-
-                <path
-                  d="M19.5 7.5L12 12v9l7.5-4.5V7.5z"
-                  fill="url(#nav-ic-cube-right)"
-                />
-
-                <path
-                  d="M12 3L4.5 7.5 12 12l7.5-4.5L12 3z"
-                  stroke="#a1a1aa"
-                  strokeWidth="0.3"
-                  opacity="0.5"
-                />
-                <path
-                  d="M12 12v9"
-                  stroke="#71717a"
-                  strokeWidth="0.4"
-                  opacity="0.4"
-                />
+      <header className="fixed top-0 left-0 right-0 z-50 font-sans">
+        <div className="bg-[#0a0a0a] text-white">
+          <div className="max-w-[1440px] mx-auto h-9 px-5 sm:px-8 flex items-center justify-center gap-2 text-[11.5px] tracking-[0.02em]">
+            <span className="inline-flex items-center gap-1.5 text-emerald-400">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              </span>
+              <span className="font-semibold uppercase tracking-[0.16em]">Live</span>
+            </span>
+            <span className="text-white/30" aria-hidden>·</span>
+            <span className="text-white/85 hidden sm:inline">Public beta — generate your first video free</span>
+            <span className="text-white/85 sm:hidden">Public beta — free during launch</span>
+            <Link href="/generate" className="ml-1 inline-flex items-center gap-1 text-white hover:text-emerald-300 transition-colors">
+              <span className="font-semibold">Try it</span>
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
-              Features
             </Link>
-            <Link
-              href="/pricing"
-              className="hidden md:flex min-w-0 sm:min-w-[170px] items-center justify-center gap-2 sm:gap-3 px-2.5 sm:px-6 py-2 sm:py-2.5 rounded-[12px] sm:rounded-[16px] text-[13px] sm:text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
-            >
-              <svg
-                className="w-5 h-5 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <defs>
-                  <linearGradient id="nav-ic-price-card" x1="3" y1="4" x2="21" y2="20" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#a1a1aa" />
-                    <stop offset="1" stopColor="#52525b" />
-                  </linearGradient>
-                </defs>
-                <rect x="3.5" y="6" width="17" height="12" rx="2.5" stroke="url(#nav-ic-price-card)" strokeWidth="1.4" />
-                <path d="M3.5 10h17" stroke="url(#nav-ic-price-card)" strokeWidth="1.2" strokeLinecap="round" />
-                <rect x="6.5" y="13" width="4.5" height="2" rx="1" fill="#a1a1aa" opacity="0.8" />
-              </svg>
-              Pricing
-            </Link>
-            <Link
-              href="/how"
-              className="hidden md:flex min-w-0 sm:min-w-[170px] items-center justify-center gap-2 sm:gap-3 px-2.5 sm:px-6 py-2 sm:py-2.5 rounded-[12px] sm:rounded-[16px] text-[13px] sm:text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
-            >
-              <svg
-                className="w-5 h-5 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <defs>
-                  <linearGradient
-                    id="nav-ic-shield-l"
-                    x1="4"
-                    y1="3"
-                    x2="12"
-                    y2="22"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#a1a1aa" />
-                    <stop offset="1" stopColor="#52525b" />
-                  </linearGradient>
-                  <linearGradient
-                    id="nav-ic-shield-r"
-                    x1="12"
-                    y1="3"
-                    x2="20"
-                    y2="22"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#71717a" />
-                    <stop offset="1" stopColor="#3f3f46" />
-                  </linearGradient>
-                </defs>
-
-                <path
-                  d="M12 3L4 7v5c0 4.5 3.5 8.5 8 10V3z"
-                  fill="url(#nav-ic-shield-l)"
-                />
-
-                <path
-                  d="M12 3l8 4v5c0 4.5-3.5 8.5-8 10V3z"
-                  fill="url(#nav-ic-shield-r)"
-                />
-
-                <path
-                  d="M12 3L4 7v5c0 4.5 3.5 8.5 8 10 4.5-1.5 8-5.5 8-10V7l-8-4z"
-                  stroke="#a1a1aa"
-                  strokeWidth="0.4"
-                  opacity="0.35"
-                />
-              </svg>
-              How it works
-            </Link>
-            {sessionPending ? (
-              <div
-                className="flex items-center gap-3 px-8 py-2.5 rounded-[16px] min-h-[42px]"
-                aria-hidden
-              >
-                <span className="h-5 w-28 bg-gray-100 rounded-md animate-pulse" />
-              </div>
-            ) : isLoggedIn && sessionUser ? (
-              <div
-                ref={accountMenuRef}
-                className="relative flex items-center gap-1.5 pl-2 pr-2 py-1.5 rounded-[16px] border border-gray-200 bg-white/90 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset]"
-              >
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-3 px-3 py-1.5 rounded-[12px] text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
-                >
-                  <svg
-                    className="w-5 h-5 shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden
-                  >
-                    <defs>
-                      <linearGradient
-                        id="nav-ic-dash1"
-                        x1="3"
-                        y1="3"
-                        x2="11"
-                        y2="11"
-                        gradientUnits="userSpaceOnUse"
-                      >
-                        <stop stopColor="#a1a1aa" />
-                        <stop offset="1" stopColor="#52525b" />
-                      </linearGradient>
-                      <linearGradient
-                        id="nav-ic-dash2"
-                        x1="13"
-                        y1="3"
-                        x2="21"
-                        y2="11"
-                        gradientUnits="userSpaceOnUse"
-                      >
-                        <stop stopColor="#71717a" />
-                        <stop offset="1" stopColor="#3f3f46" />
-                      </linearGradient>
-                      <linearGradient
-                        id="nav-ic-dash3"
-                        x1="3"
-                        y1="13"
-                        x2="11"
-                        y2="21"
-                        gradientUnits="userSpaceOnUse"
-                      >
-                        <stop stopColor="#71717a" />
-                        <stop offset="1" stopColor="#3f3f46" />
-                      </linearGradient>
-                      <linearGradient
-                        id="nav-ic-dash4"
-                        x1="13"
-                        y1="13"
-                        x2="21"
-                        y2="21"
-                        gradientUnits="userSpaceOnUse"
-                      >
-                        <stop stopColor="#a1a1aa" />
-                        <stop offset="1" stopColor="#52525b" />
-                      </linearGradient>
-                    </defs>
-                    <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash1)" />
-                    <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash2)" />
-                    <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash3)" />
-                    <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" fill="url(#nav-ic-dash4)" />
-                  </svg>
-                  <span className="shrink-0">Dashboard</span>
-                </Link>
-
-                <span className="h-6 w-px bg-gray-200" aria-hidden />
-
-                <button
-                  type="button"
-                  onClick={() => setAccountMenuOpen((v) => !v)}
-                  aria-expanded={accountMenuOpen}
-                  aria-haspopup="menu"
-                  className="flex items-center gap-2 min-w-0 rounded-[12px] px-2.5 py-1.5 text-[13px] sm:text-[14px] text-gray-800 hover:bg-gray-100 transition-colors max-w-[min(220px,36vw)] sm:max-w-[min(180px,28vw)]"
-                >
-                  {typeof sessionUser.image === "string" && sessionUser.image.trim() ? (
-                    <img
-                      src={sessionUser.image}
-                      alt=""
-                      width={28}
-                      height={28}
-                      className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-gray-200"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600 shrink-0">
-                      {(sessionUser.name?.trim()?.[0] ?? sessionUser.email?.trim()?.[0] ?? "?").toUpperCase()}
-                    </span>
-                  )}
-                  <span className="truncate">
-                    {sessionUser.name?.trim() || sessionUser.email?.trim() || "Account"}
-                  </span>
-                </button>
-
-                {accountMenuOpen ? (
-                  <div
-                    role="menu"
-                    className="absolute right-0 top-[calc(100%+8px)] z-40 min-w-[180px] rounded-xl border border-gray-200 bg-white p-1.5 shadow-[0_16px_32px_-20px_rgba(0,0,0,0.55)]"
-                  >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={async () => {
-                        setAccountMenuOpen(false);
-                        try {
-                          await authClient.signOut({ fetchOptions: { onSuccess: () => { } } });
-                        } finally {
-                          window.location.href = "/";
-                        }
-                      }}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <Link
-                href="/signin"
-                className="flex min-w-0 sm:min-w-[170px] items-center justify-center gap-2 sm:gap-3 px-2.5 sm:px-6 py-2 sm:py-2.5 rounded-[12px] sm:rounded-[16px] text-[13px] sm:text-[15px] font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
-              >
-                <svg
-                  className="w-5 h-5 shrink-0"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <defs>
-                    <linearGradient
-                      id="nav-ic-grid1"
-                      x1="3"
-                      y1="3"
-                      x2="11"
-                      y2="11"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop stopColor="#a1a1aa" />
-                      <stop offset="1" stopColor="#52525b" />
-                    </linearGradient>
-                    <linearGradient
-                      id="nav-ic-grid2"
-                      x1="13"
-                      y1="3"
-                      x2="21"
-                      y2="11"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop stopColor="#71717a" />
-                      <stop offset="1" stopColor="#3f3f46" />
-                    </linearGradient>
-                    <linearGradient
-                      id="nav-ic-grid3"
-                      x1="3"
-                      y1="13"
-                      x2="11"
-                      y2="21"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop stopColor="#71717a" />
-                      <stop offset="1" stopColor="#3f3f46" />
-                    </linearGradient>
-                    <linearGradient
-                      id="nav-ic-grid4"
-                      x1="13"
-                      y1="13"
-                      x2="21"
-                      y2="21"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop stopColor="#a1a1aa" />
-                      <stop offset="1" stopColor="#52525b" />
-                    </linearGradient>
-                  </defs>
-                  <rect
-                    x="3.5"
-                    y="3.5"
-                    width="7"
-                    height="7"
-                    rx="1.8"
-                    fill="url(#nav-ic-grid1)"
-                  />
-                  <rect
-                    x="13.5"
-                    y="3.5"
-                    width="7"
-                    height="7"
-                    rx="1.8"
-                    fill="url(#nav-ic-grid2)"
-                  />
-                  <rect
-                    x="3.5"
-                    y="13.5"
-                    width="7"
-                    height="7"
-                    rx="1.8"
-                    fill="url(#nav-ic-grid3)"
-                  />
-                  <rect
-                    x="13.5"
-                    y="13.5"
-                    width="7"
-                    height="7"
-                    rx="1.8"
-                    fill="url(#nav-ic-grid4)"
-                  />
-
-                  <rect
-                    x="3.5"
-                    y="3.5"
-                    width="7"
-                    height="7"
-                    rx="1.8"
-                    stroke="#a1a1aa"
-                    strokeWidth="0.3"
-                    opacity="0.3"
-                  />
-                  <rect
-                    x="13.5"
-                    y="3.5"
-                    width="7"
-                    height="7"
-                    rx="1.8"
-                    stroke="#a1a1aa"
-                    strokeWidth="0.3"
-                    opacity="0.3"
-                  />
-                  <rect
-                    x="3.5"
-                    y="13.5"
-                    width="7"
-                    height="7"
-                    rx="1.8"
-                    stroke="#a1a1aa"
-                    strokeWidth="0.3"
-                    opacity="0.3"
-                  />
-                  <rect
-                    x="13.5"
-                    y="13.5"
-                    width="7"
-                    height="7"
-                    rx="1.8"
-                    stroke="#a1a1aa"
-                    strokeWidth="0.3"
-                    opacity="0.3"
-                  />
-                </svg>
-                Generate
-              </Link>
-            )}
-          </nav>
+          </div>
         </div>
+
+        <nav className="bg-white/90 backdrop-blur-md border-b border-gray-200/70">
+          <div className="max-w-[1440px] mx-auto flex items-center px-5 sm:px-8 h-[60px]">
+            <Link href="/" className="flex items-center gap-2 shrink-0 mr-7 sm:mr-9 group">
+              <span className="relative inline-flex w-8 h-8 rounded-[8px] overflow-hidden bg-[#0a0a0a] ring-1 ring-black/5">
+                <Image
+                  src="/cutline-logo.png"
+                  alt=""
+                  width={1280}
+                  height={720}
+                  priority
+                  className="absolute inset-0 w-full h-full object-cover"
+                  style={{ objectPosition: "78% 50%" }}
+                />
+              </span>
+              <span className="text-[15.5px] font-semibold tracking-[-0.02em] text-[#0a0a0a]">Cutline</span>
+            </Link>
+
+            <div className="hidden md:flex items-center gap-1">
+              <Link href="/#features" className="px-3 py-1.5 text-[13.5px] font-medium text-[#3f3f46] hover:text-[#0a0a0a] transition-colors">
+                Features
+              </Link>
+              <Link href="/pricing" className="px-3 py-1.5 text-[13.5px] font-medium text-[#3f3f46] hover:text-[#0a0a0a] transition-colors">
+                Pricing
+              </Link>
+              <Link href="/#how" className="px-3 py-1.5 text-[13.5px] font-medium text-[#3f3f46] hover:text-[#0a0a0a] transition-colors">
+                How it works
+              </Link>
+              {isLoggedIn && sessionUser ? (
+                <Link href="/dashboard" className="px-3 py-1.5 text-[13.5px] font-medium text-[#3f3f46] hover:text-[#0a0a0a] transition-colors">
+                  Dashboard
+                </Link>
+              ) : null}
+            </div>
+
+            <div className="ml-auto flex items-center gap-0.5 sm:gap-1">
+              <a href="https://github.com/parbhatkapila4/cutline" target="_blank" rel="noopener noreferrer" aria-label="GitHub" className="hidden sm:inline-flex w-8 h-8 items-center justify-center rounded-md text-[#71717a] hover:text-[#0a0a0a] hover:bg-gray-100/70 transition-colors">
+                <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="currentColor" aria-hidden>
+                  <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.438 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12.5c0-6.63-5.37-12-12-12z" />
+                </svg>
+              </a>
+              <a href="https://discord.gg" target="_blank" rel="noopener noreferrer" aria-label="Discord" className="hidden sm:inline-flex w-8 h-8 items-center justify-center rounded-md text-[#71717a] hover:text-[#0a0a0a] hover:bg-gray-100/70 transition-colors">
+                <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="currentColor" aria-hidden>
+                  <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419-.0188 1.3332-.946 2.4189-2.1569 2.4189zm7.9748 0c-1.1826 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z" />
+                </svg>
+              </a>
+              <a href="https://x.com" target="_blank" rel="noopener noreferrer" aria-label="X" className="hidden sm:inline-flex w-8 h-8 items-center justify-center rounded-md text-[#71717a] hover:text-[#0a0a0a] hover:bg-gray-100/70 transition-colors">
+                <svg viewBox="0 0 24 24" className="w-[13px] h-[13px]" fill="currentColor" aria-hidden>
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z" />
+                </svg>
+              </a>
+              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="hidden sm:inline-flex w-8 h-8 items-center justify-center rounded-md text-[#71717a] hover:text-[#0a0a0a] hover:bg-gray-100/70 transition-colors">
+                <svg viewBox="0 0 24 24" className="w-[14px] h-[14px]" fill="currentColor" aria-hidden>
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                </svg>
+              </a>
+              <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube" className="hidden sm:inline-flex w-8 h-8 items-center justify-center rounded-md text-[#71717a] hover:text-[#0a0a0a] hover:bg-gray-100/70 transition-colors">
+                <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="currentColor" aria-hidden>
+                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                </svg>
+              </a>
+
+              <span className="hidden sm:block w-px h-5 bg-gray-200/80 mx-2" aria-hidden />
+
+              {sessionPending ? (
+                <div className="h-8 w-[180px] bg-gray-100 rounded-full animate-pulse" aria-hidden />
+              ) : isLoggedIn && sessionUser ? (
+                <div ref={accountMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAccountMenuOpen((v) => !v)}
+                    aria-expanded={accountMenuOpen}
+                    aria-haspopup="menu"
+                    className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-gray-200 bg-white hover:border-gray-300 transition-colors"
+                  >
+                    {typeof sessionUser.image === "string" && sessionUser.image.trim() ? (
+                      <img src={sessionUser.image} alt="" width={24} height={24} className="w-6 h-6 rounded-full object-cover shrink-0" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10.5px] font-semibold text-gray-600 shrink-0">
+                        {(sessionUser.name?.trim()?.[0] ?? sessionUser.email?.trim()?.[0] ?? "?").toUpperCase()}
+                      </span>
+                    )}
+                    <span className="text-[13px] font-medium text-[#0a0a0a] max-w-[120px] truncate">
+                      {sessionUser.name?.trim() || sessionUser.email?.trim() || "Account"}
+                    </span>
+                  </button>
+                  {accountMenuOpen ? (
+                    <div role="menu" className="absolute right-0 top-[calc(100%+8px)] z-40 min-w-[180px] rounded-xl border border-gray-200 bg-white p-1.5 shadow-[0_16px_32px_-20px_rgba(0,0,0,0.55)]">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={async () => {
+                          setAccountMenuOpen(false);
+                          try {
+                            await authClient.signOut({ fetchOptions: { onSuccess: () => { } } });
+                          } finally {
+                            window.location.href = "/";
+                          }
+                        }}
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <Link
+                    href="/signin"
+                    className="hidden sm:inline-flex items-center px-4 py-2 rounded-full border border-gray-300 hover:border-gray-400 bg-white text-[12px] font-bold tracking-[0.06em] uppercase text-[#0a0a0a] transition-colors"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    href="/generate"
+                    className="inline-flex items-center px-4 py-2 rounded-full bg-[#0a0a0a] hover:bg-black text-white text-[12px] font-bold tracking-[0.06em] uppercase shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors"
+                  >
+                    Try for free
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </nav>
       </header>
 
       <main>
-        <section className="h-screen w-full min-h-[600px] pt-20">
-          <IntroAnimation onScrollComplete={() => setHeroScrollComplete(true)} />
+        <section className="relative min-h-screen flex items-center w-full pt-32 pb-16 px-4 sm:px-6 lg:px-12 overflow-hidden">
+          <div
+            className="absolute inset-0 -z-10 pointer-events-none"
+            aria-hidden
+            style={{
+              background:
+                "radial-gradient(ellipse 70% 60% at 50% 30%, rgba(15,23,42,0.04), transparent 70%)",
+            }}
+          />
+          <div
+            className="absolute inset-0 -z-10 pointer-events-none opacity-[0.025]"
+            aria-hidden
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, #0f172a 1px, transparent 1px), linear-gradient(to bottom, #0f172a 1px, transparent 1px)",
+              backgroundSize: "56px 56px",
+              maskImage: "radial-gradient(ellipse at center, black 40%, transparent 80%)",
+              WebkitMaskImage: "radial-gradient(ellipse at center, black 40%, transparent 80%)",
+            }}
+          />
+
+          <div className="max-w-[min(1680px,96vw)] mx-auto w-full font-sans">
+            <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-12 items-center">
+              <div className="relative">
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200/80 bg-white/70 backdrop-blur-sm text-[11px] font-medium tracking-[0.14em] text-[#52525b] uppercase shadow-[0_1px_2px_rgba(15,23,42,0.04)] mb-8"
+                >
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                  AI Video Director
+                </motion.div>
+
+                <motion.h1
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: 0.05 }}
+                  className="text-balance leading-[0.94] text-[clamp(3.25rem,8.4vw,7.5rem)] text-[#0a0a0a]"
+                >
+                  <span
+                    className="block italic font-normal tracking-[-0.025em]"
+                    style={{ fontFamily: 'Georgia, "Times New Roman", ui-serif, serif' }}
+                  >
+                    One sentence in.
+                  </span>
+                  <span className="block font-semibold tracking-[-0.055em]">
+                    One video out.
+                  </span>
+                </motion.h1>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.18 }}
+                  className="mt-8 text-[17.5px] sm:text-[19px] text-[#52525b] max-w-[46ch] leading-[1.55] tracking-[-0.008em]"
+                >
+                  A finished 30-60 second MP4: script, voice, captions, b-roll, and score, rendered in a single pass.
+                </motion.p>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.32 }}
+                  className="mt-10 flex flex-wrap items-center gap-2"
+                >
+                  <a
+                    href="/generate"
+                    className="group relative inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#0a0a0a] text-white text-[14.5px] font-semibold tracking-[-0.005em] shadow-[0_10px_30px_-10px_rgba(15,23,42,0.6)] hover:bg-black transition-all hover:shadow-[0_16px_36px_-12px_rgba(15,23,42,0.6)] hover:-translate-y-0.5"
+                  >
+                    Create your first video
+                    <svg className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </a>
+                  <a
+                    href="#how"
+                    className="group inline-flex items-center gap-2 px-5 py-3.5 rounded-full text-[#3f3f46] text-[14.5px] font-semibold tracking-[-0.005em] hover:text-[#0a0a0a] transition-colors"
+                  >
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-gray-300 bg-white group-hover:border-gray-400 transition-colors">
+                      <svg className="w-2.5 h-2.5 text-[#0a0a0a] translate-x-px" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </span>
+                    See it work
+                  </a>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.5 }}
+                  className="mt-12 flex items-center gap-3"
+                >
+                  <span className="relative flex h-1.5 w-1.5 shrink-0">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                  <div className="font-mono text-[11px] tracking-[0.04em] text-[#71717a] flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span><span className="text-[#0a0a0a] font-semibold">~60s</span> render</span>
+                    <span className="text-gray-300" aria-hidden>/</span>
+                    <span><span className="text-[#0a0a0a] font-semibold">1080p</span> HD</span>
+                    <span className="text-gray-300" aria-hidden>/</span>
+                    <span><span className="text-[#0a0a0a] font-semibold">30+</span> languages</span>
+                    <span className="text-gray-300" aria-hidden>/</span>
+                    <span><span className="text-[#0a0a0a] font-semibold">MP4</span> · 4K-ready</span>
+                  </div>
+                </motion.div>
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.9, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="relative w-full max-w-[640px] aspect-square mx-auto"
+              >
+
+                <div className="absolute inset-0 animate-[spin_70s_linear_infinite]">
+                  {HERO_IMAGES.map((src, i) => {
+                    const total = HERO_IMAGES.length;
+                    const angle = (i / total) * 360 - 90;
+                    const radius = 44;
+                    const x = 50 + radius * Math.cos((angle * Math.PI) / 180);
+                    const y = 50 + radius * Math.sin((angle * Math.PI) / 180);
+                    const tilt = ((i * 53) % 18) - 9;
+                    return (
+                      <div
+                        key={i}
+                        className="absolute"
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}%`,
+                          width: "13%",
+                          aspectRatio: "3 / 4",
+                          transform: `translate(-50%, -50%) rotate(${tilt}deg)`,
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt=""
+                          loading="lazy"
+                          className="w-full h-full object-cover rounded-xl shadow-[0_10px_28px_-12px_rgba(15,23,42,0.3),0_4px_12px_-4px_rgba(15,23,42,0.15)] ring-1 ring-black/5"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="absolute inset-0 pointer-events-none">
+                  {["Script", "Voice", "Scenes", "B-roll", "Captions", "Music", "Final"].map((stage, i) => {
+                    const angle = (i / 7) * 360 - 90;
+                    const radius = 28;
+                    const x = 50 + radius * Math.cos((angle * Math.PI) / 180);
+                    const y = 50 + radius * Math.sin((angle * Math.PI) / 180);
+                    return (
+                      <span
+                        key={stage}
+                        className="absolute text-[9.5px] font-semibold tracking-[0.2em] uppercase text-[#71717a] whitespace-nowrap"
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}%`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        {stage}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-12 font-sans">
+                  <div
+                    className="absolute inset-[27%] rounded-full bg-white ring-1 ring-gray-200/70"
+                    aria-hidden
+                  />
+                  <div className="relative z-10">
+                    <p className="text-[clamp(1rem,1.7vw,1.35rem)] font-semibold text-[#0a0a0a] tracking-[-0.025em] leading-tight">
+                      Brief. Assembly. Master.
+                    </p>
+                    <p className="mt-2.5 text-[10px] font-medium tracking-[0.28em] uppercase text-[#a1a1aa]">
+                      Cutline pipeline
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
         </section>
         <motion.div
           initial={false}
@@ -2200,7 +2102,7 @@ function HomeContent() {
                 .
               </h2>
               <p className="text-center text-[15px] text-gray-500 max-w-xl mx-auto mb-12 leading-relaxed">
-                Pick your role — every stage of the pipeline tunes itself for what you actually ship.
+                Pick your role: every stage of the pipeline tunes itself for what you actually ship.
               </p>
 
               <div className="flex justify-center mb-14">
@@ -2262,7 +2164,7 @@ function HomeContent() {
                     key={activeFeatureTab}
                     className="grid md:grid-cols-3 gap-5 animate-fade-in"
                   >
-                    {/* Card 1 — Script */}
+                    {/* Card 1: Script */}
                     <div className={cardBase}>
                       <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
@@ -2374,7 +2276,7 @@ function HomeContent() {
                       </div>
                     </div>
 
-                    {/* Card 2 — Visuals */}
+                    {/* Card 2: Visuals */}
                     <div className={cardBase}>
                       <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
@@ -2473,7 +2375,7 @@ function HomeContent() {
                                 {item.count}
                               </span>
                             ) : (
-                              <span className="text-[10px] text-gray-400">—</span>
+                              <span className="text-[10px] text-gray-400">·</span>
                             )}
                           </div>
                         ))}
@@ -2504,7 +2406,7 @@ function HomeContent() {
                       </div>
                     </div>
 
-                    {/* Card 3 — Studio */}
+                    {/* Card 3: Studio */}
                     <div className={cardBase}>
                       <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
@@ -2670,7 +2572,7 @@ function HomeContent() {
                   From idea to <span className="italic">video</span> in minutes.
                 </h2>
                 <p className="text-[15px] text-gray-500 max-w-[44ch] mx-auto mt-6 leading-relaxed">
-                  One sentence in. A directed, captioned, music-cut MP4 out — every shot sourced, scripted, and rendered in a single pass.
+                  One sentence in. A directed, captioned, music-cut MP4 out, every shot sourced, scripted, and rendered in a single pass.
                 </p>
               </div>
 
@@ -2979,7 +2881,7 @@ function HomeContent() {
               </div>
 
               <div className="grid md:grid-cols-3 gap-4">
-                {/* Pain 01 — Linear-style timeline */}
+                {/* Pain 01: Linear-style timeline */}
                 <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
                   <div className="flex items-center justify-between mb-5">
                     <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Pain 01 · Time</span>
@@ -3054,7 +2956,7 @@ function HomeContent() {
                   </div>
                 </div>
 
-                {/* Pain 02 — Premiere-style export queue */}
+                {/* Pain 02: Premiere-style export queue */}
                 <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
                   <div className="flex items-center justify-between mb-5">
                     <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Pain 02 · Formats</span>
@@ -3116,7 +3018,7 @@ function HomeContent() {
                   </div>
                 </div>
 
-                {/* Pain 03 — Stripe-style invoice */}
+                {/* Pain 03: Stripe-style invoice */}
                 <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
                   <div className="flex items-center justify-between mb-5">
                     <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Pain 03 · Cost</span>
