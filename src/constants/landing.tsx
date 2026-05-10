@@ -424,7 +424,7 @@ export type FeatureTabPreview = {
 };
 
 export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
-  // 0 — Content Creators
+  // 0: Content Creators
   {
     card1: {
       filename: "vlog-ep-12.md",
@@ -440,7 +440,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       readTime: "1m 12s",
       aiHint: {
         label: "AI rewrite",
-        body: "Tighten the hook — open with the question viewers are already asking.",
+        body: "Tighten the hook: open with the question viewers are already asking.",
       },
       stat: { value: "+30%", label: "watch-through" },
       variations: 3,
@@ -488,7 +488,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ E",
     },
   },
-  // 1 — Marketers
+  // 1: Marketers
   {
     card1: {
       filename: "q4-launch-ad.md",
@@ -504,7 +504,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       readTime: "0m 54s",
       aiHint: {
         label: "AI lift",
-        body: "Lead with the metric — readers anchor on the number, not the claim.",
+        body: "Lead with the metric: readers anchor on the number, not the claim.",
       },
       stat: { value: "+45%", label: "vs control" },
       variations: 4,
@@ -553,7 +553,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ ↵",
     },
   },
-  // 2 — Educators
+  // 2: Educators
   {
     card1: {
       filename: "biology-ch08.md",
@@ -562,14 +562,14 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       lines: [
         { text: "Today we'll break down photosynthesis." },
         { text: "There are three steps to remember.", emphasis: true },
-        { text: "Step one — light hits the chloroplasts." },
-        { text: "Step two — the Calvin cycle fixes carbon." },
-        { text: "Step three — sugar feeds the plant." },
+        { text: "Step one: light hits the chloroplasts." },
+        { text: "Step two: the Calvin cycle fixes carbon." },
+        { text: "Step three: sugar feeds the plant." },
       ],
       readTime: "2m 04s",
       aiHint: {
         label: "AI tutor",
-        body: "Add a recap before the next concept — students retain 38% more on the second pass.",
+        body: "Add a recap before the next concept: students retain 38% more on the second pass.",
       },
       stat: { value: "+52%", label: "retention" },
       variations: 2,
@@ -617,7 +617,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ ↵",
     },
   },
-  // 3 — E-commerce
+  // 3: E-commerce
   {
     card1: {
       filename: "drop-22-launch.md",
@@ -633,7 +633,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       readTime: "0m 38s",
       aiHint: {
         label: "AI hook",
-        body: "Front-load the return policy — it lifts add-to-cart 18% on first-time buyers.",
+        body: "Front-load the return policy: it lifts add-to-cart 18% on first-time buyers.",
       },
       stat: { value: "+38%", label: "conversion" },
       variations: 5,
@@ -653,7 +653,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
         detail: "Sized for Shopify hero banners.",
         badge: "4K Ready",
       },
-      summary: { label: "Catalog", value: "84 SKUs · $24 – $280" },
+      summary: { label: "Catalog", value: "84 SKUs · $24 - $280" },
     },
     card3: {
       status: { label: "publishing", tone: "rose" },
@@ -681,14 +681,14 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ ↵",
     },
   },
-  // 4 — Social Media
+  // 4: Social Media
   {
     card1: {
       filename: "reel-trend-08.md",
       status: { label: "viral-ready", tone: "emerald" },
       tags: ["Hook", "Loop", "Pattern", "Hashtag"],
       lines: [
-        { text: "Wait — don't scroll yet.", emphasis: true },
+        { text: "Wait, don't scroll yet.", emphasis: true },
         { text: "This is the trend everyone is missing." },
         { text: "It works because the algo now…" },
         { text: "…ranks 3-second saves over watch time." },
@@ -697,7 +697,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       readTime: "0m 22s",
       aiHint: {
         label: "AI hook",
-        body: "Promise a save in the first 1.5 seconds — saves rank higher than likes on Reels.",
+        body: "Promise a save in the first 1.5 seconds: saves rank higher than likes on Reels.",
       },
       stat: { value: "+62%", label: "share rate" },
       variations: 6,
@@ -745,14 +745,14 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ S",
     },
   },
-  // 5 — Agencies
+  // 5: Agencies
   {
     card1: {
       filename: "acme-q4-master.md",
       status: { label: "client-ready", tone: "emerald" },
       tags: ["Brief", "Approval", "Brand", "Delivery"],
       lines: [
-        { text: "Acme — Q4 product launch." },
+        { text: "Acme: Q4 product launch." },
         { text: "Approved scripts. Approved palette.", emphasis: true },
         { text: "Six variants, three regions, one queue." },
         { text: "Delivery: Friday, 4 PM PT." },
@@ -761,7 +761,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       readTime: "1m 48s",
       aiHint: {
         label: "AI brief",
-        body: "Match Acme's tone — 80% of approved copy uses 'we' over 'you'.",
+        body: "Match Acme's tone: 80% of approved copy uses 'we' over 'you'.",
       },
       stat: { value: "−28%", label: "delivery time" },
       variations: 6,
