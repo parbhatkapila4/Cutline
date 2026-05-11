@@ -3,8 +3,8 @@ import { CUTLINEComposition } from "./CUTLINEComposition";
 import type { CUTLINECompositionProps } from "./types";
 
 const FPS = 30;
-const WIDTH = 1920;
-const HEIGHT = 1080;
+const WIDTH = 3840;
+const HEIGHT = 2160;
 
 const defaultProps: CUTLINECompositionProps = {
   script: { entries: [] },

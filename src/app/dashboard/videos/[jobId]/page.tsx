@@ -840,7 +840,7 @@ export default function DashboardVideoDetailPage() {
                                     </ul>
 
                                     <p className="mt-3 text-[10.5px] text-amber-200/50 leading-snug">
-                                      Usually 1–5 mins. We&apos;ll update this the moment it&apos;s ready.
+                                      Usually 1-5 mins. We&apos;ll update this the moment it&apos;s ready.
                                     </p>
                                   </div>
                                 </div>
