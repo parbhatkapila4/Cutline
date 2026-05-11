@@ -1074,108 +1074,230 @@ export default function CreatePage() {
           {!busy && !done && (
             <motion.main key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="relative min-h-full flex flex-col items-center justify-center px-6 lg:px-10 py-6 sm:py-8">
               <div className="w-full max-w-[min(1660px,96vw)] mx-auto">
-                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-2xl border border-white/10 bg-zinc-950 overflow-hidden">
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="relative rounded-[24px] overflow-hidden"
+                  style={{
+                    background: "#0d0d10",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                    boxShadow: "0 0 0 1px rgba(0,0,0,0.5) inset, 0 1px 0 rgba(255,255,255,0.03) inset, 0 40px 100px -20px rgba(0,0,0,0.6), 0 0 80px rgba(212,255,58,0.02)",
+                  }}
+                >
                   <div className="grid md:grid-cols-[300px_1fr] xl:grid-cols-[340px_1fr] 2xl:grid-cols-[380px_1fr]">
-                    <div className="p-6 md:p-7 border-b md:border-b-0 md:border-r border-white/5 bg-zinc-900/50">
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm font-medium text-white">Your images (optional)</p>
-                        <p className="text-xs text-gray-500">{imgs.length}/5</p>
-                      </div>
+                    <div
+                      className="p-6 md:p-7 border-b md:border-b-0 md:border-r flex flex-col gap-7"
+                      style={{
+                        borderColor: "rgba(255,255,255,0.04)",
+                        background: "linear-gradient(180deg, rgba(255,255,255,0.012), transparent 200px)",
+                      }}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10.5px] font-medium tracking-[0.18em] uppercase text-zinc-500">
+                            Your images
+                          </span>
+                          <span className="text-[10.5px] font-mono text-zinc-700 tabular-nums">{imgs.length} / 5</span>
+                        </div>
                       <div
                         onDragOver={(e) => { e.preventDefault(); }}
                         onDrop={(e) => { e.preventDefault(); const f = Array.from(e.dataTransfer.files).filter((x) => x.type.startsWith("image/")); setImgs((prev) => prev.concat(f).slice(0, 5)); }}
                         onClick={() => fileRef.current?.click()}
-                        className="relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors border-zinc-800 hover:border-zinc-700"
+                        className="relative rounded-[14px] cursor-pointer transition-all overflow-hidden text-center px-4 pt-6 pb-5 group"
+                        style={{
+                          background: "radial-gradient(circle at 50% 0%, rgba(212,255,58,0.04), transparent 70%), rgba(255,255,255,0.012)",
+                          border: "1.5px dashed rgba(255,255,255,0.1)",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(212,255,58,0.4)"; e.currentTarget.style.background = "radial-gradient(circle at 50% 0%, rgba(212,255,58,0.08), transparent 70%), rgba(255,255,255,0.025)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.background = "radial-gradient(circle at 50% 0%, rgba(212,255,58,0.04), transparent 70%), rgba(255,255,255,0.012)"; }}
                       >
                         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFile} />
-                        <svg className="w-8 h-8 mx-auto mb-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        <p className="text-sm text-gray-500">Drop images or click</p>
-                        <p className="text-xs text-gray-600 mt-1">Optional • Max 5</p>
+                        <span
+                          className="inline-flex items-center justify-center w-9 h-9 rounded-[10px] mx-auto mb-3 text-white/90"
+                          style={{
+                            background: "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))",
+                            border: "1px solid rgba(255,255,255,0.07)",
+                            boxShadow: "0 1px 0 rgba(255,255,255,0.05) inset",
+                          }}
+                        >
+                          <svg className="w-[17px] h-[17px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                          </svg>
+                        </span>
+                        <p className="text-[13px] font-medium text-white tracking-[-0.005em] mb-1">Drop images or click</p>
+                        <p className="text-[11px] font-mono text-zinc-500">optional · max 5</p>
                       </div>
                       {imgUrls.length > 0 && (
-                        <div className="mt-4 grid grid-cols-3 gap-2">
+                        <div className="mt-3 grid grid-cols-3 gap-2">
                           {imgUrls.map((u, i) => (
-                            <div key={u} className="relative aspect-square rounded-lg overflow-hidden bg-zinc-800">
+                            <div key={u} className="relative aspect-square rounded-lg overflow-hidden bg-zinc-900 ring-1 ring-white/10">
                               <img src={u} alt="" className="w-full h-full object-cover" />
-                              <button onClick={(e) => { e.stopPropagation(); rmImg(i); }} className="absolute top-1 right-1 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-white hover:bg-red-500 transition-colors">
+                              <button onClick={(e) => { e.stopPropagation(); rmImg(i); }} className="absolute top-1 right-1 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-white hover:bg-rose-500 transition-colors">
                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                               </button>
                             </div>
                           ))}
                         </div>
                       )}
-                      <p className="text-xs text-gray-600 mt-4 leading-relaxed">
-                        No images? We&apos;ll find visuals from the web based on your description. Or add your own and we&apos;ll use them first.
-                      </p>
+                        <p className="text-[11px] text-zinc-500 mt-3 leading-[1.55] px-0.5">
+                          No images? We&rsquo;ll find visuals from the web. Or add your own — we use them first.
+                        </p>
+                      </div>
 
-                      <div className="mt-6 pt-6 border-t border-white/5">
-                        <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-3">Platform</p>
-                        <div className="grid grid-cols-2 gap-2.5">
-                          {PLATFORM_OPTIONS.map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => setPlatform(p)}
-                              className={`flex items-center justify-center gap-2 w-full min-h-[44px] rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${platform === p ? "border-blue-500/50 bg-blue-500/10 text-white" : "border-zinc-700/80 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300"}`}
-                            >
-                              <span className={platform === p ? "text-blue-200" : "text-zinc-500"}>{PLATFORM_ICONS[p]}</span>
-                              <span>{p === "general" ? "General" : p === "youtube_shorts" ? "Shorts" : p === "twitter" ? "X" : "LinkedIn"}</span>
-                            </button>
-                          ))}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10.5px] font-medium tracking-[0.18em] uppercase text-zinc-500">
+                            Platform
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {PLATFORM_OPTIONS.map((p) => {
+                            const selected = platform === p;
+                            const label = p === "general" ? "General" : p === "youtube_shorts" ? "Shorts" : p === "twitter" ? "X" : "LinkedIn";
+                            return (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => setPlatform(p)}
+                                className="flex items-center justify-center gap-2 min-h-[38px] px-3 py-2 rounded-[9px] text-[12.5px] tracking-[-0.005em] transition-all"
+                                style={
+                                  selected
+                                    ? {
+                                        background: "rgba(212,255,58,0.06)",
+                                        border: "1px solid rgba(212,255,58,0.3)",
+                                        color: "rgba(255,255,255,0.95)",
+                                        fontWeight: 500,
+                                      }
+                                    : {
+                                        background: "rgba(255,255,255,0.02)",
+                                        border: "1px solid rgba(255,255,255,0.06)",
+                                        color: "rgba(255,255,255,0.55)",
+                                      }
+                                }
+                              >
+                                <span style={{ color: selected ? "#d4ff3a" : "rgba(255,255,255,0.4)" }}>{PLATFORM_ICONS[p]}</span>
+                                <span>{label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
 
-                      <div className="mt-6 pt-6 border-t border-white/5">
-                        <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-3">Aspect ratio</p>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                          {ASPECT_RATIOS.map((r) => (
-                            <button
-                              key={r}
-                              type="button"
-                              onClick={() => setAspectRatio(r)}
-                              className={`flex items-center justify-center min-h-[40px] rounded-xl border px-2.5 py-2 text-xs font-medium tabular-nums transition-all ${aspectRatio === r ? "border-blue-500/50 bg-blue-500/10 text-white" : "border-zinc-700/80 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300"}`}
-                            >
-                              {r}
-                            </button>
-                          ))}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10.5px] font-medium tracking-[0.18em] uppercase text-zinc-500">
+                            Aspect ratio
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {ASPECT_RATIOS.map((r) => {
+                            const selected = aspectRatio === r;
+                            const [w, h] = r.split(":").map(Number);
+                            const maxBox = 14;
+                            const scale = Math.min(maxBox / w, maxBox / h);
+                            const boxW = Math.max(7, Math.round(w * scale));
+                            const boxH = Math.max(7, Math.round(h * scale));
+                            return (
+                              <button
+                                key={r}
+                                type="button"
+                                onClick={() => setAspectRatio(r)}
+                                className="flex items-center justify-center gap-1.5 min-h-[34px] px-2 rounded-[8px] font-mono text-[11px] tabular-nums transition-all"
+                                style={
+                                  selected
+                                    ? {
+                                        background: "rgba(212,255,58,0.08)",
+                                        border: "1px solid rgba(212,255,58,0.35)",
+                                        color: "#d4ff3a",
+                                      }
+                                    : {
+                                        background: "rgba(255,255,255,0.02)",
+                                        border: "1px solid rgba(255,255,255,0.06)",
+                                        color: "rgba(255,255,255,0.55)",
+                                      }
+                                }
+                              >
+                                <span
+                                  className="inline-block rounded-[1.5px] shrink-0"
+                                  style={{
+                                    width: boxW,
+                                    height: boxH,
+                                    border: "1.2px solid currentColor",
+                                    opacity: selected ? 1 : 0.6,
+                                  }}
+                                  aria-hidden
+                                />
+                                <span>{r}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
 
-                    <div className="p-6 flex flex-col">
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-white mb-3">Describe your video</label>
-                        <textarea
-                          value={prompt}
-                          onChange={(e) => setPrompt(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
-                          placeholder="e.g. Create a 30-second explainer about how solar panels work, professional tone with upbeat background music"
-                          rows={5}
-                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 focus:outline-none resize-none"
-                        />
-                        <div className="flex items-start justify-between mt-2 text-xs text-gray-600 gap-4">
-                          <span>Be specific: topic, tone, style, audience</span>
-                          <div className="flex flex-col items-end shrink-0">
-                            <span>{prompt.length}/500</span>
+                    <div className="p-6 sm:p-9 flex flex-col">
+                      <div className="flex-1 flex flex-col gap-8">
+
+                        <div>
+                          <div className="inline-flex items-center gap-2 text-[11px] font-medium tracking-[0.14em] uppercase mb-2" style={{ color: "#d4ff3a" }}>
+                            <span className="block w-[18px] h-px" style={{ background: "#d4ff3a" }} />
+                            Studio
+                          </div>
+                          <h1 className="text-[28px] font-medium tracking-[-0.025em] leading-[1.1] m-0 mb-2 text-white">
+                            Make something{" "}
+                            <em
+                              className="not-italic"
+                              style={{
+                                fontFamily: "Georgia, 'Times New Roman', ui-serif, serif",
+                                fontStyle: "italic",
+                                fontWeight: 400,
+                                color: "#d4ff3a",
+                                letterSpacing: "-0.02em",
+                              }}
+                            >
+                              worth
+                            </em>{" "}
+                            watching.
+                          </h1>
+                          <p className="text-[13.5px] leading-[1.5] tracking-[-0.005em] max-w-[560px]" style={{ color: "rgba(255,255,255,0.46)" }}>
+                            Describe the video in one sentence. We&rsquo;ll write the script, find the visuals, and edit it together.
+                          </p>
+                        </div>
+
+                        <div>
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div>
+                              <div className="flex items-baseline gap-2.5">
+                                <span className="font-mono text-[11px] text-zinc-700">01</span>
+                                <span className="text-[15px] font-medium tracking-[-0.01em] text-white">Describe your video</span>
+                              </div>
+                              <div className="text-[12.5px] mt-1 leading-[1.5] pl-[22px]" style={{ color: "rgba(255,255,255,0.46)" }}>Be specific about topic, tone, style, audience.</div>
+                            </div>
                             <button
                               type="button"
                               onClick={suggest}
                               disabled={suggesting || prompt.trim().split(/\s+/).filter(Boolean).length <= 10}
-                              className="inline-flex items-center gap-2 text-xs font-medium text-blue-400 hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-1"
+                              className="shrink-0 inline-flex items-center gap-1.5 text-[11.5px] px-2.5 py-1.5 rounded-[8px] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              style={{
+                                background: "rgba(255,255,255,0.03)",
+                                border: "1px solid rgba(255,255,255,0.07)",
+                                color: "rgba(255,255,255,0.68)",
+                              }}
+                              onMouseEnter={(e) => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = "rgba(212,255,58,0.06)"; e.currentTarget.style.borderColor = "rgba(212,255,58,0.3)"; e.currentTarget.style.color = "#d4ff3a"; } }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.68)"; }}
                             >
                               {suggesting ? (
                                 <>
-                                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+                                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                   </svg>
-                                  Suggesting...
+                                  Suggesting
                                 </>
                               ) : (
                                 <>
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                   </svg>
                                   Suggest prompt
@@ -1183,53 +1305,125 @@ export default function CreatePage() {
                               )}
                             </button>
                           </div>
-                        </div>
 
-                        <div className="flex flex-wrap gap-2 mt-4">
-                          {PROMPT_CHIPS.map(({ label, prompt: p }) => (
-                            <button
-                              key={label}
-                              onClick={() => setPrompt(p)}
-                              className="text-xs text-gray-500 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="mt-6">
-                          <label className="block text-sm font-medium text-white mb-3">Video length (seconds)</label>
-                          <div className="flex items-center gap-4">
-                            <input
-                              type="range"
-                              min={DURATION_MIN}
-                              max={DURATION_MAX}
-                              value={dur}
-                              onChange={(e) => setDur(Number(e.target.value))}
-                              className="flex-1 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                          <div
+                            className="relative rounded-[14px] px-[18px] pt-4 pb-3 transition-all focus-within:[box-shadow:0_0_0_4px_rgba(212,255,58,0.05),0_0_40px_rgba(212,255,58,0.04)] focus-within:[border-color:rgba(212,255,58,0.3)]"
+                            style={{
+                              background: "#0a0a0d",
+                              border: "1px solid rgba(255,255,255,0.07)",
+                            }}
+                          >
+                            <textarea
+                              value={prompt}
+                              onChange={(e) => setPrompt(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+                              placeholder="e.g. Create a 30-second explainer about how solar panels work, professional tone with upbeat background music"
+                              rows={4}
+                              className="block w-full bg-transparent border-0 outline-none resize-none text-[14.5px] leading-[1.6] tracking-[-0.005em] text-white placeholder:text-zinc-700 p-0 min-h-[80px]"
+                              style={{ fontFamily: "inherit" }}
                             />
-                            <input
-                              type="number"
-                              min={DURATION_MIN}
-                              max={DURATION_MAX}
-                              value={dur}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                if (!Number.isNaN(v)) setDur(Math.min(DURATION_MAX, Math.max(DURATION_MIN, v)));
-                              }}
-                              className="w-16 bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-white text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <span className="text-sm text-gray-500">sec</span>
+                            <div className="flex items-center justify-between mt-3 pt-3 gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                              <div className="flex flex-wrap gap-1.5 min-w-0">
+                                {PROMPT_CHIPS.map(({ label, prompt: p }) => (
+                                  <button
+                                    key={label}
+                                    type="button"
+                                    onClick={() => setPrompt(p)}
+                                    className="px-2.5 py-1 rounded-full text-[11.5px] tracking-[-0.005em] transition-all"
+                                    style={{
+                                      background: "rgba(255,255,255,0.025)",
+                                      border: "1px solid rgba(255,255,255,0.07)",
+                                      color: "rgba(255,255,255,0.68)",
+                                    }}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                              <span className="font-mono text-[10.5px] tabular-nums shrink-0" style={{ color: "rgba(255,255,255,0.28)" }}>{prompt.length} / 500</span>
+                            </div>
                           </div>
-                          <p className="text-xs text-gray-600 mt-1">
-                            {DURATION_MIN}-{DURATION_MAX} seconds. Talking object videos over 8s use multiple clips.
-                          </p>
                         </div>
 
-                        <div className="mt-6">
-                          <label className="block text-sm font-medium text-white mb-1.5">How should this video be made?</label>
-                          <p className="text-xs text-zinc-500 mb-3">Pick one. We build exactly what you pick.</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <div className="mb-3">
+                            <div className="flex items-baseline gap-2.5">
+                              <span className="font-mono text-[11px] text-zinc-700">02</span>
+                              <span className="text-[15px] font-medium tracking-[-0.01em] text-white">Video length</span>
+                            </div>
+                            <div className="text-[12.5px] mt-1 leading-[1.5] pl-[22px]" style={{ color: "rgba(255,255,255,0.46)" }}>{DURATION_MIN}–{DURATION_MAX} seconds. Talking videos over 8s use multiple clips.</div>
+                          </div>
+                          <div
+                            className="relative rounded-[14px] px-6 py-[22px] flex flex-col gap-[18px] overflow-hidden"
+                            style={{
+                              background: "#14141a",
+                              border: "1px solid rgba(255,255,255,0.07)",
+                            }}
+                          >
+                            <span
+                              className="pointer-events-none absolute top-0 left-0 right-0 h-px"
+                              aria-hidden
+                              style={{ background: "linear-gradient(90deg, transparent, rgba(212,255,58,0.3), transparent)" }}
+                            />
+                            <div className="flex items-baseline justify-between gap-4">
+                              <div className="flex items-baseline gap-2">
+                                <span className="font-mono font-medium tabular-nums leading-none text-white" style={{ fontSize: "44px", letterSpacing: "-2px" }}>
+                                  {dur}
+                                </span>
+                                <span className="text-[14px] tracking-[-0.01em]" style={{ color: "rgba(255,255,255,0.46)" }}>seconds</span>
+                              </div>
+                              <div className="text-[12px] text-right max-w-[200px] leading-[1.5]" style={{ color: "rgba(255,255,255,0.46)" }}>
+                                <strong className="font-medium" style={{ color: "#d4ff3a" }}>
+                                  {dur <= 15 ? "Quick hit" : dur <= 30 ? "Standard short" : dur <= 45 ? "Mid-length" : "Long-form"}
+                                </strong>
+                                <br />
+                                {dur <= 15 ? "best for hooks and ads" : dur <= 30 ? "good retention on social" : dur <= 45 ? "room for a clear arc" : "use for explainers and stories"}
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <input
+                                type="range"
+                                min={DURATION_MIN}
+                                max={DURATION_MAX}
+                                value={dur}
+                                onChange={(e) => setDur(Number(e.target.value))}
+                                className="absolute inset-0 w-full h-1.5 opacity-0 cursor-pointer z-10"
+                                aria-label="Video length"
+                              />
+                              <div className="relative h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }}>
+                                <div
+                                  className="absolute left-0 top-0 h-full rounded-full"
+                                  style={{
+                                    width: `${((dur - DURATION_MIN) / (DURATION_MAX - DURATION_MIN)) * 100}%`,
+                                    background: "linear-gradient(90deg, #d4ff3a, #b8e030)",
+                                    boxShadow: "0 0 12px rgba(212,255,58,0.3)",
+                                  }}
+                                />
+                                <div
+                                  className="absolute top-1/2 w-[18px] h-[18px] rounded-full bg-white"
+                                  style={{
+                                    left: `${((dur - DURATION_MIN) / (DURATION_MAX - DURATION_MIN)) * 100}%`,
+                                    transform: "translate(-50%, -50%)",
+                                    boxShadow: "0 0 0 1px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.5), 0 0 0 4px rgba(212,255,58,0.15)",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-between font-mono text-[10.5px] tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }}>
+                              <span>10s</span><span>20s</span><span>30s</span><span>40s</span><span>50s</span><span>60s</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="mb-3">
+                            <div className="flex items-baseline gap-2.5">
+                              <span className="font-mono text-[11px] text-zinc-700">03</span>
+                              <span className="text-[15px] font-medium tracking-[-0.01em] text-white">How should this video be made?</span>
+                            </div>
+                            <div className="text-[12.5px] mt-1 leading-[1.5] pl-[22px]" style={{ color: "rgba(255,255,255,0.46)" }}>Pick one. We build exactly what you pick.</div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                             {(
                               [
                                 {
@@ -1239,13 +1433,13 @@ export default function CreatePage() {
                                 },
                                 {
                                   id: "talking_cartoon" as const,
-                                  title: "Talking (cartoon)",
+                                  title: "Talking — cartoon",
                                   body: "Character speaks on camera. Works for most prompts.",
                                 },
                                 {
                                   id: "talking_real" as const,
-                                  title: "Talking (realistic)",
-                                  body: "Looks like a real speaker. The video provider may block some scripts; neutral wording helps.",
+                                  title: "Talking — realistic",
+                                  body: "Real-looking speaker. Use neutral wording for best results.",
                                 },
                               ] as const
                             ).map(({ id, title, body }) => {
@@ -1255,15 +1449,61 @@ export default function CreatePage() {
                                   key={id}
                                   type="button"
                                   onClick={() => setVideoKind(id)}
-                                  className={`p-4 rounded-xl border text-left transition-all h-full ${selected ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/20" : "border-zinc-800 hover:border-zinc-700"}`}
+                                  className="relative rounded-[14px] cursor-pointer overflow-hidden text-left transition-all hover:-translate-y-px"
+                                  style={
+                                    selected
+                                      ? {
+                                          background: "linear-gradient(180deg, rgba(212,255,58,0.06), rgba(212,255,58,0.01)), #14141a",
+                                          border: "1px solid rgba(212,255,58,0.4)",
+                                          boxShadow: "0 0 0 1px rgba(212,255,58,0.2), 0 0 30px rgba(212,255,58,0.06)",
+                                        }
+                                      : {
+                                          background: "#14141a",
+                                          border: "1px solid rgba(255,255,255,0.07)",
+                                        }
+                                  }
                                 >
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected ? "border-amber-400" : "border-zinc-700"}`}>
-                                      {selected && <div className="w-2 h-2 rounded-full bg-amber-400" />}
-                                    </div>
-                                    <span className="text-sm font-medium text-white">{title}</span>
+                                  <div
+                                    className="relative h-[80px] overflow-hidden"
+                                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                                    aria-hidden
+                                  >
+                                    {id === "slideshow" && (
+                                      <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #2a2a35 0%, #15151d 100%)" }}>
+                                        <div className="absolute" style={{ left: "14%", top: "22%", width: "36%", height: "56%", background: "linear-gradient(135deg, #4a4a5a, #2a2a35)", borderRadius: 4, border: "0.5px solid rgba(255,255,255,0.1)" }} />
+                                        <div className="absolute" style={{ right: "14%", top: "32%", width: "36%", height: "50%", background: "linear-gradient(135deg, #6a6a7a, #3a3a45)", borderRadius: 4, border: "0.5px solid rgba(255,255,255,0.1)" }} />
+                                      </div>
+                                    )}
+                                    {id === "talking_cartoon" && (
+                                      <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #d85a30 0%, #993c1d 60%, #2a1208 100%)" }}>
+                                        <div className="absolute" style={{ width: 36, height: 36, borderRadius: "50%", background: "radial-gradient(circle at 35% 30%, #fff5d0, #facb74)", top: "22%", left: "50%", transform: "translateX(-50%)", boxShadow: "0 0 24px rgba(250,203,116,0.5)" }} />
+                                        <div className="absolute bottom-0 left-0 right-0" style={{ height: "38%", background: "radial-gradient(ellipse at 30% 100%, #1d6e56 0%, transparent 50%), radial-gradient(ellipse at 70% 100%, #0f6e56 0%, transparent 50%)" }} />
+                                      </div>
+                                    )}
+                                    {id === "talking_real" && (
+                                      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 30%, #6a8caf 0%, #2a4565 40%, #0a1929 80%)" }}>
+                                        <div className="absolute" style={{ top: "18%", left: "50%", transform: "translateX(-50%)", width: 28, height: 28, borderRadius: "50%", background: "radial-gradient(circle, #fff5d0 0%, #facb74 60%, transparent 80%)", filter: "blur(0.5px)" }} />
+                                        <div className="absolute bottom-0 left-0 right-0" style={{ height: "50%", background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.7)), linear-gradient(90deg, #1a3a5f 0%, #0a1929 100%)" }} />
+                                      </div>
+                                    )}
                                   </div>
-                                  <p className="text-xs text-zinc-500 leading-relaxed">{body}</p>
+                                  <div className="px-4 pt-3.5 pb-4">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <span className="text-[13.5px] font-medium tracking-[-0.01em] text-white">{title}</span>
+                                      <span
+                                        className="relative inline-flex items-center justify-center w-4 h-4 rounded-full transition-all shrink-0"
+                                        style={
+                                          selected
+                                            ? { border: "1.5px solid #d4ff3a", background: "#d4ff3a" }
+                                            : { border: "1.5px solid rgba(255,255,255,0.28)" }
+                                        }
+                                        aria-hidden
+                                      >
+                                        {selected && <span className="absolute w-1.5 h-1.5 rounded-full" style={{ background: "#0a0e02" }} />}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11.5px] leading-[1.5] tracking-[-0.003em]" style={{ color: "rgba(255,255,255,0.46)" }}>{body}</p>
+                                  </div>
                                 </button>
                               );
                             })}
@@ -1527,55 +1767,116 @@ export default function CreatePage() {
                           )}
                         </div>
 
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium text-white mb-2">Captions</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setCc(true)}
-                              className={`p-3 rounded-xl border text-left transition-all ${cc ? "border-blue-500 bg-blue-500/10" : "border-zinc-800 hover:border-zinc-700"}`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${cc ? "border-blue-500" : "border-zinc-700"}`}>
-                                  {cc && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
-                                </div>
-                                <span className="text-sm font-medium text-white">With captions</span>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setCc(false)}
-                              className={`p-3 rounded-xl border text-left transition-all ${!cc ? "border-blue-500 bg-blue-500/10" : "border-zinc-800 hover:border-zinc-700"}`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${!cc ? "border-blue-500" : "border-zinc-700"}`}>
-                                  {!cc && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
-                                </div>
-                                <span className="text-sm font-medium text-white">No captions</span>
-                              </div>
-                            </button>
+                        <div>
+                          <div className="mb-3">
+                            <div className="flex items-baseline gap-2.5">
+                              <span className="font-mono text-[11px] text-zinc-700">04</span>
+                              <span className="text-[15px] font-medium tracking-[-0.01em] text-white">Captions</span>
+                            </div>
+                            <div className="text-[12.5px] mt-1 leading-[1.5] pl-[22px]" style={{ color: "rgba(255,255,255,0.46)" }}>Auto-synced burn-in. Editable after generation.</div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {(
+                              [
+                                { value: true, title: "With captions", desc: "Burned-in, auto-synced to voiceover", iconPath: "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" },
+                                { value: false, title: "No captions", desc: "Clean output, voice only", iconPath: "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z M9 9l6 6 M15 9l-6 6" },
+                              ] as const
+                            ).map(({ value, title, desc, iconPath }) => {
+                              const selected = cc === value;
+                              return (
+                                <button
+                                  key={String(value)}
+                                  type="button"
+                                  onClick={() => setCc(value)}
+                                  className="rounded-[12px] cursor-pointer flex items-center gap-3.5 px-[18px] py-4 transition-all hover:-translate-y-px text-left"
+                                  style={
+                                    selected
+                                      ? {
+                                          background: "linear-gradient(180deg, rgba(212,255,58,0.05), rgba(212,255,58,0.01)), #14141a",
+                                          border: "1px solid rgba(212,255,58,0.4)",
+                                          boxShadow: "0 0 0 1px rgba(212,255,58,0.2)",
+                                        }
+                                      : {
+                                          background: "#14141a",
+                                          border: "1px solid rgba(255,255,255,0.07)",
+                                        }
+                                  }
+                                >
+                                  <span
+                                    className="shrink-0 w-[38px] h-[38px] rounded-[10px] flex items-center justify-center"
+                                    style={
+                                      selected
+                                        ? {
+                                            background: "linear-gradient(135deg, rgba(212,255,58,0.15), rgba(212,255,58,0.04))",
+                                            border: "1px solid rgba(212,255,58,0.3)",
+                                            color: "#d4ff3a",
+                                          }
+                                        : {
+                                            background: "#1a1a22",
+                                            border: "1px solid rgba(255,255,255,0.07)",
+                                            color: "rgba(255,255,255,0.68)",
+                                          }
+                                    }
+                                  >
+                                    <svg className="w-[17px] h-[17px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d={iconPath} />
+                                    </svg>
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                      <span className="text-[13.5px] font-medium tracking-[-0.01em] text-white">{title}</span>
+                                      <span
+                                        className="relative inline-flex items-center justify-center w-3.5 h-3.5 rounded-full transition-all shrink-0"
+                                        style={
+                                          selected
+                                            ? { border: "1.5px solid #d4ff3a", background: "#d4ff3a" }
+                                            : { border: "1.5px solid rgba(255,255,255,0.28)" }
+                                        }
+                                        aria-hidden
+                                      >
+                                        {selected && <span className="absolute w-[5px] h-[5px] rounded-full" style={{ background: "#0a0e02" }} />}
+                                      </span>
+                                    </div>
+                                    <div className="text-[11.5px] leading-[1.45]" style={{ color: "rgba(255,255,255,0.46)" }}>{desc}</div>
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
 
-                      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/5">
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <div
+                        className="relative mt-8 flex flex-wrap items-center justify-between gap-3 pt-[22px]"
+                        style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
+                      >
+                        <span
+                          className="pointer-events-none absolute top-0 left-[30%] right-[30%] h-px"
+                          aria-hidden
+                          style={{ background: "linear-gradient(90deg, transparent, rgba(212,255,58,0.3), transparent)" }}
+                        />
+                        <div className="flex items-center gap-3.5 text-[11.5px]" style={{ color: "rgba(255,255,255,0.46)" }}>
                           <span className="inline-flex items-center gap-1.5">
-                            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="w-[13px] h-[13px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: "rgba(255,255,255,0.68)" }}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
-                            <span>~60 sec</span>
+                            <strong className="font-mono font-medium text-white text-[11px]">~{Math.max(60, Math.round(dur * 1.5))}s</strong> render
                           </span>
                           <span className="text-zinc-700">·</span>
-                          <span>1080p</span>
+                          <span className="inline-flex items-center gap-1.5"><strong className="font-mono font-medium text-white text-[11px]">4K</strong> UHD</span>
                           <span className="text-zinc-700">·</span>
-                          <span className="text-blue-400">Free</span>
+                          <span className="font-medium" style={{ color: "#d4ff3a" }}>Free</span>
                         </div>
                         <button
                           type="button"
                           onClick={submit}
                           disabled={!prompt.trim() || prompt.trim().length < 5 || submitting || !canGenerateByPlan}
-                          className="inline-flex items-center gap-2 bg-white text-black font-semibold px-6 py-3 rounded-xl hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          className="relative inline-flex items-center gap-2.5 px-5 py-3 rounded-[12px] text-[14px] font-medium tracking-[-0.01em] transition-all hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                          style={{
+                            background: "#d4ff3a",
+                            color: "#0a0e02",
+                            boxShadow: "0 0 0 1px rgba(212,255,58,0.3), 0 0 30px rgba(212,255,58,0.18), 0 4px 16px rgba(212,255,58,0.2)",
+                          }}
                         >
                           {submitting ? (
                             <>
@@ -1583,12 +1884,20 @@ export default function CreatePage() {
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                               </svg>
-                              Starting...
+                              Starting render
                             </>
                           ) : (
                             <>
-                              Generate
-                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z" /></svg>
+                              <svg className="w-[15px] h-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z" />
+                              </svg>
+                              Generate video
+                              <span
+                                className="font-mono text-[10.5px] px-1.5 py-0.5 rounded-[5px] font-medium ml-0.5"
+                                style={{ background: "rgba(10,14,2,0.2)", border: "1px solid rgba(10,14,2,0.15)" }}
+                              >
+                                ⌘↵
+                              </span>
                             </>
                           )}
                         </button>

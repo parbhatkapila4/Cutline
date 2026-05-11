@@ -221,8 +221,8 @@ export default function ContactPage() {
             <div className="px-8 sm:px-10 lg:px-12 py-6 border-t border-zinc-200 bg-white flex flex-col sm:flex-row flex-wrap items-center justify-center gap-8 sm:gap-12 text-sm">
               <div className="text-center sm:text-left">
                 <p className="text-zinc-500 mb-0.5">Work with us</p>
-                <a href="mailto:parbhat@parbhat.dev" className="font-medium text-zinc-900 hover:text-emerald-600 transition-colors">
-                  parbhat@parbhat.dev
+                <a href="mailto:parbhat@parbhat.work" className="font-medium text-zinc-900 hover:text-emerald-600 transition-colors">
+                  parbhat@parbhat.work
                 </a>
               </div>
             </div>
