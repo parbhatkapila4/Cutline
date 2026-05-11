@@ -1,10 +1,21 @@
 import Link from "next/link";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
+const SECTIONS = [
+  { id: "pipeline", label: "Pipeline: from sentence to video" },
+  { id: "stages", label: "What each pipeline stage does" },
+  { id: "tech", label: "What CUTLINE uses (tech stack)" },
+  { id: "models", label: "How to choose and change AI models" },
+  { id: "modes", label: "Slideshow vs Talking object" },
+  { id: "jobs", label: "How jobs run: submit, worker, poll" },
+  { id: "inputs", label: "Optional inputs you can send" },
+  { id: "env", label: "Environment variables" },
+];
+
 export default function HowPage() {
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex justify-start">
+      <div className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 py-4 flex justify-start bg-black/60 backdrop-blur-sm border-b border-white/5">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
@@ -14,43 +25,37 @@ export default function HowPage() {
         </Link>
       </div>
 
-      <main className="pt-20 pb-24">
-        <div className="max-w-4xl mx-auto px-6">
+      <main className="pt-24 pb-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[min(90vw,1760px)] mx-auto grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-10 lg:gap-14">
+
+          <aside className="lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto" aria-label="Page sections">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <h2 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-[0.16em] mb-3.5">On this page</h2>
+              <ul className="space-y-1.5 text-[13.5px]">
+                {SECTIONS.map(({ id, label }) => (
+                  <li key={id}>
+                    <a href={`#${id}`} className="block text-zinc-400 hover:text-white transition-colors leading-snug">
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+
+          <div className="min-w-0">
 
           <section className="mb-16">
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white mb-4">
               How CUTLINE works
             </h1>
-            <p className="text-xl text-zinc-400 leading-relaxed max-w-2xl mb-6">
+            <p className="text-xl text-zinc-400 leading-relaxed mb-6">
               You give one sentence describing what you want the video to do-for example, “Explain why coffee makes you feel awake in 30 seconds” or “A short product teaser for our new API.” CUTLINE turns that into a finished short video: script, voiceover, images, motion, and subtitles. No templates, no storyboards; the system acts as both director and editor.
             </p>
-            <p className="text-zinc-500 text-sm max-w-2xl">
-              This page walks through the pipeline, the tech behind it, how to pick models, the two video modes, and how jobs are run in the background. Use the links below to jump to a section.
+            <p className="text-zinc-500 text-sm">
+              This page walks through the pipeline, the tech behind it, how to pick models, the two video modes, and how jobs are run in the background. Use the side menu to jump to a section.
             </p>
           </section>
-
-
-          <nav className="mb-20 rounded-2xl border border-white/10 bg-white/2 p-6" aria-label="Page sections">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">On this page</h2>
-            <ul className="space-y-2 text-sm">
-              {[
-                { id: "pipeline", label: "Pipeline: from sentence to video" },
-                { id: "stages", label: "What each pipeline stage does" },
-                { id: "tech", label: "What CUTLINE uses (tech stack)" },
-                { id: "models", label: "How to choose and change AI models" },
-                { id: "modes", label: "Slideshow vs Talking object" },
-                { id: "jobs", label: "How jobs run: submit, worker, poll" },
-                { id: "inputs", label: "Optional inputs you can send" },
-                { id: "env", label: "Environment variables" },
-              ].map(({ id, label }) => (
-                <li key={id}>
-                  <a href={`#${id}`} className="text-zinc-400 hover:text-white transition-colors">
-                    {label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
 
 
           <section className="mb-20" id="pipeline">
@@ -168,7 +173,7 @@ export default function HowPage() {
             <p className="text-zinc-400 mb-8 leading-relaxed">
               A quick reference for the main technologies and services. All of these are configurable via environment variables or (where noted) per-job options.
             </p>
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-2 xl:grid-cols-2 gap-4">
               {[
                 { name: "Next.js 16", role: "The app and API: App Router, React 19, API routes for generate, assets, and job status. The web UI and the Remotion composition share the same stack." },
                 { name: "OpenRouter", role: "One API for many LLMs. Used for Intent, Narrative, Shots, Script, image-query derivation, and asset analysis. You set a default model in .env and can override it per job with the Text model dropdown or the textModel API field." },
@@ -334,6 +339,7 @@ export default function HowPage() {
             </div>
           </section>
 
+          </div>
         </div>
       </main>
     </div>
