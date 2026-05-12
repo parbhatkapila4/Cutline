@@ -53,17 +53,6 @@ function WarpShaderHero({ disableWarp = false }: WarpShaderHeroProps) {
       />
 
 
-      <div
-        className="absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.45) 1px, transparent 1px)",
-          backgroundSize: "56px 56px",
-        }}
-        aria-hidden
-      />
-
-
       {showWarp ? (
         <div className="absolute inset-0 z-1 min-h-full w-full opacity-65 mix-blend-screen">
           <Warp
@@ -73,7 +62,7 @@ function WarpShaderHero({ disableWarp = false }: WarpShaderHeroProps) {
             distortion={0.22}
             swirl={0.7}
             swirlIterations={10}
-            shape="checks"
+            shape="stripes"
             shapeScale={0.1}
             scale={1}
             rotation={0}

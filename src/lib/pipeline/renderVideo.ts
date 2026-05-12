@@ -121,7 +121,7 @@ export function runRemotionRender(
     );
   }
 
-  const RENDER_TIMEOUT_MS = 300_000;
+  const RENDER_TIMEOUT_MS = 600_000;
   const result = spawnSync(
     process.execPath,
     [
@@ -132,6 +132,23 @@ export function runRemotionRender(
       outputPath,
       "--props",
       propsPath,
+      "--codec",
+      "h264",
+      "--crf",
+      "15",
+      "--jpeg-quality",
+      "100",
+      "--pixel-format",
+      "yuv420p",
+      "--color-space",
+      "bt709",
+      "--audio-bitrate",
+      "192k",
+      "--audio-codec",
+      "aac",
+      "--enforce-audio-track",
+      "--concurrency",
+      "1",
     ],
     {
       cwd,
