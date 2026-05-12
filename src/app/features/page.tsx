@@ -1,10 +1,22 @@
 import Link from "next/link";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
+const SECTIONS = [
+  { id: "different", label: "What makes CUTLINE different" },
+  { id: "one-sentence", label: "One sentence to full video" },
+  { id: "pipeline", label: "End-to-end pipeline (no handoffs)" },
+  { id: "modes", label: "Two output modes: slideshow and talking object" },
+  { id: "script-voice", label: "AI script and natural voiceover" },
+  { id: "visuals", label: "Image sourcing and motion" },
+  { id: "subtitles", label: "Auto subtitles synced to voice" },
+  { id: "optional", label: "Optional inputs: duration, assets, brand, model" },
+  { id: "background", label: "Background jobs and polling" },
+];
+
 export default function FeaturesPage() {
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex justify-start">
+      <div className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 py-4 flex justify-start bg-black/60 backdrop-blur-sm border-b border-white/5">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
@@ -14,43 +26,37 @@ export default function FeaturesPage() {
         </Link>
       </div>
 
-      <main className="pt-20 pb-24">
-        <div className="max-w-4xl mx-auto px-6">
+      <main className="pt-24 pb-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[min(90vw,1760px)] mx-auto grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-10 lg:gap-14">
+
+          <aside className="lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto" aria-label="Page sections">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <h2 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-[0.16em] mb-3.5">On this page</h2>
+              <ul className="space-y-1.5 text-[13.5px]">
+                {SECTIONS.map(({ id, label }) => (
+                  <li key={id}>
+                    <a href={`#${id}`} className="block text-zinc-400 hover:text-white transition-colors leading-snug">
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+
+          <div className="min-w-0">
 
           <section className="mb-16">
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white mb-4">
               CUTLINE features
             </h1>
-            <p className="text-xl text-zinc-400 leading-relaxed max-w-2xl mb-6">
+            <p className="text-xl text-zinc-400 leading-relaxed mb-6">
               CUTLINE turns a single sentence into a finished short video: script, voiceover, images, motion, and subtitles. No templates, no storyboards. The system acts as both director and editor. This page explains what it does, what makes it different, and what you can control.
             </p>
-            <p className="text-zinc-500 text-sm max-w-2xl">
-              All of the following is a factual description of how CUTLINE works. Use the links below to jump to a section.
+            <p className="text-zinc-500 text-sm">
+              All of the following is a factual description of how CUTLINE works. Use the side menu to jump to a section.
             </p>
           </section>
-
-          <nav className="mb-20 rounded-2xl border border-white/10 bg-white/2 p-6" aria-label="Page sections">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">On this page</h2>
-            <ul className="space-y-2 text-sm">
-              {[
-                { id: "different", label: "What makes CUTLINE different" },
-                { id: "one-sentence", label: "One sentence to full video" },
-                { id: "pipeline", label: "End-to-end pipeline (no handoffs)" },
-                { id: "modes", label: "Two output modes: slideshow and talking object" },
-                { id: "script-voice", label: "AI script and natural voiceover" },
-                { id: "visuals", label: "Image sourcing and motion" },
-                { id: "subtitles", label: "Auto subtitles synced to voice" },
-                { id: "optional", label: "Optional inputs: duration, assets, brand, model" },
-                { id: "background", label: "Background jobs and polling" },
-              ].map(({ id, label }) => (
-                <li key={id}>
-                  <a href={`#${id}`} className="text-zinc-400 hover:text-white transition-colors">
-                    {label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
 
           <section className="mb-20" id="different">
             <h2 className="text-2xl font-semibold text-white mb-4">
@@ -163,6 +169,7 @@ export default function FeaturesPage() {
             </p>
           </section>
 
+          </div>
         </div>
       </main>
     </div>
