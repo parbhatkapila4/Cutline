@@ -10,12 +10,12 @@ export const ASPECT_RATIOS = [
 export type AspectRatio = (typeof ASPECT_RATIOS)[number];
 
 const DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
-  "16:9": { width: 1920, height: 1080 },
-  "9:16": { width: 1080, height: 1920 },
-  "1:1": { width: 1080, height: 1080 },
-  "4:5": { width: 864, height: 1080 },
-  "3:2": { width: 1620, height: 1080 },
-  "21:9": { width: 2520, height: 1080 },
+  "16:9": { width: 3840, height: 2160 },
+  "9:16": { width: 2160, height: 3840 },
+  "1:1": { width: 2160, height: 2160 },
+  "4:5": { width: 1728, height: 2160 },
+  "3:2": { width: 3240, height: 2160 },
+  "21:9": { width: 5040, height: 2160 },
 };
 
 export function getDimensionsForAspectRatio(
