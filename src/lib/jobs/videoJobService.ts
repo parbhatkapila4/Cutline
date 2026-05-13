@@ -52,14 +52,26 @@ export async function createVideoJob(insert: VideoJobInsert): Promise<{ id: stri
   return { id: (row as { id: string }).id };
 }
 
+const UUID_RE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 export async function getVideoJobById(jobId: string): Promise<VideoJob | null> {
   const sql = getSql();
-  const rows = (await sql`
-    SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id
-    FROM video_jobs
-    WHERE id = ${jobId}::uuid
-    LIMIT 1
-  `) as VideoJobRow[];
+  const rows = UUID_RE.test(jobId)
+    ? ((await sql`
+        SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id
+        FROM video_jobs
+        WHERE id = ${jobId}::uuid OR queue_job_id = ${jobId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `) as VideoJobRow[])
+    : ((await sql`
+        SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id
+        FROM video_jobs
+        WHERE queue_job_id = ${jobId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `) as VideoJobRow[]);
   const row = rows[0];
   if (!row || typeof row !== "object") return null;
   return mapRow(row as VideoJobRow);
