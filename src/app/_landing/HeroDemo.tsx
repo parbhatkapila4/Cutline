@@ -8,12 +8,15 @@ type Scene = {
   caption: string;
 };
 
+const UNSPLASH = (id: string) =>
+  `https://images.unsplash.com/photo-${id}?w=1920&h=1080&fit=crop&crop=entropy&q=90&auto=format&fm=jpg`;
+
 const SCENES: Scene[] = [
-  { img: "/hero/1.jpg", caption: "One sentence in." },
-  { img: "/hero/3.jpg", caption: "Script. Voice. Captions." },
-  { img: "/hero/5.jpg", caption: "B-roll, timed to every word." },
-  { img: "/hero/8.jpg", caption: "Music, mixed in one pass." },
-  { img: "/hero/12.jpg", caption: "One finished MP4." },
+  { img: UNSPLASH("1455390582262-044cdead277a"), caption: "One sentence in." },
+  { img: UNSPLASH("1590602847861-f357a9332bbc"), caption: "Script. Voice. Captions." },
+  { img: UNSPLASH("1485846234645-a62644f84728"), caption: "B-roll, timed to every word." },
+  { img: UNSPLASH("1493863641943-9b68992a8d07"), caption: "Music, mixed in one pass." },
+  { img: UNSPLASH("1574717024653-61fd2cf4d44d"), caption: "One finished MP4." },
 ];
 
 const SCENE_DURATION_MS = 2400;
@@ -28,6 +31,13 @@ export function HeroDemo() {
     return () => window.clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    SCENES.forEach((s) => {
+      const img = new window.Image();
+      img.src = s.img;
+    });
+  }, []);
+
   const current = SCENES[idx];
 
   return (
@@ -35,14 +45,15 @@ export function HeroDemo() {
       <AnimatePresence mode="sync">
         <motion.div
           key={idx}
-          initial={{ opacity: 0, scale: 1.06 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 1.02 }}
+          initial={{ opacity: 0, scale: 1 }}
+          animate={{ opacity: 1, scale: 1.04 }}
+          exit={{ opacity: 0, scale: 1.05 }}
           transition={{
             opacity: { duration: 0.55 },
             scale: { duration: SCENE_DURATION_MS / 1000, ease: "linear" },
           }}
           className="absolute inset-0"
+          style={{ willChange: "transform, opacity" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -50,6 +61,9 @@ export function HeroDemo() {
             alt=""
             className="w-full h-full object-cover"
             draggable={false}
+            decoding="async"
+            loading="eager"
+            style={{ imageRendering: "auto" }}
           />
         </motion.div>
       </AnimatePresence>
