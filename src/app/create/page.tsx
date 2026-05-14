@@ -482,25 +482,23 @@ export default function CreatePage() {
     <div className="h-dvh max-h-dvh flex flex-col bg-black text-white font-sans relative overflow-hidden">
       <WarpShaderHero />
 
-      <nav className="relative z-10 shrink-0 flex items-center justify-between px-6 lg:px-10 py-3">
-        <Link
-          href="/"
-          className="group inline-flex items-center gap-2.5 shrink-0 py-0.5 rounded-xl px-1 -mx-1 transition-colors hover:bg-white/3"
-        >
-          <CreateBrandMark className="transition-transform duration-300 group-hover:-rotate-3" />
-          <span className="flex flex-col leading-none">
-            <span className="text-[15px] font-semibold tracking-tight text-white">
-              CUTLINE
+      {(busy || done) && (
+        <nav className="relative z-10 shrink-0 flex items-center justify-between px-6 lg:px-10 py-3">
+          <Link
+            href="/"
+            className="group inline-flex items-center gap-2.5 shrink-0 py-0.5 rounded-xl px-1 -mx-1 transition-colors hover:bg-white/3"
+          >
+            <CreateBrandMark className="transition-transform duration-300 group-hover:-rotate-3" />
+            <span className="flex flex-col leading-none">
+              <span className="text-[15px] font-semibold tracking-tight text-white">CUTLINE</span>
+              <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500 group-hover:text-zinc-300 transition-colors hidden sm:inline">Studio</span>
             </span>
-            <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500 group-hover:text-zinc-300 transition-colors hidden sm:inline">
-              Studio
-            </span>
-          </span>
-        </Link>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Dashboard</Link>
-        </div>
-      </nav>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard" className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Dashboard</Link>
+          </div>
+        </nav>
+      )}
 
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain">
         <AnimatePresence mode="wait">
@@ -1072,86 +1070,268 @@ export default function CreatePage() {
           )}
 
           {!busy && !done && (
-            <motion.main key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="relative min-h-full flex flex-col items-center justify-center px-6 lg:px-10 py-6 sm:py-8">
-              <div className="w-full max-w-[min(1660px,96vw)] mx-auto">
+            <motion.main
+              key="form"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="relative min-h-full px-4 sm:px-6 py-5 sm:py-7"
+            >
+              <div className="w-full max-w-[1240px] mx-auto">
                 <motion.div
-                  initial={{ opacity: 0, y: 15 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="relative rounded-[24px] overflow-hidden"
+                  transition={{ delay: 0.08 }}
+                  className="relative rounded-[16px] overflow-hidden"
                   style={{
-                    background: "#0d0d10",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                    boxShadow: "0 0 0 1px rgba(0,0,0,0.5) inset, 0 1px 0 rgba(255,255,255,0.03) inset, 0 40px 100px -20px rgba(0,0,0,0.6), 0 0 80px rgba(212,255,58,0.02)",
+                    background: "#111111",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    boxShadow: "0 24px 60px -20px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.3)",
                   }}
                 >
-                  <div className="grid md:grid-cols-[300px_1fr] xl:grid-cols-[340px_1fr] 2xl:grid-cols-[380px_1fr]">
-                    <div
-                      className="p-6 md:p-7 border-b md:border-b-0 md:border-r flex flex-col gap-7"
-                      style={{
-                        borderColor: "rgba(255,255,255,0.04)",
-                        background: "linear-gradient(180deg, rgba(255,255,255,0.012), transparent 200px)",
-                      }}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10.5px] font-medium tracking-[0.18em] uppercase text-zinc-500">
-                            Your images
-                          </span>
-                          <span className="text-[10.5px] font-mono text-zinc-700 tabular-nums">{imgs.length} / 5</span>
-                        </div>
-                      <div
-                        onDragOver={(e) => { e.preventDefault(); }}
-                        onDrop={(e) => { e.preventDefault(); const f = Array.from(e.dataTransfer.files).filter((x) => x.type.startsWith("image/")); setImgs((prev) => prev.concat(f).slice(0, 5)); }}
-                        onClick={() => fileRef.current?.click()}
-                        className="relative rounded-[14px] cursor-pointer transition-all overflow-hidden text-center px-4 pt-6 pb-5 group"
-                        style={{
-                          background: "radial-gradient(circle at 50% 0%, rgba(212,255,58,0.04), transparent 70%), rgba(255,255,255,0.012)",
-                          border: "1.5px dashed rgba(255,255,255,0.1)",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(212,255,58,0.4)"; e.currentTarget.style.background = "radial-gradient(circle at 50% 0%, rgba(212,255,58,0.08), transparent 70%), rgba(255,255,255,0.025)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.background = "radial-gradient(circle at 50% 0%, rgba(212,255,58,0.04), transparent 70%), rgba(255,255,255,0.012)"; }}
-                      >
-                        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFile} />
+                  <span
+                    className="pointer-events-none absolute top-0 left-0 right-0 h-px z-[1]"
+                    aria-hidden
+                    style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent)" }}
+                  />
+
+                  <header
+                    className="relative flex items-center justify-between gap-4 px-5 py-3.5"
+                    style={{
+                      borderBottom: "1px solid rgba(255,255,255,0.06)",
+                      background: "linear-gradient(180deg, rgba(255,255,255,0.012), transparent)",
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Link href="/" className="group inline-flex items-center justify-center shrink-0">
                         <span
-                          className="inline-flex items-center justify-center w-9 h-9 rounded-[10px] mx-auto mb-3 text-white/90"
+                          className="relative inline-flex items-center justify-center w-[22px] h-[22px] rounded-[6px]"
                           style={{
-                            background: "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))",
-                            border: "1px solid rgba(255,255,255,0.07)",
-                            boxShadow: "0 1px 0 rgba(255,255,255,0.05) inset",
+                            background: "linear-gradient(180deg, #ffffff, #d4d4d4)",
+                            boxShadow: "0 1px 0 rgba(255,255,255,0.4) inset, 0 1px 2px rgba(0,0,0,0.4)",
                           }}
+                          aria-hidden
                         >
-                          <svg className="w-[17px] h-[17px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                          <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 ml-[2px]" aria-hidden>
+                            <path d="M2 1.5L10 6L2 10.5z" fill="#0a0a0a" />
                           </svg>
                         </span>
-                        <p className="text-[13px] font-medium text-white tracking-[-0.005em] mb-1">Drop images or click</p>
-                        <p className="text-[11px] font-mono text-zinc-500">optional · max 5</p>
-                      </div>
-                      {imgUrls.length > 0 && (
-                        <div className="mt-3 grid grid-cols-3 gap-2">
-                          {imgUrls.map((u, i) => (
-                            <div key={u} className="relative aspect-square rounded-lg overflow-hidden bg-zinc-900 ring-1 ring-white/10">
-                              <img src={u} alt="" className="w-full h-full object-cover" />
-                              <button onClick={(e) => { e.stopPropagation(); rmImg(i); }} className="absolute top-1 right-1 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-white hover:bg-rose-500 transition-colors">
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                        <p className="text-[11px] text-zinc-500 mt-3 leading-[1.55] px-0.5">
-                          No images? We&rsquo;ll find visuals from the web. Or add your own — we use them first.
-                        </p>
-                      </div>
+                      </Link>
+                      <span className="text-[13px] font-medium tracking-[-0.005em] text-[#ededed]">Cutline</span>
+                      <span className="text-[#3a3a3a] text-[13px] mx-1">/</span>
+                      <input
+                        defaultValue="Untitled project"
+                        className="bg-transparent border border-transparent outline-none text-[13px] text-zinc-400 px-2 py-0.5 rounded-md transition-all w-[200px] truncate hover:bg-[#1c1c1c] hover:text-[#ededed] focus:bg-[#1c1c1c] focus:text-[#ededed] focus:border-[rgba(255,255,255,0.14)]"
+                        style={{ fontFamily: "inherit" }}
+                      />
+                      <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-zinc-500 ml-1.5">
+                        <span className="relative inline-flex" aria-hidden>
+                          <span className="w-[5px] h-[5px] rounded-full bg-[#4ec9a0]" style={{ boxShadow: "0 0 0 3px rgba(78,201,160,0.15)" }} />
+                        </span>
+                        Saved
+                      </span>
+                    </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10.5px] font-medium tracking-[0.18em] uppercase text-zinc-500">
-                            Platform
-                          </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        title="Search"
+                        className="hidden sm:flex w-[30px] h-[30px] items-center justify-center rounded-[7px] text-zinc-500 hover:text-white hover:bg-[#1c1c1c] transition-colors border border-transparent hover:border-[rgba(255,255,255,0.09)]"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10 17a7 7 0 110-14 7 7 0 010 14z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        title="History"
+                        className="hidden sm:flex w-[30px] h-[30px] items-center justify-center rounded-[7px] text-zinc-500 hover:text-white hover:bg-[#1c1c1c] transition-colors border border-transparent hover:border-[rgba(255,255,255,0.09)]"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2M3 12a9 9 0 109-9 9.74 9.74 0 00-6.74 2.74L3 8M3 3v5h5" />
+                        </svg>
+                      </button>
+                      <Link
+                        href="/dashboard"
+                        title="Dashboard"
+                        className="hidden sm:flex w-[30px] h-[30px] items-center justify-center rounded-[7px] text-zinc-500 hover:text-white hover:bg-[#1c1c1c] transition-colors border border-transparent hover:border-[rgba(255,255,255,0.09)]"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h7v7H3zM14 4.5h7v4h-7zM14 12.5h7v7h-7zM3 15.5h7v4H3z" />
+                        </svg>
+                      </Link>
+                      <div
+                        title="Account"
+                        className="ml-1.5 inline-flex items-center justify-center w-[28px] h-[28px] rounded-full text-[10.5px] font-medium text-[#ededed] cursor-pointer transition-transform hover:scale-105"
+                        style={{
+                          background: "linear-gradient(135deg, #5a5a5a, #2a2a2a)",
+                          border: "1px solid rgba(255,255,255,0.09)",
+                        }}
+                      >
+                        PK
+                      </div>
+                    </div>
+                  </header>
+
+                  <div
+                    className="px-7 pt-6 pb-5 flex items-end justify-between gap-5"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <h1 className="text-[19px] font-semibold tracking-[-0.015em] text-[#ededed] m-0 mb-1">Create a video</h1>
+                      <p className="text-[13px] text-zinc-500 m-0 leading-[1.5]">Fill out the details below and we&rsquo;ll handle the rest — script, voice, visuals, edit.</p>
+                    </div>
+                    {(() => {
+                      const filled =
+                        (prompt.trim().length > 10 ? 1 : 0) +
+                        1 + 1 + 1 + 1;
+                      const pct = (filled / 5) * 100;
+                      return (
+                        <div className="hidden sm:flex items-center gap-2.5 text-[11.5px] text-zinc-500 shrink-0">
+                          <span className="font-mono text-[11px] text-zinc-300 tabular-nums">{filled} / 5 set</span>
+                          <div className="w-[80px] h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                            <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${pct}%`, background: "#4ec9a0" }} />
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-1.5">
+                      );
+                    })()}
+                  </div>
+
+                  <div className="px-7 py-7 flex flex-col gap-8">
+
+                    <div className="flex flex-col gap-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Describe your video</h2>
+                          <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">Be specific about topic, tone, style, and audience.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={suggest}
+                          disabled={suggesting || prompt.trim().split(/\s+/).filter(Boolean).length <= 10}
+                          className="shrink-0 inline-flex items-center gap-1.5 text-[11.5px] px-2.5 py-1 rounded-[7px] transition-all disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300 hover:text-white hover:-translate-y-px"
+                          style={{
+                            background: "transparent",
+                            border: "1px solid rgba(255,255,255,0.09)",
+                          }}
+                          onMouseEnter={(e) => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = "#1c1c1c"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; } }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.09)"; }}
+                        >
+                          {suggesting ? (
+                            <>
+                              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Suggesting
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              </svg>
+                              Suggest prompt
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div
+                        className="relative rounded-[10px] px-4 pt-3.5 pb-3 transition-all focus-within:[border-color:rgba(255,255,255,0.22)] focus-within:bg-[#1c1c1c] focus-within:[box-shadow:0_0_0_4px_rgba(255,255,255,0.025)]"
+                        style={{
+                          background: "#161616",
+                          border: "1px solid rgba(255,255,255,0.09)",
+                        }}
+                      >
+                        <textarea
+                          value={prompt}
+                          onChange={(e) => setPrompt(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+                          placeholder="e.g. Create a 30-second explainer about how solar panels work, professional tone with upbeat background music"
+                          rows={3}
+                          className="block w-full bg-transparent border-0 outline-none resize-none text-[13.5px] leading-[1.55] tracking-[-0.005em] text-[#ededed] placeholder:text-zinc-600 p-0 min-h-[76px]"
+                          style={{ fontFamily: "inherit" }}
+                        />
+                        <div className="flex items-center justify-between gap-2 pt-3 mt-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                          <div className="flex flex-wrap gap-1.5 min-w-0 flex-1">
+                            {PROMPT_CHIPS.map(({ label, prompt: p }) => (
+                              <button
+                                key={label}
+                                type="button"
+                                onClick={() => setPrompt(p)}
+                                className="px-2.5 py-[3px] rounded-full text-[11.5px] tracking-[-0.003em] transition-all text-zinc-300 hover:text-white hover:-translate-y-px"
+                                style={{
+                                  background: "rgba(255,255,255,0.03)",
+                                  border: "1px solid rgba(255,255,255,0.09)",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = "#232323"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.09)"; }}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <span className="shrink-0 font-mono text-[11px] tabular-nums text-zinc-500">{prompt.length} / 500</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em] flex items-center gap-2">
+                            Your images
+                            <span className="text-[11px] font-normal text-zinc-500 px-1.5 py-px rounded-full" style={{ background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.06)" }}>Optional</span>
+                          </h2>
+                          <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">No images? We&rsquo;ll find visuals from the web. Add your own to use them first.</p>
+                        </div>
+                        <span className="shrink-0 font-mono text-[11px] tabular-nums text-zinc-500">{imgs.length} / 5</span>
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap">
+                        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFile} />
+                        <button
+                          type="button"
+                          onClick={() => fileRef.current?.click()}
+                          className="w-16 h-16 rounded-[9px] cursor-pointer flex flex-col items-center justify-center gap-[3px] text-[10px] text-zinc-500 hover:text-white transition-all hover:-translate-y-px"
+                          style={{
+                            background: "#161616",
+                            border: "1px dashed rgba(255,255,255,0.14)",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#1c1c1c"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.22)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "#161616"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                          </svg>
+                          Add
+                        </button>
+                        {imgUrls.map((u, i) => (
+                          <div key={u} className="relative w-16 h-16 rounded-[9px] overflow-hidden bg-zinc-900 ring-1 ring-white/10">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={u} alt="" className="w-full h-full object-cover" />
+                            <button onClick={(e) => { e.stopPropagation(); rmImg(i); }} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/80 rounded-full flex items-center justify-center text-white hover:bg-rose-500 transition-colors">
+                              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+                        ))}
+                        {Array.from({ length: Math.max(0, 5 - imgUrls.length) }).map((_, i) => (
+                          <div
+                            key={`slot-${i}`}
+                            className="w-16 h-16 rounded-[9px] opacity-[0.35]"
+                            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.06)" }}
+                            aria-hidden
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px]">
+                      <div className="flex flex-col gap-2.5">
+                        <div>
+                          <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Platform</h2>
+                          <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">Where this video will live.</p>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
                           {PLATFORM_OPTIONS.map((p) => {
                             const selected = platform === p;
                             const label = p === "general" ? "General" : p === "youtube_shorts" ? "Shorts" : p === "twitter" ? "X" : "LinkedIn";
@@ -1160,23 +1340,24 @@ export default function CreatePage() {
                                 key={p}
                                 type="button"
                                 onClick={() => setPlatform(p)}
-                                className="flex items-center justify-center gap-2 min-h-[38px] px-3 py-2 rounded-[9px] text-[12.5px] tracking-[-0.005em] transition-all"
+                                className="flex items-center justify-center gap-1.5 px-2 py-[9px] rounded-[8px] text-[12px] tracking-[-0.003em] transition-all"
                                 style={
                                   selected
                                     ? {
-                                        background: "rgba(212,255,58,0.06)",
-                                        border: "1px solid rgba(212,255,58,0.3)",
-                                        color: "rgba(255,255,255,0.95)",
+                                        background: "#232323",
+                                        border: "1px solid rgba(255,255,255,0.22)",
+                                        color: "#ededed",
                                         fontWeight: 500,
+                                        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
                                       }
                                     : {
-                                        background: "rgba(255,255,255,0.02)",
-                                        border: "1px solid rgba(255,255,255,0.06)",
-                                        color: "rgba(255,255,255,0.55)",
+                                        background: "#161616",
+                                        border: "1px solid rgba(255,255,255,0.09)",
+                                        color: "rgba(255,255,255,0.72)",
                                       }
                                 }
                               >
-                                <span style={{ color: selected ? "#d4ff3a" : "rgba(255,255,255,0.4)" }}>{PLATFORM_ICONS[p]}</span>
+                                <span style={{ color: selected ? "#ededed" : "rgba(255,255,255,0.48)" }}>{PLATFORM_ICONS[p]}</span>
                                 <span>{label}</span>
                               </button>
                             );
@@ -1184,17 +1365,16 @@ export default function CreatePage() {
                         </div>
                       </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10.5px] font-medium tracking-[0.18em] uppercase text-zinc-500">
-                            Aspect ratio
-                          </span>
+                      <div className="flex flex-col gap-2.5">
+                        <div>
+                          <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Aspect ratio</h2>
+                          <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">Frame size for the output.</p>
                         </div>
-                        <div className="grid grid-cols-3 gap-1.5">
+                        <div className="grid grid-cols-6 gap-1.5">
                           {ASPECT_RATIOS.map((r) => {
                             const selected = aspectRatio === r;
                             const [w, h] = r.split(":").map(Number);
-                            const maxBox = 14;
+                            const maxBox = 18;
                             const scale = Math.min(maxBox / w, maxBox / h);
                             const boxW = Math.max(7, Math.round(w * scale));
                             const boxH = Math.max(7, Math.round(h * scale));
@@ -1203,28 +1383,29 @@ export default function CreatePage() {
                                 key={r}
                                 type="button"
                                 onClick={() => setAspectRatio(r)}
-                                className="flex items-center justify-center gap-1.5 min-h-[34px] px-2 rounded-[8px] font-mono text-[11px] tabular-nums transition-all"
+                                className="flex flex-col items-center justify-center gap-1.5 px-1 pt-2.5 pb-2 rounded-[8px] font-mono text-[10.5px] tabular-nums transition-all"
                                 style={
                                   selected
                                     ? {
-                                        background: "rgba(212,255,58,0.08)",
-                                        border: "1px solid rgba(212,255,58,0.35)",
-                                        color: "#d4ff3a",
+                                        background: "#232323",
+                                        border: "1px solid rgba(255,255,255,0.22)",
+                                        color: "#ededed",
+                                        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
                                       }
                                     : {
-                                        background: "rgba(255,255,255,0.02)",
-                                        border: "1px solid rgba(255,255,255,0.06)",
-                                        color: "rgba(255,255,255,0.55)",
+                                        background: "#161616",
+                                        border: "1px solid rgba(255,255,255,0.09)",
+                                        color: "rgba(255,255,255,0.72)",
                                       }
                                 }
                               >
                                 <span
-                                  className="inline-block rounded-[1.5px] shrink-0"
+                                  className="block rounded-[1.5px]"
                                   style={{
                                     width: boxW,
                                     height: boxH,
-                                    border: "1.2px solid currentColor",
-                                    opacity: selected ? 1 : 0.6,
+                                    border: "1px solid currentColor",
+                                    opacity: selected ? 1 : 0.55,
                                   }}
                                   aria-hidden
                                 />
@@ -1236,690 +1417,509 @@ export default function CreatePage() {
                       </div>
                     </div>
 
-                    <div className="p-6 sm:p-9 flex flex-col">
-                      <div className="flex-1 flex flex-col gap-8">
-
-                        <div>
-                          <div className="inline-flex items-center gap-2 text-[11px] font-medium tracking-[0.14em] uppercase mb-2" style={{ color: "#d4ff3a" }}>
-                            <span className="block w-[18px] h-px" style={{ background: "#d4ff3a" }} />
-                            Studio
-                          </div>
-                          <h1 className="text-[28px] font-medium tracking-[-0.025em] leading-[1.1] m-0 mb-2 text-white">
-                            Make something{" "}
-                            <em
-                              className="not-italic"
-                              style={{
-                                fontFamily: "Georgia, 'Times New Roman', ui-serif, serif",
-                                fontStyle: "italic",
-                                fontWeight: 400,
-                                color: "#d4ff3a",
-                                letterSpacing: "-0.02em",
-                              }}
-                            >
-                              worth
-                            </em>{" "}
-                            watching.
-                          </h1>
-                          <p className="text-[13.5px] leading-[1.5] tracking-[-0.005em] max-w-[560px]" style={{ color: "rgba(255,255,255,0.46)" }}>
-                            Describe the video in one sentence. We&rsquo;ll write the script, find the visuals, and edit it together.
-                          </p>
+                    <div className="flex flex-col gap-2.5">
+                      <div>
+                        <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Video length</h2>
+                        <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">{DURATION_MIN}–{DURATION_MAX} seconds. Talking videos over 8s use multiple clips.</p>
+                      </div>
+                      <div
+                        className="rounded-[10px] px-[18px] py-4 flex items-center gap-[18px]"
+                        style={{
+                          background: "#161616",
+                          border: "1px solid rgba(255,255,255,0.09)",
+                        }}
+                      >
+                        <div className="flex items-baseline gap-1.5 min-w-[88px]">
+                          <span className="font-medium tabular-nums leading-none text-[#ededed]" style={{ fontSize: "26px", letterSpacing: "-1.2px" }}>
+                            {dur}
+                          </span>
+                          <span className="text-[12px] text-zinc-500">sec</span>
                         </div>
-
-                        <div>
-                          <div className="flex items-start justify-between gap-3 mb-3">
-                            <div>
-                              <div className="flex items-baseline gap-2.5">
-                                <span className="font-mono text-[11px] text-zinc-700">01</span>
-                                <span className="text-[15px] font-medium tracking-[-0.01em] text-white">Describe your video</span>
-                              </div>
-                              <div className="text-[12.5px] mt-1 leading-[1.5] pl-[22px]" style={{ color: "rgba(255,255,255,0.46)" }}>Be specific about topic, tone, style, audience.</div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={suggest}
-                              disabled={suggesting || prompt.trim().split(/\s+/).filter(Boolean).length <= 10}
-                              className="shrink-0 inline-flex items-center gap-1.5 text-[11.5px] px-2.5 py-1.5 rounded-[8px] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        <div className="relative flex-1">
+                          <input
+                            type="range"
+                            min={DURATION_MIN}
+                            max={DURATION_MAX}
+                            value={dur}
+                            onChange={(e) => setDur(Number(e.target.value))}
+                            className="absolute inset-0 w-full h-1 opacity-0 cursor-pointer z-10"
+                            aria-label="Video length"
+                          />
+                          <div className="relative h-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+                            <div
+                              className="absolute left-0 top-0 h-full rounded-full"
                               style={{
-                                background: "rgba(255,255,255,0.03)",
-                                border: "1px solid rgba(255,255,255,0.07)",
-                                color: "rgba(255,255,255,0.68)",
+                                width: `${((dur - DURATION_MIN) / (DURATION_MAX - DURATION_MIN)) * 100}%`,
+                                background: "linear-gradient(90deg, rgba(255,255,255,0.85), #ededed)",
                               }}
-                              onMouseEnter={(e) => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = "rgba(212,255,58,0.06)"; e.currentTarget.style.borderColor = "rgba(212,255,58,0.3)"; e.currentTarget.style.color = "#d4ff3a"; } }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.68)"; }}
-                            >
-                              {suggesting ? (
-                                <>
-                                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                  </svg>
-                                  Suggesting
-                                </>
-                              ) : (
-                                <>
-                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                  </svg>
-                                  Suggest prompt
-                                </>
-                              )}
-                            </button>
+                            />
+                            <div
+                              className="absolute top-1/2 w-[14px] h-[14px] rounded-full bg-white"
+                              style={{
+                                left: `${((dur - DURATION_MIN) / (DURATION_MAX - DURATION_MIN)) * 100}%`,
+                                transform: "translate(-50%, -50%)",
+                                border: "1px solid rgba(0,0,0,0.3)",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.4)",
+                              }}
+                            />
                           </div>
+                        </div>
+                        <div className="flex gap-2.5 font-mono text-[10px] tabular-nums min-w-[90px] justify-end" style={{ color: "rgba(255,255,255,0.3)" }}>
+                          <span>{DURATION_MIN}</span>
+                          <span style={{ color: "#ededed", fontWeight: 500 }}>{dur}</span>
+                          <span>{DURATION_MAX}</span>
+                        </div>
+                      </div>
+                    </div>
 
+                    <div className="flex flex-col gap-2.5">
+                      <div>
+                        <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">How should this video be made?</h2>
+                        <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">Pick one. We build exactly what you pick.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {(
+                          [
+                            { id: "slideshow" as const, title: "Slideshow", body: "Images + voiceover. Reliable for any topic." },
+                            { id: "talking_cartoon" as const, title: "Talking — cartoon", body: "Character speaks on camera. Works for most prompts." },
+                            { id: "talking_real" as const, title: "Talking — realistic", body: "Real-looking speaker. Use neutral wording for best results." },
+                          ] as const
+                        ).map(({ id, title, body }) => {
+                          const selected = videoKind === id;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => setVideoKind(id)}
+                              className="rounded-[10px] cursor-pointer text-left transition-all hover:-translate-y-px px-[15px] py-3.5 flex flex-col gap-1.5"
+                              style={
+                                selected
+                                  ? {
+                                      background: "#1c1c1c",
+                                      border: "1px solid rgba(255,255,255,0.22)",
+                                      boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
+                                    }
+                                  : {
+                                      background: "#161616",
+                                      border: "1px solid rgba(255,255,255,0.09)",
+                                    }
+                              }
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[13px] font-medium tracking-[-0.005em] text-[#ededed]">{title}</span>
+                                <span
+                                  className="relative inline-flex items-center justify-center w-[14px] h-[14px] rounded-full transition-all shrink-0"
+                                  style={
+                                    selected
+                                      ? { border: "1.5px solid #ededed", background: "#ededed" }
+                                      : { border: "1.5px solid rgba(255,255,255,0.3)" }
+                                  }
+                                  aria-hidden
+                                >
+                                  {selected && <span className="absolute w-[5px] h-[5px] rounded-full" style={{ background: "#111111" }} />}
+                                </span>
+                              </div>
+                              <p className="text-[11.5px] m-0 leading-[1.45] text-zinc-500">{body}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {videoKind === "talking_real" && (
+                      <div
+                        className="relative rounded-[10px] px-5 py-[18px] flex flex-col gap-4 overflow-hidden"
+                        style={{
+                          background: "linear-gradient(180deg, rgba(255,255,255,0.012), transparent 40%), #161616",
+                          border: "1px solid rgba(255,255,255,0.09)",
+                        }}
+                      >
+                        <span
+                          className="pointer-events-none absolute top-0 left-[20%] right-[20%] h-px"
+                          aria-hidden
+                          style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)" }}
+                        />
+                        <div className="flex items-center gap-3 pb-3.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                           <div
-                            className="relative rounded-[14px] px-[18px] pt-4 pb-3 transition-all focus-within:[box-shadow:0_0_0_4px_rgba(212,255,58,0.05),0_0_40px_rgba(212,255,58,0.04)] focus-within:[border-color:rgba(212,255,58,0.3)]"
+                            className="shrink-0 w-8 h-8 rounded-[8px] flex items-center justify-center text-zinc-300"
                             style={{
-                              background: "#0a0a0d",
-                              border: "1px solid rgba(255,255,255,0.07)",
+                              background: "#232323",
+                              border: "1px solid rgba(255,255,255,0.09)",
+                              boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
                             }}
                           >
-                            <textarea
-                              value={prompt}
-                              onChange={(e) => setPrompt(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
-                              placeholder="e.g. Create a 30-second explainer about how solar panels work, professional tone with upbeat background music"
-                              rows={4}
-                              className="block w-full bg-transparent border-0 outline-none resize-none text-[14.5px] leading-[1.6] tracking-[-0.005em] text-white placeholder:text-zinc-700 p-0 min-h-[80px]"
-                              style={{ fontFamily: "inherit" }}
-                            />
-                            <div className="flex items-center justify-between mt-3 pt-3 gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                              <div className="flex flex-wrap gap-1.5 min-w-0">
-                                {PROMPT_CHIPS.map(({ label, prompt: p }) => (
+                            <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h2l2-3h10l2 3h2v12H3V7z M12 17a4 4 0 100-8 4 4 0 000 8z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10px] tracking-[0.14em] uppercase text-zinc-500 mb-[3px] font-medium">Realistic speaker</div>
+                            <div className="text-[13px] font-medium text-[#ededed] tracking-[-0.005em] mb-0.5">Look &amp; setting</div>
+                            <div className="text-[11.5px] text-zinc-500 leading-[1.45]">Pick a controlled studio frame, or a moving environment-driven take.</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {(
+                            [
+                              { id: "studio" as const, title: "Studio framing", body: "Talking-head with calm backdrop. Avatars apply." },
+                              { id: "scenario" as const, title: "Cinematic scenes", body: "On-location motion tied to topic." },
+                            ] as const
+                          ).map(({ id, title, body }) => {
+                            const selected = talkingRealMode === id;
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => setTalkingRealMode(id)}
+                                className="rounded-[9px] cursor-pointer text-left transition-all hover:-translate-y-px px-[13px] py-[11px] flex items-center gap-3"
+                                style={
+                                  selected
+                                    ? {
+                                        background: "#232323",
+                                        border: "1px solid rgba(255,255,255,0.22)",
+                                        boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
+                                      }
+                                    : {
+                                        background: "#1c1c1c",
+                                        border: "1px solid rgba(255,255,255,0.06)",
+                                      }
+                                }
+                              >
+                                <div
+                                  className="relative w-[42px] h-[42px] rounded-[7px] shrink-0 overflow-hidden"
+                                  style={{ border: "1px solid rgba(255,255,255,0.09)" }}
+                                  aria-hidden
+                                >
+                                  {id === "studio" ? (
+                                    <>
+                                      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 40%, #3a3a45, #1a1a22 60%, #0e0e15)" }} />
+                                      <div className="absolute" style={{ top: "32%", left: "50%", transform: "translateX(-50%)", width: 17, height: 17, borderRadius: "50%", background: "radial-gradient(circle at 35% 30%, #e8c8a8, #a07050)" }} />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #6a4a30, #2a1a0e 60%, #0a0805)" }} />
+                                      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 25% 40%, rgba(240,180,120,0.5), transparent 50%)" }} />
+                                    </>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2 mb-[3px]">
+                                    <span className="text-[12.5px] font-medium tracking-[-0.005em] text-[#ededed]">{title}</span>
+                                    <span
+                                      className="relative inline-flex items-center justify-center w-[13px] h-[13px] rounded-full transition-all shrink-0"
+                                      style={
+                                        selected
+                                          ? { border: "1.5px solid #ededed", background: "#ededed" }
+                                          : { border: "1.5px solid rgba(255,255,255,0.3)" }
+                                      }
+                                      aria-hidden
+                                    >
+                                      {selected && <span className="absolute w-[4.5px] h-[4.5px] rounded-full" style={{ background: "#111111" }} />}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-zinc-500 leading-[1.4]">{body}</div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+                            <div className="inline-flex items-center gap-2 text-[12.5px] font-medium text-[#ededed] tracking-[-0.005em]">
+                              <CircleUserRound className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.8} />
+                              <span>Avatar</span>
+                            </div>
+                            <div
+                              className="inline-flex items-center gap-0.5 p-[2px] rounded-[7px]"
+                              style={{
+                                background: "rgba(0,0,0,0.35)",
+                                border: "1px solid rgba(255,255,255,0.06)",
+                              }}
+                            >
+                              {([
+                                { tab: "default" as const, label: "Default" },
+                                { tab: "preset" as const, label: "Preset" },
+                                { tab: "upload" as const, label: "Upload" },
+                              ]).map(({ tab, label }) => {
+                                const active = avatarMode === tab;
+                                return (
                                   <button
-                                    key={label}
+                                    key={tab}
                                     type="button"
-                                    onClick={() => setPrompt(p)}
-                                    className="px-2.5 py-1 rounded-full text-[11.5px] tracking-[-0.005em] transition-all"
-                                    style={{
-                                      background: "rgba(255,255,255,0.025)",
-                                      border: "1px solid rgba(255,255,255,0.07)",
-                                      color: "rgba(255,255,255,0.68)",
-                                    }}
+                                    onClick={() => setAvatarMode(tab)}
+                                    className={`px-3 py-[4px] rounded-[5px] text-[11.5px] tracking-[-0.003em] transition-colors ${active ? "text-[#ededed]" : "text-zinc-500 hover:text-[#ededed]"}`}
+                                    style={active ? { background: "#232323", fontWeight: 500, boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset" } : undefined}
                                   >
                                     {label}
                                   </button>
-                                ))}
-                              </div>
-                              <span className="font-mono text-[10.5px] tabular-nums shrink-0" style={{ color: "rgba(255,255,255,0.28)" }}>{prompt.length} / 500</span>
+                                );
+                              })}
                             </div>
                           </div>
-                        </div>
 
-                        <div>
-                          <div className="mb-3">
-                            <div className="flex items-baseline gap-2.5">
-                              <span className="font-mono text-[11px] text-zinc-700">02</span>
-                              <span className="text-[15px] font-medium tracking-[-0.01em] text-white">Video length</span>
-                            </div>
-                            <div className="text-[12.5px] mt-1 leading-[1.5] pl-[22px]" style={{ color: "rgba(255,255,255,0.46)" }}>{DURATION_MIN}–{DURATION_MAX} seconds. Talking videos over 8s use multiple clips.</div>
-                          </div>
-                          <div
-                            className="relative rounded-[14px] px-6 py-[22px] flex flex-col gap-[18px] overflow-hidden"
-                            style={{
-                              background: "#14141a",
-                              border: "1px solid rgba(255,255,255,0.07)",
-                            }}
-                          >
-                            <span
-                              className="pointer-events-none absolute top-0 left-0 right-0 h-px"
-                              aria-hidden
-                              style={{ background: "linear-gradient(90deg, transparent, rgba(212,255,58,0.3), transparent)" }}
-                            />
-                            <div className="flex items-baseline justify-between gap-4">
-                              <div className="flex items-baseline gap-2">
-                                <span className="font-mono font-medium tabular-nums leading-none text-white" style={{ fontSize: "44px", letterSpacing: "-2px" }}>
-                                  {dur}
-                                </span>
-                                <span className="text-[14px] tracking-[-0.01em]" style={{ color: "rgba(255,255,255,0.46)" }}>seconds</span>
-                              </div>
-                              <div className="text-[12px] text-right max-w-[200px] leading-[1.5]" style={{ color: "rgba(255,255,255,0.46)" }}>
-                                <strong className="font-medium" style={{ color: "#d4ff3a" }}>
-                                  {dur <= 15 ? "Quick hit" : dur <= 30 ? "Standard short" : dur <= 45 ? "Mid-length" : "Long-form"}
-                                </strong>
-                                <br />
-                                {dur <= 15 ? "best for hooks and ads" : dur <= 30 ? "good retention on social" : dur <= 45 ? "room for a clear arc" : "use for explainers and stories"}
-                              </div>
-                            </div>
-                            <div className="relative">
-                              <input
-                                type="range"
-                                min={DURATION_MIN}
-                                max={DURATION_MAX}
-                                value={dur}
-                                onChange={(e) => setDur(Number(e.target.value))}
-                                className="absolute inset-0 w-full h-1.5 opacity-0 cursor-pointer z-10"
-                                aria-label="Video length"
+                          {avatarMode === "default" && (
+                            <div
+                              className="rounded-[9px] p-[13px_14px] flex items-center gap-3"
+                              style={{
+                                background: "#1c1c1c",
+                                border: "1px solid rgba(255,255,255,0.06)",
+                              }}
+                            >
+                              <div
+                                className="shrink-0 w-[46px] h-[46px] rounded-full"
+                                style={{
+                                  background: "radial-gradient(circle at 35% 30%, #e8c8a8 30%, #c8a888 60%, #604838)",
+                                  border: "1px solid rgba(255,255,255,0.09)",
+                                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                                }}
                               />
-                              <div className="relative h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }}>
-                                <div
-                                  className="absolute left-0 top-0 h-full rounded-full"
-                                  style={{
-                                    width: `${((dur - DURATION_MIN) / (DURATION_MAX - DURATION_MIN)) * 100}%`,
-                                    background: "linear-gradient(90deg, #d4ff3a, #b8e030)",
-                                    boxShadow: "0 0 12px rgba(212,255,58,0.3)",
-                                  }}
-                                />
-                                <div
-                                  className="absolute top-1/2 w-[18px] h-[18px] rounded-full bg-white"
-                                  style={{
-                                    left: `${((dur - DURATION_MIN) / (DURATION_MAX - DURATION_MIN)) * 100}%`,
-                                    transform: "translate(-50%, -50%)",
-                                    boxShadow: "0 0 0 1px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.5), 0 0 0 4px rgba(212,255,58,0.15)",
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex justify-between font-mono text-[10.5px] tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }}>
-                              <span>10s</span><span>20s</span><span>30s</span><span>40s</span><span>50s</span><span>60s</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="mb-3">
-                            <div className="flex items-baseline gap-2.5">
-                              <span className="font-mono text-[11px] text-zinc-700">03</span>
-                              <span className="text-[15px] font-medium tracking-[-0.01em] text-white">How should this video be made?</span>
-                            </div>
-                            <div className="text-[12.5px] mt-1 leading-[1.5] pl-[22px]" style={{ color: "rgba(255,255,255,0.46)" }}>Pick one. We build exactly what you pick.</div>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                            {(
-                              [
-                                {
-                                  id: "slideshow" as const,
-                                  title: "Slideshow",
-                                  body: "Images + voiceover. Reliable for any topic.",
-                                },
-                                {
-                                  id: "talking_cartoon" as const,
-                                  title: "Talking — cartoon",
-                                  body: "Character speaks on camera. Works for most prompts.",
-                                },
-                                {
-                                  id: "talking_real" as const,
-                                  title: "Talking — realistic",
-                                  body: "Real-looking speaker. Use neutral wording for best results.",
-                                },
-                              ] as const
-                            ).map(({ id, title, body }) => {
-                              const selected = videoKind === id;
-                              return (
-                                <button
-                                  key={id}
-                                  type="button"
-                                  onClick={() => setVideoKind(id)}
-                                  className="relative rounded-[14px] cursor-pointer overflow-hidden text-left transition-all hover:-translate-y-px"
-                                  style={
-                                    selected
-                                      ? {
-                                          background: "linear-gradient(180deg, rgba(212,255,58,0.06), rgba(212,255,58,0.01)), #14141a",
-                                          border: "1px solid rgba(212,255,58,0.4)",
-                                          boxShadow: "0 0 0 1px rgba(212,255,58,0.2), 0 0 30px rgba(212,255,58,0.06)",
-                                        }
-                                      : {
-                                          background: "#14141a",
-                                          border: "1px solid rgba(255,255,255,0.07)",
-                                        }
-                                  }
-                                >
-                                  <div
-                                    className="relative h-[80px] overflow-hidden"
-                                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
-                                    aria-hidden
-                                  >
-                                    {id === "slideshow" && (
-                                      <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #2a2a35 0%, #15151d 100%)" }}>
-                                        <div className="absolute" style={{ left: "14%", top: "22%", width: "36%", height: "56%", background: "linear-gradient(135deg, #4a4a5a, #2a2a35)", borderRadius: 4, border: "0.5px solid rgba(255,255,255,0.1)" }} />
-                                        <div className="absolute" style={{ right: "14%", top: "32%", width: "36%", height: "50%", background: "linear-gradient(135deg, #6a6a7a, #3a3a45)", borderRadius: 4, border: "0.5px solid rgba(255,255,255,0.1)" }} />
-                                      </div>
-                                    )}
-                                    {id === "talking_cartoon" && (
-                                      <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #d85a30 0%, #993c1d 60%, #2a1208 100%)" }}>
-                                        <div className="absolute" style={{ width: 36, height: 36, borderRadius: "50%", background: "radial-gradient(circle at 35% 30%, #fff5d0, #facb74)", top: "22%", left: "50%", transform: "translateX(-50%)", boxShadow: "0 0 24px rgba(250,203,116,0.5)" }} />
-                                        <div className="absolute bottom-0 left-0 right-0" style={{ height: "38%", background: "radial-gradient(ellipse at 30% 100%, #1d6e56 0%, transparent 50%), radial-gradient(ellipse at 70% 100%, #0f6e56 0%, transparent 50%)" }} />
-                                      </div>
-                                    )}
-                                    {id === "talking_real" && (
-                                      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 30%, #6a8caf 0%, #2a4565 40%, #0a1929 80%)" }}>
-                                        <div className="absolute" style={{ top: "18%", left: "50%", transform: "translateX(-50%)", width: 28, height: 28, borderRadius: "50%", background: "radial-gradient(circle, #fff5d0 0%, #facb74 60%, transparent 80%)", filter: "blur(0.5px)" }} />
-                                        <div className="absolute bottom-0 left-0 right-0" style={{ height: "50%", background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.7)), linear-gradient(90deg, #1a3a5f 0%, #0a1929 100%)" }} />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="px-4 pt-3.5 pb-4">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                      <span className="text-[13.5px] font-medium tracking-[-0.01em] text-white">{title}</span>
-                                      <span
-                                        className="relative inline-flex items-center justify-center w-4 h-4 rounded-full transition-all shrink-0"
-                                        style={
-                                          selected
-                                            ? { border: "1.5px solid #d4ff3a", background: "#d4ff3a" }
-                                            : { border: "1.5px solid rgba(255,255,255,0.28)" }
-                                        }
-                                        aria-hidden
-                                      >
-                                        {selected && <span className="absolute w-1.5 h-1.5 rounded-full" style={{ background: "#0a0e02" }} />}
-                                      </span>
-                                    </div>
-                                    <p className="text-[11.5px] leading-[1.5] tracking-[-0.003em]" style={{ color: "rgba(255,255,255,0.46)" }}>{body}</p>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {mode === "talking_object" && objStyle === "real" && (
-                            <div className="mt-5">
-                              <div className="rounded-2xl border border-zinc-800/90 bg-linear-to-b from-zinc-900/45 to-zinc-950/90 p-4 sm:p-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-                                <div className="mb-4 sm:mb-5">
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                                    Realistic speaker
-                                  </p>
-                                  <h4 className="mt-1.5 text-base font-semibold text-white tracking-tight">
-                                    Look and setting
-                                  </h4>
-                                  <p className="mt-1.5 text-[13px] leading-snug text-zinc-400 max-w-xl">
-                                    Same realistic pipeline: pick a controlled studio frame or a moving, environment-driven take.
-                                  </p>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => setTalkingRealMode("studio")}
-                                    className={`group relative rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${talkingRealMode === "studio"
-                                      ? "border-amber-500/40 bg-amber-500/6 shadow-[0_0_0_1px_rgba(245,158,11,0.12)]"
-                                      : "border-zinc-800/90 bg-zinc-950/30 hover:border-zinc-600/80 hover:bg-zinc-900/40"
-                                      }`}
-                                  >
-                                    <div className="flex gap-3.5 p-4">
-                                      <span
-                                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${talkingRealMode === "studio"
-                                          ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
-                                          : "border-zinc-700/80 bg-zinc-900/50 text-zinc-500 group-hover:text-zinc-400"
-                                          }`}
-                                        aria-hidden
-                                      >
-                                        <CircleUserRound className="h-5 w-5" strokeWidth={1.6} />
-                                      </span>
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-start justify-between gap-2">
-                                          <span className="text-[15px] font-semibold text-white leading-tight">
-                                            Studio framing
-                                          </span>
-                                          <span
-                                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${talkingRealMode === "studio"
-                                              ? "border-amber-400"
-                                              : "border-zinc-600"
-                                              }`}
-                                            aria-hidden
-                                          >
-                                            {talkingRealMode === "studio" && (
-                                              <span className="h-2 w-2 rounded-full bg-amber-400" />
-                                            )}
-                                          </span>
-                                        </div>
-                                        <p className="mt-2 text-xs leading-relaxed text-zinc-500 group-hover:text-zinc-400">
-                                          Talking-head composition with a calm backdrop. Avatar presets and image uploads apply.
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (!canUseCinematicMode) return;
-                                      setTalkingRealMode("scenario");
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[12.5px] font-medium text-[#ededed] mb-[3px] flex items-center gap-[7px] tracking-[-0.005em]">
+                                  Default presenter
+                                  <span
+                                    className="text-[9.5px] tracking-[0.04em] uppercase font-medium px-[7px] py-[1px] rounded-full"
+                                    style={{
+                                      background: "rgba(78,201,160,0.1)",
+                                      color: "#4ec9a0",
+                                      border: "1px solid rgba(78,201,160,0.18)",
                                     }}
-                                    disabled={!canUseCinematicMode}
-                                    className={`group relative rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${talkingRealMode === "scenario"
-                                      ? "border-amber-500/40 bg-amber-500/6 shadow-[0_0_0_1px_rgba(245,158,11,0.12)]"
-                                      : !canUseCinematicMode
-                                        ? "border-zinc-800/90 bg-zinc-950/20 opacity-55 cursor-not-allowed"
-                                        : "border-zinc-800/90 bg-zinc-950/30 hover:border-zinc-600/80 hover:bg-zinc-900/40"
-                                      }`}
                                   >
-                                    <div className="flex gap-3.5 p-4">
-                                      <span
-                                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${talkingRealMode === "scenario"
-                                          ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
-                                          : !canUseCinematicMode
-                                            ? "border-zinc-700/80 bg-zinc-900/40 text-zinc-500"
-                                            : "border-zinc-700/80 bg-zinc-900/50 text-zinc-500 group-hover:text-zinc-400"
-                                          }`}
-                                        aria-hidden
-                                      >
-                                        <Clapperboard className="h-5 w-5" strokeWidth={1.6} />
-                                      </span>
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-start justify-between gap-2">
-                                          <span className="text-[15px] font-semibold text-white leading-tight">
-                                            Cinematic scenes
-                                          </span>
-                                          {!canUseCinematicMode && (
-                                            <span className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/8 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                                              Pro
-                                            </span>
-                                          )}
-                                          <span
-                                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${talkingRealMode === "scenario"
-                                              ? "border-amber-400"
-                                              : "border-zinc-600"
-                                              }`}
-                                            aria-hidden
-                                          >
-                                            {talkingRealMode === "scenario" && (
-                                              <span className="h-2 w-2 rounded-full bg-amber-400" />
-                                            )}
-                                          </span>
-                                        </div>
-                                        <p className="mt-2 text-xs leading-relaxed text-zinc-500 group-hover:text-zinc-400">
-                                          On-location motion and context tied to your topic, closer to a polished reel. Generation focuses on full scenes.
-                                        </p>
-                                        {!canUseCinematicMode && (
-                                          <p className="mt-2 text-[11px] leading-relaxed text-amber-300/90">
-                                            Available on Professional and Enterprise plans.
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
+                                    Recommended
+                                  </span>
                                 </div>
-
-                                {talkingRealMode === "scenario" && (
-                                  <div className="mt-4 flex gap-3 rounded-xl border border-zinc-700/60 bg-zinc-950/50 px-3.5 py-3 sm:px-4">
-                                    <Info
-                                      className="h-4 w-4 shrink-0 text-zinc-500 mt-0.5"
-                                      strokeWidth={2}
-                                      aria-hidden
-                                    />
-                                    <p className="text-[12px] leading-relaxed text-zinc-400">
-                                      <span className="text-zinc-300 font-medium">Note.</span>{" "}
-                                      This mode uses full-scene video generation. Custom avatar presets and uploads are not applied; look and setting follow your prompt and topic.
-                                    </p>
-                                  </div>
-                                )}
+                                <div className="text-[11px] text-zinc-500 leading-[1.4]">Neutral, professional look. Best when you want focus on the message.</div>
                               </div>
+                            </div>
+                          )}
 
-                              {talkingRealMode === "studio" ? (
-                                <>
-                                  <p className="text-xs font-medium text-gray-500 mb-2 mt-5">Avatar</p>
-                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                    {(["default", "preset", "upload"] as const).map((m) => {
-                                      const isPro = PRO_AVATAR_MODES.includes(m);
-                                      const locked = isPro && !canUseProAvatar(userPlan);
-                                      return (
-                                        <button
-                                          key={m}
-                                          type="button"
-                                          onClick={() => setAvatarMode(m)}
-                                          className={`relative px-3 py-2 rounded-lg border text-sm transition-all ${avatarMode === m
-                                            ? "border-blue-500/50 bg-blue-500/10 text-blue-200"
-                                            : "border-zinc-700 text-gray-500 hover:border-zinc-600 hover:text-gray-400"
-                                            }`}
-                                        >
-                                          {locked && (
-                                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-1.5 py-px text-[9px] font-semibold tracking-wide text-amber-400 bg-zinc-900 border border-amber-500/30 rounded-full leading-none">
-                                              ✦ Pro
-                                            </span>
-                                          )}
-                                          {m === "default" ? "Default" : m === "preset" ? "Preset" : "Upload"}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {avatarMode === "preset" && (
-                                    canUseProAvatar(userPlan) ? (
-                                      <motion.div
-                                        layout
-                                        initial={{ opacity: 0.85, y: 6 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="mt-4 rounded-2xl border border-zinc-700/90 bg-linear-to-b from-zinc-900/80 to-black/40 p-2.5 sm:p-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
+                          {avatarMode === "preset" && (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {AVATAR_PRESETS.map((preset) => {
+                                const selected = avatarPresetId === preset.id;
+                                return (
+                                  <button
+                                    key={preset.id}
+                                    type="button"
+                                    onClick={() => setAvatarPresetId(preset.id)}
+                                    className="relative rounded-[9px] cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5"
+                                    style={{
+                                      aspectRatio: "3/4",
+                                      background: "#1c1c1c",
+                                      border: selected ? "1.5px solid #ededed" : "1.5px solid rgba(255,255,255,0.06)",
+                                      boxShadow: selected ? "0 0 0 2px rgba(255,255,255,0.08)" : undefined,
+                                    }}
+                                  >
+                                    <div
+                                      className="w-full h-full transition-transform duration-300"
+                                      style={{
+                                        backgroundImage: `linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.94)), url('${preset.imageSrc}')`,
+                                        backgroundSize: "cover",
+                                        backgroundPosition: "center 25%",
+                                      }}
+                                    />
+                                    <div className="absolute bottom-[7px] left-[9px] right-[9px]">
+                                      <div className="text-[11px] font-medium text-white tracking-[-0.003em]">{preset.label}</div>
+                                      <div className="text-[9.5px] font-mono uppercase tracking-[0.02em] text-white/65 mt-[2px]">{preset.hint}</div>
+                                    </div>
+                                    {selected && (
+                                      <div
+                                        className="absolute top-[7px] right-[7px] w-[18px] h-[18px] rounded-full flex items-center justify-center"
+                                        style={{ background: "#ededed", color: "#111111", boxShadow: "0 2px 6px rgba(0,0,0,0.4)" }}
                                       >
-                                        <div className="grid grid-cols-2 gap-2.5">
-                                          {AVATAR_PRESETS.map((preset) => (
-                                            <button
-                                              key={preset.id}
-                                              type="button"
-                                              onClick={() => setAvatarPresetId(preset.id)}
-                                              className={`group relative aspect-square w-full rounded-lg border-2 overflow-hidden text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${avatarPresetId === preset.id
-                                                ? "border-amber-400 ring-2 ring-amber-500/35 shadow-lg shadow-amber-950/40"
-                                                : "border-zinc-700 hover:border-zinc-500"
-                                                }`}
-                                            >
-                                              <img
-                                                src={preset.imageSrc}
-                                                alt={preset.label}
-                                                className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-                                                loading="lazy"
-                                                onError={(e) => {
-                                                  const img = e.currentTarget;
-                                                  img.onerror = null;
-                                                  img.src = "/avatars/presets/fallback.svg";
-                                                }}
-                                              />
-                                              <div
-                                                className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent"
-                                                aria-hidden
-                                              />
-                                              <div className="absolute bottom-0 left-0 right-0 p-2">
-                                                <p className="text-xs font-semibold text-white drop-shadow-md leading-tight">
-                                                  {preset.label}
-                                                </p>
-                                                <p className="text-[10px] text-zinc-200/80 mt-0.5 drop-shadow leading-tight">
-                                                  {preset.hint}
-                                                </p>
-                                              </div>
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </motion.div>
-                                    ) : (
-                                      <ProAvatarGate />
-                                    )
-                                  )}
-
-                                  {avatarMode === "upload" && (
-                                    canUseProAvatar(userPlan) ? (
-                                      <div className="mt-3">
-                                        <input
-                                          ref={avatarFileRef}
-                                          type="file"
-                                          accept="image/*"
-                                          className="hidden"
-                                          onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() => avatarFileRef.current?.click()}
-                                          className="w-full rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-300 transition-colors"
-                                        >
-                                          {avatarFile ? "Change avatar image" : "Upload avatar image"}
-                                        </button>
-                                        {avatarFileUrl ? (
-                                          <div className="mt-2 flex items-center gap-3">
-                                            <img src={avatarFileUrl} alt="Avatar preview" className="w-12 h-12 rounded-lg object-cover border border-zinc-700" />
-                                            <div className="min-w-0">
-                                              <p className="text-xs text-zinc-400 truncate">{avatarFile?.name}</p>
-                                              <button
-                                                type="button"
-                                                onClick={() => setAvatarFile(null)}
-                                                className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                                              >
-                                                Remove
-                                              </button>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <p className="text-[11px] text-zinc-600 mt-2">Use a clear face photo for best results.</p>
-                                        )}
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                       </div>
-                                    ) : (
-                                      <ProAvatarGate />
-                                    )
-                                  )}
-                                </>
-                              ) : null}
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {avatarMode === "upload" && (
+                            <div
+                              onClick={() => avatarFileRef.current?.click()}
+                              className="rounded-[9px] cursor-pointer text-center px-4 py-[26px] transition-all"
+                              style={{
+                                background: "#1c1c1c",
+                                border: "1px dashed rgba(255,255,255,0.14)",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.22)"; e.currentTarget.style.background = "#232323"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; e.currentTarget.style.background = "#1c1c1c"; }}
+                            >
+                              <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)} />
+                              <div
+                                className="inline-flex items-center justify-center w-9 h-9 rounded-[9px] mx-auto mb-[11px] text-zinc-300"
+                                style={{
+                                  background: "#232323",
+                                  border: "1px solid rgba(255,255,255,0.09)",
+                                  boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
+                                }}
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 16l-4-4-4 4m4-4v9m9-7v3a4 4 0 01-4 4H7a4 4 0 01-4-4v-3m0-4l9-9 9 9" />
+                                </svg>
+                              </div>
+                              <div className="text-[12.5px] font-medium text-[#ededed] mb-[3px] tracking-[-0.005em]">{avatarFile ? avatarFile.name : "Upload avatar image"}</div>
+                              <div className="text-[11px] text-zinc-500 leading-[1.5]">
+                                Use a clear face photo for best results.
+                                <br />
+                                JPG or PNG · up to 8 MB
+                              </div>
                             </div>
                           )}
                         </div>
+                      </div>
+                    )}
 
-                        <div>
-                          <div className="mb-3">
-                            <div className="flex items-baseline gap-2.5">
-                              <span className="font-mono text-[11px] text-zinc-700">04</span>
-                              <span className="text-[15px] font-medium tracking-[-0.01em] text-white">Captions</span>
-                            </div>
-                            <div className="text-[12.5px] mt-1 leading-[1.5] pl-[22px]" style={{ color: "rgba(255,255,255,0.46)" }}>Auto-synced burn-in. Editable after generation.</div>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {(
-                              [
-                                { value: true, title: "With captions", desc: "Burned-in, auto-synced to voiceover", iconPath: "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" },
-                                { value: false, title: "No captions", desc: "Clean output, voice only", iconPath: "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z M9 9l6 6 M15 9l-6 6" },
-                              ] as const
-                            ).map(({ value, title, desc, iconPath }) => {
-                              const selected = cc === value;
-                              return (
-                                <button
-                                  key={String(value)}
-                                  type="button"
-                                  onClick={() => setCc(value)}
-                                  className="rounded-[12px] cursor-pointer flex items-center gap-3.5 px-[18px] py-4 transition-all hover:-translate-y-px text-left"
-                                  style={
-                                    selected
-                                      ? {
-                                          background: "linear-gradient(180deg, rgba(212,255,58,0.05), rgba(212,255,58,0.01)), #14141a",
-                                          border: "1px solid rgba(212,255,58,0.4)",
-                                          boxShadow: "0 0 0 1px rgba(212,255,58,0.2)",
-                                        }
-                                      : {
-                                          background: "#14141a",
-                                          border: "1px solid rgba(255,255,255,0.07)",
-                                        }
-                                  }
-                                >
+                    <div className="flex flex-col gap-2.5">
+                      <div>
+                        <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Captions</h2>
+                        <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">Auto-synced burn-in. Editable after generation.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {(
+                          [
+                            { value: true, title: "With captions", desc: "Burned-in, auto-synced to voiceover", iconPath: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z M7 9h10 M7 13h6" },
+                            { value: false, title: "No captions", desc: "Clean output, voice only", iconPath: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z M8 9l8 6 M16 9l-8 6" },
+                          ] as const
+                        ).map(({ value, title, desc, iconPath }) => {
+                          const selected = cc === value;
+                          return (
+                            <button
+                              key={String(value)}
+                              type="button"
+                              onClick={() => setCc(value)}
+                              className="rounded-[10px] cursor-pointer flex items-center gap-3 px-[15px] py-[13px] transition-all hover:-translate-y-px text-left"
+                              style={
+                                selected
+                                  ? {
+                                      background: "#1c1c1c",
+                                      border: "1px solid rgba(255,255,255,0.22)",
+                                      boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
+                                    }
+                                  : {
+                                      background: "#161616",
+                                      border: "1px solid rgba(255,255,255,0.09)",
+                                    }
+                              }
+                            >
+                              <span
+                                className="shrink-0 w-[34px] h-[34px] rounded-[8px] flex items-center justify-center"
+                                style={
+                                  selected
+                                    ? {
+                                        background: "#111111",
+                                        border: "1px solid rgba(255,255,255,0.14)",
+                                        color: "#ededed",
+                                      }
+                                    : {
+                                        background: "#232323",
+                                        border: "1px solid rgba(255,255,255,0.09)",
+                                        color: "rgba(255,255,255,0.72)",
+                                      }
+                                }
+                              >
+                                <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d={iconPath} />
+                                </svg>
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2 mb-[2px]">
+                                  <span className="text-[12.5px] font-medium text-[#ededed] tracking-[-0.005em]">{title}</span>
                                   <span
-                                    className="shrink-0 w-[38px] h-[38px] rounded-[10px] flex items-center justify-center"
+                                    className="relative inline-flex items-center justify-center w-[13px] h-[13px] rounded-full transition-all shrink-0"
                                     style={
                                       selected
-                                        ? {
-                                            background: "linear-gradient(135deg, rgba(212,255,58,0.15), rgba(212,255,58,0.04))",
-                                            border: "1px solid rgba(212,255,58,0.3)",
-                                            color: "#d4ff3a",
-                                          }
-                                        : {
-                                            background: "#1a1a22",
-                                            border: "1px solid rgba(255,255,255,0.07)",
-                                            color: "rgba(255,255,255,0.68)",
-                                          }
+                                        ? { border: "1.5px solid #ededed", background: "#ededed" }
+                                        : { border: "1.5px solid rgba(255,255,255,0.3)" }
                                     }
+                                    aria-hidden
                                   >
-                                    <svg className="w-[17px] h-[17px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d={iconPath} />
-                                    </svg>
+                                    {selected && <span className="absolute w-[4.5px] h-[4.5px] rounded-full" style={{ background: "#111111" }} />}
                                   </span>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between gap-2 mb-1">
-                                      <span className="text-[13.5px] font-medium tracking-[-0.01em] text-white">{title}</span>
-                                      <span
-                                        className="relative inline-flex items-center justify-center w-3.5 h-3.5 rounded-full transition-all shrink-0"
-                                        style={
-                                          selected
-                                            ? { border: "1.5px solid #d4ff3a", background: "#d4ff3a" }
-                                            : { border: "1.5px solid rgba(255,255,255,0.28)" }
-                                        }
-                                        aria-hidden
-                                      >
-                                        {selected && <span className="absolute w-[5px] h-[5px] rounded-full" style={{ background: "#0a0e02" }} />}
-                                      </span>
-                                    </div>
-                                    <div className="text-[11.5px] leading-[1.45]" style={{ color: "rgba(255,255,255,0.46)" }}>{desc}</div>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        className="relative mt-8 flex flex-wrap items-center justify-between gap-3 pt-[22px]"
-                        style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
-                      >
-                        <span
-                          className="pointer-events-none absolute top-0 left-[30%] right-[30%] h-px"
-                          aria-hidden
-                          style={{ background: "linear-gradient(90deg, transparent, rgba(212,255,58,0.3), transparent)" }}
-                        />
-                        <div className="flex items-center gap-3.5 text-[11.5px]" style={{ color: "rgba(255,255,255,0.46)" }}>
-                          <span className="inline-flex items-center gap-1.5">
-                            <svg className="w-[13px] h-[13px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: "rgba(255,255,255,0.68)" }}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                            <strong className="font-mono font-medium text-white text-[11px]">~{Math.max(60, Math.round(dur * 1.5))}s</strong> render
-                          </span>
-                          <span className="text-zinc-700">·</span>
-                          <span className="inline-flex items-center gap-1.5"><strong className="font-mono font-medium text-white text-[11px]">4K</strong> UHD</span>
-                          <span className="text-zinc-700">·</span>
-                          <span className="font-medium" style={{ color: "#d4ff3a" }}>Free</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={submit}
-                          disabled={!prompt.trim() || prompt.trim().length < 5 || submitting || !canGenerateByPlan}
-                          className="relative inline-flex items-center gap-2.5 px-5 py-3 rounded-[12px] text-[14px] font-medium tracking-[-0.01em] transition-all hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                          style={{
-                            background: "#d4ff3a",
-                            color: "#0a0e02",
-                            boxShadow: "0 0 0 1px rgba(212,255,58,0.3), 0 0 30px rgba(212,255,58,0.18), 0 4px 16px rgba(212,255,58,0.2)",
-                          }}
-                        >
-                          {submitting ? (
-                            <>
-                              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                              </svg>
-                              Starting render
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-[15px] h-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z" />
-                              </svg>
-                              Generate video
-                              <span
-                                className="font-mono text-[10.5px] px-1.5 py-0.5 rounded-[5px] font-medium ml-0.5"
-                                style={{ background: "rgba(10,14,2,0.2)", border: "1px solid rgba(10,14,2,0.15)" }}
-                              >
-                                ⌘↵
-                              </span>
-                            </>
-                          )}
-                        </button>
-                        {!canGenerateByPlan && (
-                          <div className="basis-full text-right">
-                            <p className="text-xs text-amber-300">
-                              {planLimitMessage ?? "Plan limit reached."}
-                              {!isEnterprisePlan(userPlan) ? (
-                                <>
-                                  {" "}
-                                  <Link href="/pricing" className="underline hover:text-amber-200">
-                                    Upgrade plan
-                                  </Link>
-                                </>
-                              ) : null}
-                            </p>
-                          </div>
-                        )}
+                                </div>
+                                <div className="text-[11px] text-zinc-500 leading-[1.4]">{desc}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
+
+                  </div>
+
+                  <div
+                    className="flex flex-wrap items-center justify-between gap-3 px-7 py-4"
+                    style={{
+                      borderTop: "1px solid rgba(255,255,255,0.06)",
+                      background: "linear-gradient(180deg, transparent, rgba(255,255,255,0.012))",
+                    }}
+                  >
+                    <div className="flex items-center gap-3.5 text-[11.5px] text-zinc-500">
+                      <span className="inline-flex items-center gap-1.5">
+                        <svg className="w-[13px] h-[13px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: "rgba(255,255,255,0.72)" }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <strong className="font-mono font-medium text-[#ededed] text-[11px] tabular-nums">~{Math.max(60, Math.round(dur * 1.5))}s</strong> render
+                      </span>
+                      <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
+                      <span className="inline-flex items-center gap-1.5"><strong className="font-mono font-medium text-[#ededed] text-[11px] tabular-nums">4K</strong> UHD</span>
+                      <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
+                      <span
+                        className="px-[9px] py-[2px] rounded-full font-medium tracking-[0.04em] uppercase"
+                        style={{
+                          fontSize: "10px",
+                          background: "rgba(78,201,160,0.1)",
+                          color: "#4ec9a0",
+                          border: "1px solid rgba(78,201,160,0.18)",
+                        }}
+                      >
+                        Free
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={submit}
+                      disabled={!prompt.trim() || prompt.trim().length < 5 || submitting || !canGenerateByPlan}
+                      className="inline-flex items-center gap-2.5 px-[18px] py-[10px] rounded-[9px] text-[13px] font-medium tracking-[-0.005em] transition-all hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                      style={{
+                        background: "linear-gradient(180deg, #ffffff, #d4d4d4)",
+                        color: "#0a0a0a",
+                        boxShadow: "0 1px 0 rgba(255,255,255,0.5) inset, 0 -1px 0 rgba(0,0,0,0.1) inset, 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      {submitting ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Starting render
+                        </>
+                      ) : (
+                        <>
+                          Generate video
+                          <svg className="w-[14px] h-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                          </svg>
+                          <span
+                            className="font-mono text-[10px] px-1.5 py-0.5 rounded-[4px] font-medium ml-[2px]"
+                            style={{
+                              background: "rgba(10,10,10,0.1)",
+                              border: "1px solid rgba(10,10,10,0.08)",
+                              color: "rgba(10,10,10,0.7)",
+                            }}
+                          >
+                            ⌘↵
+                          </span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </motion.div>
+
 
                 {error && (() => {
                   const presentation = getErrorPresentation(error, errorCode);
