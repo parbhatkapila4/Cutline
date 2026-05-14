@@ -34,7 +34,7 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex justify-start">
+      <div className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 py-4 flex justify-start bg-black/60 backdrop-blur-sm border-b border-white/5">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
@@ -44,8 +44,8 @@ export default function PricingPage() {
         </Link>
       </div>
 
-      <main className="pt-20 pb-24 px-6">
-        <div className="max-w-6xl mx-auto">
+      <main className="pt-24 pb-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[min(90vw,1760px)] mx-auto">
           <section className="mb-12">
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white mb-4">Pricing</h1>
             <p className="text-xl text-zinc-400 leading-relaxed max-w-3xl">
@@ -150,8 +150,8 @@ export default function PricingPage() {
               </ul>
               <p className="mt-5 text-sm text-zinc-400">
                 Need help choosing? Email{" "}
-                <a href="mailto:parbhat@parbhat.dev" className="underline hover:text-zinc-200">
-                  parbhat@parbhat.dev
+                <a href="mailto:parbhat@parbhat.work" className="underline hover:text-zinc-200">
+                  parbhat@parbhat.work
                 </a>
                 .
               </p>
