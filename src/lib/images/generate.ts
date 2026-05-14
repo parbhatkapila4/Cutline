@@ -18,8 +18,8 @@ export async function generateImageWithDalle(
     model: "dall-e-3",
     prompt: prompt.slice(0, 4000),
     n: 1,
-    size: "1024x1024" as const,
-    quality: "standard" as const,
+    size: "1792x1024" as const,
+    quality: "hd" as const,
     response_format: (options?.outputDir ? "b64_json" : "url") as "url" | "b64_json",
   };
 
