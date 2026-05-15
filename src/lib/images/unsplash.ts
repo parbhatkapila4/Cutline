@@ -2,6 +2,17 @@ const UNSPLASH_SEARCH = "https://api.unsplash.com/search/photos";
 
 export type UnsplashResult = { url: string } | null;
 
+function pickHighRes(urls: { raw?: string; full?: string; regular?: string } | undefined): string | null {
+  if (!urls) return null;
+  if (typeof urls.raw === "string" && urls.raw) {
+    const sep = urls.raw.includes("?") ? "&" : "?";
+    return `${urls.raw}${sep}w=3840&q=92&fm=jpg&fit=crop`;
+  }
+  if (typeof urls.full === "string" && urls.full) return urls.full;
+  if (typeof urls.regular === "string" && urls.regular) return urls.regular;
+  return null;
+}
+
 export async function searchUnsplash(query: string): Promise<UnsplashResult> {
   const key = process.env.UNSPLASH_ACCESS_KEY;
   if (!key?.trim()) {
@@ -42,10 +53,10 @@ export async function searchUnsplash(query: string): Promise<UnsplashResult> {
   }
 
   const data = (await response.json()) as {
-    results?: Array<{ urls?: { regular?: string } }>;
+    results?: Array<{ urls?: { raw?: string; full?: string; regular?: string } }>;
   };
   const first = data.results?.[0];
-  const imageUrl = first?.urls?.regular;
+  const imageUrl = pickHighRes(first?.urls);
   if (typeof imageUrl !== "string" || !imageUrl) {
     return null;
   }
@@ -69,10 +80,12 @@ export async function searchUnsplashMultiple(query: string, count: number = 10):
     });
     clearTimeout(timeoutId);
     if (!response.ok) return [];
-    const data = (await response.json()) as { results?: Array<{ urls?: { regular?: string } }> };
+    const data = (await response.json()) as {
+      results?: Array<{ urls?: { raw?: string; full?: string; regular?: string } }>;
+    };
     const urls: string[] = [];
     for (const r of data.results ?? []) {
-      const u = r?.urls?.regular;
+      const u = pickHighRes(r?.urls);
       if (typeof u === "string" && u && !urls.includes(u)) urls.push(u);
     }
     return urls;
