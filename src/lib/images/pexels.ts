@@ -2,6 +2,20 @@ const PEXELS_SEARCH = "https://api.pexels.com/v1/search";
 
 export type PexelsResult = { url: string } | null;
 
+function pickHighRes(
+  src: { original?: string; large2x?: string; large?: string; medium?: string } | undefined
+): string | null {
+  if (!src) return null;
+  if (typeof src.original === "string" && src.original) {
+    const sep = src.original.includes("?") ? "&" : "?";
+    return `${src.original}${sep}auto=compress&cs=tinysrgb&w=3840&h=2160&fit=crop`;
+  }
+  if (typeof src.large2x === "string" && src.large2x) return src.large2x;
+  if (typeof src.large === "string" && src.large) return src.large;
+  if (typeof src.medium === "string" && src.medium) return src.medium;
+  return null;
+}
+
 export async function searchPexels(query: string): Promise<PexelsResult> {
   const key = process.env.PEXELS_API_KEY;
   if (!key?.trim()) {
@@ -42,10 +56,12 @@ export async function searchPexels(query: string): Promise<PexelsResult> {
   }
 
   const data = (await response.json()) as {
-    photos?: Array<{ src?: { large?: string; medium?: string } }>;
+    photos?: Array<{
+      src?: { original?: string; large2x?: string; large?: string; medium?: string };
+    }>;
   };
   const first = data.photos?.[0];
-  const imageUrl = first?.src?.large ?? first?.src?.medium;
+  const imageUrl = pickHighRes(first?.src);
   if (typeof imageUrl !== "string" || !imageUrl) {
     return null;
   }
@@ -70,10 +86,14 @@ export async function searchPexelsMultiple(query: string, count: number = 10): P
     });
     clearTimeout(timeoutId);
     if (!response.ok) return [];
-    const data = (await response.json()) as { photos?: Array<{ src?: { large?: string; medium?: string } }> };
+    const data = (await response.json()) as {
+      photos?: Array<{
+        src?: { original?: string; large2x?: string; large?: string; medium?: string };
+      }>;
+    };
     const urls: string[] = [];
     for (const p of data.photos ?? []) {
-      const u = p?.src?.large ?? p?.src?.medium;
+      const u = pickHighRes(p?.src);
       if (typeof u === "string" && u && !urls.includes(u)) urls.push(u);
     }
     return urls;
