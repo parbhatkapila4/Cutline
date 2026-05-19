@@ -1,13 +1,14 @@
 import Link from "next/link";
+import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 type Tag = "shipped" | "improved" | "fixed" | "infra" | "api";
 
-const TAG_STYLES: Record<Tag, { bg: string; text: string; label: string }> = {
-  shipped: { bg: "bg-emerald-50 ring-emerald-200", text: "text-emerald-700", label: "Shipped" },
-  improved: { bg: "bg-sky-50 ring-sky-200", text: "text-sky-700", label: "Improved" },
-  fixed: { bg: "bg-amber-50 ring-amber-200", text: "text-amber-700", label: "Fixed" },
-  infra: { bg: "bg-violet-50 ring-violet-200", text: "text-violet-700", label: "Infra" },
-  api: { bg: "bg-gray-100 ring-gray-200", text: "text-gray-700", label: "API" },
+const TAG_STYLES: Record<Tag, { bg: string; ring: string; text: string; label: string }> = {
+  shipped: { bg: "bg-emerald-500/10", ring: "ring-emerald-500/25", text: "text-emerald-300", label: "Shipped" },
+  improved: { bg: "bg-sky-500/10", ring: "ring-sky-500/25", text: "text-sky-300", label: "Improved" },
+  fixed: { bg: "bg-amber-500/10", ring: "ring-amber-500/25", text: "text-amber-300", label: "Fixed" },
+  infra: { bg: "bg-violet-500/10", ring: "ring-violet-500/25", text: "text-violet-300", label: "Infra" },
+  api: { bg: "bg-zinc-500/10", ring: "ring-zinc-400/25", text: "text-zinc-300", label: "API" },
 };
 
 type Entry = {
@@ -145,94 +146,122 @@ const ENTRIES: Entry[] = [
   },
 ];
 
+const sectionId = (version: string) => `v${version.replace(/\./g, "-")}`;
+
 export default function ChangelogPage() {
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <header className="bg-white border-b border-gray-200/70">
-        <div className="max-w-[960px] mx-auto flex items-center px-5 sm:px-8 h-[60px]">
-          <Link href="/" className="flex items-center gap-2 group">
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-[7px] bg-[#0a0a0a]">
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-white" fill="currentColor">
-                <path d="M8 5.14v13.72a1 1 0 0 0 1.5.866l11.5-6.86a1 1 0 0 0 0-1.732l-11.5-6.86A1 1 0 0 0 8 5.14z" />
-              </svg>
-            </span>
-            <span className="text-[15.5px] font-semibold tracking-[-0.02em] text-[#0a0a0a]">Cutline</span>
-            <span className="text-gray-300 mx-1">/</span>
-            <span className="text-[14px] font-medium text-gray-600">Changelog</span>
-          </Link>
+    <div className="min-h-screen bg-black text-white">
+      <div className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 py-4 flex justify-start bg-black/60 backdrop-blur-sm border-b border-white/5">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
+        >
+          <CutlineLogo size="sm" className="max-w-[140px]" />
+          <span>Home</span>
+        </Link>
+      </div>
+
+      <main className="pt-24 pb-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[min(90vw,1760px)] mx-auto grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-10 lg:gap-14">
+
+          <aside className="lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto" aria-label="Releases">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <h2 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-[0.16em] mb-3.5">Releases</h2>
+              <ul className="space-y-2 text-[13.5px]">
+                {ENTRIES.map((entry) => (
+                  <li key={entry.version}>
+                    <a
+                      href={`#${sectionId(entry.version)}`}
+                      className="group block text-zinc-400 hover:text-white transition-colors leading-snug"
+                    >
+                      <span className="font-mono text-[11px] tracking-[0.08em] text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                        v{entry.version}
+                      </span>
+                      <span className="block mt-0.5 text-[13px] line-clamp-2">{entry.title}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+
+          <div className="min-w-0">
+
+            <section className="mb-12">
+              <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-[0.18em] mb-3">Changelog</p>
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white mb-4">
+                What&rsquo;s new in Cutline
+              </h1>
+              <p className="text-zinc-400 text-sm leading-relaxed max-w-[60ch]">
+                We ship continuously. Most weeks bring a pipeline fix, a UI refinement, or a new mode. This is the public log of what changed and when.
+              </p>
+            </section>
+
+            <div className="relative">
+              <div className="absolute left-[3px] top-3 bottom-3 w-px bg-white/10" aria-hidden />
+
+              <ol className="space-y-16">
+                {ENTRIES.map((entry) => (
+                  <li
+                    key={entry.version}
+                    id={sectionId(entry.version)}
+                    className="relative pl-9 scroll-mt-28"
+                  >
+                    <span
+                      className="absolute left-0 top-2 w-[7px] h-[7px] rounded-full bg-white ring-[3px] ring-black"
+                      aria-hidden
+                    />
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-3">
+                      <time className="text-[12px] font-mono tracking-tight text-zinc-400 tabular-nums">
+                        {entry.date}
+                      </time>
+                      <span className="text-[10.5px] font-bold tracking-[0.16em] uppercase text-zinc-500">
+                        v{entry.version}
+                      </span>
+                    </div>
+                    <h2 className="text-2xl font-semibold text-white mb-3 leading-snug">
+                      {entry.title}
+                    </h2>
+                    <p className="text-zinc-400 text-sm leading-relaxed mb-5 max-w-[60ch]">
+                      {entry.summary}
+                    </p>
+
+                    <ul className="space-y-2">
+                      {entry.changes.map((change, i) => {
+                        const cfg = TAG_STYLES[change.tag];
+                        return (
+                          <li key={i} className="flex items-start gap-3">
+                            <span
+                              className={`shrink-0 inline-flex items-center justify-center min-w-[64px] h-[19px] rounded-md ${cfg.bg} ring-1 ${cfg.ring} px-2 text-[10px] font-bold tracking-[0.06em] uppercase ${cfg.text} mt-px`}
+                            >
+                              {cfg.label}
+                            </span>
+                            <span className="text-[13.5px] text-zinc-300 leading-snug pt-px">
+                              {change.text}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="mt-16 pt-8 border-t border-white/10">
+              <p className="text-[12.5px] text-zinc-500">
+                Have feedback or hit a bug?{" "}
+                <a
+                  href="mailto:parbhat@parbhat.work"
+                  className="font-semibold text-white underline underline-offset-2 decoration-zinc-600 hover:decoration-white transition-colors"
+                >
+                  parbhat@parbhat.work
+                </a>
+              </p>
+            </div>
+
+          </div>
         </div>
-      </header>
-
-      <main className="max-w-[960px] mx-auto px-5 sm:px-8 py-12 sm:py-16">
-
-        <div className="mb-12">
-          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-gray-500 mb-3">
-            Changelog
-          </p>
-          <h1 className="text-[2.25rem] sm:text-[2.75rem] font-bold tracking-[-0.025em] text-[#0a0a0a] leading-[1.05]">
-            What&rsquo;s new in Cutline
-          </h1>
-          <p className="mt-4 text-[15px] text-gray-500 leading-relaxed max-w-[60ch]">
-            We ship continuously. Most weeks bring a pipeline fix, a UI refinement, or a new mode. This is the public log of what changed and when.
-          </p>
-        </div>
-
-        <div className="relative">
-          <div className="absolute left-[3px] top-3 bottom-3 w-px bg-gray-200" aria-hidden />
-
-          <ol className="space-y-12">
-            {ENTRIES.map((entry) => (
-              <li key={entry.version} className="relative pl-9">
-                <span
-                  className="absolute left-0 top-2 w-[7px] h-[7px] rounded-full bg-[#0a0a0a] ring-[3px] ring-[#FAFAFA]"
-                  aria-hidden
-                />
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
-                  <time className="text-[12px] font-mono tracking-tight text-gray-500 tabular-nums">
-                    {entry.date}
-                  </time>
-                  <span className="text-[10.5px] font-bold tracking-[0.16em] uppercase text-gray-400">
-                    v{entry.version}
-                  </span>
-                </div>
-                <h2 className="text-[20px] sm:text-[22px] font-semibold tracking-[-0.015em] text-[#0a0a0a] leading-snug mb-2">
-                  {entry.title}
-                </h2>
-                <p className="text-[14px] text-gray-600 leading-relaxed mb-5 max-w-[60ch]">
-                  {entry.summary}
-                </p>
-
-                <ul className="space-y-2">
-                  {entry.changes.map((change, i) => {
-                    const cfg = TAG_STYLES[change.tag];
-                    return (
-                      <li key={i} className="flex items-start gap-3">
-                        <span
-                          className={`shrink-0 inline-flex items-center justify-center min-w-[64px] h-[19px] rounded-md ${cfg.bg} ring-1 px-2 text-[10px] font-bold tracking-[0.06em] uppercase ${cfg.text} mt-px`}
-                        >
-                          {cfg.label}
-                        </span>
-                        <span className="text-[13.5px] text-gray-700 leading-snug pt-px">
-                          {change.text}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        <div className="mt-16 pt-8 border-t border-gray-200">
-          <p className="text-[12.5px] text-gray-500">
-            Have feedback or hit a bug?{" "}
-            <a href="mailto:parbhat@parbhat.work" className="font-semibold text-[#0a0a0a] underline underline-offset-2">
-              parbhat@parbhat.work
-            </a>
-          </p>
-        </div>
-
       </main>
     </div>
   );

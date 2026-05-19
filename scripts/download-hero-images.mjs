@@ -30,7 +30,9 @@ const HERO_IMAGE_URLS = [
 ];
 
 async function download(url, filepath) {
-  const res = await fetch(url, { headers: { "User-Agent": "CutlineHero/1.0" } });
+  const res = await fetch(url, {
+    headers: { "User-Agent": "CutlineHero/1.0" },
+  });
   if (!res.ok) throw new Error(`${url} => ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   fs.writeFileSync(filepath, buf);
@@ -49,7 +51,9 @@ async function main() {
       console.error(`  ${num}/20 FAILED:`, e.message);
     }
   }
-  console.log("Done. Hero now uses local files from /hero/1.jpg ... /hero/20.jpg");
+  console.log(
+    "Done. Hero now uses local files from /hero/1.jpg ... /hero/20.jpg",
+  );
 }
 
 main().catch((e) => {

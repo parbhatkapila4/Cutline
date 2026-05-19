@@ -8,7 +8,7 @@ export function Features() {
   const [activeFeatureTab, setActiveFeatureTab] = useState(0);
 
   return (
-          <section id="features" className="relative pt-44 pb-44 px-4 sm:px-6 xl:px-10 2xl:px-14 overflow-hidden">
+          <section id="features" className="relative pt-12 sm:pt-16 pb-44 px-4 sm:px-6 xl:px-10 2xl:px-14 overflow-hidden">
             <div
               className="absolute inset-0 -z-10 pointer-events-none"
               aria-hidden

@@ -58,8 +58,8 @@ export default function ContactPage() {
         </Link>
       </div>
 
-      <main className="pt-20 pb-16 px-4 sm:px-6 flex-1 min-h-0 overflow-hidden">
-        <div className="max-w-5xl mx-auto">
+      <main className="pt-20 pb-16 px-4 sm:px-6 flex-1 min-h-0 overflow-hidden flex items-center justify-center">
+        <div className="w-full max-w-5xl">
           <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
             <div className="grid lg:grid-cols-2 min-h-[520px]">
               <div className="p-6 sm:p-8 flex flex-col bg-white min-h-0">

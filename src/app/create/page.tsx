@@ -223,6 +223,13 @@ export default function CreatePage() {
   useEffect(() => {
     setShareSupported(typeof navigator !== "undefined" && typeof navigator.share === "function");
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const initialPrompt = params.get("prompt");
+    if (initialPrompt) setPrompt(initialPrompt);
+  }, []);
   const [suggesting, setSuggesting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [userPlan, setUserPlan] = useState<PlanId>("free");
