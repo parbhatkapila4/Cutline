@@ -137,7 +137,11 @@ export function Features() {
                           </div>
                         </div>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${card1Tone.bg} border ${card1Tone.border} text-[10px] font-bold ${card1Tone.text}`}>
-                          <span className={`w-1 h-1 rounded-full ${card1Tone.dot}`} />
+                          <motion.span
+                            className={`w-1 h-1 rounded-full ${card1Tone.dot}`}
+                            animate={{ opacity: [0.4, 1, 0.4] }}
+                            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                          />
                           {p.card1.status.label}
                         </span>
                       </div>
@@ -185,6 +189,18 @@ export function Features() {
                                 }
                               >
                                 {line.text}
+                                {line.emphasis && (
+                                  <motion.span
+                                    className="inline-block w-[1.5px] h-[0.95em] bg-violet-600 ml-[1px] align-middle"
+                                    animate={{ opacity: [1, 0] }}
+                                    transition={{
+                                      duration: 0.55,
+                                      repeat: Infinity,
+                                      repeatType: "reverse",
+                                    }}
+                                    aria-hidden
+                                  />
+                                )}
                               </span>
                             </div>
                           ))}
@@ -204,12 +220,28 @@ export function Features() {
                         </div>
                       </div>
 
-                      <div className="mt-3 rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/60 to-white p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <svg className="w-3 h-3 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.847.814a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
+                      <div className="mt-3 rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/60 to-white p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset] relative overflow-hidden">
+                        <motion.div
+                          className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-violet-200/40 to-transparent pointer-events-none"
+                          animate={{ x: ["0%", "500%"] }}
+                          transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut", repeatDelay: 1.6 }}
+                          aria-hidden
+                        />
+                        <div className="relative flex items-center gap-1.5 mb-1">
+                          <motion.svg
+                            className="w-3 h-3 text-violet-500"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            animate={{ rotate: [0, 18, -18, 0], scale: [1, 1.12, 1] }}
+                            transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.847.814a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                          </motion.svg>
                           <span className="text-[10px] font-semibold text-violet-700">{p.card1.aiHint.label}</span>
                         </div>
-                        <p className="text-[11px] text-gray-700 leading-snug">{p.card1.aiHint.body}</p>
+                        <p className="relative text-[11px] text-gray-700 leading-snug">{p.card1.aiHint.body}</p>
                       </div>
 
                       <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
@@ -233,10 +265,38 @@ export function Features() {
                       <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
                           <div className="relative w-10 h-10">
-                            <span className="absolute inset-0 rounded-[8px] bg-gradient-to-br from-amber-200 via-orange-300 to-rose-300 ring-1 ring-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] origin-bottom-left -rotate-[10deg] translate-x-[2px] translate-y-[1px]" />
-                            <span className="absolute inset-0 rounded-[8px] bg-gradient-to-br from-violet-300 via-indigo-300 to-purple-400 ring-1 ring-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] origin-bottom-left -rotate-[3deg]" />
-                            <span className="absolute inset-0 rounded-[8px] bg-gradient-to-br from-emerald-200 via-teal-300 to-cyan-400 ring-1 ring-white shadow-[0_2px_6px_-1px_rgba(15,23,42,0.18)] rotate-[5deg] -translate-x-[1px]" />
-                            <span className="absolute inset-0 rounded-[8px] bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.55),transparent_55%)] rotate-[5deg] -translate-x-[1px]" />
+                            <div className="absolute inset-0 rounded-[8px] bg-white p-[2px] ring-1 ring-gray-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.1)] origin-bottom-left -rotate-[14deg] translate-x-[3px] translate-y-[2px]">
+                              <div className="w-full h-full rounded-[5px] bg-gradient-to-br from-amber-300 via-orange-400 to-rose-500" />
+                            </div>
+                            <div className="absolute inset-0 rounded-[8px] bg-white p-[2px] ring-1 ring-gray-200/70 shadow-[0_2px_5px_-1px_rgba(15,23,42,0.14)] origin-bottom-left -rotate-[5deg]">
+                              <div className="w-full h-full rounded-[5px] bg-gradient-to-br from-violet-400 via-fuchsia-500 to-pink-500" />
+                            </div>
+                            <div className="absolute inset-0 rounded-[8px] bg-white p-[2px] ring-[1.5px] ring-sky-500 shadow-[0_4px_10px_-2px_rgba(15,23,42,0.22)] rotate-[6deg]">
+                              <div className="w-full h-full rounded-[5px] bg-gradient-to-br from-emerald-300 via-teal-400 to-sky-500 relative overflow-hidden">
+                                <div
+                                  className="absolute inset-0"
+                                  style={{
+                                    background:
+                                      "radial-gradient(ellipse 60% 40% at 30% 25%, rgba(255,255,255,0.45), transparent 60%)",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-500 ring-2 ring-white flex items-center justify-center z-10 shadow-[0_1px_2px_rgba(0,0,0,0.25)]">
+                              <svg
+                                className="w-2 h-2 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={4}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M4.5 12.75l6 6 9-13.5"
+                                />
+                              </svg>
+                            </div>
                           </div>
                           <div>
                             <div className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">Stage 02</div>
@@ -246,7 +306,15 @@ export function Features() {
                           </div>
                         </div>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${card2Tone.bg} border ${card2Tone.border} text-[10px] font-bold ${card2Tone.text} tabular-nums`}>
-                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 4a1 1 0 011 1v3.59l2.3 2.3a1 1 0 11-1.4 1.42l-2.6-2.6A1 1 0 019 11V7a1 1 0 011-1z"/></svg>
+                          <motion.svg
+                            className="w-2.5 h-2.5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                          >
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 4a1 1 0 011 1v3.59l2.3 2.3a1 1 0 11-1.4 1.42l-2.6-2.6A1 1 0 019 11V7a1 1 0 011-1z" />
+                          </motion.svg>
                           {p.card2.perf}
                         </span>
                       </div>
@@ -323,7 +391,22 @@ export function Features() {
                                 className={`relative flex items-center gap-3 px-3.5 py-3 ${!isLast ? "border-b border-gray-100" : ""} ${item.active ? "bg-gradient-to-r from-emerald-50/50 via-white to-white" : ""}`}
                               >
                                 {item.active && (
-                                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-r-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" aria-hidden />
+                                  <motion.span
+                                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-r-full bg-emerald-500"
+                                    animate={{
+                                      boxShadow: [
+                                        "0 0 6px rgba(16,185,129,0.3)",
+                                        "0 0 16px rgba(16,185,129,0.75)",
+                                        "0 0 6px rgba(16,185,129,0.3)",
+                                      ],
+                                    }}
+                                    transition={{
+                                      duration: 1.8,
+                                      repeat: Infinity,
+                                      ease: "easeInOut",
+                                    }}
+                                    aria-hidden
+                                  />
                                 )}
                                 <div
                                   className={`relative w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${item.active
@@ -336,9 +419,12 @@ export function Features() {
                                   </svg>
                                   {item.active && (
                                     <span
-                                      className="absolute -top-0.5 -right-0.5 inline-flex h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-white"
+                                      className="absolute -top-0.5 -right-0.5 inline-flex h-2 w-2"
                                       aria-hidden
-                                    />
+                                    >
+                                      <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
+                                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-white" />
+                                    </span>
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -406,19 +492,42 @@ export function Features() {
                     <div className={cardBase}>
                       <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
-                          <div className="relative flex flex-col w-10 h-10 rounded-[9px] bg-gradient-to-b from-gray-900 to-gray-950 shadow-[0_2px_6px_-1px_rgba(15,23,42,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] overflow-hidden">
-                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.06),transparent_60%)]" />
-                            <div className="flex-1 flex items-center justify-center">
-                              <div className="w-4 h-4 rounded-full bg-white/95 flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
-                                <svg className="w-2 h-2 text-gray-900 translate-x-[0.5px]" fill="currentColor" viewBox="0 0 24 24">
+                          <div className="relative w-10 h-10 rounded-[10px] overflow-hidden shadow-[0_3px_8px_-1px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-black/10">
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, #6366f1 0%, #a855f7 45%, #ec4899 78%, #f97316 100%)",
+                              }}
+                            />
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background:
+                                  "radial-gradient(ellipse 60% 40% at 30% 22%, rgba(255,255,255,0.28), transparent 60%)",
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-[18px] h-[18px] rounded-full bg-white flex items-center justify-center shadow-[0_2px_5px_rgba(0,0,0,0.35)] ring-1 ring-white/50">
+                                <svg
+                                  className="w-[8px] h-[8px] text-gray-900 translate-x-[0.5px]"
+                                  fill="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
                                   <path d="M8 5v14l11-7z" />
                                 </svg>
                               </div>
                             </div>
-                            <div className="px-1.5 pb-1.5">
-                              <div className="h-[2px] rounded-full bg-white/15 overflow-hidden">
-                                <div className="h-full w-[68%] rounded-full bg-gradient-to-r from-emerald-400 to-teal-300" />
-                              </div>
+
+                            <span className="absolute top-1 right-1 flex h-[5px] w-[5px]" aria-hidden>
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                              <span className="relative inline-flex h-[5px] w-[5px] rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.7)]" />
+                            </span>
+
+                            <div className="absolute bottom-[3px] left-[3px] right-[3px] h-[2px] rounded-full bg-white/30 overflow-hidden">
+                              <div className="h-full rounded-full bg-gradient-to-r from-emerald-300 via-emerald-400 to-cyan-300 w-[68%] shadow-[0_0_4px_rgba(110,231,183,0.7)]" />
                             </div>
                           </div>
                           <div>
@@ -429,7 +538,11 @@ export function Features() {
                           </div>
                         </div>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${card3Tone.bg} border ${card3Tone.border} text-[10px] font-bold ${card3Tone.text}`}>
-                          <span className={`w-1 h-1 rounded-full ${card3Tone.dot}`} />
+                          <motion.span
+                            className={`w-1 h-1 rounded-full ${card3Tone.dot}`}
+                            animate={{ opacity: [0.35, 1, 0.35], scale: [1, 1.4, 1] }}
+                            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                          />
                           {p.card3.status.label}
                         </span>
                       </div>
@@ -473,11 +586,23 @@ export function Features() {
                             <span className="text-gray-900">{p.card3.progress}%</span> · {p.card3.eta}
                           </span>
                         </div>
-                        <div className="h-[5px] rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-[5px] rounded-full bg-gray-100 overflow-hidden relative">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500 relative overflow-hidden"
                             style={{ width: `${p.card3.progress}%` }}
-                          />
+                          >
+                            <motion.div
+                              className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/55 to-transparent"
+                              animate={{ x: ["-100%", "400%"] }}
+                              transition={{
+                                duration: 2.2,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                                repeatDelay: 0.4,
+                              }}
+                              aria-hidden
+                            />
+                          </div>
                         </div>
 
                         <div className="mt-3 flex items-center">
@@ -493,16 +618,19 @@ export function Features() {
                                       step.status === "done"
                                         ? "w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center"
                                         : step.status === "active"
-                                          ? "w-4 h-4 rounded-full bg-white ring-2 ring-emerald-500 flex items-center justify-center"
+                                          ? "relative w-4 h-4 rounded-full bg-white ring-2 ring-emerald-500 flex items-center justify-center"
                                           : "w-4 h-4 rounded-full bg-gray-100 ring-1 ring-gray-200 flex items-center justify-center"
                                     }
                                   >
+                                    {step.status === "active" && (
+                                      <span className="absolute inset-0 rounded-full ring-2 ring-emerald-400 opacity-60 animate-ping" aria-hidden />
+                                    )}
                                     {step.status === "done" ? (
                                       <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                       </svg>
                                     ) : step.status === "active" ? (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                      <span className="relative w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                     ) : (
                                       <span className="text-[8px] font-bold text-gray-400 tabular-nums">{i + 1}</span>
                                     )}
