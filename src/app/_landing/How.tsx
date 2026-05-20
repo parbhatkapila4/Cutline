@@ -27,7 +27,7 @@ export function How() {
             From idea to <span className="italic">video</span> in minutes.
           </h2>
           <p className="text-[15px] text-gray-500 max-w-[44ch] mx-auto mt-6 leading-relaxed">
-            One sentence in. A directed, captioned, music-cut MP4 out — every shot sourced, scripted, and rendered in a single pass.
+            One sentence in. A directed, captioned, music-cut MP4 out, with every shot sourced, scripted, and rendered in a single pass.
           </p>
         </div>
 
