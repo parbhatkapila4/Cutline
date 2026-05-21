@@ -214,8 +214,16 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1.5px solid rgba(16, 185, 129, 0.55);
   outline-offset: 2px;
+}
+/* Inputs and textareas get their focus styling from their custom wrappers (background,
+   border, glow). The native focus outline is doubly-distracting there — suppress it
+   on those elements only. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 
 ::-webkit-scrollbar {

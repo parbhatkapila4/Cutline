@@ -454,7 +454,7 @@ export function Features() {
                                         : "text-gray-300"
                                       }`}
                                   >
-                                    {item.count || "—"}
+                                    {item.count || "-"}
                                   </div>
                                 </div>
                               </div>
