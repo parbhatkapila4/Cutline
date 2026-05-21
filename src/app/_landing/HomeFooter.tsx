@@ -143,7 +143,7 @@ export function HomeFooter() {
                   className="inline-block h-2 w-2 rounded-sm bg-emerald-400/60 shrink-0"
                   aria-hidden
                 />
-                <span>30–60s · 1080p MP4 · single-pass.</span>
+                <span>30-60s · 1080p MP4 · single-pass.</span>
               </div>
               <div className="flex items-center gap-2.5 text-zinc-500">
                 <span

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { authClient, useCachedSession } from "@/lib/auth-client";
 
 export function Navbar() {
@@ -10,6 +11,18 @@ export function Navbar() {
   const sessionUser = sessionData?.user;
   const isLoggedIn = !sessionPending && !!sessionData;
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const router = useRouter();
+  const [isSigningIn, startSigningIn] = useTransition();
+
+  const handleSignInClick = () => {
+    startSigningIn(() => {
+      router.push("/auth/sign-in");
+    });
+  };
+
+  const prefetchSignIn = () => {
+    router.prefetch("/auth/sign-in");
+  };
 
   useEffect(() => {
     if (!accountMenuOpen) return;
@@ -177,12 +190,23 @@ export function Navbar() {
                   </div>
                 </div>
               ) : (
-                <Link
-                  href="/auth/sign-in"
-                  className="inline-flex items-center px-4 py-2 rounded-full bg-[#0a0a0a] hover:bg-black text-white text-[12px] font-bold tracking-[0.06em] uppercase shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors"
+                <button
+                  type="button"
+                  onClick={handleSignInClick}
+                  onMouseEnter={prefetchSignIn}
+                  onFocus={prefetchSignIn}
+                  disabled={isSigningIn}
+                  aria-busy={isSigningIn}
+                  aria-label={isSigningIn ? "Opening sign-in" : "Sign in"}
+                  className="relative inline-flex items-center justify-center min-w-[88px] px-4 py-2 rounded-full bg-[#0a0a0a] hover:bg-black text-white text-[12px] font-bold tracking-[0.06em] uppercase shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors disabled:cursor-default"
                 >
-                  Sign in
-                </Link>
+                  <span className={isSigningIn ? "invisible" : ""}>Sign in</span>
+                  {isSigningIn && (
+                    <span className="absolute inset-0 flex items-center justify-center" aria-hidden>
+                      <span className="block w-3.5 h-3.5 rounded-full border-[1.5px] border-white/15 border-t-emerald-400 animate-spin" />
+                    </span>
+                  )}
+                </button>
               )}
             </div>
           </div>
