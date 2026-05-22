@@ -193,7 +193,7 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             className="max-w-[46ch] text-[11px] sm:text-[12.5px] tracking-[0.22em] uppercase text-white/65 leading-[1.7]"
           >
             Type one sentence. A 12-stage AI director plans, narrates, and
-            renders a finished MP4 — in a single pass.
+            renders a finished MP4 in a single pass.
           </motion.p>
 
           {/* Pipeline phase timeline */}

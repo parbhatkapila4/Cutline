@@ -497,11 +497,28 @@ export default function CreatePage() {
   };
 
   return (
-    <div className="h-dvh max-h-dvh flex flex-col bg-black text-white font-sans relative overflow-hidden">
+    <div className="min-h-dvh flex flex-col bg-black text-white font-sans relative">
       <WarpShaderHero />
 
-      {(busy || done) && (
-        <nav className="relative z-10 shrink-0 flex items-center justify-between px-6 lg:px-10 py-3">
+      <nav className="relative z-20 shrink-0 flex items-center justify-between px-6 lg:px-10 py-3.5">
+        <Link
+          href="/dashboard"
+          aria-label="Back to dashboard"
+          className="group inline-flex items-center gap-2 px-2.5 py-1.5 -mx-2.5 rounded-lg text-[12.5px] font-medium text-zinc-400 hover:text-white hover:bg-white/[0.05] transition-colors"
+        >
+          <svg
+            className="w-4 h-4 transition-transform duration-300 group-hover:-translate-x-0.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back to dashboard</span>
+        </Link>
+        {(busy || done) && (
           <Link
             href="/"
             className="group inline-flex items-center gap-2.5 shrink-0 py-0.5 rounded-xl px-1 -mx-1 transition-colors hover:bg-white/3"
@@ -512,13 +529,10 @@ export default function CreatePage() {
               <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500 group-hover:text-zinc-300 transition-colors hidden sm:inline">Studio</span>
             </span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard" className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Dashboard</Link>
-          </div>
-        </nav>
-      )}
+        )}
+      </nav>
 
-      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain">
+      <div className="relative z-10 flex-1">
         <AnimatePresence mode="wait">
           {busy && (
             <motion.main
