@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { CircleUserRound, Clapperboard, Info } from "lucide-react";
 import { getUserFriendlyErrorMessage, getErrorPresentation } from "@/lib/utils/error";
@@ -161,11 +162,21 @@ const PROMPT_CHIPS = [
 
 const PLATFORM_OPTIONS: readonly Platform[] = ["general", "youtube_shorts", "twitter", "linkedin"] as const;
 
+// Each platform has a canonical frame. Shorts is hard-locked to vertical by YouTube;
+// the rest default to 16:9. Users can still override the aspect ratio after picking
+// a platform — selection just nudges them to the right starting point.
+const PLATFORM_DEFAULT_ASPECT: Record<Platform, AspectRatio> = {
+  general: "16:9",
+  linkedin: "16:9",
+  twitter: "16:9",
+  youtube_shorts: "9:16",
+};
+
 const PLATFORM_ICONS: Record<Platform, React.ReactNode> = {
-  general: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3" /></svg>,
-  youtube_shorts: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" /></svg>,
-  twitter: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>,
-  linkedin: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>,
+  general: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3" /></svg>,
+  youtube_shorts: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" /></svg>,
+  twitter: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>,
+  linkedin: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>,
 };
 
 function ProAvatarGate() {
@@ -557,9 +568,21 @@ export default function CreatePage() {
                           </div>
 
                           <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="relative inline-flex items-center gap-2.5 rounded-xl bg-black/55 border border-white/12 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/40">
-                              <CreateBrandMark className="h-6 w-6" />
-                              <span className="text-[12px] font-semibold tracking-tight text-white leading-none">
+                            <div className="relative inline-flex items-center gap-2.5 rounded-xl bg-black/55 border border-white/12 pl-1.5 pr-3.5 py-1.5 backdrop-blur-md shadow-lg shadow-black/40">
+                              <span
+                                className="relative inline-flex h-6 w-6 items-center justify-center rounded-[7px] overflow-hidden ring-1 ring-white/12 bg-[#0a0a0a]"
+                                aria-hidden
+                              >
+                                <Image
+                                  src="/cutline-logo.png"
+                                  alt=""
+                                  width={1280}
+                                  height={720}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  style={{ objectPosition: "78% 50%" }}
+                                />
+                              </span>
+                              <span className="text-[12px] font-semibold tracking-[0.04em] text-white leading-none">
                                 CUTLINE
                               </span>
                             </div>
@@ -749,12 +772,12 @@ export default function CreatePage() {
                             setError("Cancelled");
                             setJobId(null);
                           }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium text-zinc-400 hover:text-red-300 hover:bg-red-500/8 border border-transparent hover:border-red-500/20 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium leading-none text-zinc-400 hover:text-red-300 hover:bg-red-500/8 border border-transparent hover:border-red-500/20 transition-colors"
                         >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                          <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                           </svg>
-                          Cancel
+                          <span className="leading-none">Cancel</span>
                         </button>
                       </div>
                     </motion.div>
@@ -1103,106 +1126,12 @@ export default function CreatePage() {
                     style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent)" }}
                   />
 
-                  <header
-                    className="relative flex items-center justify-between gap-4 px-5 py-3.5"
-                    style={{
-                      borderBottom: "1px solid rgba(255,255,255,0.06)",
-                      background: "linear-gradient(180deg, rgba(255,255,255,0.012), transparent)",
-                    }}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Link href="/" className="group inline-flex items-center justify-center shrink-0">
-                        <span
-                          className="relative inline-flex items-center justify-center w-[22px] h-[22px] rounded-[6px]"
-                          style={{
-                            background: "linear-gradient(180deg, #ffffff, #d4d4d4)",
-                            boxShadow: "0 1px 0 rgba(255,255,255,0.4) inset, 0 1px 2px rgba(0,0,0,0.4)",
-                          }}
-                          aria-hidden
-                        >
-                          <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 ml-[2px]" aria-hidden>
-                            <path d="M2 1.5L10 6L2 10.5z" fill="#0a0a0a" />
-                          </svg>
-                        </span>
-                      </Link>
-                      <span className="text-[13px] font-medium tracking-[-0.005em] text-[#ededed]">Cutline</span>
-                      <span className="text-[#3a3a3a] text-[13px] mx-1">/</span>
-                      <input
-                        defaultValue="Untitled project"
-                        className="bg-transparent border border-transparent outline-none text-[13px] text-zinc-400 px-2 py-0.5 rounded-md transition-all w-[200px] truncate hover:bg-[#1c1c1c] hover:text-[#ededed] focus:bg-[#1c1c1c] focus:text-[#ededed] focus:border-[rgba(255,255,255,0.14)]"
-                        style={{ fontFamily: "inherit" }}
-                      />
-                      <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-zinc-500 ml-1.5">
-                        <span className="relative inline-flex" aria-hidden>
-                          <span className="w-[5px] h-[5px] rounded-full bg-[#4ec9a0]" style={{ boxShadow: "0 0 0 3px rgba(78,201,160,0.15)" }} />
-                        </span>
-                        Saved
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        title="Search"
-                        className="hidden sm:flex w-[30px] h-[30px] items-center justify-center rounded-[7px] text-zinc-500 hover:text-white hover:bg-[#1c1c1c] transition-colors border border-transparent hover:border-[rgba(255,255,255,0.09)]"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10 17a7 7 0 110-14 7 7 0 010 14z" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        title="History"
-                        className="hidden sm:flex w-[30px] h-[30px] items-center justify-center rounded-[7px] text-zinc-500 hover:text-white hover:bg-[#1c1c1c] transition-colors border border-transparent hover:border-[rgba(255,255,255,0.09)]"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2M3 12a9 9 0 109-9 9.74 9.74 0 00-6.74 2.74L3 8M3 3v5h5" />
-                        </svg>
-                      </button>
-                      <Link
-                        href="/dashboard"
-                        title="Dashboard"
-                        className="hidden sm:flex w-[30px] h-[30px] items-center justify-center rounded-[7px] text-zinc-500 hover:text-white hover:bg-[#1c1c1c] transition-colors border border-transparent hover:border-[rgba(255,255,255,0.09)]"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h7v7H3zM14 4.5h7v4h-7zM14 12.5h7v7h-7zM3 15.5h7v4H3z" />
-                        </svg>
-                      </Link>
-                      <div
-                        title="Account"
-                        className="ml-1.5 inline-flex items-center justify-center w-[28px] h-[28px] rounded-full text-[10.5px] font-medium text-[#ededed] cursor-pointer transition-transform hover:scale-105"
-                        style={{
-                          background: "linear-gradient(135deg, #5a5a5a, #2a2a2a)",
-                          border: "1px solid rgba(255,255,255,0.09)",
-                        }}
-                      >
-                        PK
-                      </div>
-                    </div>
-                  </header>
-
                   <div
-                    className="px-7 pt-6 pb-5 flex items-end justify-between gap-5"
+                    className="px-7 pt-7 pb-5"
                     style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
                   >
-                    <div className="flex-1 min-w-0">
-                      <h1 className="text-[19px] font-semibold tracking-[-0.015em] text-[#ededed] m-0 mb-1">Create a video</h1>
-                      <p className="text-[13px] text-zinc-500 m-0 leading-[1.5]">Fill out the details below and we&rsquo;ll handle the rest — script, voice, visuals, edit.</p>
-                    </div>
-                    {(() => {
-                      const filled =
-                        (prompt.trim().length > 10 ? 1 : 0) +
-                        1 + 1 + 1 + 1;
-                      const pct = (filled / 5) * 100;
-                      return (
-                        <div className="hidden sm:flex items-center gap-2.5 text-[11.5px] text-zinc-500 shrink-0">
-                          <span className="font-mono text-[11px] text-zinc-300 tabular-nums">{filled} / 5 set</span>
-                          <div className="w-[80px] h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                            <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${pct}%`, background: "#4ec9a0" }} />
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    <h1 className="text-[19px] font-semibold tracking-[-0.015em] text-[#ededed] m-0 mb-1">Create a video</h1>
+                    <p className="text-[13px] text-zinc-500 m-0 leading-[1.5]">Fill out the details below and we&rsquo;ll handle the rest - script, voice, visuals, edit.</p>
                   </div>
 
                   <div className="px-7 py-7 flex flex-col gap-8">
@@ -1244,7 +1173,7 @@ export default function CreatePage() {
                         </button>
                       </div>
                       <div
-                        className="relative rounded-[10px] px-4 pt-3.5 pb-3 transition-all focus-within:[border-color:rgba(255,255,255,0.22)] focus-within:bg-[#1c1c1c] focus-within:[box-shadow:0_0_0_4px_rgba(255,255,255,0.025)]"
+                        className="relative rounded-[10px] px-4 pt-3.5 pb-3 transition-all duration-300 ease-out focus-within:[border-color:rgba(16,185,129,0.35)] focus-within:bg-[#141816] focus-within:[box-shadow:0_0_0_4px_rgba(16,185,129,0.08),0_12px_36px_-12px_rgba(16,185,129,0.18)]"
                         style={{
                           background: "#161616",
                           border: "1px solid rgba(255,255,255,0.09)",
@@ -1346,8 +1275,11 @@ export default function CreatePage() {
                               <button
                                 key={p}
                                 type="button"
-                                onClick={() => setPlatform(p)}
-                                className="flex items-center justify-center gap-1.5 px-2 py-[9px] rounded-[8px] text-[12px] tracking-[-0.003em] transition-all"
+                                onClick={() => {
+                                  setPlatform(p);
+                                  setAspectRatio(PLATFORM_DEFAULT_ASPECT[p]);
+                                }}
+                                className="flex flex-col items-center justify-center gap-2 px-2 pt-3 pb-2.5 rounded-[8px] text-[12.5px] tracking-[-0.003em] transition-all"
                                 style={
                                   selected
                                     ? {
@@ -1381,16 +1313,16 @@ export default function CreatePage() {
                           {ASPECT_RATIOS.map((r) => {
                             const selected = aspectRatio === r;
                             const [w, h] = r.split(":").map(Number);
-                            const maxBox = 18;
+                            const maxBox = 22;
                             const scale = Math.min(maxBox / w, maxBox / h);
-                            const boxW = Math.max(7, Math.round(w * scale));
-                            const boxH = Math.max(7, Math.round(h * scale));
+                            const boxW = Math.max(8, Math.round(w * scale));
+                            const boxH = Math.max(8, Math.round(h * scale));
                             return (
                               <button
                                 key={r}
                                 type="button"
                                 onClick={() => setAspectRatio(r)}
-                                className="flex flex-col items-center justify-center gap-1.5 px-1 pt-2.5 pb-2 rounded-[8px] font-mono text-[10.5px] tabular-nums transition-all"
+                                className="flex flex-col items-center justify-center gap-2 px-1 pt-3 pb-2.5 rounded-[8px] font-mono text-[11px] tabular-nums transition-all"
                                 style={
                                   selected
                                     ? {
@@ -1427,7 +1359,7 @@ export default function CreatePage() {
                     <div className="flex flex-col gap-2.5">
                       <div>
                         <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Video length</h2>
-                        <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">{DURATION_MIN}–{DURATION_MAX} seconds. Talking videos over 8s use multiple clips.</p>
+                        <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">{DURATION_MIN}-{DURATION_MAX} seconds. Talking videos over 8s use multiple clips.</p>
                       </div>
                       <div
                         className="rounded-[10px] px-[18px] py-4 flex items-center gap-[18px]"
@@ -1471,11 +1403,6 @@ export default function CreatePage() {
                             />
                           </div>
                         </div>
-                        <div className="flex gap-2.5 font-mono text-[10px] tabular-nums min-w-[90px] justify-end" style={{ color: "rgba(255,255,255,0.3)" }}>
-                          <span>{DURATION_MIN}</span>
-                          <span style={{ color: "#ededed", fontWeight: 500 }}>{dur}</span>
-                          <span>{DURATION_MAX}</span>
-                        </div>
                       </div>
                     </div>
 
@@ -1488,8 +1415,8 @@ export default function CreatePage() {
                         {(
                           [
                             { id: "slideshow" as const, title: "Slideshow", body: "Images + voiceover. Reliable for any topic." },
-                            { id: "talking_cartoon" as const, title: "Talking — cartoon", body: "Character speaks on camera. Works for most prompts." },
-                            { id: "talking_real" as const, title: "Talking — realistic", body: "Real-looking speaker. Use neutral wording for best results." },
+                            { id: "talking_cartoon" as const, title: "Talking - cartoon", body: "Character speaks on camera. Works for most prompts." },
+                            { id: "talking_real" as const, title: "Talking - realistic", body: "Real-looking speaker. Use neutral wording for best results." },
                           ] as const
                         ).map(({ id, title, body }) => {
                           const selected = videoKind === id;
@@ -1600,13 +1527,113 @@ export default function CreatePage() {
                                 >
                                   {id === "studio" ? (
                                     <>
-                                      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 40%, #3a3a45, #1a1a22 60%, #0e0e15)" }} />
-                                      <div className="absolute" style={{ top: "32%", left: "50%", transform: "translateX(-50%)", width: 17, height: 17, borderRadius: "50%", background: "radial-gradient(circle at 35% 30%, #e8c8a8, #a07050)" }} />
+                                      {/* Studio backdrop with key light */}
+                                      <div
+                                        className="absolute inset-0"
+                                        style={{ background: "radial-gradient(ellipse at 50% 38%, #2c2c34, #14141a 60%, #0a0a0e)" }}
+                                      />
+                                      <div
+                                        className="absolute inset-0"
+                                        style={{
+                                          background:
+                                            "radial-gradient(ellipse at 50% 30%, rgba(255,218,180,0.13), transparent 55%)",
+                                        }}
+                                      />
+                                      {/* Frame brackets (cinema viewfinder) */}
+                                      <span className="absolute top-[3px] left-[3px] w-[5px] h-px bg-white/55" />
+                                      <span className="absolute top-[3px] left-[3px] h-[5px] w-px bg-white/55" />
+                                      <span className="absolute top-[3px] right-[3px] w-[5px] h-px bg-white/55" />
+                                      <span className="absolute top-[3px] right-[3px] h-[5px] w-px bg-white/55" />
+                                      <span className="absolute bottom-[3px] left-[3px] w-[5px] h-px bg-white/55" />
+                                      <span className="absolute bottom-[3px] left-[3px] h-[5px] w-px bg-white/55" />
+                                      <span className="absolute bottom-[3px] right-[3px] w-[5px] h-px bg-white/55" />
+                                      <span className="absolute bottom-[3px] right-[3px] h-[5px] w-px bg-white/55" />
+                                      {/* Portrait silhouette — head + shoulders, gently breathing */}
+                                      <motion.svg
+                                        className="absolute"
+                                        style={{ left: "50%", top: "52%", x: "-50%", y: "-50%" }}
+                                        width="22"
+                                        height="22"
+                                        viewBox="0 0 24 24"
+                                        animate={{ scale: [1, 1.04, 1] }}
+                                        transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
+                                      >
+                                        <defs>
+                                          <linearGradient id="studio-head" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0" stopColor="#f0d2b0" />
+                                            <stop offset="1" stopColor="#b08868" />
+                                          </linearGradient>
+                                        </defs>
+                                        <circle cx="12" cy="9" r="3.6" fill="url(#studio-head)" />
+                                        <path
+                                          d="M4.6 23 Q 4.6 14.3 12 14.3 Q 19.4 14.3 19.4 23 Z"
+                                          fill="url(#studio-head)"
+                                        />
+                                      </motion.svg>
+                                      {/* Live REC dot */}
+                                      <span className="absolute top-[4px] right-[4px] inline-flex w-[5px] h-[5px]">
+                                        <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400/80 animate-ping" />
+                                        <span className="relative inline-flex w-[5px] h-[5px] rounded-full bg-emerald-400" />
+                                      </span>
                                     </>
                                   ) : (
                                     <>
-                                      <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #6a4a30, #2a1a0e 60%, #0a0805)" }} />
-                                      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 25% 40%, rgba(240,180,120,0.5), transparent 50%)" }} />
+                                      {/* Cinema landscape backdrop */}
+                                      <div
+                                        className="absolute inset-0"
+                                        style={{
+                                          background:
+                                            "linear-gradient(180deg, #1a120a 0%, #100a06 55%, #050402 100%)",
+                                        }}
+                                      />
+                                      <div
+                                        className="absolute inset-0"
+                                        style={{
+                                          background:
+                                            "radial-gradient(ellipse at 22% 35%, rgba(245,180,110,0.32), transparent 55%)",
+                                        }}
+                                      />
+                                      {/* Top + bottom film sprocket rails */}
+                                      <span className="absolute top-[3px] left-[2px] right-[2px] h-px bg-white/12" />
+                                      <span className="absolute bottom-[3px] left-[2px] right-[2px] h-px bg-white/12" />
+                                      {/* Scrolling film-strip thumbnails */}
+                                      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[18px] overflow-hidden">
+                                        <motion.div
+                                          className="flex gap-[2px] h-full"
+                                          style={{ width: "max-content" }}
+                                          animate={{ x: ["0%", "-50%"] }}
+                                          transition={{ duration: 7, repeat: Infinity, ease: "linear" }}
+                                        >
+                                          {Array.from({ length: 14 }).map((_, i) => {
+                                            const palette = [
+                                              "linear-gradient(135deg, #9a6a3a 0%, #4a2f18 70%)",
+                                              "linear-gradient(160deg, #7a5028 0%, #2c1c0e 70%)",
+                                              "linear-gradient(120deg, #c08850 0%, #5a3818 65%)",
+                                              "linear-gradient(150deg, #6a4222 0%, #1c1208 75%)",
+                                            ];
+                                            return (
+                                              <span
+                                                key={i}
+                                                className="block h-full w-[10px] shrink-0 rounded-[1.5px]"
+                                                style={{
+                                                  background: palette[i % palette.length],
+                                                  boxShadow:
+                                                    "inset 0 0 0 0.5px rgba(255,255,255,0.05)",
+                                                }}
+                                              />
+                                            );
+                                          })}
+                                        </motion.div>
+                                      </div>
+                                      {/* Center playhead */}
+                                      <span
+                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1.5px] h-[22px] rounded-full"
+                                        style={{
+                                          background:
+                                            "linear-gradient(180deg, transparent, rgba(255,255,255,0.9), transparent)",
+                                          boxShadow: "0 0 6px rgba(255,255,255,0.5)",
+                                        }}
+                                      />
                                     </>
                                   )}
                                 </div>
@@ -1632,18 +1659,43 @@ export default function CreatePage() {
                           })}
                         </div>
 
+                        {(() => {
+                          const avatarDisabled = talkingRealMode === "scenario";
+                          return (
                         <div className="pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                           <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-                            <div className="inline-flex items-center gap-2 text-[12.5px] font-medium text-[#ededed] tracking-[-0.005em]">
-                              <CircleUserRound className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.8} />
+                            <div
+                              className="inline-flex items-center gap-2 text-[12.5px] font-medium tracking-[-0.005em] transition-colors"
+                              style={{ color: avatarDisabled ? "rgba(255,255,255,0.4)" : "#ededed" }}
+                            >
+                              <CircleUserRound
+                                className="w-3.5 h-3.5"
+                                strokeWidth={1.8}
+                                style={{ color: avatarDisabled ? "rgba(255,255,255,0.25)" : "rgb(113,113,122)" }}
+                              />
                               <span>Avatar</span>
+                              {avatarDisabled && (
+                                <span
+                                  className="ml-1 text-[9.5px] font-mono tracking-[0.18em] uppercase px-[7px] py-[2px] rounded-full"
+                                  style={{
+                                    color: "rgba(255,255,255,0.45)",
+                                    background: "rgba(255,255,255,0.04)",
+                                    border: "1px solid rgba(255,255,255,0.08)",
+                                  }}
+                                >
+                                  Not used in cinematic
+                                </span>
+                              )}
                             </div>
                             <div
-                              className="inline-flex items-center gap-0.5 p-[2px] rounded-[7px]"
+                              className="inline-flex items-center gap-0.5 p-[2px] rounded-[7px] transition-opacity"
                               style={{
                                 background: "rgba(0,0,0,0.35)",
                                 border: "1px solid rgba(255,255,255,0.06)",
+                                opacity: avatarDisabled ? 0.4 : 1,
+                                pointerEvents: avatarDisabled ? "none" : "auto",
                               }}
+                              aria-disabled={avatarDisabled}
                             >
                               {([
                                 { tab: "default" as const, label: "Default" },
@@ -1656,6 +1708,7 @@ export default function CreatePage() {
                                     key={tab}
                                     type="button"
                                     onClick={() => setAvatarMode(tab)}
+                                    disabled={avatarDisabled}
                                     className={`px-3 py-[4px] rounded-[5px] text-[11.5px] tracking-[-0.003em] transition-colors ${active ? "text-[#ededed]" : "text-zinc-500 hover:text-[#ededed]"}`}
                                     style={active ? { background: "#232323", fontWeight: 500, boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset" } : undefined}
                                   >
@@ -1665,6 +1718,15 @@ export default function CreatePage() {
                               })}
                             </div>
                           </div>
+                          <div
+                            className="transition-opacity"
+                            style={{
+                              opacity: avatarDisabled ? 0.35 : 1,
+                              pointerEvents: avatarDisabled ? "none" : "auto",
+                              filter: avatarDisabled ? "saturate(0.55)" : "none",
+                            }}
+                            aria-disabled={avatarDisabled}
+                          >
 
                           {avatarMode === "default" && (
                             <div
@@ -1674,14 +1736,58 @@ export default function CreatePage() {
                                 border: "1px solid rgba(255,255,255,0.06)",
                               }}
                             >
-                              <div
-                                className="shrink-0 w-[46px] h-[46px] rounded-full"
-                                style={{
-                                  background: "radial-gradient(circle at 35% 30%, #e8c8a8 30%, #c8a888 60%, #604838)",
-                                  border: "1px solid rgba(255,255,255,0.09)",
-                                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
-                                }}
-                              />
+                              <div className="relative shrink-0 w-[46px] h-[46px]" aria-hidden>
+                                {/* Expanding sound-wave rings — signals "live presenter" */}
+                                <motion.span
+                                  className="absolute inset-0 rounded-full border border-emerald-400/40 pointer-events-none"
+                                  animate={{ scale: [1, 1.45], opacity: [0.55, 0] }}
+                                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
+                                />
+                                <motion.span
+                                  className="absolute inset-0 rounded-full border border-emerald-400/30 pointer-events-none"
+                                  animate={{ scale: [1, 1.45], opacity: [0.45, 0] }}
+                                  transition={{
+                                    duration: 2.2,
+                                    repeat: Infinity,
+                                    ease: "easeOut",
+                                    delay: 1.1,
+                                  }}
+                                />
+
+                                {/* Avatar disc with portrait silhouette */}
+                                <div
+                                  className="relative w-full h-full rounded-full overflow-hidden"
+                                  style={{
+                                    background:
+                                      "radial-gradient(circle at 32% 26%, #f0d4b4 25%, #d2ad8a 55%, #6a4c38 95%)",
+                                    border: "1px solid rgba(255,255,255,0.09)",
+                                    boxShadow:
+                                      "inset 0 1px 0 rgba(255,255,255,0.18), 0 2px 6px rgba(0,0,0,0.3)",
+                                  }}
+                                >
+                                  <svg
+                                    className="absolute inset-0 m-auto"
+                                    width="32"
+                                    height="32"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle cx="12" cy="9" r="3.6" fill="rgba(60,40,28,0.5)" />
+                                    <path
+                                      d="M4.4 24 Q 4.4 14.4 12 14.4 Q 19.6 14.4 19.6 24 Z"
+                                      fill="rgba(60,40,28,0.5)"
+                                    />
+                                  </svg>
+                                </div>
+
+                                {/* Active status dot */}
+                                <span
+                                  className="absolute bottom-0 right-0 w-[10px] h-[10px] rounded-full bg-emerald-400"
+                                  style={{
+                                    boxShadow:
+                                      "0 0 0 2px #1c1c1c, 0 0 6px rgba(52,211,153,0.55)",
+                                  }}
+                                />
+                              </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-[12.5px] font-medium text-[#ededed] mb-[3px] flex items-center gap-[7px] tracking-[-0.005em]">
                                   Default presenter
@@ -1776,7 +1882,10 @@ export default function CreatePage() {
                               </div>
                             </div>
                           )}
+                          </div>
                         </div>
+                          );
+                        })()}
                       </div>
                     )}
 
