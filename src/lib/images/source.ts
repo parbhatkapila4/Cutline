@@ -5,8 +5,8 @@ import type { Shot } from "@/lib/types";
 import type { AnalyzedAssets } from "@/lib/assets/types";
 import type { ImageSpec, ImageSpecEntry, ImageSource } from "@/lib/images/types";
 import { deriveImageQuery, type AlreadyUsedForShots } from "@/lib/images/deriveQuery";
-import { searchUnsplash, searchUnsplashMultiple } from "@/lib/images/unsplash";
-import { searchPexels, searchPexelsMultiple } from "@/lib/images/pexels";
+import { searchUnsplash, searchUnsplashMultiple, type UnsplashOrientation } from "@/lib/images/unsplash";
+import { searchPexels, searchPexelsMultiple, type PexelsOrientation } from "@/lib/images/pexels";
 import { generateImageWithDalle } from "@/lib/images/generate";
 import {
   retry,
@@ -73,6 +73,45 @@ function toImageUrl(filePath: string, jobId?: string): string {
 
 const FALLBACK_IMAGE_PATH = "/fallback.png";
 
+/**
+ * Maps a "W:H" aspect ratio string to a stock-photo orientation bucket.
+ *
+ * - `r < 0.7`  → portrait (covers 9:16 = 0.5625)
+ * - `r ≤ 1.3`  → square (covers 4:5 = 0.8, 1:1 = 1.0, 5:4 = 1.25)
+ * - otherwise  → landscape (covers 3:2 = 1.5, 16:9 = 1.78, 21:9 = 2.33)
+ *
+ * Defaults to landscape when the ratio is missing/unparseable so legacy callers
+ * keep their old behavior.
+ */
+function aspectRatioToOrientation(
+  ratio?: string
+): "landscape" | "portrait" | "square" {
+  if (!ratio || typeof ratio !== "string") return "landscape";
+  const parts = ratio.split(":");
+  if (parts.length !== 2) return "landscape";
+  const w = Number(parts[0]);
+  const h = Number(parts[1]);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    return "landscape";
+  }
+  const r = w / h;
+  if (r < 0.7) return "portrait";
+  if (r <= 1.3) return "square";
+  return "landscape";
+}
+
+function toUnsplashOrientation(
+  o: "landscape" | "portrait" | "square"
+): UnsplashOrientation {
+  return o === "square" ? "squarish" : o;
+}
+
+function toPexelsOrientation(
+  o: "landscape" | "portrait" | "square"
+): PexelsOrientation {
+  return o;
+}
+
 function normalizeImageUrl(url: string): string {
   if (!url || url === FALLBACK_IMAGE_PATH || url.startsWith("data:")) return url;
   try {
@@ -99,13 +138,18 @@ export async function sourceImageForShot(
   jobId?: string,
   stockOnly?: boolean,
   usedUrls?: Set<string>,
-  alreadyUsedForOtherShots?: AlreadyUsedForShots
+  alreadyUsedForOtherShots?: AlreadyUsedForShots,
+  aspectRatio?: string
 ): Promise<{ url: string; source: ImageSource; fallbackUsed: boolean; searchQuery?: string; imagePrompt?: string }> {
   const retryConfig = getRetryConfig();
   const used = usedUrls ?? new Set<string>();
   const addUsed = (u: string) => {
     if (u && u !== FALLBACK_IMAGE_PATH && !u.startsWith("data:")) used.add(normalizeImageUrl(u));
   };
+
+  const orientation = aspectRatioToOrientation(aspectRatio);
+  const unsplashOrient = toUnsplashOrientation(orientation);
+  const pexelsOrient = toPexelsOrientation(orientation);
 
   const { searchQuery, imagePrompt } = await retry(
     () => deriveImageQuery(shot, script, intent, alreadyUsedForOtherShots),
@@ -129,7 +173,7 @@ export async function sourceImageForShot(
   let url: string | null = null;
 
   const unsplashMultiple = await retry(
-    () => searchUnsplashMultiple(searchQuery, 15),
+    () => searchUnsplashMultiple(searchQuery, 15, unsplashOrient),
     { ...imageRetryOpts, label: "Unsplash (multiple)" }
   );
   url = pickUnusedUrl(unsplashMultiple, used);
@@ -139,7 +183,7 @@ export async function sourceImageForShot(
   }
 
   const unsplashResult = await retry(
-    () => searchUnsplash(searchQuery),
+    () => searchUnsplash(searchQuery, unsplashOrient),
     { ...imageRetryOpts, label: "Unsplash" }
   );
   url = unsplashResult?.url ?? null;
@@ -149,7 +193,7 @@ export async function sourceImageForShot(
   }
 
   const pexelsMultiple = await retry(
-    () => searchPexelsMultiple(searchQuery, 15),
+    () => searchPexelsMultiple(searchQuery, 15, pexelsOrient),
     { ...imageRetryOpts, label: "Pexels (multiple)" }
   );
   url = pickUnusedUrl(pexelsMultiple, used);
@@ -159,7 +203,7 @@ export async function sourceImageForShot(
   }
 
   const pexelsResult = await retry(
-    () => searchPexels(searchQuery),
+    () => searchPexels(searchQuery, pexelsOrient),
     { ...imageRetryOpts, label: "Pexels" }
   );
   url = pexelsResult?.url ?? null;
@@ -188,7 +232,7 @@ export async function sourceImageForShot(
   const simplifiedQuery = searchQuery.split(/\s+/).slice(0, 3).join(" ") || "abstract visual";
 
   const unsplashSimplified = await retry(
-    () => searchUnsplash(simplifiedQuery),
+    () => searchUnsplash(simplifiedQuery, unsplashOrient),
     { ...imageRetryOpts, label: "Unsplash (simplified)" }
   );
   url = unsplashSimplified?.url ?? null;
@@ -198,7 +242,7 @@ export async function sourceImageForShot(
   }
 
   const pexelsSimplified = await retry(
-    () => searchPexels(simplifiedQuery),
+    () => searchPexels(simplifiedQuery, pexelsOrient),
     { ...imageRetryOpts, label: "Pexels (simplified)" }
   );
   url = pexelsSimplified?.url ?? null;
@@ -237,7 +281,8 @@ export async function sourceImages(
   analyzedAssets?: AnalyzedAssets,
   assetPaths?: AssetPaths,
   jobId?: string,
-  stockOnly?: boolean
+  stockOnly?: boolean,
+  aspectRatio?: string
 ): Promise<ImageSpec> {
   const shots = [...(shotList.shots ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const productPhotoPaths = assetPaths?.productPhotos ?? [];
@@ -269,7 +314,7 @@ export async function sourceImages(
       continue;
     }
 
-    const result = await sourceImageForShot(shot, script, intent, jobId, stockOnly, usedImageUrls, alreadyUsedForOtherShots);
+    const result = await sourceImageForShot(shot, script, intent, jobId, stockOnly, usedImageUrls, alreadyUsedForOtherShots, aspectRatio);
     if (result.searchQuery != null || result.imagePrompt != null) {
       alreadyUsedForOtherShots.push({ searchQuery: result.searchQuery, imagePrompt: result.imagePrompt });
     }
@@ -286,7 +331,7 @@ export async function sourceImages(
     const norm = normalizeImageUrl(entries[j]!.imageUrl);
     if (committedNormalized.has(norm) && entries[j]!.imageUrl !== FALLBACK_IMAGE_PATH) {
       const shot = shots[j]!;
-      const replacement = await sourceImageForShot(shot, script, intent, jobId, stockOnly, new Set(committedNormalized), alreadyUsedForOtherShots);
+      const replacement = await sourceImageForShot(shot, script, intent, jobId, stockOnly, new Set(committedNormalized), alreadyUsedForOtherShots, aspectRatio);
       entries[j] = {
         shotId: shot.id,
         imageUrl: replacement.url,
