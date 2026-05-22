@@ -1,14 +1,22 @@
 const PEXELS_SEARCH = "https://api.pexels.com/v1/search";
 
 export type PexelsResult = { url: string } | null;
+export type PexelsOrientation = "landscape" | "portrait" | "square";
 
 function pickHighRes(
-  src: { original?: string; large2x?: string; large?: string; medium?: string } | undefined
+  src: { original?: string; large2x?: string; large?: string; medium?: string } | undefined,
+  orientation: PexelsOrientation
 ): string | null {
   if (!src) return null;
+  const dimensions =
+    orientation === "portrait"
+      ? "w=2160&h=3840"
+      : orientation === "square"
+      ? "w=2160&h=2160"
+      : "w=3840&h=2160";
   if (typeof src.original === "string" && src.original) {
     const sep = src.original.includes("?") ? "&" : "?";
-    return `${src.original}${sep}auto=compress&cs=tinysrgb&w=3840&h=2160&fit=crop`;
+    return `${src.original}${sep}auto=compress&cs=tinysrgb&${dimensions}&fit=crop`;
   }
   if (typeof src.large2x === "string" && src.large2x) return src.large2x;
   if (typeof src.large === "string" && src.large) return src.large;
@@ -16,7 +24,10 @@ function pickHighRes(
   return null;
 }
 
-export async function searchPexels(query: string): Promise<PexelsResult> {
+export async function searchPexels(
+  query: string,
+  orientation: PexelsOrientation = "landscape"
+): Promise<PexelsResult> {
   const key = process.env.PEXELS_API_KEY;
   if (!key?.trim()) {
     return null;
@@ -24,7 +35,7 @@ export async function searchPexels(query: string): Promise<PexelsResult> {
   const url = new URL(PEXELS_SEARCH);
   url.searchParams.set("query", query.slice(0, 200));
   url.searchParams.set("per_page", "1");
-  url.searchParams.set("orientation", "landscape");
+  url.searchParams.set("orientation", orientation);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15_000);
@@ -61,7 +72,7 @@ export async function searchPexels(query: string): Promise<PexelsResult> {
     }>;
   };
   const first = data.photos?.[0];
-  const imageUrl = pickHighRes(first?.src);
+  const imageUrl = pickHighRes(first?.src, orientation);
   if (typeof imageUrl !== "string" || !imageUrl) {
     return null;
   }
@@ -69,13 +80,17 @@ export async function searchPexels(query: string): Promise<PexelsResult> {
 }
 
 
-export async function searchPexelsMultiple(query: string, count: number = 10): Promise<string[]> {
+export async function searchPexelsMultiple(
+  query: string,
+  count: number = 10,
+  orientation: PexelsOrientation = "landscape"
+): Promise<string[]> {
   const key = process.env.PEXELS_API_KEY;
   if (!key?.trim()) return [];
   const url = new URL(PEXELS_SEARCH);
   url.searchParams.set("query", query.slice(0, 200));
   url.searchParams.set("per_page", String(Math.min(30, Math.max(1, count))));
-  url.searchParams.set("orientation", "landscape");
+  url.searchParams.set("orientation", orientation);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15_000);
   try {
@@ -93,7 +108,7 @@ export async function searchPexelsMultiple(query: string, count: number = 10): P
     };
     const urls: string[] = [];
     for (const p of data.photos ?? []) {
-      const u = pickHighRes(p?.src);
+      const u = pickHighRes(p?.src, orientation);
       if (typeof u === "string" && u && !urls.includes(u)) urls.push(u);
     }
     return urls;
