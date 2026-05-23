@@ -109,15 +109,21 @@ function OutroOverlay({ durationInFrames }: { durationInFrames: number }) {
 const FALLBACK_IMAGE = "/fallback.png";
 
 const DEFAULT_CAPTION_STYLE = {
-  fontFamily: "TikTok Sans",
-  fontSize: 28,
+  fontFamily: "Inter",
+  fontSize: 26,
+  fontWeight: 700,
+  letterSpacing: -0.01,
   fontColor: "#FFFFFF",
   strokeColor: "#000000",
-  strokeWidth: 1.2,
+  strokeWidth: 1.6,
   alignment: "center" as const,
   verticalPosition: "bottom" as const,
-  yOffset: 0,
-  styleType: "clean" as const,
+  yOffset: -56,
+  styleType: "pop" as const,
+  shadowColor: "rgba(0,0,0,0.6)",
+  shadowBlur: 6,
+  shadowOffsetX: 0,
+  shadowOffsetY: 2,
 };
 
 export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
@@ -234,7 +240,7 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
           captionOnly
           captions={captionsForTimeline}
           captionStyle={DEFAULT_CAPTION_STYLE}
-          captionPosition={{ x: 0.5, y: 0.82 }}
+          captionPosition={{ x: 0.5, y: 0.86 }}
         />
       )}
 
