@@ -541,7 +541,7 @@ export default function CreatePage() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="relative min-h-full flex items-center justify-center px-6 py-6"
+              className="relative min-h-[calc(100dvh-64px)] flex items-center justify-center px-6 py-6"
             >
               {(() => {
                 const totalStages = STAGES.length;
@@ -796,7 +796,7 @@ export default function CreatePage() {
                       </div>
                     </motion.div>
 
-                    <p className="mt-4 text-center text-[11px] text-zinc-600">
+                    <p className="mt-4 text-center text-[11.5px] text-zinc-300/85">
                       You can leave this tab open. We will keep working in the background.
                     </p>
                   </div>
@@ -812,76 +812,112 @@ export default function CreatePage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="relative min-h-full w-full max-w-[min(1680px,96vw)] mx-auto px-4 sm:px-6 xl:px-10 2xl:px-14 py-6 sm:py-8"
+              className="relative min-h-[calc(100dvh-64px)] w-full max-w-[980px] mx-auto px-4 sm:px-6 py-10 sm:py-14"
             >
+              {/* Slate header — director-monitor chrome */}
               <motion.div
-                initial={{ opacity: 0, y: -8 }}
+                initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 }}
-                className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                transition={{ duration: 0.6, delay: 0.05 }}
+                className="mb-7 flex items-center gap-3 font-mono text-[10.5px] tracking-[0.32em] uppercase text-zinc-500"
               >
-                <div className="flex items-center gap-3">
-                  <div className="relative shrink-0">
-                    <div className="absolute inset-0 rounded-xl bg-emerald-400/25 blur-md" aria-hidden />
-                    <div className="relative w-10 h-10 rounded-xl bg-linear-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-900/30">
-                      <svg className="w-5 h-5 text-emerald-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.6} aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h1 className="text-lg sm:text-xl font-semibold text-white tracking-tight leading-tight">
-                        Your video is ready
-                      </h1>
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-emerald-500/12 text-emerald-300 border border-emerald-500/25">
-                        MP4
-                      </span>
-                    </div>
-                    <p className="text-[12.5px] text-zinc-400 mt-0.5">
-                      Generated successfully. Download it, share it, or refine it on the dashboard.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={reset}
-                  className="group relative inline-flex items-center justify-center gap-2 self-start sm:self-auto rounded-xl border border-white/12 bg-white/3 pl-3 pr-3.5 py-2 text-sm font-medium text-zinc-300 hover:text-white hover:bg-amber-500/8 hover:border-amber-400/35 transition-colors"
-                >
-                  <span className="relative flex items-center justify-center w-5 h-5 rounded-md bg-white/6 group-hover:bg-amber-400/20 transition-colors">
-                    <svg className="w-3 h-3 text-zinc-300 group-hover:text-amber-200 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.6} aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
+                <span className="inline-flex items-center gap-2">
+                  <span className="relative inline-flex w-1.5 h-1.5" aria-hidden>
+                    <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+                    <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   </span>
-                  Create another
-                </button>
+                  <span className="text-emerald-300/90 font-semibold">Ready</span>
+                </span>
+                <span className="text-white/15">/</span>
+                <span className="text-zinc-400">MP4</span>
+                <span className="text-white/15">·</span>
+                <span className="text-zinc-400">1080P</span>
+                {videoDurationSec != null && (
+                  <>
+                    <span className="text-white/15">·</span>
+                    <span className="text-zinc-400 tabular-nums">{formatElapsed(videoDurationSec)}</span>
+                  </>
+                )}
+                <span className="text-white/15">·</span>
+                <span className="text-zinc-400">{aspectRatio.replace(":", "·")}</span>
+                <span className="h-px flex-1 bg-white/[0.06] mx-1" aria-hidden />
+                <span className="text-zinc-600 tabular-nums hidden sm:inline">
+                  Render {formatElapsed(elapsedSec)}
+                </span>
               </motion.div>
+
+              {/* Massive title — film-slate moment */}
+              <motion.h1
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.75, delay: 0.12, ease: [0.2, 0.7, 0.2, 1] }}
+                className="font-black uppercase leading-[0.86] tracking-[-0.04em] text-[clamp(2.4rem,7vw,5.5rem)] text-transparent bg-clip-text mb-3"
+                style={{
+                  fontFamily: "'Inter', 'Helvetica Neue', system-ui, sans-serif",
+                  fontWeight: 900,
+                  backgroundImage: "linear-gradient(180deg, #ffffff 0%, #e9e9ea 55%, #b9b9bd 100%)",
+                }}
+              >
+                Your video is ready.
+              </motion.h1>
+
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.28, duration: 0.6 }}
+                className="text-[14px] text-zinc-400 leading-relaxed mb-8 max-w-[60ch]"
+              >
+                Generated successfully and saved to your library. Download the MP4, share it with anyone, or refine the angle in your dashboard.
+              </motion.p>
 
               {completionMessage ? (
                 <motion.div
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="mb-6 flex items-start gap-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-[13px] text-amber-100/95 leading-relaxed"
+                  transition={{ delay: 0.35 }}
+                  className="mb-7 flex items-start gap-2.5 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] backdrop-blur-md px-4 py-3 text-[12.5px] text-amber-100/90 leading-relaxed"
                 >
-                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-amber-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <span>{completionMessage}</span>
                 </motion.div>
               ) : null}
 
-              <div className="grid gap-5 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15 }}
-                  className="relative rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 shadow-2xl shadow-black/60 isolate"
-                >
-                  <div className="pointer-events-none absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-amber-400/55 to-transparent z-10" />
-                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/5 z-10" aria-hidden />
+              {/* Video — center stage with cinema frame */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.7, ease: [0.2, 0.7, 0.2, 1] }}
+                className="relative mb-6"
+              >
+                {/* Cinema corner brackets */}
+                <span aria-hidden className="pointer-events-none absolute -top-2 -left-2 w-3.5 h-px bg-white/40 z-20" />
+                <span aria-hidden className="pointer-events-none absolute -top-2 -left-2 h-3.5 w-px bg-white/40 z-20" />
+                <span aria-hidden className="pointer-events-none absolute -top-2 -right-2 w-3.5 h-px bg-white/40 z-20" />
+                <span aria-hidden className="pointer-events-none absolute -top-2 -right-2 h-3.5 w-px bg-white/40 z-20" />
+                <span aria-hidden className="pointer-events-none absolute -bottom-2 -left-2 w-3.5 h-px bg-white/40 z-20" />
+                <span aria-hidden className="pointer-events-none absolute -bottom-2 -left-2 h-3.5 w-px bg-white/40 z-20" />
+                <span aria-hidden className="pointer-events-none absolute -bottom-2 -right-2 w-3.5 h-px bg-white/40 z-20" />
+                <span aria-hidden className="pointer-events-none absolute -bottom-2 -right-2 h-3.5 w-px bg-white/40 z-20" />
 
-                  <div className="relative w-full aspect-video bg-black z-1 contain-layout">
+                <div
+                  className="relative rounded-2xl overflow-hidden border border-white/[0.10] bg-zinc-950/85 backdrop-blur-md shadow-[0_40px_100px_-30px_rgba(0,0,0,0.9)] isolate"
+                >
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/[0.04] z-10" aria-hidden />
+
+                  <div
+                    className="relative bg-black z-1 contain-layout mx-auto w-full"
+                    style={{
+                      aspectRatio: aspectRatio.replace(":", " / "),
+                      maxHeight: "78vh",
+                      // For vertical / square ratios the height bound kicks in first;
+                      // letting width auto-compute keeps the player narrow + centered
+                      // instead of being stretched into a landscape box.
+                      width: "auto",
+                      maxWidth: "100%",
+                    }}
+                  >
                     <video
                       src={videoUrl}
                       controls
@@ -894,222 +930,179 @@ export default function CreatePage() {
                           setVideoDurationSec(Math.round(d));
                         }
                       }}
-                      className="absolute inset-0 h-full w-full object-cover transform-gpu"
+                      className="absolute inset-0 h-full w-full object-contain transform-gpu"
                     />
-                    <div className="pointer-events-none absolute top-3 right-3 z-10 flex items-center gap-2">
-                      {videoDurationSec != null ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-black/70 text-zinc-100 border border-white/15 shadow-lg shadow-black/40 tabular-nums">
-                          {formatElapsed(videoDurationSec)}
-                        </span>
-                      ) : null}
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-200 border border-emerald-400/30 shadow-lg shadow-black/40">
-                        <span className="relative flex h-1.5 w-1.5">
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
-                        </span>
-                        Ready
-                      </span>
-                    </div>
                   </div>
 
-                  <div className="relative z-1 px-4 sm:px-5 py-3.5 border-t border-white/8 bg-black/70 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11.5px] text-zinc-400">
-                    <span className="inline-flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5 text-amber-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h18v14H3V5zM3 9h18M7 5v14M17 5v14" />
-                      </svg>
-                      <span className="text-zinc-300 font-medium">MP4 · 1080p</span>
-                    </span>
-                    {videoDurationSec != null ? (
-                      <>
-                        <span className="h-3 w-px bg-white/10" aria-hidden />
-                        <span className="inline-flex items-center gap-1.5">
-                          <svg className="w-3.5 h-3.5 text-amber-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                          </svg>
-                          <span className="text-zinc-300 tabular-nums font-medium">
-                            {formatElapsed(videoDurationSec)} runtime
-                          </span>
-                        </span>
-                      </>
-                    ) : null}
-                    <span className="h-3 w-px bg-white/10" aria-hidden />
-                    <span className="inline-flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5 text-teal-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM12 8v4l2.5 1.5" />
-                      </svg>
-                      <span className="text-zinc-300 tabular-nums">{formatElapsed(elapsedSec)} render</span>
-                    </span>
-                    <span className="h-3 w-px bg-white/10 hidden sm:inline-block" aria-hidden />
-                    <span className="hidden sm:inline-flex items-center gap-1.5 ml-auto">
-                      <svg className="w-3.5 h-3.5 text-emerald-300/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                </div>
+              </motion.div>
+
+              {/* Primary action toolbar — single dominant Download + utility actions */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55 }}
+                className="flex flex-col sm:flex-row gap-2 mb-10"
+              >
+                <a
+                  href={`/api/generate/${jobId}/download`}
+                  className="group relative flex-1 inline-flex items-center justify-center gap-3 px-5 py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-[14px] font-semibold tracking-[-0.005em] shadow-[0_14px_32px_-10px_rgba(251,191,36,0.55)] hover:shadow-[0_18px_38px_-10px_rgba(251,191,36,0.7)] transition-all overflow-hidden"
+                >
+                  <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-linear-to-r from-transparent via-white/40 to-transparent" aria-hidden />
+                  <svg className="relative w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span className="relative">Download MP4</span>
+                  <span className="relative inline-flex items-center font-mono text-[10px] font-bold tracking-[0.16em] uppercase opacity-65">
+                    1080p
+                  </span>
+                  <svg className="relative w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!videoUrl) return;
+                    navigator.clipboard.writeText(window.location.origin + videoUrl);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className={`group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border text-[13px] font-medium transition-colors ${
+                    copied
+                      ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                      : "border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22]"
+                  }`}
+                  aria-live="polite"
+                >
+                  {copied ? (
+                    <>
+                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
-                      <span className="text-zinc-300">Saved to your library</span>
-                    </span>
-                  </div>
-                </motion.div>
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                      </svg>
+                      Copy link
+                    </>
+                  )}
+                </button>
 
-                <motion.aside
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.22 }}
-                  className="space-y-4"
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!videoUrl) return;
+                    const shareUrl = window.location.origin + videoUrl;
+                    if (shareSupported) {
+                      try {
+                        await navigator.share({
+                          title: "My Cutline video",
+                          text: "Made with Cutline.",
+                          url: shareUrl,
+                        });
+                        return;
+                      } catch {
+                      }
+                    }
+                    navigator.clipboard.writeText(shareUrl);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22] text-[13px] font-medium transition-colors"
+                  title={shareSupported ? "Share via system" : "Copy share link"}
                 >
-                  <div className="relative rounded-2xl border border-white/10 bg-zinc-950 overflow-hidden">
-                    <div className="pointer-events-none absolute -top-20 -right-16 h-40 w-40 rounded-full bg-amber-500/8 opacity-60" aria-hidden />
-                    <div className="relative p-4 sm:p-5">
-                      <div className="flex items-center justify-between mb-3.5">
-                        <h3 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-[0.16em] flex items-center gap-2">
-                          <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-amber-400/15">
-                            <svg className="w-2.5 h-2.5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </span>
-                          Share &amp; Save
-                        </h3>
-                        <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] font-medium text-zinc-500">
-                          <span className="text-zinc-600">⌘</span>D
-                        </kbd>
-                      </div>
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                  </svg>
+                  Share
+                </button>
+              </motion.div>
 
-                      <div className="space-y-2">
-                        <a
-                          href={`/api/generate/${jobId}/download`}
-                          className="group relative inline-flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-linear-to-br from-amber-300 via-amber-400 to-amber-500 text-zinc-950 text-sm font-semibold shadow-lg shadow-amber-900/30 hover:shadow-amber-700/40 hover:-translate-y-0.5 transition-all overflow-hidden"
-                        >
-                          <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-linear-to-r from-transparent via-white/35 to-transparent" />
-                          <svg className="relative w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2} aria-hidden>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                          <span className="relative">Download MP4</span>
-                          <span className="relative ml-auto inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider opacity-70">
-                            1080p
-                            <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                            </svg>
-                          </span>
-                        </a>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!videoUrl) return;
-                              navigator.clipboard.writeText(window.location.origin + videoUrl);
-                              setCopied(true);
-                              setTimeout(() => setCopied(false), 2000);
-                            }}
-                            className={`group inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-[12.5px] font-medium transition-all ${copied
-                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                              : "border-white/12 bg-white/3 text-zinc-300 hover:text-white hover:bg-white/6 hover:border-white/20"
-                              }`}
-                            aria-live="polite"
-                          >
-                            {copied ? (
-                              <>
-                                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                                </svg>
-                                Copy link
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!videoUrl) return;
-                              const shareUrl = window.location.origin + videoUrl;
-                              if (shareSupported) {
-                                try {
-                                  await navigator.share({
-                                    title: "My Cutline video",
-                                    text: "Made with Cutline.",
-                                    url: shareUrl,
-                                  });
-                                  return;
-                                } catch {
-                                }
-                              }
-                              navigator.clipboard.writeText(shareUrl);
-                              setCopied(true);
-                              setTimeout(() => setCopied(false), 2000);
-                            }}
-                            className="group inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-white/12 bg-white/3 text-zinc-300 hover:text-white hover:bg-white/6 hover:border-white/20 text-[12.5px] font-medium transition-all"
-                            title={shareSupported ? "Share via system" : "Copy share link"}
-                          >
-                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-                            </svg>
-                            Share
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Link
-                    href={jobId ? `/dashboard/videos/${jobId}` : "/dashboard"}
-                    className="group relative block rounded-2xl border border-white/10 bg-linear-to-br from-zinc-950 via-zinc-950 to-zinc-900 p-4 sm:p-5 overflow-hidden hover:border-amber-400/30 transition-colors"
-                  >
-                    <div className="pointer-events-none absolute -bottom-16 -left-16 h-36 w-36 rounded-full bg-teal-500/8 opacity-50" aria-hidden />
-                    <div className="relative flex items-start gap-3">
-                      <div className="shrink-0 w-9 h-9 rounded-xl bg-amber-500/12 border border-amber-400/25 flex items-center justify-center">
-                        <svg className="w-4 h-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13.5px] font-semibold text-white leading-tight">
-                          Refine with AI
-                        </p>
-                        <p className="text-[12px] text-zinc-400 mt-1 leading-relaxed">
-                          Tweak the tone, pacing, or angle in your dashboard.
-                        </p>
-                      </div>
-                      <svg
-                        className="w-4 h-4 mt-1 text-zinc-500 group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        aria-hidden
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              {/* Refine — full-width card, deliberate next-step CTA */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.68 }}
+                className="mb-4"
+              >
+                <div className="flex items-center gap-3 mb-3 font-mono text-[9.5px] font-semibold tracking-[0.32em] uppercase text-zinc-500">
+                  <span>Iterate</span>
+                  <span className="h-px flex-1 bg-white/[0.06]" aria-hidden />
+                </div>
+                <Link
+                  href={jobId ? `/dashboard/videos/${jobId}` : "/dashboard"}
+                  className="group relative block rounded-2xl border border-white/[0.08] bg-zinc-950/60 backdrop-blur-md hover:bg-zinc-950/80 hover:border-white/[0.18] transition-colors overflow-hidden"
+                >
+                  <div className="relative flex items-center gap-4 p-5">
+                    <div className="shrink-0 w-11 h-11 rounded-xl bg-amber-500/12 border border-amber-400/30 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
                       </svg>
                     </div>
-                  </Link>
-
-                  <div className={`grid gap-2 text-[12px] ${isEnterprisePlan(userPlan) ? "grid-cols-1" : "grid-cols-2"}`}>
-                    <Link
-                      href="/dashboard"
-                      className="group inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-white/8 bg-white/3 text-zinc-400 hover:text-white hover:bg-white/6 hover:border-white/15 transition-all"
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14.5px] font-semibold text-white leading-tight tracking-[-0.005em]">
+                        Refine with AI
+                      </p>
+                      <p className="text-[12.5px] text-zinc-400 mt-1 leading-relaxed">
+                        Tweak the tone, pacing, or angle in your dashboard. Same prompt, different cut.
+                      </p>
+                    </div>
+                    <svg
+                      className="w-4 h-4 text-zinc-500 group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
-                      </svg>
-                      All my videos
-                    </Link>
-                    {!isEnterprisePlan(userPlan) ? (
-                      <Link
-                        href="/pricing"
-                        className="group inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-amber-400/20 bg-amber-500/6 text-amber-200/90 hover:text-amber-100 hover:bg-amber-500/12 hover:border-amber-400/35 transition-all"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.405 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811V8.69zM12.75 8.689c0-.864.933-1.405 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061a1.125 1.125 0 01-1.683-.977V8.69z" />
-                        </svg>
-                        Upgrade plan
-                      </Link>
-                    ) : null}
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
-                </motion.aside>
-              </div>
+                </Link>
+              </motion.div>
+
+              {/* Footer: Create another + library shortcuts */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.82 }}
+                className="flex flex-col sm:flex-row sm:items-center gap-2.5 mt-6 pt-6 border-t border-white/[0.06]"
+              >
+                <button
+                  onClick={reset}
+                  className="group inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/[0.12] bg-white/[0.03] text-[13px] font-medium text-zinc-300 hover:text-white hover:bg-white/[0.07] hover:border-white/[0.22] backdrop-blur-md transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5 transition-transform duration-500 group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Create another
+                </button>
+                <Link
+                  href="/dashboard"
+                  className="group inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] text-[13px] font-medium text-zinc-400 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.16] backdrop-blur-md transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+                  </svg>
+                  All my videos
+                </Link>
+                {!isEnterprisePlan(userPlan) ? (
+                  <Link
+                    href="/pricing"
+                    className="group inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-amber-400/20 bg-amber-500/[0.06] text-[13px] font-medium text-amber-200/90 hover:text-amber-100 hover:bg-amber-500/[0.12] hover:border-amber-400/40 backdrop-blur-md transition-colors sm:ml-auto"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.405 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811V8.69zM12.75 8.689c0-.864.933-1.405 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061a1.125 1.125 0 01-1.683-.977V8.69z" />
+                    </svg>
+                    Upgrade plan
+                  </Link>
+                ) : null}
+              </motion.div>
             </motion.main>
           )}
 
@@ -1120,7 +1113,7 @@ export default function CreatePage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              className="relative min-h-full px-4 sm:px-6 py-5 sm:py-7"
+              className="relative min-h-[calc(100dvh-64px)] px-4 sm:px-6 py-5 sm:py-7"
             >
               <div className="w-full max-w-[1240px] mx-auto">
                 <motion.div

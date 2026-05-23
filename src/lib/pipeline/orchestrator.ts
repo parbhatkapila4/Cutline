@@ -183,6 +183,81 @@ function scenarioVisualBeatForChunk(chunkIndex: number): string {
   return ` ${beats[chunkIndex % beats.length]}`;
 }
 
+/**
+ * Without an explicit subject description, Veo falls into its trained mean —
+ * which is basically "young business-casual woman in a glass-walled office."
+ * Every cinematic render ends up looking like the same person. These two
+ * pools give the model concrete, varied human + setting briefs. Selection is
+ * keyed on jobId so the same job is deterministic but different jobs get
+ * meaningfully different output.
+ */
+const CINEMATIC_SUBJECT_POOL: readonly string[] = [
+  "warm middle-aged East Asian man with salt-and-pepper hair and round wire-frame glasses, charcoal henley shirt with rolled sleeves",
+  "early-30s Afro-Latina woman with a curly bob, gold hoop earrings, mustard denim jacket over a white tee",
+  "late-20s white man with a soft beard, hoodie pushed up to the forearms, headphones around the neck",
+  "late-30s South Asian woman with sleek straight hair past the shoulders, slate blazer over a cream t-shirt",
+  "Black woman in her 50s with gray locs in a low bun, oversized statement glasses, deep-burgundy turtleneck",
+  "athletic early-20s mixed-race woman with a high ponytail, oversized college hoodie, no makeup",
+  "Mediterranean-looking man in his early 40s, short salt-and-pepper beard, white henley with sleeves rolled, leather watch",
+  "Korean-American woman in her late 20s, sharp blunt bangs, oversized cream sweater, layered gold chains",
+  "Black man in his early 30s, low fade haircut, gold-framed glasses, terracotta corduroy jacket over a black tee",
+  "Brazilian woman in her early 30s, sun-streaked wavy hair, light freckles, olive utility shirt unbuttoned over a white tank",
+  "Pacific Islander man in his mid-30s, a tattoo peeking from the collar, navy crewneck sweatshirt, gentle smile",
+  "white woman in her late 40s, silver-streaked auburn pixie cut, oversized linen shirt, single minimalist hoop earring",
+];
+
+const CINEMATIC_SETTING_POOL: readonly string[] = [
+  "third-wave coffee shop with exposed brick and pendant lighting, warm afternoon sun through the front window",
+  "open-plan loft with leafy houseplants and a wood-and-steel desk softly out of focus behind",
+  "cozy independent bookshop interior, floor-to-ceiling shelves, warm reading lamps in the background",
+  "urban side street with brick facade and fairy lights strung overhead, evening blue hour",
+  "modern studio apartment kitchen, marble counter, terracotta wall, soft late-morning light",
+  "neighborhood park bench under leafy trees, golden hour, dappled sunlight across the subject",
+  "minimalist hotel lobby with brushed-concrete walls and a sculptural pendant lamp overhead",
+  "industrial design studio, raw concrete, oversized monstera plant, daylight from clerestory windows",
+  "rooftop terrace at dusk, blurred city skyline behind, string lights overhead",
+  "vintage record store with crate-dug LPs visible in soft-focus background",
+  "bright airy bakery, marble counter and brass fixtures, croissants softly out of focus",
+  "creative co-working space, whiteboard sketches softly blurred behind, sun streaming sideways through tall windows",
+];
+
+function hashStringForCinematic(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+function pickCinematicSubject(jobId: string | undefined): string {
+  const key = (jobId ?? "") + ":subject";
+  return CINEMATIC_SUBJECT_POOL[
+    hashStringForCinematic(key) % CINEMATIC_SUBJECT_POOL.length
+  ]!;
+}
+
+function pickCinematicSetting(jobId: string | undefined): string {
+  const key = (jobId ?? "") + ":setting";
+  return CINEMATIC_SETTING_POOL[
+    hashStringForCinematic(key) % CINEMATIC_SETTING_POOL.length
+  ]!;
+}
+
+function buildCinematicBasePrompt(jobId: string | undefined, aspectRatio?: string): string {
+  const subject = pickCinematicSubject(jobId);
+  const setting = pickCinematicSetting(jobId);
+  // Orientation hint must AGREE with the config.aspectRatio we pass to Veo.
+  // Saying "vertical" in the prompt while requesting a landscape config makes
+  // Veo non-deterministically return portrait clips that then render rotated
+  // sideways in the landscape composition. Derive from the user's choice.
+  const isPortrait = aspectRatio === "9:16" || aspectRatio === "4:5";
+  const orientationHint = isPortrait
+    ? "vertical phone-style framing"
+    : "horizontal widescreen framing";
+  return `Ultra-real influencer-style video, ${orientationHint}, shot like a genuine creator reel. SUBJECT: ${subject}. LOCATION: ${setting}. The presenter speaks directly to camera while naturally inhabiting the space — small head movements, natural blinks, hands occasionally entering frame, breath between phrases, micro-pauses. Practical camera with subtle handheld movement, shallow depth of field, environmental details kept in soft focus. Avoid generic newsroom or static talking-head framing. Avoid corporate stock-footage look.`;
+}
+
 function splitScriptIntoChunks(
   fullText: string,
   targetWordsPerChunk: number = VEO_WORDS_PER_CHUNK
@@ -613,6 +688,7 @@ async function runPipelineOnce(
       brandBrain: options.brandBrain,
       locale: options.locale,
       jobId,
+      ...(talkingRealMode ? { talkingRealMode } : {}),
     }
     : undefined;
   if (!loadedArtifacts) {
@@ -966,7 +1042,7 @@ async function runPipelineOnce(
         const singleClipBase =
           talkingObjectStyle === "real"
             ? talkingRealMode === "scenario"
-              ? `Ultra-real influencer-style vertical video in a believable real-world environment. The presenter is naturally moving through context-relevant locations tied to the topic (e.g. product setting, office, street, studio, gym, garage) while speaking directly to camera. Include subtle environmental storytelling, practical camera movement, depth, and real-life details so it feels like a genuine creator reel, not a static talking head.${avatarPromptSuffix}`
+              ? `${buildCinematicBasePrompt(jobId, aspectRatio)}${avatarPromptSuffix}`
               : `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
             : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
         const singleLock =
@@ -1116,7 +1192,7 @@ async function runPipelineOnce(
           const base =
             talkingObjectStyle === "real"
               ? talkingRealMode === "scenario"
-                ? `Ultra-real influencer-style vertical video in a believable real-world environment. The presenter is naturally moving through context-relevant locations tied to the topic (e.g. product setting, office, street, studio, gym, garage) while speaking directly to camera. Include subtle environmental storytelling, practical camera movement, depth, and real-life details so it feels like a genuine creator reel, not a static talking head.${avatarPromptSuffix}`
+                ? `${buildCinematicBasePrompt(jobId, aspectRatio)}${avatarPromptSuffix}`
                 : `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
               : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
           const multiRealBeat =
@@ -1396,7 +1472,8 @@ async function runPipelineOnce(
           analyzedAssets,
           assetPaths,
           jobId,
-          isPreview
+          isPreview,
+          aspectRatio
         ),
       {
         maxRetries: retryConfig.image.maxRetries,
