@@ -30,6 +30,31 @@ Rules:
 
 Output only valid JSON.`;
 
+// Hard tone override for the "Cinematic scenes" path (on-location, real person on
+// camera). Without this the LLM defaults to a narrator-voice register that reads
+// as classic AI: parallel comma series, "Studies show", "Did you know", clean
+// transitions. This snippet aggressively pulls the voice toward how a real
+// person actually talks to camera.
+const CINEMATIC_DELIVERY_SNIPPET = `
+
+CINEMATIC ON-CAMERA DELIVERY (overrides any narrator instincts):
+The footage shows a real person speaking to camera in a real location (street, café, hallway, room — not a studio). Every line must read like that person actually talking to a friend, not delivering a presentation.
+
+Voice rules (mandatory):
+- Contractions in EVERY sentence: it's, don't, you're, that's, here's, we're, you'll, can't, won't, isn't, doesn't, gonna, wanna. If a draft has "it is" — rewrite to "it's". No exceptions.
+- Vary sentence length aggressively. Mix a short reaction (3-5 words) with a longer beat (10-15 words) with a tight punchline. Never three same-length sentences in a row.
+- Casual openers are welcome, mixed: "Look,", "So,", "Honestly,", "Here's the thing,", "Real talk —", "Listen,", "And look,". Do not repeat the same opener across shots.
+- Start sentences with "And", "But", "So", "Because" when it sounds natural — that's how people speak.
+
+Banned (these are AI tells, instant kill):
+- "Studies show", "Research indicates", "Did you know", "It's important to note", "In addition", "Furthermore", "Moreover", "Additionally"
+- "Today we're going to talk about", "Let's dive in", "Let's explore", "Without further ado"
+- Parallel triplets: "calmer, sharper, faster" / "smarter, stronger, better" / any "A, B, and C" rhythm that lists qualities
+- Lists or enumerations ("first... second... third...")
+- Em-dashes used to stack two parallel clauses ("X — and Y — and Z")
+
+The person is reacting to something they figured out, not lecturing from above. Direct, slightly emphatic, sometimes mid-thought. Imperfect is fine; performative is not.`;
+
 function buildSystemPrompt(options?: {
   mode?: "slideshow" | "talking_object";
   durationSeconds?: number;
@@ -37,6 +62,7 @@ function buildSystemPrompt(options?: {
   platform?: Platform;
   brandBrain?: BrandBrainInput;
   locale?: string;
+  talkingRealMode?: "studio" | "scenario";
 }): string {
   let prompt = BASE_SYSTEM_PROMPT;
   const variationSnippet = options?.variationStrategy
@@ -48,6 +74,9 @@ function buildSystemPrompt(options?: {
       ? getPlatformPromptSnippet(options.platform, "script")
       : "";
   if (platformSnippet) prompt += platformSnippet;
+  if (options?.talkingRealMode === "scenario") {
+    prompt += CINEMATIC_DELIVERY_SNIPPET;
+  }
 
   const loc = options?.locale?.trim();
   if (loc && loc.toLowerCase() !== "en" && !loc.toLowerCase().startsWith("en-")) {
@@ -210,6 +239,7 @@ export type GenerateScriptOptions = {
   brandBrain?: BrandBrainInput;
   locale?: string;
   jobId?: string;
+  talkingRealMode?: "studio" | "scenario";
 };
 
 async function requestScriptFromModel(
@@ -301,6 +331,7 @@ export async function generateScript(
     platform: options?.platform,
     brandBrain: options?.brandBrain,
     locale: options?.locale,
+    talkingRealMode: options?.talkingRealMode,
   });
   const n = shotList.shots.length;
 

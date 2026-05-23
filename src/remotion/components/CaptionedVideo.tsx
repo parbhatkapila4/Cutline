@@ -17,6 +17,8 @@ interface CaptionPhrase {
 interface CaptionStyle {
   fontFamily: string;
   fontSize: number;
+  fontWeight?: number;
+  letterSpacing?: number;
   fontColor: string;
   strokeColor: string;
   strokeWidth: number;
@@ -625,8 +627,10 @@ const CaptionContainer: React.FC<{
   const baseTextStyle: React.CSSProperties = {
     fontFamily: getFontFamily(style.fontFamily),
     fontSize: style.fontSize || 28,
-    fontWeight: 500,
-    lineHeight: 1.25,
+    fontWeight: style.fontWeight ?? 500,
+    letterSpacing:
+      typeof style.letterSpacing === "number" ? `${style.letterSpacing}em` : undefined,
+    lineHeight: 1.18,
     whiteSpace: "pre-wrap",
     wordBreak: "break-word",
     maxWidth: "100%",

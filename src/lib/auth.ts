@@ -49,6 +49,11 @@ export const auth = betterAuth({
         google: {
           clientId: process.env.GOOGLE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          // Force Google to surface its account chooser every time. Without this,
+          // Google silently completes OAuth using whatever Google session the
+          // browser already has, which manifests as "auto sign-in" with the
+          // previous account whenever a user lands on /auth/sign-in.
+          prompt: "select_account",
         },
       }
       : {}),
