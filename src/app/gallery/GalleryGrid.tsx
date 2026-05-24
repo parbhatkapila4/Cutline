@@ -265,7 +265,7 @@ export function GalleryGrid({ items }: { items: GalleryItem[] }) {
                 Make one of these for your brief.
               </h2>
               <p className="text-zinc-400 text-sm leading-relaxed max-w-[52ch]">
-                Type a sentence. The 12-stage director writes, narrates, and renders. First video is free — no card.
+                Type a sentence. The 12-stage director writes, narrates, and renders. First video is free - no card.
               </p>
             </div>
             <Link

@@ -763,7 +763,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
         label: "AI brief",
         body: "Match Acme's tone: 80% of approved copy uses 'we' over 'you'.",
       },
-      stat: { value: "−28%", label: "delivery time" },
+      stat: { value: "-28%", label: "delivery time" },
       variations: 6,
     },
     card2: {

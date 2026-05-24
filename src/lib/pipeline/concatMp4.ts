@@ -5,7 +5,7 @@ import path from "path";
 
 
 
-export const CROSSFADE_DURATION_SECONDS = 1;
+export const CROSSFADE_DURATION_SECONDS = 0.6;
 
 function getFfmpegPath(): string {
   const envPath = process.env.FFMPEG_PATH;
@@ -261,8 +261,12 @@ function crossfadeTwoClips(
   const resolvedB = path.resolve(pathB);
   const resolvedOut = path.resolve(outputPath);
 
+  // "fade" = soft cross-dissolve, the standard cinematic transition between
+  // shots. The previous "slideleft" looked like an iMovie 2008 wipe — wrong
+  // register for the brand. tri curves on the audio give a smooth equal-power
+  // crossfade so the voice doesn't dip into silence at the seam.
   const filterWithAudioCrossfade =
-    `[0:v][1:v]xfade=transition=slideleft:duration=${crossfadeSec}:offset=${offsetSec}[v];` +
+    `[0:v][1:v]xfade=transition=fade:duration=${crossfadeSec}:offset=${offsetSec}[v];` +
     `[0:a][1:a]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[a]`;
 
   const result = runFfmpegCrossfade(
@@ -279,7 +283,7 @@ function crossfadeTwoClips(
   const trimStartB = Math.min(crossfadeSec, dB - 0.1);
   const trimEndB = dB;
   const filterVideoXfadeAudioConcat =
-    `[0:v][1:v]xfade=transition=slideleft:duration=${crossfadeSec}:offset=${offsetSec}[v];` +
+    `[0:v][1:v]xfade=transition=fade:duration=${crossfadeSec}:offset=${offsetSec}[v];` +
     `[0:a]atrim=0:${trimEndA},asetpts=PTS-STARTPTS[a0];` +
     `[1:a]atrim=${trimStartB}:${trimEndB},asetpts=PTS-STARTPTS[a1];` +
     `[a0][a1]concat=n=2:v=0:a=1[a]`;

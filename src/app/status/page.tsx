@@ -102,7 +102,7 @@ async function fetchMetrics(): Promise<MetricsPayload | null> {
 }
 
 function formatDuration(ms: number): string {
-  if (ms <= 0) return "—";
+  if (ms <= 0) return "-";
   if (ms < 1000) return `${ms} ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
   const m = Math.floor(ms / 60_000);
