@@ -6,7 +6,7 @@ type SkeletonProps = {
 };
 
 /**
- * Skeleton primitive — a subtly shimmering placeholder block.
+ * Skeleton primitive - a subtly shimmering placeholder block.
  *
  * Uses the global `skeleton-sheen` keyframe (declared in globals.css) which
  * translates a narrow gradient sweep across the element. Pass `tone="dark"`

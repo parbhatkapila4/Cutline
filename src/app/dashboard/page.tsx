@@ -506,160 +506,98 @@ export default function DashboardPage() {
 
         <main className="flex-1 min-w-0 min-h-0 overflow-y-auto pt-8 pb-16 px-6 lg:px-10 xl:px-12 scrollbar-hide">
 
-          <section id="overview" className="mb-8">
-            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-br from-zinc-950 via-zinc-950 to-black p-8 sm:p-10">
-              <div className="pointer-events-none absolute -top-24 -right-24 w-[520px] h-[520px] rounded-full bg-linear-to-br from-amber-500/15 via-orange-500/8 to-transparent blur-3xl" />
-              <div className="pointer-events-none absolute -bottom-32 -left-32 w-[420px] h-[420px] rounded-full bg-linear-to-tr from-teal-500/12 via-emerald-500/6 to-transparent blur-3xl" />
-              <div
-                className="pointer-events-none absolute inset-0 opacity-[0.035]"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-                  backgroundSize: "48px 48px",
-                }}
-              />
+          <section id="overview" className="mb-10">
+            {(() => {
+              const totalVideos = videos.length;
+              const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+              const thisWeek = videos.filter((v) => {
+                const t = typeof v.timestamp === "number" ? v.timestamp : NaN;
+                return Number.isFinite(t) && t >= weekAgo;
+              }).length;
+              const completed = videos.filter((v) => v.status === "completed").length;
 
-              <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
-                <div className="max-w-2xl">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 mb-5">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400" />
+              return (
+                <>
+                  {/* Slate strip: plan + key counts */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-7 font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-500">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="relative inline-flex w-1.5 h-1.5" aria-hidden>
+                        <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+                        <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      </span>
+                      <span className="text-emerald-300/90 font-semibold">
+                        {usageLoading ? "Loading" : `${usage.planLabel} Plan`}
+                      </span>
                     </span>
-                    <span className="text-[11px] font-semibold text-amber-200 uppercase tracking-widest">
-                      {usageLoading ? "Loading" : `${usage.planLabel} plan · Studio ready`}
+                    <span className="text-white/15">/</span>
+                    <span className="text-zinc-400">Studio Ready</span>
+                    <span className="h-px flex-1 bg-white/[0.06] mx-1 min-w-[24px]" aria-hidden />
+                    <span className="text-zinc-400 tabular-nums">
+                      <span className="text-zinc-300">{totalVideos}</span>{" "}
+                      {totalVideos === 1 ? "Video" : "Videos"}
+                    </span>
+                    <span className="text-white/15">·</span>
+                    <span className="text-zinc-400 tabular-nums">
+                      <span className="text-zinc-300">{thisWeek}</span> This Week
+                    </span>
+                    <span className="text-white/15 hidden sm:inline">·</span>
+                    <span className="text-zinc-400 tabular-nums hidden sm:inline">
+                      <span className="text-zinc-300">{completed}</span> Shipped
                     </span>
                   </div>
 
-                  <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.05]">
-                    <span className="text-white">Welcome back.</span>{" "}
-                    <span className="bg-linear-to-r from-amber-200 via-orange-300 to-amber-400 bg-clip-text text-transparent">
-                      Let&apos;s create something.
-                    </span>
+                  {/* Massive title - silver gradient (matches landing hero + /create done view) */}
+                  <h1
+                    className="font-black uppercase leading-[0.86] tracking-[-0.04em] text-[clamp(2.6rem,6.5vw,5.5rem)] text-transparent bg-clip-text mb-4 max-w-[14ch]"
+                    style={{
+                      fontFamily:
+                        "'Inter', 'Helvetica Neue', system-ui, sans-serif",
+                      fontWeight: 900,
+                      backgroundImage:
+                        "linear-gradient(180deg, #ffffff 0%, #e9e9ea 55%, #b9b9bd 100%)",
+                    }}
+                  >
+                    Welcome back.
                   </h1>
 
-                  <p className="text-base text-zinc-400 mt-4 leading-relaxed">
-                    One sentence in. A finished video out. Script, visuals, voice, and edit.
-                    <span className="text-zinc-300"> ready in about 60 seconds.</span>
+                  <p className="text-[14.5px] sm:text-[15.5px] text-zinc-400 leading-relaxed max-w-[58ch] mb-8">
+                    One sentence in. A finished MP4 out - script, visuals, voice, and edit, rendered in about 60 seconds.
                   </p>
 
-                  <div className="mt-7 flex flex-wrap items-center gap-3">
+                  {/* CTA row */}
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <Link
                       href="/create"
-                      className="group relative inline-flex items-center gap-2 bg-white text-black font-semibold px-5 py-3 rounded-xl hover:bg-zinc-100 transition-all shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_8px_32px_rgba(255,255,255,0.12)]"
+                      className="group relative inline-flex items-center gap-2.5 pl-5 pr-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-[14px] font-semibold tracking-[-0.005em] shadow-[0_14px_32px_-10px_rgba(251,191,36,0.55)] hover:shadow-[0_18px_38px_-10px_rgba(251,191,36,0.7)] transition-all overflow-hidden"
                     >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M8 7h8" />
-                        <path d="M8 12h6" />
-                        <path d="M8 17h4" />
-                        <path d="M17 7v10l4-2V9l-4-2Z" />
+                      <span
+                        className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-linear-to-r from-transparent via-white/40 to-transparent"
+                        aria-hidden
+                      />
+                      <svg className="relative w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14M5 12h14" />
                       </svg>
-                      Create new video
-                      <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <span className="relative">Create new video</span>
+                      <svg className="relative w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
                         <path d="M5 12h14M12 5l7 7-7 7" />
                       </svg>
                     </Link>
+
                     {!isEnterprisePlan(usage.plan) ? (
                       <Link
                         href="/pricing"
-                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-white/10 bg-white/2 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all"
+                        className="group inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-amber-400/20 bg-amber-500/[0.06] backdrop-blur-md text-[13px] font-medium text-amber-200/90 hover:text-amber-100 hover:bg-amber-500/[0.12] hover:border-amber-400/40 transition-colors sm:ml-auto"
                       >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.405 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811V8.69zM12.75 8.689c0-.864.933-1.405 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061a1.125 1.125 0 01-1.683-.977V8.69z" />
+                        </svg>
                         Upgrade plan
                       </Link>
                     ) : null}
                   </div>
-                </div>
-
-                <div className="relative shrink-0 hidden lg:flex items-center justify-center w-[360px] h-[260px]">
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_60%_40%,rgba(251,146,60,0.18),transparent_60%)]" />
-
-                  <div className="relative w-[300px] rounded-2xl border border-white/10 bg-linear-to-br from-zinc-900 to-black shadow-2xl shadow-black/60 overflow-hidden">
-                    <div className="pointer-events-none absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px)", backgroundSize: "100% 3px" }} />
-                    <div className="pointer-events-none absolute -inset-y-8 inset-x-0 scan-sweep bg-linear-to-b from-transparent via-amber-300/4 to-transparent" />
-
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
-                        <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
-                        <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
-                      </div>
-                      <span className="text-[9px] font-mono text-zinc-500 tracking-widest uppercase">cutline · editor</span>
-                      <div className="flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5">
-                        <span className="live-dot w-1 h-1 rounded-full bg-rose-400" />
-                        <span className="text-[8px] font-bold text-rose-300 tracking-widest">REC</span>
-                      </div>
-                    </div>
-
-                    <div className="relative aspect-video bg-black">
-                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(251,191,36,0.14),transparent_70%)]" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <svg
-                          className="w-10 h-10 text-amber-200/90"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.8}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M17.6 7.2a7.5 7.5 0 1 0 0 9.6" />
-                          <path d="M10 8v8" />
-                          <path d="M10 8l7 8" />
-                        </svg>
-                      </div>
-                      <div className="absolute top-2 left-2 text-[8px] font-mono tracking-widest text-amber-200/70 uppercase">Shot 03 / 06</div>
-                      <div className="absolute bottom-2 right-2 text-[9px] font-mono tabular-nums text-amber-100/80">00:00:47</div>
-                    </div>
-
-                    <div className="relative h-14 px-3 flex items-center gap-[3px] border-t border-white/5 bg-black/40">
-                      {Array.from({ length: 36 }).map((_, i) => {
-                        const h = 18 + ((i * 37) % 70);
-                        return (
-                          <span
-                            key={i}
-                            className="wave-bar flex-1 rounded-full bg-linear-to-t from-amber-600/60 via-amber-400 to-amber-200"
-                            style={{
-                              height: `${h}%`,
-                              animationDelay: `${i * 55}ms`,
-                              animationDuration: `${950 + ((i * 23) % 500)}ms`,
-                            }}
-                          />
-                        );
-                      })}
-                      <span className="playhead-sweep pointer-events-none absolute top-1 bottom-1 w-px bg-amber-200 shadow-[0_0_10px_2px_rgba(253,224,71,0.6)]" />
-                    </div>
-
-                    <div className="flex items-center justify-between px-3 py-1.5 border-t border-white/5 bg-black/60">
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">TIMELINE · 00:47 / 01:00</span>
-                      <div className="flex items-center gap-1">
-                        <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[9px] font-mono text-emerald-300/90 tracking-widest uppercase">Rendering</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="chip-float absolute -top-1 -left-3 flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur px-2.5 py-1.5 shadow-xl shadow-black/60">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/15 text-amber-300">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                    </span>
-                    <div className="leading-tight">
-                      <div className="text-[9px] font-mono tracking-widest text-zinc-500 uppercase">Script</div>
-                      <div className="text-[10px] font-medium text-white">6 shots ready</div>
-                    </div>
-                  </div>
-
-                  <div className="chip-float-alt absolute -bottom-2 -right-3 flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur px-2.5 py-1.5 shadow-xl shadow-black/60">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-300">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    </span>
-                    <div className="leading-tight">
-                      <div className="text-[9px] font-mono tracking-widest text-zinc-500 uppercase">Voice</div>
-                      <div className="text-[10px] font-medium text-white">Synced</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                </>
+              );
+            })()}
           </section>
 
           <section id="videos" className="mb-10">
@@ -715,30 +653,56 @@ export default function DashboardPage() {
                 <button type="button" onClick={() => fetchVideos()} className="mt-4 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors">Try again</button>
               </div>
             ) : filteredVideos.length === 0 ? (
-              <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-16 text-center">
-                <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-zinc-900">
-                  <svg className="w-5 h-5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <p className="text-base font-medium text-white">
-                  {videos.length === 0 ? "No videos yet" : "No videos match your filters"}
-                </p>
-                <p className="text-sm text-zinc-500 mt-1 max-w-sm mx-auto">
-                  {videos.length === 0
-                    ? "Generate your first video from a single sentence. Script, visuals, voice, and edit. Done in about a minute."
-                    : "Try clearing the search or switching filters."}
-                </p>
-                <Link
-                  href="/create"
-                  className="inline-flex items-center gap-2 mt-5 bg-white text-black font-semibold px-4 py-2 rounded-lg text-sm hover:bg-zinc-200 transition-colors"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Create your first video
-                </Link>
-              </div>
+              (() => {
+                const isFiltered = videos.length > 0;
+                return (
+                  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] px-6 py-20 sm:py-24 text-center">
+                    <div className="mx-auto mb-6 flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.10] bg-zinc-900/60 text-zinc-500">
+                      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        {isFiltered ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10 17a7 7 0 110-14 7 7 0 010 14z" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        )}
+                      </svg>
+                    </div>
+
+                    <h3 className="text-[16px] font-semibold text-white tracking-[-0.01em] mb-1.5">
+                      {isFiltered ? "Nothing matches that filter" : "Your library is empty"}
+                    </h3>
+
+                    <p className="text-[13px] text-zinc-500 leading-relaxed max-w-[42ch] mx-auto mb-6">
+                      {isFiltered
+                        ? "Try clearing the search or switching to a different status."
+                        : "Generate your first video from a single sentence — script, visuals, voice, and edit in about 60 seconds."}
+                    </p>
+
+                    <div className="flex items-center justify-center gap-2">
+                      {isFiltered ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery("");
+                            setVideoFilter("all");
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-white/[0.10] bg-white/[0.03] text-[12.5px] font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.20] transition-colors"
+                        >
+                          Clear filters
+                        </button>
+                      ) : null}
+                      <Link
+                        href="/create"
+                        className="group inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white text-zinc-950 text-[12.5px] font-semibold hover:bg-zinc-100 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        {isFiltered ? "Create new video" : "Create your first video"}
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })()
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
                 {filteredVideos.map((video) => (
