@@ -184,7 +184,7 @@ function scenarioVisualBeatForChunk(chunkIndex: number): string {
 }
 
 /**
- * Without an explicit subject description, Veo falls into its trained mean —
+ * Without an explicit subject description, Veo falls into its trained mean -
  * which is basically "young business-casual woman in a glass-walled office."
  * Every cinematic render ends up looking like the same person. These two
  * pools give the model concrete, varied human + setting briefs. Selection is
@@ -230,23 +230,33 @@ function hashStringForCinematic(s: string): number {
   return Math.abs(h);
 }
 
-function pickCinematicSubject(jobId: string | undefined): string {
-  const key = (jobId ?? "") + ":subject";
+function pickCinematicSubject(
+  jobId: string | undefined,
+  chunkIndex: number = 0
+): string {
+  const key = (jobId ?? "") + ":subject:" + String(chunkIndex);
   return CINEMATIC_SUBJECT_POOL[
     hashStringForCinematic(key) % CINEMATIC_SUBJECT_POOL.length
   ]!;
 }
 
-function pickCinematicSetting(jobId: string | undefined): string {
-  const key = (jobId ?? "") + ":setting";
+function pickCinematicSetting(
+  jobId: string | undefined,
+  chunkIndex: number = 0
+): string {
+  const key = (jobId ?? "") + ":setting:" + String(chunkIndex);
   return CINEMATIC_SETTING_POOL[
     hashStringForCinematic(key) % CINEMATIC_SETTING_POOL.length
   ]!;
 }
 
-function buildCinematicBasePrompt(jobId: string | undefined, aspectRatio?: string): string {
-  const subject = pickCinematicSubject(jobId);
-  const setting = pickCinematicSetting(jobId);
+function buildCinematicBasePrompt(
+  jobId: string | undefined,
+  aspectRatio?: string,
+  chunkIndex: number = 0
+): string {
+  const subject = pickCinematicSubject(jobId, chunkIndex);
+  const setting = pickCinematicSetting(jobId, chunkIndex);
   // Orientation hint must AGREE with the config.aspectRatio we pass to Veo.
   // Saying "vertical" in the prompt while requesting a landscape config makes
   // Veo non-deterministically return portrait clips that then render rotated
@@ -255,7 +265,7 @@ function buildCinematicBasePrompt(jobId: string | undefined, aspectRatio?: strin
   const orientationHint = isPortrait
     ? "vertical phone-style framing"
     : "horizontal widescreen framing";
-  return `Ultra-real influencer-style video, ${orientationHint}, shot like a genuine creator reel. SUBJECT: ${subject}. LOCATION: ${setting}. The presenter speaks directly to camera while naturally inhabiting the space — small head movements, natural blinks, hands occasionally entering frame, breath between phrases, micro-pauses. Practical camera with subtle handheld movement, shallow depth of field, environmental details kept in soft focus. Avoid generic newsroom or static talking-head framing. Avoid corporate stock-footage look.`;
+  return `Ultra-real influencer-style video, ${orientationHint}, shot like a genuine creator reel. SUBJECT: ${subject}. LOCATION: ${setting}. The presenter speaks directly to camera while naturally inhabiting the space - small head movements, natural blinks, hands occasionally entering frame, breath between phrases, micro-pauses. Practical camera with subtle handheld movement, shallow depth of field, environmental details kept in soft focus. Avoid generic newsroom or static talking-head framing. Avoid corporate stock-footage look.`;
 }
 
 function splitScriptIntoChunks(
@@ -1192,23 +1202,30 @@ async function runPipelineOnce(
           const base =
             talkingObjectStyle === "real"
               ? talkingRealMode === "scenario"
-                ? `${buildCinematicBasePrompt(jobId, aspectRatio)}${avatarPromptSuffix}`
+                ? `${buildCinematicBasePrompt(jobId, aspectRatio, i)}${avatarPromptSuffix}`
                 : `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
               : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
           const multiRealBeat =
             talkingObjectStyle === "real" && N > 1
               ? talkingRealMode === "scenario"
-                ? scenarioVisualBeatForChunk(i)
+                ? " This segment must show a DIFFERENT presenter from prior clips — distinct person, distinct ethnicity/age/wardrobe, distinct location — documentary-style multi-voice cut. Do NOT carry over the previous speaker."
                 : " This segment: shift background or wardrobe slightly from the prior clip so it does not look duplicated; same person."
               : "";
           const baseAugmented = `${base}${multiRealBeat}`;
           const chunkText = textChunks[i]!;
+          // Cinematic mode intentionally uses a NEW person per chunk, so we
+          // must NOT apply the character-lock suffix — that suffix tells Veo
+          // "keep the same person across clips," which is the opposite of
+          // what cinematic mode wants. Studio mode still gets the lock.
+          const isCinematicScenarioChunk =
+            talkingObjectStyle === "real" && talkingRealMode === "scenario";
           const lockVariant =
-            talkingObjectStyle === "real" && (talkingRealMode === "scenario" || N > 1)
+            talkingObjectStyle === "real" && N > 1 && !isCinematicScenarioChunk
               ? ("wardrobeAndSetOk" as const)
               : ("default" as const);
-          const lockSuffix =
-            lockVariant === "wardrobeAndSetOk"
+          const lockSuffix = isCinematicScenarioChunk
+            ? ""
+            : lockVariant === "wardrobeAndSetOk"
               ? veoCharacterLockSuffix(options.characterLockId, { variant: "wardrobeAndSetOk" })
               : veoCharacterLockSuffix(options.characterLockId);
           let flow: string;

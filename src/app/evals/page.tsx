@@ -17,8 +17,8 @@ type Pass = { stage: string; pct: number; sample: number; note?: string };
 
 const CURRENT_PASSES: Pass[] = [
   { stage: "Intent classification", pct: 98.4, sample: 612, note: "audience / tone / goal correctly extracted" },
-  { stage: "Narrative arc validity", pct: 94.8, sample: 612, note: "3–5 beats, no orphan beats" },
-  { stage: "Shot list well-formed", pct: 96.2, sample: 612, note: "8–12 shots, durations sum within ±5% of target" },
+  { stage: "Narrative arc validity", pct: 94.8, sample: 612, note: "3-5 beats, no orphan beats" },
+  { stage: "Shot list well-formed", pct: 96.2, sample: 612, note: "8-12 shots, durations sum within ±5% of target" },
   { stage: "Script length match", pct: 91.6, sample: 612, note: "spoken text fits estimated TTS duration ±10%" },
   { stage: "Subtitle word alignment", pct: 89.1, sample: 612, note: "post-TTS refinement aligns ≥95% of words" },
   { stage: "Image source per shot", pct: 99.7, sample: 612, note: "every shot has a non-placeholder image (Unsplash → DALL·E → Pexels)" },
@@ -114,7 +114,7 @@ export default function EvalsPage() {
               <h2 className="text-2xl font-semibold text-[#0a0a0a] mb-4">Approach</h2>
               <div className="space-y-4 text-[14px] text-gray-700 leading-relaxed">
                 <p>
-                  Cutline runs a 12-stage pipeline. We evaluate quality stage-by-stage rather than only at the final-MP4 level — a single end-to-end pass/fail tells you nothing about <em>where</em> the failure was. Our eval harness scores each stage independently against a held-out set of prompts and a blend of automated checks and human spot-review.
+                  Cutline runs a 12-stage pipeline. We evaluate quality stage-by-stage rather than only at the final-MP4 level - a single end-to-end pass/fail tells you nothing about <em>where</em> the failure was. Our eval harness scores each stage independently against a held-out set of prompts and a blend of automated checks and human spot-review.
                 </p>
                 <p>
                   We deliberately don&rsquo;t run evals against the same model we use in production. Stage-level checks use cheaper deterministic validators where possible (length, structure, schema conformance), and human review where structure isn&rsquo;t enough to judge quality (script tone, voice naturalness, image relevance).
@@ -130,9 +130,9 @@ export default function EvalsPage() {
               <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden divide-y divide-gray-100">
                 {[
                   { stage: "Intent", pass: "Audience inferred, goal classified into one of {explain, persuade, tease, demo, narrate}, tone classified, durationSeconds within bounds." },
-                  { stage: "Narrative", pass: "3–5 beats, each beat has a purpose, no two beats with identical purpose, total estimated duration within ±10% of target." },
-                  { stage: "Shots", pass: "8–12 shots produced, every shot has a purpose / duration / text-density / motion-hint, durations sum within ±5% of target." },
-                  { stage: "Script", pass: "Per-shot text exists or is explicitly null (silence). No empty strings. Words-per-second estimate within natural-speech range (2.0–3.5)." },
+                  { stage: "Narrative", pass: "3-5 beats, each beat has a purpose, no two beats with identical purpose, total estimated duration within ±10% of target." },
+                  { stage: "Shots", pass: "8-12 shots produced, every shot has a purpose / duration / text-density / motion-hint, durations sum within ±5% of target." },
+                  { stage: "Script", pass: "Per-shot text exists or is explicitly null (silence). No empty strings. Words-per-second estimate within natural-speech range (2.0-3.5)." },
                   { stage: "Subtitles (draft)", pass: "Every spoken segment chunked into ≤7-word lines. Estimated timing per chunk monotonic." },
                   { stage: "TTS", pass: "Audio file written for every non-silent segment. Duration within ±15% of script-estimated duration. Word timings present where supported." },
                   { stage: "Subtitle refine", pass: "≥95% of subtitle chunks aligned to actual word timings (post-TTS). No chunk overlaps the next chunk's start." },
@@ -161,11 +161,11 @@ export default function EvalsPage() {
                 Run on every job in production and on every CI build against the regression suite:
               </p>
               <ul className="space-y-2 text-[14px] text-gray-700 leading-relaxed list-disc pl-5">
-                <li><span className="font-semibold text-[#0a0a0a]">Schema validation</span> — every stage&rsquo;s output is parsed by a Zod schema before the next stage runs. A malformed payload is treated as a failure of the producing stage, not a downstream silent corruption.</li>
-                <li><span className="font-semibold text-[#0a0a0a]">Quality gates</span> — explicit checks in <span className="font-mono text-[12.5px] bg-gray-100 px-1.5 py-0.5 rounded">src/lib/pipeline/qualityGate.ts</span> for shot count, duration totals, words-per-second, and subtitle alignment ratio.</li>
-                <li><span className="font-semibold text-[#0a0a0a]">Strict script mapping</span> — <span className="font-mono text-[12.5px] bg-gray-100 px-1.5 py-0.5 rounded">strictScriptMap.ts</span> verifies that every shot in the shot list has corresponding script text (or explicit silence).</li>
-                <li><span className="font-semibold text-[#0a0a0a]">Render validation</span> — post-render ffprobe checks codec, duration, file size. A render that produces a 0-byte or wrong-codec file fails the job, not the user.</li>
-                <li><span className="font-semibold text-[#0a0a0a]">Model fallback telemetry</span> — when the primary OpenRouter model fails, we record the fallback hit. Stages with elevated fallback rates trigger investigation.</li>
+                <li><span className="font-semibold text-[#0a0a0a]">Schema validation</span> - every stage&rsquo;s output is parsed by a Zod schema before the next stage runs. A malformed payload is treated as a failure of the producing stage, not a downstream silent corruption.</li>
+                <li><span className="font-semibold text-[#0a0a0a]">Quality gates</span> - explicit checks in <span className="font-mono text-[12.5px] bg-gray-100 px-1.5 py-0.5 rounded">src/lib/pipeline/qualityGate.ts</span> for shot count, duration totals, words-per-second, and subtitle alignment ratio.</li>
+                <li><span className="font-semibold text-[#0a0a0a]">Strict script mapping</span> - <span className="font-mono text-[12.5px] bg-gray-100 px-1.5 py-0.5 rounded">strictScriptMap.ts</span> verifies that every shot in the shot list has corresponding script text (or explicit silence).</li>
+                <li><span className="font-semibold text-[#0a0a0a]">Render validation</span> - post-render ffprobe checks codec, duration, file size. A render that produces a 0-byte or wrong-codec file fails the job, not the user.</li>
+                <li><span className="font-semibold text-[#0a0a0a]">Model fallback telemetry</span> - when the primary OpenRouter model fails, we record the fallback hit. Stages with elevated fallback rates trigger investigation.</li>
               </ul>
             </section>
 
@@ -175,11 +175,11 @@ export default function EvalsPage() {
                 Automated checks catch <em>structural</em> failures. They do not catch a script that&rsquo;s grammatical but boring, a voice that&rsquo;s correctly synced but unpleasant, or an image that&rsquo;s technically relevant but tone-deaf. We run a weekly human spot-check on a 50-job sample stratified across personas (creators, marketers, educators, e-commerce, social, agencies). Each job is reviewed against:
               </p>
               <ul className="mt-3 space-y-1.5 text-[14px] text-gray-700 leading-relaxed list-disc pl-5">
-                <li>Script naturalness — does it sound like a human wrote it for a 30-second video?</li>
-                <li>Voice clarity — pacing, pronunciation, emotional fit.</li>
-                <li>Image relevance — does each shot&rsquo;s image match what the script is saying at that moment?</li>
-                <li>Caption legibility on mobile — burned-in subtitle styling on real phone screens.</li>
-                <li>Edit pacing — too slow, too fast, or right.</li>
+                <li>Script naturalness - does it sound like a human wrote it for a 30-second video?</li>
+                <li>Voice clarity - pacing, pronunciation, emotional fit.</li>
+                <li>Image relevance - does each shot&rsquo;s image match what the script is saying at that moment?</li>
+                <li>Caption legibility on mobile - burned-in subtitle styling on real phone screens.</li>
+                <li>Edit pacing - too slow, too fast, or right.</li>
               </ul>
               <p className="mt-3 text-[14px] text-gray-700 leading-relaxed">
                 Findings get filed as issues. Repeat patterns become regression-suite entries.
@@ -204,7 +204,7 @@ export default function EvalsPage() {
                 ))}
               </div>
               <p className="text-[12px] text-gray-500 mt-4 leading-relaxed">
-                Sample size <span className="font-mono">n = 612</span> reflects production jobs over the trailing 30 days excluding cancelled jobs. Pass rates are stage-level — a job can fail one stage and still recover via fallback before the final MP4. End-to-end render success (97.9%) is the user-visible metric.
+                Sample size <span className="font-mono">n = 612</span> reflects production jobs over the trailing 30 days excluding cancelled jobs. Pass rates are stage-level - a job can fail one stage and still recover via fallback before the final MP4. End-to-end render success (97.9%) is the user-visible metric.
               </p>
             </section>
 

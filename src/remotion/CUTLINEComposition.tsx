@@ -26,7 +26,7 @@ function OutroOverlay({ durationInFrames }: { durationInFrames: number }) {
   });
 
   // Wordmark fades in starting at 30% (after the dim has begun) and settles
-  // into full opacity by 75% — last 25% of the outro the mark holds.
+  // into full opacity by 75% - last 25% of the outro the mark holds.
   const markOpacity = interpolate(progress, [0.3, 0.75], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
