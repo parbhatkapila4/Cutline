@@ -138,7 +138,7 @@ export default function DocsPage() {
                   The Cutline API exposes a single asynchronous workflow: <span className="text-zinc-200">submit a job</span>, <span className="text-zinc-200">poll for status</span>, <span className="text-zinc-200">download when ready</span>. All endpoints are versioned under <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/</code>.
                 </p>
                 <p>
-                  Responses are JSON. Error responses always carry a stable, branchable <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">code</code> field — never branch on <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">error</code> message text.
+                  Responses are JSON. Error responses always carry a stable, branchable <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">code</code> field - never branch on <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">error</code> message text.
                 </p>
               </div>
 
@@ -157,7 +157,7 @@ export default function DocsPage() {
             <section id="auth" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Authentication</h2>
               <p className="text-[14px] text-zinc-400 leading-relaxed mb-3">
-                API requests are authenticated with an API key sent in the <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">X-API-Key</code> header. Generate keys from your dashboard. Each key is shown <em>once</em> at creation time and stored as a hash on our side — keep it safe.
+                API requests are authenticated with an API key sent in the <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">X-API-Key</code> header. Generate keys from your dashboard. Each key is shown <em>once</em> at creation time and stored as a hash on our side - keep it safe.
               </p>
               <CodeBlock language="curl">{`curl https://cutline.cloud/api/v1/generate/jobs \\
   -H "X-API-Key: ck_live_••••••••••••••••"`}</CodeBlock>
@@ -168,18 +168,18 @@ export default function DocsPage() {
               <Endpoint method="POST" path="/api/v1/generate" />
 
               <p className="text-[14px] text-zinc-400 leading-relaxed mb-3">
-                Submits a generation job. Returns immediately with a <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">jobId</code> — rendering happens asynchronously in a worker. Poll status (next section) until <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">completed</code> or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">failed</code>.
+                Submits a generation job. Returns immediately with a <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">jobId</code> - rendering happens asynchronously in a worker. Poll status (next section) until <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">completed</code> or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">failed</code>.
               </p>
 
               <h3 className="text-[15px] font-semibold text-zinc-200 mt-6 mb-2">Request body</h3>
               <ParamTable
                 rows={[
-                  { name: "input", type: "string", required: true, desc: "Your one-sentence prompt. 5–500 characters." },
-                  { name: "durationSeconds", type: "number", desc: "Target video length, 10–60. Defaults to inferred from prompt." },
+                  { name: "input", type: "string", required: true, desc: "Your one-sentence prompt. 5-500 characters." },
+                  { name: "durationSeconds", type: "number", desc: "Target video length, 10-60. Defaults to inferred from prompt." },
                   { name: "mode", type: "string", desc: "\"slideshow\" (default) or \"talking_object\" (Veo-backed character video)." },
                   { name: "captions", type: "string", desc: "\"on\" (default) or \"off\". Burned-in subtitles." },
                   { name: "platform", type: "string", desc: "\"general\" / \"linkedin\" / \"twitter\" / \"youtube_shorts\". Tunes pacing and tone." },
-                  { name: "assetIds", type: "string[]", desc: "IDs from /api/assets/upload — logos, product photos, reference media." },
+                  { name: "assetIds", type: "string[]", desc: "IDs from /api/assets/upload - logos, product photos, reference media." },
                   { name: "brandColors", type: "object", desc: "{ primary?: hex, secondary?: hex }. Used by the visual stage." },
                   { name: "callbackUrl", type: "string", desc: "Webhook URL fired on terminal job state. See Webhooks below." },
                   { name: "textModel", type: "string", desc: "OpenRouter model ID override for this job's LLM stages." },
@@ -265,7 +265,7 @@ job_id = res.json()["jobId"]`}</CodeBlock>
               <Endpoint method="GET" path="/api/v1/generate/:jobId/download" />
 
               <p className="text-[14px] text-zinc-400 leading-relaxed">
-                Streams the rendered MP4 as <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">Content-Disposition: attachment</code>. Files are retained for <span className="font-mono text-zinc-200">VIDEO_RETENTION_HOURS</span> (default 24h) — fetch within the window. Returns <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">404 VIDEO_NOT_FOUND</code> after expiry.
+                Streams the rendered MP4 as <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">Content-Disposition: attachment</code>. Files are retained for <span className="font-mono text-zinc-200">VIDEO_RETENTION_HOURS</span> (default 24h) - fetch within the window. Returns <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">404 VIDEO_NOT_FOUND</code> after expiry.
               </p>
 
               <CodeBlock language="curl">{`curl -L \\
@@ -279,7 +279,7 @@ job_id = res.json()["jobId"]`}</CodeBlock>
               <Endpoint method="POST" path="/api/v1/generate/:jobId/cancel" />
 
               <p className="text-[14px] text-zinc-400 leading-relaxed">
-                Sets a Redis cancellation flag. The orchestrator checks the flag between every pipeline stage, so cancellation is eventual — the current stage finishes before the job exits. Returns <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">409 JOB_CANNOT_CANCEL</code> if the job is already in a terminal state.
+                Sets a Redis cancellation flag. The orchestrator checks the flag between every pipeline stage, so cancellation is eventual - the current stage finishes before the job exits. Returns <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">409 JOB_CANNOT_CANCEL</code> if the job is already in a terminal state.
               </p>
             </section>
 
@@ -318,7 +318,7 @@ job_id = res.json()["jobId"]`}</CodeBlock>
             <section id="idempotency" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Idempotency</h2>
               <p className="text-[14px] text-zinc-400 leading-relaxed">
-                Pass <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">X-Idempotency-Key</code> (max 128 chars) on POST to safely retry network failures. The same key within a 24h window returns the same <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">jobId</code> — duplicate work is never enqueued. We recommend a UUID per logical user-action.
+                Pass <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">X-Idempotency-Key</code> (max 128 chars) on POST to safely retry network failures. The same key within a 24h window returns the same <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">jobId</code> - duplicate work is never enqueued. We recommend a UUID per logical user-action.
               </p>
             </section>
 
@@ -350,10 +350,10 @@ job_id = res.json()["jobId"]`}</CodeBlock>
                 Per-IP and per-key limits, enforced by Redis with sliding windows.
               </p>
               <ul className="text-[14px] text-zinc-400 leading-relaxed space-y-1.5 list-disc pl-5">
-                <li><span className="text-zinc-200 font-mono">5/hour</span> — POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate</code> per IP (anonymous)</li>
-                <li><span className="text-zinc-200 font-mono">60/min</span> — GET <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate/:jobId</code> per IP</li>
-                <li><span className="text-zinc-200 font-mono">20/hour</span> — POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/assets/upload</code> per IP</li>
-                <li>Authenticated quotas are determined by your plan — see <Link href="/pricing" className="underline text-zinc-200">pricing</Link>.</li>
+                <li><span className="text-zinc-200 font-mono">5/hour</span> - POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate</code> per IP (anonymous)</li>
+                <li><span className="text-zinc-200 font-mono">60/min</span> - GET <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate/:jobId</code> per IP</li>
+                <li><span className="text-zinc-200 font-mono">20/hour</span> - POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/assets/upload</code> per IP</li>
+                <li>Authenticated quotas are determined by your plan - see <Link href="/pricing" className="underline text-zinc-200">pricing</Link>.</li>
               </ul>
               <p className="text-[14px] text-zinc-400 leading-relaxed mt-4">
                 <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">429</code> responses include a <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">Retry-After</code> header (seconds).

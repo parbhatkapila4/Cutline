@@ -164,7 +164,7 @@ const PLATFORM_OPTIONS: readonly Platform[] = ["general", "youtube_shorts", "twi
 
 // Each platform has a canonical frame. Shorts is hard-locked to vertical by YouTube;
 // the rest default to 16:9. Users can still override the aspect ratio after picking
-// a platform — selection just nudges them to the right starting point.
+// a platform - selection just nudges them to the right starting point.
 const PLATFORM_DEFAULT_ASPECT: Record<Platform, AspectRatio> = {
   general: "16:9",
   linkedin: "16:9",
@@ -814,7 +814,7 @@ export default function CreatePage() {
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               className="relative min-h-[calc(100dvh-64px)] w-full max-w-[980px] mx-auto px-4 sm:px-6 py-10 sm:py-14"
             >
-              {/* Slate header — director-monitor chrome */}
+              {/* Slate header - director-monitor chrome */}
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -846,7 +846,7 @@ export default function CreatePage() {
                 </span>
               </motion.div>
 
-              {/* Massive title — film-slate moment */}
+              {/* Massive title - film-slate moment */}
               <motion.h1
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -884,7 +884,7 @@ export default function CreatePage() {
                 </motion.div>
               ) : null}
 
-              {/* Video — center stage with cinema frame */}
+              {/* Video - center stage with cinema frame */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -937,7 +937,7 @@ export default function CreatePage() {
                 </div>
               </motion.div>
 
-              {/* Primary action toolbar — single dominant Download + utility actions */}
+              {/* Primary action toolbar - single dominant Download + utility actions */}
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1023,7 +1023,7 @@ export default function CreatePage() {
                 </button>
               </motion.div>
 
-              {/* Refine — full-width card, deliberate next-step CTA */}
+              {/* Refine - full-width card, deliberate next-step CTA */}
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1555,7 +1555,7 @@ export default function CreatePage() {
                                       <span className="absolute bottom-[3px] left-[3px] h-[5px] w-px bg-white/55" />
                                       <span className="absolute bottom-[3px] right-[3px] w-[5px] h-px bg-white/55" />
                                       <span className="absolute bottom-[3px] right-[3px] h-[5px] w-px bg-white/55" />
-                                      {/* Portrait silhouette — head + shoulders, gently breathing */}
+                                      {/* Portrait silhouette - head + shoulders, gently breathing */}
                                       <motion.svg
                                         className="absolute"
                                         style={{ left: "50%", top: "52%", x: "-50%", y: "-50%" }}
@@ -1744,7 +1744,7 @@ export default function CreatePage() {
                               }}
                             >
                               <div className="relative shrink-0 w-[46px] h-[46px]" aria-hidden>
-                                {/* Expanding sound-wave rings — signals "live presenter" */}
+                                {/* Expanding sound-wave rings - signals "live presenter" */}
                                 <motion.span
                                   className="absolute inset-0 rounded-full border border-emerald-400/40 pointer-events-none"
                                   animate={{ scale: [1, 1.45], opacity: [0.55, 0] }}
