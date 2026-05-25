@@ -30,7 +30,7 @@ const ENTRIES: Entry[] = [
       { tag: "shipped", text: "New left-aligned hero with iridescent stepped diamond visual" },
       { tag: "shipped", text: "Persistent 'live' announcement bar at cutline.cloud" },
       { tag: "improved", text: "Refactored navigation header with status indicator and tighter spacing" },
-      { tag: "improved", text: "useCachedSession() — localStorage-backed session preload kills the navbar skeleton on revisit" },
+      { tag: "improved", text: "useCachedSession() - localStorage-backed session preload kills the navbar skeleton on revisit" },
       { tag: "shipped", text: "Per-route loading.tsx skeletons across /create, /dashboard, /features, /how, /pricing, /privacy, /terms, /auth, /contact" },
     ],
   },
@@ -39,23 +39,23 @@ const ENTRIES: Entry[] = [
     version: "0.17",
     title: "Persona-tuned feature previews",
     summary:
-      "Built-in Features section now adapts every card to the selected persona — Content Creators, Marketers, Educators, E-commerce, Social Media, Agencies.",
+      "Built-in Features section now adapts every card to the selected persona - Content Creators, Marketers, Educators, E-commerce, Social Media, Agencies.",
     changes: [
-      { tag: "shipped", text: "Six persona presets driving Cards 1–3 (script, visuals, studio)" },
+      { tag: "shipped", text: "Six persona presets driving Cards 1-3 (script, visuals, studio)" },
       { tag: "shipped", text: "Real Unsplash thumbnail tiles per persona, replacing gradient placeholders" },
-      { tag: "improved", text: "Refined typography scale across the landing — Geist Sans + Georgia italic accents" },
+      { tag: "improved", text: "Refined typography scale across the landing - Geist Sans + Georgia italic accents" },
     ],
   },
   {
     date: "May 8, 2026",
     version: "0.16",
-    title: "Pipeline reliability — strict-script + dynamic frame mapping",
+    title: "Pipeline reliability - strict-script + dynamic frame mapping",
     summary:
       "Two changes that meaningfully cut transient failures on the script and render stages.",
     changes: [
-      { tag: "infra", text: "Model fallback mechanism in strict script mapping — primary failure routes to a secondary OpenRouter model before erroring" },
+      { tag: "infra", text: "Model fallback mechanism in strict script mapping - primary failure routes to a secondary OpenRouter model before erroring" },
       { tag: "infra", text: "Composition now computes shot start-frames dynamically from the timeline rather than from precomputed offsets" },
-      { tag: "improved", text: "Dashboard video detail page — simplified category metadata structure" },
+      { tag: "improved", text: "Dashboard video detail page - simplified category metadata structure" },
     ],
   },
   {
@@ -66,9 +66,9 @@ const ENTRIES: Entry[] = [
       "Real talking-video output mode shipped (Veo-backed) plus a per-job logo overlay layer.",
     changes: [
       { tag: "shipped", text: "Talking Real Mode option on the video job pipeline" },
-      { tag: "shipped", text: "Logo overlay component — configurable placement on the final composition" },
+      { tag: "shipped", text: "Logo overlay component - configurable placement on the final composition" },
       { tag: "shipped", text: "Captioned video component for the slideshow path" },
-      { tag: "infra", text: "Redis-based snapshot store for regen snapshots — save / load / delete" },
+      { tag: "infra", text: "Redis-based snapshot store for regen snapshots - save / load / delete" },
     ],
   },
   {
@@ -93,7 +93,7 @@ const ENTRIES: Entry[] = [
       { tag: "shipped", text: "Cinematic scenes support gated to Pro / Enterprise" },
       { tag: "shipped", text: "DODO Payments checkout replacing the prior flow" },
       { tag: "infra", text: "Retry utility functions across the pipeline + user-plan fallback logic in planService" },
-      { tag: "improved", text: "Account menu — click-outside + escape-to-close handling" },
+      { tag: "improved", text: "Account menu - click-outside + escape-to-close handling" },
     ],
   },
   {
@@ -105,7 +105,7 @@ const ENTRIES: Entry[] = [
     changes: [
       { tag: "api", text: "All error responses carry { error, code, details? } with stable codes" },
       { tag: "shipped", text: "Talking video creation flow with new option set" },
-      { tag: "infra", text: "Shot planning — model fallback + tightened request handling" },
+      { tag: "infra", text: "Shot planning - model fallback + tightened request handling" },
     ],
   },
   {
@@ -129,7 +129,7 @@ const ENTRIES: Entry[] = [
     changes: [
       { tag: "shipped", text: "Remix functionality on completed video jobs" },
       { tag: "shipped", text: "Slideshow tail generation from existing subtitles" },
-      { tag: "infra", text: "Simplified Redis connection management — single creation path" },
+      { tag: "infra", text: "Simplified Redis connection management - single creation path" },
     ],
   },
   {
@@ -139,7 +139,7 @@ const ENTRIES: Entry[] = [
     summary:
       "Job processing got proper status types, polling intervals as constants, and shared UI labels.",
     changes: [
-      { tag: "infra", text: "Constants module for job status, polling, and UI labels — single source of truth" },
+      { tag: "infra", text: "Constants module for job status, polling, and UI labels - single source of truth" },
       { tag: "shipped", text: "Per-route loading and error components" },
       { tag: "fixed", text: "Free-plan API limit corrected from 0 to 1 generation" },
     ],

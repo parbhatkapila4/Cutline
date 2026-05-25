@@ -218,7 +218,7 @@ body {
   outline-offset: 2px;
 }
 /* Inputs and textareas get their focus styling from their custom wrappers (background,
-   border, glow). The native focus outline is doubly-distracting there — suppress it
+   border, glow). The native focus outline is doubly-distracting there - suppress it
    on those elements only. */
 input:focus-visible,
 textarea:focus-visible,
