@@ -19,7 +19,7 @@ const EXAMPLE_CHIPS = [
   "Series A pitch",
 ];
 
-// All 20 photos — used twice for seamless marquee loop
+// All 20 photos - used twice for seamless marquee loop
 const MARQUEE_PHOTOS = Array.from({ length: 20 }, (_, i) => i + 1);
 
 function useTypewriter(
@@ -132,7 +132,7 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             <span>24fps</span>
           </motion.div>
 
-          {/* Title — per-letter reveal + subtle mouse parallax */}
+          {/* Title - per-letter reveal + subtle mouse parallax */}
           <motion.h1
             style={{ x: titleX, y: titleY }}
             className="font-black uppercase leading-[0.84] tracking-[-0.045em] text-[clamp(2.6rem,10vw,10rem)] text-transparent bg-clip-text"
@@ -174,7 +174,7 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             </span>
           </motion.h1>
 
-          {/* Photo marquee — subtle counter-parallax */}
+          {/* Photo marquee - subtle counter-parallax */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -301,29 +301,6 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
 
       </div>
 
-      {/* Cinema fade zone — blends the dark hero into the light section below */}
-      <div
-        aria-hidden
-        className="relative h-[300px] w-full pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(180deg, #060606 0%, #0a0a0a 8%, #131313 20%, #232323 32%, #3d3d3d 44%, #6b6b6b 56%, #9d9d9d 67%, #c4c4c4 76%, #dedede 84%, #ececec 90%, #f5f5f5 96%, #FAFAFA 100%)",
-        }}
-      >
-        {/* Continue subtle film grain through the transition so it reads as one filmic surface */}
-        <div
-          className="absolute inset-0 opacity-[0.06] mix-blend-overlay"
-          style={{
-            backgroundImage:
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")",
-            maskImage:
-              "linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)",
-            WebkitMaskImage:
-              "linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)",
-          }}
-        />
-      </div>
-
       <style jsx>{`
         @keyframes typingCursor {
           0%,
@@ -362,7 +339,7 @@ function PhaseTimeline() {
         {/* Base track */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-white/[0.08]" />
 
-        {/* Animated emerald playhead sweep — sits ABOVE the phase boxes so it visibly crosses over them */}
+        {/* Animated emerald playhead sweep - sits ABOVE the phase boxes so it visibly crosses over them */}
         <motion.div
           aria-hidden
           className="absolute z-20 top-1/2 -translate-y-1/2 h-[2px] w-16 rounded-full"

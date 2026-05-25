@@ -80,7 +80,7 @@ const GALLERY: GalleryItem[] = [
   },
   {
     id: "06",
-    prompt: "Wait — don't scroll yet. The trend everyone is missing.",
+    prompt: "Wait - don't scroll yet. The trend everyone is missing.",
     persona: "Social Media",
     durationSec: 18,
     shotCount: 6,
