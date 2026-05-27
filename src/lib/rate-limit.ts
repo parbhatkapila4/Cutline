@@ -2,7 +2,13 @@ import Redis from "ioredis";
 import { RateLimiterRedis } from "rate-limiter-flexible";
 import { createManagedRedis } from "@/lib/redis/managedRedis";
 
-export type RateLimitType = "generate" | "upload" | "status" | "general" | "apiKeyGenerate";
+export type RateLimitType =
+  | "generate"
+  | "generateDaily"
+  | "upload"
+  | "status"
+  | "general"
+  | "apiKeyGenerate";
 
 export type RateLimitResult = {
   allowed: boolean;
@@ -10,6 +16,7 @@ export type RateLimitResult = {
 };
 
 const DEFAULT_GENERATE_PER_HOUR = 5;
+const DEFAULT_GENERATE_PER_DAY = 50;
 const DEFAULT_UPLOAD_PER_HOUR = 20;
 const DEFAULT_STATUS_PER_MINUTE = 60;
 const DEFAULT_GENERAL_PER_MINUTE = 100;
@@ -53,6 +60,15 @@ function getConfig(type: RateLimitType): { points: number; durationSeconds: numb
       const window = Number(process.env.RATE_LIMIT_WINDOW_SECONDS) || 3600;
       return { points: max, durationSeconds: window };
     }
+    case "generateDaily": {
+      // Hard 24h ceiling per identifier — a circuit breaker against runaway
+      // AI spend (each generation burns OpenRouter + TTS + Veo credits).
+      const max =
+        Number(process.env.AI_DAILY_CAP) ||
+        Number(process.env.RATE_LIMIT_GENERATE_PER_DAY) ||
+        DEFAULT_GENERATE_PER_DAY;
+      return { points: max, durationSeconds: 86_400 };
+    }
     case "upload": {
       const n = Number(process.env.RATE_LIMIT_UPLOAD) || DEFAULT_UPLOAD_PER_HOUR;
       return { points: n, durationSeconds: 3600 };
@@ -76,14 +92,41 @@ function getConfig(type: RateLimitType): { points: number; durationSeconds: numb
   }
 }
 
+/**
+ * Resolve the client IP for rate-limiting and ownership keys.
+ *
+ * The previous implementation trusted the LEFTMOST `x-forwarded-for` entry,
+ * which is fully client-controlled: an attacker rotates that value to mint a
+ * fresh rate-limit bucket on every request and bypass the limiter entirely.
+ *
+ * Correct order of trust:
+ *  1. `x-real-ip` — set by the reverse proxy / platform (Vercel, nginx) to the
+ *     real client; not client-spoofable when a proxy is in front.
+ *  2. The RIGHTMOST `x-forwarded-for` hop — appended by our own trusted proxy,
+ *     so it reflects the real client for a single-proxy deployment. An attacker
+ *     can only prepend entries on the LEFT, never append on the right.
+ *     `TRUSTED_PROXY_HOPS` (default 1) selects how many trailing hops are ours.
+ *  3. `"anonymous"` fallback.
+ */
 export function getClientIdentifier(request: Request): string {
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp && realIp.trim()) return realIp.trim();
+
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+    const parts = forwarded
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length > 0) {
+      const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1);
+      // Pick the entry `hops` positions from the right (the client as seen by
+      // the outermost trusted proxy), clamped to the first entry.
+      const idx = Math.max(0, parts.length - hops);
+      const candidate = parts[idx];
+      if (candidate) return candidate;
+    }
   }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
   return "anonymous";
 }
 

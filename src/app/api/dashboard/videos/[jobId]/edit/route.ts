@@ -6,7 +6,8 @@ import { interpretEdit } from "@/lib/edit/interpreter";
 import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
 import { auth } from "@/lib/auth";
 import { getUserPlan } from "@/lib/users/planService";
-import { isQuickEditPrompt } from "@/lib/dashboard/editQuickPrompts";
+import { isProPlan } from "@/lib/plans";
+import { isDatabaseConfigured } from "@/lib/db";
 
 type EditBody = { message?: unknown };
 
@@ -121,15 +122,19 @@ export async function POST(
       if (typeof uid === "string" && uid.trim()) sessionUserId = uid.trim();
     } catch {
     }
-    const plan = await getUserPlan(sessionUserId);
-    if (plan.id === "free" && !isQuickEditPrompt(message)) {
-      return NextResponse.json(
-        {
-          error: "Custom edits require a paid plan. Pick a quick edit or upgrade.",
-          code: "CUSTOM_EDIT_REQUIRES_PLAN",
-        },
-        { status: 403 }
-      );
+    // Editing is a Pro+ feature. Enforced only when a database is configured
+    // (no DB = open dev mode, consistent with the generate handler).
+    if (isDatabaseConfigured()) {
+      const plan = await getUserPlan(sessionUserId);
+      if (!isProPlan(plan.id)) {
+        return NextResponse.json(
+          {
+            error: "Editing is available on Professional and Enterprise plans. Upgrade to edit videos.",
+            code: "PLAN_REQUIRED",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     let newInput: string;

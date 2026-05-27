@@ -11,7 +11,9 @@ import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import { SUBMIT_TIMEOUT_MS } from "@/components/generate/constants";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId } from "@/lib/types/avatar";
-import { isEnterprisePlan, type PlanId } from "@/lib/plans";
+import { isEnterprisePlan, isProPlan, type PlanId } from "@/lib/plans";
+import { ProBadge } from "@/components/ui/pro-badge";
+import { useRouter } from "next/navigation";
 import WarpShaderHero from "@/components/ui/warp-shader";
 
 function CreateBrandMark({ className }: { className?: string }) {
@@ -72,10 +74,10 @@ type AvatarMode = "default" | "preset" | "upload";
 
 const PRO_AVATAR_MODES: AvatarMode[] = ["preset", "upload"];
 function canUseProAvatar(plan: PlanId): boolean {
-  return plan === "professional" || plan === "enterprise";
+  return isProPlan(plan);
 }
 function canUseCinematicScenes(plan: PlanId): boolean {
-  return plan === "professional" || plan === "enterprise";
+  return isProPlan(plan);
 }
 
 const POLL_MS = 2500;
@@ -248,6 +250,8 @@ export default function CreatePage() {
   const [canGenerateByPlan, setCanGenerateByPlan] = useState(true);
   const [planLimitMessage, setPlanLimitMessage] = useState<string | null>(null);
   const canUseCinematicMode = canUseCinematicScenes(userPlan);
+  const isPro = isProPlan(userPlan);
+  const router = useRouter();
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -288,6 +292,14 @@ export default function CreatePage() {
       setTalkingRealMode("studio");
     }
   }, [canUseCinematicMode, talkingRealMode]);
+
+  // Pro-only inputs must never linger for free/starter users (e.g. after a
+  // downgrade): drop custom avatars and uploaded images back to safe defaults.
+  useEffect(() => {
+    if (isPro) return;
+    setAvatarMode((prev) => (PRO_AVATAR_MODES.includes(prev) ? "default" : prev));
+    setImgs((prev) => (prev.length ? [] : prev));
+  }, [isPro]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -375,6 +387,10 @@ export default function CreatePage() {
       !canUseProAvatar(userPlan)
     ) {
       setError("Custom avatars need a Pro plan. Switch to Default or upgrade.");
+      return;
+    }
+    if (imgs.length && !isPro) {
+      setError("Uploading your own images is available on Pro and Enterprise plans. Upgrade to use them.");
       return;
     }
     setError(null); setErrorCode(null); setVideoUrl(null); setStatus(null); setJobId(null); setCompletionMessage(null); setSubmitting(true);
@@ -1224,9 +1240,17 @@ export default function CreatePage() {
                         <div>
                           <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em] flex items-center gap-2">
                             Your images
-                            <span className="text-[11px] font-normal text-zinc-500 px-1.5 py-px rounded-full" style={{ background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.06)" }}>Optional</span>
+                            {isPro ? (
+                              <span className="text-[11px] font-normal text-zinc-500 px-1.5 py-px rounded-full" style={{ background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.06)" }}>Optional</span>
+                            ) : (
+                              <ProBadge plan={userPlan} withLock />
+                            )}
                           </h2>
-                          <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">No images? We&rsquo;ll find visuals from the web. Add your own to use them first.</p>
+                          <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">
+                            {isPro
+                              ? "No images? We'll find visuals from the web. Add your own to use them first."
+                              : "We'll source visuals from the web. Upload your own images on Pro and above."}
+                          </p>
                         </div>
                         <span className="shrink-0 font-mono text-[11px] tabular-nums text-zinc-500">{imgs.length} / 5</span>
                       </div>
@@ -1234,19 +1258,34 @@ export default function CreatePage() {
                         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFile} />
                         <button
                           type="button"
-                          onClick={() => fileRef.current?.click()}
-                          className="w-16 h-16 rounded-[9px] cursor-pointer flex flex-col items-center justify-center gap-[3px] text-[10px] text-zinc-500 hover:text-white transition-all hover:-translate-y-px"
+                          onClick={() => {
+                            if (!isPro) { router.push("/pricing"); return; }
+                            fileRef.current?.click();
+                          }}
+                          aria-label={isPro ? "Add images" : "Upgrade to upload your own images"}
+                          className={`w-16 h-16 rounded-[9px] cursor-pointer flex flex-col items-center justify-center gap-[3px] text-[10px] transition-all ${isPro ? "text-zinc-500 hover:text-white hover:-translate-y-px" : "text-amber-300/90 hover:text-amber-200"}`}
                           style={{
                             background: "#161616",
-                            border: "1px dashed rgba(255,255,255,0.14)",
+                            border: isPro ? "1px dashed rgba(255,255,255,0.14)" : "1px dashed rgba(251,191,36,0.32)",
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "#1c1c1c"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.22)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "#161616"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#1c1c1c"; e.currentTarget.style.borderColor = isPro ? "rgba(255,255,255,0.22)" : "rgba(251,191,36,0.5)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "#161616"; e.currentTarget.style.borderColor = isPro ? "rgba(255,255,255,0.14)" : "rgba(251,191,36,0.32)"; }}
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                          </svg>
-                          Add
+                          {isPro ? (
+                            <>
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                              </svg>
+                              Add
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.9}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 0h10.5a1.5 1.5 0 011.5 1.5v6a1.5 1.5 0 01-1.5 1.5H6.75a1.5 1.5 0 01-1.5-1.5v-6a1.5 1.5 0 011.5-1.5z" />
+                              </svg>
+                              Pro
+                            </>
+                          )}
                         </button>
                         {imgUrls.map((u, i) => (
                           <div key={u} className="relative w-16 h-16 rounded-[9px] overflow-hidden bg-zinc-900 ring-1 ring-white/10">
@@ -1508,11 +1547,15 @@ export default function CreatePage() {
                             ] as const
                           ).map(({ id, title, body }) => {
                             const selected = talkingRealMode === id;
+                            const locked = id === "scenario" && !isPro;
                             return (
                               <button
                                 key={id}
                                 type="button"
-                                onClick={() => setTalkingRealMode(id)}
+                                onClick={() => {
+                                  if (locked) { router.push("/pricing"); return; }
+                                  setTalkingRealMode(id);
+                                }}
                                 className="rounded-[9px] cursor-pointer text-left transition-all hover:-translate-y-px px-[13px] py-[11px] flex items-center gap-3"
                                 style={
                                   selected
@@ -1646,7 +1689,10 @@ export default function CreatePage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between gap-2 mb-[3px]">
-                                    <span className="text-[12.5px] font-medium tracking-[-0.005em] text-[#ededed]">{title}</span>
+                                    <span className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-[12.5px] font-medium tracking-[-0.005em] text-[#ededed]">{title}</span>
+                                      {id === "scenario" && <ProBadge plan={userPlan} />}
+                                    </span>
                                     <span
                                       className="relative inline-flex items-center justify-center w-[13px] h-[13px] rounded-full transition-all shrink-0"
                                       style={
@@ -1710,16 +1756,21 @@ export default function CreatePage() {
                                 { tab: "upload" as const, label: "Upload" },
                               ]).map(({ tab, label }) => {
                                 const active = avatarMode === tab;
+                                const locked = PRO_AVATAR_MODES.includes(tab) && !isPro;
                                 return (
                                   <button
                                     key={tab}
                                     type="button"
-                                    onClick={() => setAvatarMode(tab)}
+                                    onClick={() => {
+                                      if (locked) { router.push("/pricing"); return; }
+                                      setAvatarMode(tab);
+                                    }}
                                     disabled={avatarDisabled}
-                                    className={`px-3 py-[4px] rounded-[5px] text-[11.5px] tracking-[-0.003em] transition-colors ${active ? "text-[#ededed]" : "text-zinc-500 hover:text-[#ededed]"}`}
+                                    className={`inline-flex items-center gap-1 px-3 py-[4px] rounded-[5px] text-[11.5px] tracking-[-0.003em] transition-colors ${active ? "text-[#ededed]" : "text-zinc-500 hover:text-[#ededed]"}`}
                                     style={active ? { background: "#232323", fontWeight: 500, boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset" } : undefined}
                                   >
                                     {label}
+                                    {PRO_AVATAR_MODES.includes(tab) && <ProBadge plan={userPlan} size="xs" />}
                                   </button>
                                 );
                               })}
