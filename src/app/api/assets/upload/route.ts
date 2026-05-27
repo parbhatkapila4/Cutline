@@ -10,6 +10,7 @@ import {
 } from "@/lib/assets/validation";
 import type { AssetMetadata } from "@/lib/assets/types";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
+import { resolveOwnerIdentifier } from "@/lib/jobs/jobOwnership";
 export async function POST(request: Request) {
   const identifier = getClientIdentifier(request);
   const limit = await checkRateLimit(identifier, "upload");
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
       { status: 429, headers: { "Retry-After": String(retryAfter) } }
     );
   }
+
+  // Record who uploaded each asset so the asset GET route can authorize reads.
+  const ownerId = await resolveOwnerIdentifier(request);
 
   let formData: FormData;
   try {
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
       if (corruptErr) {
         errors.push(corruptErr);
       } else {
-        const meta = storeAsset(buffer, "logo", logo.name, logo.type);
+        const meta = storeAsset(buffer, "logo", logo.name, logo.type, ownerId);
         uploaded.push(meta);
       }
     }
@@ -71,7 +75,7 @@ export async function POST(request: Request) {
         errors.push(corruptErr);
         break;
       }
-      const meta = storeAsset(buffer, "productPhoto", file.name, file.type);
+      const meta = storeAsset(buffer, "productPhoto", file.name, file.type, ownerId);
       uploaded.push(meta);
     }
   }
@@ -90,7 +94,7 @@ export async function POST(request: Request) {
       if (corruptErr) {
         errors.push(corruptErr);
       } else {
-        const meta = storeAsset(buffer, "referenceVideo", referenceVideo.name, referenceVideo.type);
+        const meta = storeAsset(buffer, "referenceVideo", referenceVideo.name, referenceVideo.type, ownerId);
         uploaded.push(meta);
       }
     }
@@ -113,7 +117,7 @@ export async function POST(request: Request) {
         errors.push(corruptErr);
         break;
       }
-      const meta = storeAsset(buffer, "referenceImage", file.name, file.type);
+      const meta = storeAsset(buffer, "referenceImage", file.name, file.type, ownerId);
       uploaded.push(meta);
     }
   }
