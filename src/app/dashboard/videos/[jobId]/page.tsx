@@ -12,10 +12,10 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { DashboardVideoDetail } from "@/app/api/dashboard/videos/[jobId]/route";
 import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
-import { isEnterprisePlan, isPlanId, type PlanId } from "@/lib/plans";
+import { isEnterprisePlan, isPlanId, isProPlan, type PlanId } from "@/lib/plans";
+import { ProBadge } from "@/components/ui/pro-badge";
 import {
   EDIT_QUICK_PROMPTS,
-  isQuickEditPrompt,
   type EditQuickPromptCategory,
 } from "@/lib/dashboard/editQuickPrompts";
 
@@ -102,7 +102,9 @@ export default function DashboardVideoDetailPage() {
       el.setSelectionRange(len, len);
     });
   }, [editInProgress]);
-  const canUseCustomEdits = usagePlan !== null && usagePlan !== "free";
+  const isPro = isProPlan(usagePlan);
+  // Editing (custom + quick) is a Pro+ feature; free/starter get the upgrade prompt.
+  const canUseCustomEdits = isPro;
   const resolvedLoading = missingJobId ? false : loading;
   const resolvedNotFound = missingJobId ? true : notFound;
 
@@ -241,12 +243,12 @@ export default function DashboardVideoDetailPage() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || editInProgress) return;
-      if (!canUseCustomEdits && !isQuickEditPrompt(trimmed)) {
+      if (!canUseCustomEdits) {
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            text: "Custom edits are included on paid plans. Use a quick edit above, or see Pricing to upgrade.",
+            text: "Editing is available on Professional and Enterprise plans. See Pricing to upgrade.",
           },
         ]);
         return;
@@ -530,37 +532,67 @@ export default function DashboardVideoDetailPage() {
                       </div>
 
                       <div className="mt-5 flex flex-col sm:flex-row gap-2.5">
-                        <a
-                          href={currentVideoUrl ?? video.videoUrl}
-                          download={`cutline-${jobId}.mp4`}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-black/30"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                          Download MP4
-                        </a>
-                        <button
-                          type="button"
-                          onClick={handleCopyLink}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-white font-semibold text-sm hover:bg-white/5 transition-colors"
-                        >
-                          {copied ? (
-                            <>
-                              <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                              Link copied
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m-1.656 3.656a4 4 0 01-5.656-5.656l3-3a4 4 0 015.656 5.656" />
-                              </svg>
-                              Copy link
-                            </>
-                          )}
-                        </button>
+                        {isPro ? (
+                          <a
+                            href={currentVideoUrl ?? video.videoUrl}
+                            download={`cutline-${jobId}.mp4`}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-black/30"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download MP4
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => router.push("/pricing")}
+                            title="Downloading is available on Professional & Enterprise plans"
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-200 font-semibold text-sm hover:bg-amber-400/15 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 0h10.5a1.5 1.5 0 011.5 1.5v6a1.5 1.5 0 01-1.5 1.5H6.75a1.5 1.5 0 01-1.5-1.5v-6a1.5 1.5 0 011.5-1.5z" />
+                            </svg>
+                            Download MP4
+                            <ProBadge plan={usagePlan} />
+                          </button>
+                        )}
+                        {isPro ? (
+                          <button
+                            type="button"
+                            onClick={handleCopyLink}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-white font-semibold text-sm hover:bg-white/5 transition-colors"
+                          >
+                            {copied ? (
+                              <>
+                                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Link copied
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m-1.656 3.656a4 4 0 01-5.656-5.656l3-3a4 4 0 015.656 5.656" />
+                                </svg>
+                                Copy link
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => router.push("/pricing")}
+                            title="Sharing is available on Professional & Enterprise plans"
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-amber-400/25 text-amber-200/90 font-semibold text-sm hover:bg-amber-400/10 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m-1.656 3.656a4 4 0 01-5.656-5.656l3-3a4 4 0 015.656 5.656" />
+                            </svg>
+                            Copy link
+                            <ProBadge plan={usagePlan} />
+                          </button>
+                        )}
                         <a
                           href="#edit-section"
                           className="inline-flex md:hidden items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 font-semibold text-sm hover:bg-amber-500/15 transition-colors"
@@ -569,6 +601,7 @@ export default function DashboardVideoDetailPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                           Edit with AI
+                          <ProBadge plan={usagePlan} />
                         </a>
                       </div>
                     </div>
@@ -598,6 +631,7 @@ export default function DashboardVideoDetailPage() {
                       <h2 className="text-[14px] font-semibold text-white tracking-tight leading-none">
                         Edit with AI
                       </h2>
+                      <ProBadge plan={usagePlan} className="ml-0.5" />
                     </div>
                     <p className="text-[12px] text-zinc-500 mt-1.5 ml-[26px] leading-relaxed">
                       Describe a change. We re-render and replace the video here.
@@ -932,14 +966,12 @@ export default function DashboardVideoDetailPage() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <h3 className="text-[14px] font-semibold text-white leading-tight">
-                                  Custom edits
+                                  Edit with AI
                                 </h3>
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-400/15 text-amber-200 border border-amber-400/30">
-                                  Pro
-                                </span>
+                                <ProBadge plan={usagePlan} withLock />
                               </div>
                               <p className="text-[12px] text-zinc-400 mt-1 leading-relaxed">
-                                Write your own edit prompts. Quick edits stay free.
+                                Re-edit and re-render your video with AI on Professional and Enterprise plans.
                               </p>
                             </div>
                           </div>

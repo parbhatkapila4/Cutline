@@ -17,6 +17,7 @@ export const ErrorCode = {
   QUEUE_UNAVAILABLE: "QUEUE_UNAVAILABLE",
   ANON_LIMIT_REACHED: "ANON_LIMIT_REACHED",
   AUTH_REQUIRED: "AUTH_REQUIRED",
+  PLAN_REQUIRED: "PLAN_REQUIRED",
 } as const;
 
 export type ApiErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
