@@ -30,7 +30,8 @@ import { composeVisuals } from "@/lib/pipeline/visuals";
 import { runRemotionRender } from "@/lib/pipeline/renderVideo";
 import { cleanupJobArtifacts } from "@/lib/storage/cleanup";
 import { isJobCancelled } from "@/lib/queue/cancelCheck";
-import { generateTalkingVideoWithVeo, VeoQuotaOrLimitError } from "@/lib/veo";
+import { generateTalkingVideoWithVeo, VeoQuotaOrLimitError, VeoContentFilteredError } from "@/lib/veo";
+import { rewriteNarrationForSafety } from "@/lib/pipeline/safetyReword";
 import {
   concatenateMp4s,
   isFfmpegAvailable,
@@ -154,6 +155,7 @@ export type PipelineOptions = {
 const VEO_WORDS_PER_CHUNK = 18;
 const VEO_CHUNK_SECONDS = 8;
 const VEO_CHUNK_VALIDATE_RETRIES = 2;
+const VEO_SAFETY_REWORDS = 2;
 
 function maxVeoChunksForTargetDuration(targetSec: number): number {
   const L = VEO_CHUNK_SECONDS;
@@ -1176,6 +1178,10 @@ async function runPipelineOnce(
       }
 
       const textChunks = splitScriptIntoChunks(combinedScript, wordsPerChunk).slice(0, targetChunks);
+      // Tracks the text actually spoken in each rendered chunk. If a chunk's
+      // audio is reworded to pass the safety filter, captions must use the
+      // reworded line — not the original — so they stay in sync with the video.
+      const finalChunkTexts: string[] = [];
       await checkCancelledAndThrow();
       logEvent({ jobId, event: "stage_start", stage: "veo" });
       const chunkPaths = await withStageTelemetry(jobId, "veo", async (): Promise<string[]> => {
@@ -1245,13 +1251,25 @@ async function runPipelineOnce(
               : N > 1 && i === N - 1
                 ? " Do not add another sentence after the final line."
                 : "";
-          const prompt = `${baseAugmented} ${flow}${chunkText}${endInstruction}${lockSuffix}`;
+          const buildChunkPrompt = (text: string) =>
+            `${baseAugmented} ${flow}${text}${endInstruction}${lockSuffix}`;
 
+          // VEO's RAI filter blocks the AUDIO (the spoken line), not the visual
+          // base prompt, so retrying identical text is futile. On a content-
+          // safety block we reword just this chunk's narration (meaning + length
+          // preserved) and re-render. Transient/validation errors still get the
+          // plain identical retry, on a separate budget.
+          let currentChunkText = chunkText;
+          let prompt = buildChunkPrompt(currentChunkText);
+          const MAX_GENERATE_ATTEMPTS = VEO_CHUNK_VALIDATE_RETRIES + 1;
+          let genAttempt = 0;
+          let safetyRewords = 0;
           let lastChunkError: Error | null = null;
-          for (let attempt = 0; attempt <= VEO_CHUNK_VALIDATE_RETRIES; attempt++) {
+
+          while (true) {
             try {
-              if (attempt > 0) {
-                console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N + " retry " + attempt + "/" + VEO_CHUNK_VALIDATE_RETRIES);
+              if (genAttempt > 0 || safetyRewords > 0) {
+                console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N + " (gen " + genAttempt + "/" + VEO_CHUNK_VALIDATE_RETRIES + ", reword " + safetyRewords + "/" + VEO_SAFETY_REWORDS + ")");
                 if (fs.existsSync(chunkPath)) fs.unlinkSync(chunkPath);
               } else {
                 console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N);
@@ -1269,27 +1287,62 @@ async function runPipelineOnce(
                 throw new Error(validation.reason ?? "Chunk validation failed");
               }
               chunkPaths.push(chunkPath);
+              finalChunkTexts.push(currentChunkText);
               lastChunkError = null;
               break;
             } catch (err) {
               lastChunkError = err instanceof Error ? err : new Error(String(err));
-              if (attempt < VEO_CHUNK_VALIDATE_RETRIES) {
-                const delayMs = (attempt + 1) * 3000;
-                console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " invalid, retrying in " + delayMs + "ms: " + lastChunkError.message);
-                if (fs.existsSync(chunkPath)) {
-                  try {
-                    fs.unlinkSync(chunkPath);
-                  } catch (unlinkErr) {
-                    console.warn("[pipeline] jobId=" + jobId + " failed to unlink chunk:", unlinkErr instanceof Error ? unlinkErr.message : String(unlinkErr));
-                  }
+              if (fs.existsSync(chunkPath)) {
+                try {
+                  fs.unlinkSync(chunkPath);
+                } catch (unlinkErr) {
+                  console.warn("[pipeline] jobId=" + jobId + " failed to unlink chunk:", unlinkErr instanceof Error ? unlinkErr.message : String(unlinkErr));
                 }
-                await new Promise((r) => setTimeout(r, delayMs));
-              } else {
+              }
+
+              // Content-safety block: rewording the identical line won't help —
+              // rewrite this chunk's narration and re-render (separate budget).
+              if (lastChunkError instanceof VeoContentFilteredError) {
+                if (safetyRewords >= VEO_SAFETY_REWORDS) {
+                  throw new Error(
+                    `Chunk ${i + 1}/${N} was blocked by the content-safety filter after ${VEO_SAFETY_REWORDS} rewrites. ` +
+                    `Try changing this part of your topic. Last error: ${lastChunkError.message}`
+                  );
+                }
+                safetyRewords++;
+                console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " blocked by content-safety filter; rewording narration (" + safetyRewords + "/" + VEO_SAFETY_REWORDS + ")");
+                let reworded: string | null = null;
+                try {
+                  reworded = await rewriteNarrationForSafety(
+                    currentChunkText,
+                    textModel ? { model: textModel } : undefined
+                  );
+                } catch (rwErr) {
+                  console.warn("[pipeline] jobId=" + jobId + " safety reword failed: " + (rwErr instanceof Error ? rwErr.message : String(rwErr)));
+                }
+                if (!reworded || !reworded.trim() || reworded.trim() === currentChunkText.trim()) {
+                  throw new Error(
+                    `Chunk ${i + 1}/${N} was blocked by the content-safety filter and could not be safely reworded. ` +
+                    `Try changing this part of your topic. Last error: ${lastChunkError.message}`
+                  );
+                }
+                currentChunkText = reworded.trim();
+                prompt = buildChunkPrompt(currentChunkText);
+                await new Promise((r) => setTimeout(r, 2000));
+                continue;
+              }
+
+              // Transient / validation error: retry the identical prompt.
+              genAttempt++;
+              if (genAttempt >= MAX_GENERATE_ATTEMPTS) {
                 throw new Error(
-                  `Chunk ${i + 1}/${N} failed validation after ${VEO_CHUNK_VALIDATE_RETRIES + 1} attempts. ` +
+                  `Chunk ${i + 1}/${N} failed validation after ${MAX_GENERATE_ATTEMPTS} attempts. ` +
                   `All chunks must be valid before concatenation. Last error: ${lastChunkError.message}`
                 );
               }
+              const delayMs = genAttempt * 3000;
+              console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " invalid, retrying in " + delayMs + "ms: " + lastChunkError.message);
+              await new Promise((r) => setTimeout(r, delayMs));
             }
           }
         }
@@ -1333,7 +1386,7 @@ async function runPipelineOnce(
             const minCaptionMs = 1000;
             const entries: SubtitleEntry[] = [];
             for (let i = 0; i < textChunks.length; i++) {
-              const text = (textChunks[i] ?? "").trim();
+              const text = (finalChunkTexts[i] ?? textChunks[i] ?? "").trim();
               if (!text) continue;
               const startMs = Math.round((i / n) * durationMs);
               let endMs = Math.round(((i + 1) / n) * durationMs);

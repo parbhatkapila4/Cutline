@@ -31,6 +31,16 @@ export class VeoQuotaOrLimitError extends Error {
   }
 }
 
+// VEO's Responsible-AI / content-safety filter rejected the request (commonly
+// the generated audio for a spoken line). Distinct from transient errors:
+// retrying the identical prompt is futile — the caller must change the input.
+export class VeoContentFilteredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VeoContentFilteredError";
+  }
+}
+
 function throwFromVeoRaw(raw: string): never {
   if (isQuotaOrLimitError(raw)) {
     throw new VeoQuotaOrLimitError(
@@ -122,7 +132,7 @@ export async function generateTalkingVideoWithVeo(
         ? `That description wasn’t accepted for a real-person look (often for safety or policy reasons). Try “Cartoon” style or change what you asked for.`
         : `That description wasn’t accepted (often for safety or policy reasons). Try changing your topic or wording.`;
     console.error("[veo] RAI/filtered response:", { raiMediaFilteredCount: raiCount, raiMediaFilteredReasons: raiReasons });
-    throw new Error(userMessage);
+    throw new VeoContentFilteredError(userMessage);
   }
 
   const generatedVideos = resp?.generatedVideos;

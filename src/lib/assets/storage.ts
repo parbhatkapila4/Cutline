@@ -54,7 +54,8 @@ export function storeAsset(
   buffer: Buffer,
   type: AssetType,
   originalFilename: string,
-  mimeType: string
+  mimeType: string,
+  ownerId?: string
 ): AssetMetadata {
   const dir = getUploadDir();
   fs.mkdirSync(dir, { recursive: true });
@@ -73,6 +74,7 @@ export function storeAsset(
     path: relativePath,
     originalFilename,
     mimeType,
+    ...(ownerId && ownerId.trim() ? { ownerId } : {}),
   };
 
   const registry = readRegistry();
