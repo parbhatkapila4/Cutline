@@ -19,7 +19,9 @@ import {
   withIdempotencyLock,
 } from "@/lib/api/idempotency";
 import { runGenerationFlow, checkDownloadAllowed } from "@/lib/anon";
+import { requestOwnsResource } from "@/lib/jobs/jobOwnership";
 import { isDatabaseConfigured } from "@/lib/db";
+import { isProPlan } from "@/lib/plans";
 import { auth } from "@/lib/auth";
 import { ensureInProcessWorkerStarted } from "@/lib/queue/autoStartWorker";
 import { validateApiKeyAndGetUserId } from "@/lib/api-keys/service";
@@ -28,6 +30,7 @@ import { brandKitToPipelineFields, getBrandKitForUser } from "@/lib/brand-kits/s
 import type { BrandColors } from "@/lib/assets/types";
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 
 type JobStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
 
@@ -112,6 +115,21 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       message: "Too Many Requests",
       status: 429,
       details: { retryAfter },
+      headers: { ...headers, "Retry-After": String(retryAfter) },
+    });
+  }
+
+  // Daily AI-spend circuit breaker (per identifier / per API key), on top of
+  // the hourly limit above. Caps total generations in any 24h window.
+  const dailyKey = fromApiKeyEarly ? `apk:${fromApiKeyEarly.keyId}` : identifier;
+  const dailyLimit = await checkRateLimit(dailyKey, "generateDaily");
+  if (!dailyLimit.allowed) {
+    const retryAfter = dailyLimit.retryAfter ?? 3600;
+    return apiError({
+      code: ErrorCode.RATE_LIMITED,
+      message: "Daily generation limit reached. Please try again tomorrow.",
+      status: 429,
+      details: { retryAfter, scope: "daily" },
       headers: { ...headers, "Retry-After": String(retryAfter) },
     });
   }
@@ -250,6 +268,40 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
+  // Pro-only feature gate: image uploads, custom avatars, and cinematic scenes
+  // require Professional or Enterprise. Anonymous callers are treated as free.
+  // Only enforced when a database is configured (no DB = open dev mode).
+  if (isDatabaseConfigured()) {
+    const usesImages = Array.isArray(data.assetIds) && data.assetIds.length > 0;
+    const usesProAvatar =
+      data.avatar?.mode === "preset" || data.avatar?.mode === "upload";
+    const usesCinematic =
+      data.mode === "talking_object" &&
+      data.talkingObjectStyle === "real" &&
+      data.talkingRealMode === "scenario";
+    if (usesImages || usesProAvatar || usesCinematic) {
+      const { getUserPlan } = await import("@/lib/users/planService");
+      const callerIsPro = userId ? isProPlan((await getUserPlan(userId)).id) : false;
+      if (!callerIsPro) {
+        const feature = usesCinematic
+          ? "Cinematic scenes"
+          : usesProAvatar
+            ? "Custom avatars"
+            : "Image uploads";
+        return apiError({
+          code: ErrorCode.PLAN_REQUIRED,
+          message: `${feature} require a Professional or Enterprise plan. Upgrade to use this feature.`,
+          status: 403,
+          details: {
+            feature: usesCinematic ? "cinematic" : usesProAvatar ? "avatar" : "image_upload",
+            requiredPlan: "professional",
+          },
+          headers,
+        });
+      }
+    }
+  }
+
   const creditsIdentifier = userId ?? anonFlow?.result.anon_session_id ?? identifier;
 
   try {
@@ -336,8 +388,14 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(remixSourceJobId ? { remixFromJobId: remixSourceJobId } : {}),
     };
 
+    // Assign an unguessable UUID as the BullMQ jobId for every job (the anon
+    // flow already supplies its own UUID). This stops the previous behavior
+    // where non-anon jobs got sequential integer IDs (1, 2, 3…) that an
+    // attacker could enumerate. Ownership checks are the primary control;
+    // this is defense-in-depth so IDs can't be guessed in the first place.
     const anonJobId = anonFlow?.result.allowed ? anonFlow.result.job_id : undefined;
-    const queueAddOptions = anonJobId ? { jobId: anonJobId } : undefined;
+    const newJobId = anonJobId ?? randomUUID();
+    const queueAddOptions = { jobId: newJobId };
 
     if (idempotencyKey) {
       const result = await withIdempotencyLock(idempotencyKey, async () => {
@@ -441,6 +499,22 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       });
     }
 
+    // Ownership: only the caller who created this job may read its status.
+    // Return 404 (not 403) so we don't confirm the existence of others' jobs.
+    const owns = await requestOwnsResource(
+      request,
+      (job.data as { clientId?: string } | undefined)?.clientId
+    );
+    if (!owns) {
+      console.log("[api] GET /api/generate/[jobId] jobId=" + jobId + " status=404 (not owner)");
+      return apiError({
+        code: ErrorCode.JOB_NOT_FOUND,
+        message: "Job not found.",
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
     const state = await job.getState();
     const failedReason = job.failedReason;
     const status: JobStatus = mapStateToStatus(state, failedReason);
@@ -535,6 +609,44 @@ export async function handleCancelPost(request: Request, jobId: string): Promise
     });
   }
 
+  // Ownership: only the creator may cancel their own job. Fetch first and
+  // verify before cancelling so an attacker can't kill other users' renders.
+  try {
+    const queue = getVideoQueue();
+    const job = await queue.getJob(jobId);
+    if (!job) {
+      return apiError({
+        code: ErrorCode.JOB_NOT_FOUND,
+        message: "Job not found.",
+        status: 404,
+        details: { reason: "not_found" },
+        headers: corsHeaders,
+      });
+    }
+    const owns = await requestOwnsResource(
+      request,
+      (job.data as { clientId?: string } | undefined)?.clientId
+    );
+    if (!owns) {
+      return apiError({
+        code: ErrorCode.JOB_NOT_FOUND,
+        message: "Job not found.",
+        status: 404,
+        details: { reason: "not_found" },
+        headers: corsHeaders,
+      });
+    }
+  } catch (e) {
+    const { logServerError } = await import("@/lib/utils/error");
+    logServerError("POST /api/generate/[jobId]/cancel (ownership)", e);
+    return apiError({
+      code: ErrorCode.INTERNAL_ERROR,
+      message: "Something went wrong",
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+
   const result = await cancelJob(jobId);
   if (result.ok) {
     return NextResponse.json({ cancelled: true, jobId }, { headers: corsHeaders });
@@ -593,12 +705,47 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
         headers: corsHeaders,
       });
     }
+    // Downloading is a Pro+ feature.
+    const apiKeyUser = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
+    let downloaderId: string | undefined;
+    try {
+      const session = await auth.api.getSession({ headers: request.headers });
+      downloaderId = session?.user?.id != null ? String(session.user.id) : undefined;
+    } catch {
+      downloaderId = undefined;
+    }
+    if (apiKeyUser) downloaderId = apiKeyUser.userId;
+    const { getUserPlan } = await import("@/lib/users/planService");
+    if (!downloaderId || !isProPlan((await getUserPlan(downloaderId)).id)) {
+      return apiError({
+        code: ErrorCode.PLAN_REQUIRED,
+        message: "Downloading videos is available on Professional and Enterprise plans.",
+        status: 403,
+        headers: corsHeaders,
+      });
+    }
   }
 
   try {
     const queue = getVideoQueue();
     const job = await queue.getJob(jobId);
     if (!job) {
+      return apiError({
+        code: ErrorCode.JOB_NOT_FOUND,
+        message: "Job not found.",
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    // Ownership: only the creator may download the MP4. The DB-backed gate
+    // above only blocks anonymous-owned jobs; this closes the case where any
+    // caller could pull another user's finished video by jobId.
+    const owns = await requestOwnsResource(
+      request,
+      (job.data as { clientId?: string } | undefined)?.clientId
+    );
+    if (!owns) {
       return apiError({
         code: ErrorCode.JOB_NOT_FOUND,
         message: "Job not found.",

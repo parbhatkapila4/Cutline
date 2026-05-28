@@ -5,6 +5,10 @@ export function isRetryableError(err: unknown): boolean {
 
   if (name === "AbortError" && lower.includes("cancel")) return false;
 
+  // Content-safety / RAI rejections are deterministic for the same input —
+  // retrying the identical prompt cannot succeed. The caller reworks the input.
+  if (name === "VeoContentFilteredError") return false;
+
   const status = parseHttpStatus(err);
   if (status != null) {
     if (status === 429 || status === 408 || status === 504) return true;
