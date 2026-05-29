@@ -251,6 +251,7 @@ export default function CreatePage() {
   const [planLimitMessage, setPlanLimitMessage] = useState<string | null>(null);
   const canUseCinematicMode = canUseCinematicScenes(userPlan);
   const isPro = isProPlan(userPlan);
+  const isSlideshow = mode === "slideshow";
   const router = useRouter();
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -300,6 +301,16 @@ export default function CreatePage() {
     setAvatarMode((prev) => (PRO_AVATAR_MODES.includes(prev) ? "default" : prev));
     setImgs((prev) => (prev.length ? [] : prev));
   }, [isPro]);
+
+  // "Your images" only applies to Slideshow mode — the talking-object pipeline
+  // does not consume assetIds. Drop any uploaded images the moment the user
+  // switches modes so they don't get sent (or quietly carried) into a render
+  // that ignores them.
+  useEffect(() => {
+    if (mode !== "slideshow") {
+      setImgs((prev) => (prev.length ? [] : prev));
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -397,7 +408,10 @@ export default function CreatePage() {
     try {
       let assetIds: string[] = [];
       let avatarUploadAssetId: string | undefined;
-      if (imgs.length) {
+      // assetIds are only consumed by the Slideshow pipeline. The mode-change
+      // effect already clears imgs, but guard here too so a race or stale
+      // state can't push uploads into a talking-object render that ignores them.
+      if (imgs.length && isSlideshow) {
         const fd = new FormData();
         imgs.forEach((f) => fd.append("productPhotos", f));
         const u = await fetch("/api/assets/upload", { method: "POST", body: fd });
@@ -1240,21 +1254,28 @@ export default function CreatePage() {
                         <div>
                           <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em] flex items-center gap-2">
                             Your images
-                            {isPro ? (
+                            {!isSlideshow ? (
+                              <span className="text-[11px] font-normal text-zinc-500 px-1.5 py-px rounded-full" style={{ background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.06)" }}>Slideshow only</span>
+                            ) : isPro ? (
                               <span className="text-[11px] font-normal text-zinc-500 px-1.5 py-px rounded-full" style={{ background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.06)" }}>Optional</span>
                             ) : (
                               <ProBadge plan={userPlan} withLock />
                             )}
                           </h2>
                           <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">
-                            {isPro
-                              ? "No images? We'll find visuals from the web. Add your own to use them first."
-                              : "We'll source visuals from the web. Upload your own images on Pro and above."}
+                            {!isSlideshow
+                              ? "Image uploads apply to Slideshow mode only. Switch the video mode below to Slideshow to add your own visuals."
+                              : isPro
+                                ? "No images? We'll find visuals from the web. Add your own to use them first."
+                                : "We'll source visuals from the web. Upload your own images on Pro and above."}
                           </p>
                         </div>
                         <span className="shrink-0 font-mono text-[11px] tabular-nums text-zinc-500">{imgs.length} / 5</span>
                       </div>
-                      <div className="flex gap-1.5 flex-wrap">
+                      <div
+                        className={`flex gap-1.5 flex-wrap transition-opacity ${!isSlideshow ? "opacity-40 pointer-events-none select-none" : ""}`}
+                        aria-disabled={!isSlideshow}
+                      >
                         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFile} />
                         <button
                           type="button"

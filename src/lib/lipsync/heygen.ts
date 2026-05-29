@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
+import {
+  getCachedTalkingPhotoId,
+  cacheTalkingPhotoId,
+} from "@/lib/lipsync/heygenPhotoCache";
 
 const HEYGEN_UPLOAD_BASE = "https://upload.heygen.com/v1";
 const HEYGEN_API_BASE = "https://api.heygen.com";
@@ -214,6 +218,18 @@ async function uploadTalkingPhoto(
     contentType = ext === ".png" ? "image/png" : "image/jpeg";
   }
 
+  // HeyGen accounts cap stored Photo Avatars per tier (3 on the lower tier).
+  // Re-uploading the same preset on every job burns through that quota fast,
+  // so dedupe by image bytes: once we've uploaded an exact image, reuse the
+  // returned talking_photo_id for every future job that uses the same image.
+  const cached = getCachedTalkingPhotoId(imageBuffer);
+  if (cached) {
+    console.log(
+      `[heygen] jobId=${jobId} stage=upload-photo cache=hit talking_photo_id=${cached}`
+    );
+    return cached;
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60_000);
 
@@ -240,6 +256,18 @@ async function uploadTalkingPhoto(
 
   if (!response.ok) {
     const text = await response.text();
+    // HeyGen returns 400 with body code 401028 when the account's stored
+    // Photo-Avatar quota is exhausted. Surface that with an actionable
+    // message instead of the raw status line, which reads like a transient
+    // HTTP failure.
+    if (text.includes('"code":401028')) {
+      throw new Error(
+        `HeyGen photo-avatar quota is full on this account (the lower tier caps at 3). ` +
+        `Delete unused avatars in the HeyGen dashboard (https://app.heygen.com/avatars) ` +
+        `or upgrade the plan, then try again. New uploads are now cached, so each unique ` +
+        `image is only uploaded once.`
+      );
+    }
     throw new Error(
       `HeyGen photo upload failed: ${response.status} ${response.statusText}. ${text}`
     );
@@ -251,6 +279,12 @@ async function uploadTalkingPhoto(
       `HeyGen photo upload failed: ${data.message || "Invalid response"}`
     );
   }
+
+  // Persist for reuse on every future job that uses this exact image.
+  const sourceHint = imagePathOrUrl.startsWith("http")
+    ? imagePathOrUrl
+    : path.basename(imagePathOrUrl);
+  cacheTalkingPhotoId(imageBuffer, data.data.talking_photo_id, sourceHint);
 
   return data.data.talking_photo_id;
 }
