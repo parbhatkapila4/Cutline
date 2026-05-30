@@ -5,6 +5,7 @@ import {
   getCachedTalkingPhotoId,
   cacheTalkingPhotoId,
 } from "@/lib/lipsync/heygenPhotoCache";
+import { freeUpHeyGenSlot } from "@/lib/lipsync/heygenAvatarManager";
 
 const HEYGEN_UPLOAD_BASE = "https://upload.heygen.com/v1";
 const HEYGEN_API_BASE = "https://api.heygen.com";
@@ -230,47 +231,91 @@ async function uploadTalkingPhoto(
     return cached;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60_000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "Content-Type": contentType,
-      },
-      body: new Uint8Array(imageBuffer),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new Error(`HeyGen photo upload timed out for jobId=${jobId}`);
+  // One upload attempt, timed out at 60s. Extracted so we can retry after
+  // auto-cleanup without duplicating the request setup.
+  const attemptUpload = async (): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60_000);
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "Content-Type": contentType,
+        },
+        body: new Uint8Array(imageBuffer),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
     }
-    throw new Error(`HeyGen photo upload failed: ${err instanceof Error ? err.message : String(err)}`);
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  };
+
+  const callUpload = async (label: "upload" | "upload retry"): Promise<Response> => {
+    try {
+      return await attemptUpload();
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new Error(`HeyGen photo ${label} timed out for jobId=${jobId}`);
+      }
+      throw new Error(
+        `HeyGen photo ${label} failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  };
+
+  let response = await callUpload("upload");
 
   if (!response.ok) {
     const text = await response.text();
     // HeyGen returns 400 with body code 401028 when the account's stored
-    // Photo-Avatar quota is exhausted. Surface that with an actionable
-    // message instead of the raw status line, which reads like a transient
-    // HTTP failure.
+    // Photo-Avatar quota is exhausted (3 on the lower tier). Auto-recover by
+    // freeing a slot (orphans first - avatars HeyGen has but our cache does
+    // not know about - then LRU among cached) and retrying the upload once.
     if (text.includes('"code":401028')) {
+      console.warn(
+        `[heygen] jobId=${jobId} stage=upload-photo quota=full; attempting bulk auto-cleanup`
+      );
+      // Bulk-delete every orphan in parallel batches. With a high default
+      // cap (10000) this handles historical accumulation from before the
+      // cache shipped — e.g. an account with thousands of leftovers gets
+      // cleaned to empty in one job (a few minutes, fully logged), and
+      // afterwards the cache prevents recurrence.
+      const result = await freeUpHeyGenSlot(apiKey, jobId);
+      if (result.freedCount === 0) {
+        throw new Error(
+          `HeyGen photo-avatar quota is full and auto-cleanup could not free any slot ` +
+          `(no orphans were deletable and no cached avatars exist to evict). ` +
+          `Delete unused avatars in the HeyGen dashboard (https://app.heygen.com/avatars), ` +
+          `or run "npx tsx scripts/cleanup-heygen-avatars.ts" for a one-shot cleanup.`
+        );
+      }
+      console.log(
+        `[heygen] jobId=${jobId} stage=upload-photo retry after freeing ${result.freedCount} avatar(s)` +
+          (result.orphansRemaining > 0
+            ? ` (${result.orphansRemaining} orphan(s) still in account)`
+            : "")
+      );
+      response = await callUpload("upload retry");
+      if (!response.ok) {
+        const retryText = await response.text();
+        if (retryText.includes('"code":401028')) {
+          throw new Error(
+            `HeyGen photo-avatar quota is STILL full after auto-cleanup freed ${result.freedCount} ` +
+            `avatar(s). ${result.orphansRemaining} orphan(s) remain in your account. ` +
+            `Run "npx tsx scripts/cleanup-heygen-avatars.ts --yes" to bulk-clean the rest, ` +
+            `or delete them at https://app.heygen.com/avatars.`
+          );
+        }
+        throw new Error(
+          `HeyGen photo upload failed after auto-cleanup: ${response.status} ${response.statusText}. ${retryText}`
+        );
+      }
+    } else {
       throw new Error(
-        `HeyGen photo-avatar quota is full on this account (the lower tier caps at 3). ` +
-        `Delete unused avatars in the HeyGen dashboard (https://app.heygen.com/avatars) ` +
-        `or upgrade the plan, then try again. New uploads are now cached, so each unique ` +
-        `image is only uploaded once.`
+        `HeyGen photo upload failed: ${response.status} ${response.statusText}. ${text}`
       );
     }
-    throw new Error(
-      `HeyGen photo upload failed: ${response.status} ${response.statusText}. ${text}`
-    );
   }
 
   const data = (await response.json()) as HeyGenUploadPhotoResponse;

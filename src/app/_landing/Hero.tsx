@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useTransform,
+  useSpring,
+  useAnimationFrame,
+  useReducedMotion,
+} from "framer-motion";
 
 const PLACEHOLDERS = [
   "Explain Redis pub/sub for backend engineers",
@@ -19,7 +26,6 @@ const EXAMPLE_CHIPS = [
   "Series A pitch",
 ];
 
-// All 20 photos - used twice for seamless marquee loop
 const MARQUEE_PHOTOS = Array.from({ length: 20 }, (_, i) => i + 1);
 
 function useTypewriter(
@@ -38,9 +44,11 @@ function useTypewriter(
       return () => window.clearTimeout(t);
     }
     if (deleting && text === "") {
-      setDeleting(false);
-      setIdx((i) => (i + 1) % phrases.length);
-      return;
+      const t = window.setTimeout(() => {
+        setDeleting(false);
+        setIdx((i) => (i + 1) % phrases.length);
+      }, deleteSpeed);
+      return () => window.clearTimeout(t);
     }
     const speed = deleting ? deleteSpeed : typeSpeed;
     const t = window.setTimeout(() => {
@@ -90,7 +98,6 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
 
   return (
     <section className="relative w-full bg-[#060606] text-white overflow-hidden">
-      {/* Film grain */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.08] mix-blend-overlay"
@@ -100,16 +107,12 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
         }}
       />
 
-      {/* Content frame (dark viewport area) */}
       <div className="relative min-h-screen flex flex-col px-6 sm:px-10 lg:px-16">
-        {/* Corner brackets scoped to the dark viewport so they don't bleed into the fade zone */}
         <CornerBrackets />
 
-        {/* Spacer to clear fixed navbar */}
         <div className="h-[100px] shrink-0" aria-hidden />
 
         <div className="flex-1 flex flex-col items-center justify-center text-center pb-10">
-          {/* Slate header: format specs */}
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -132,11 +135,9 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             <span>24fps</span>
           </motion.div>
 
-          {/* Title - per-letter reveal + subtle mouse parallax */}
           <motion.h1
             style={{ x: titleX, y: titleY }}
             className="font-black uppercase leading-[0.84] tracking-[-0.045em] text-[clamp(2.6rem,10vw,10rem)] text-transparent bg-clip-text"
-            // background-clip + per-letter span requires the gradient on h1 to be inherited
           >
             <span
               className="inline-flex flex-wrap justify-center"
@@ -173,8 +174,6 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
               ))}
             </span>
           </motion.h1>
-
-          {/* Photo marquee - subtle counter-parallax */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -185,7 +184,6 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             <PhotoMarquee />
           </motion.div>
 
-          {/* Description (small caps cinema style) */}
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -196,7 +194,6 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             renders a finished MP4 in a single pass.
           </motion.p>
 
-          {/* Pipeline phase timeline */}
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -207,7 +204,6 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             <PhaseTimeline />
           </motion.div>
 
-          {/* Prompt input + CTA */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -216,10 +212,9 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
           >
             <form
               onSubmit={(e) => e.preventDefault()}
-              className="group relative flex items-stretch gap-0 rounded-md bg-black/40 border border-white/[0.12] backdrop-blur-md transition-colors focus-within:border-white/30"
+              className="group relative flex items-stretch gap-0 rounded-md bg-black/40 border border-white/12 backdrop-blur-md transition-colors focus-within:border-white/30"
             >
-              {/* REC indicator */}
-              <div className="shrink-0 flex items-center gap-2 pl-4 pr-3.5 border-r border-white/[0.08]">
+              <div className="shrink-0 flex items-center gap-2 pl-4 pr-3.5 border-r border-white/8">
                 <span className="relative inline-flex w-1.5 h-1.5" aria-hidden>
                   <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
                   <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -229,7 +224,6 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
                 </span>
               </div>
 
-              {/* Input */}
               <div className="relative flex-1 min-w-0 flex items-center px-4">
                 <input
                   type="text"
@@ -245,7 +239,7 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
                   <div className="absolute inset-y-0 left-4 right-4 flex items-center pointer-events-none text-white/35 text-[14.5px]">
                     <span className="truncate">{typed}</span>
                     <span
-                      className="inline-block w-[1.5px] h-[1.1em] bg-white/55 ml-[1px] align-middle shrink-0"
+                      className="inline-block w-[1.5px] h-[1.1em] bg-white/55 ml-px align-middle shrink-0"
                       style={{
                         animation: "typingCursor 1s steps(2, end) infinite",
                       }}
@@ -255,10 +249,9 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
                 )}
               </div>
 
-              {/* Generate button */}
               <Link
                 href={buildCreateHref()}
-                className="shrink-0 inline-flex items-center gap-2.5 pl-5 pr-5 border-l border-white/[0.08] text-white/85 hover:text-white font-mono text-[11px] tracking-[0.28em] uppercase transition-colors group/btn"
+                className="shrink-0 inline-flex items-center gap-2.5 pl-5 pr-5 border-l border-white/8 text-white/85 hover:text-white font-mono text-[11px] tracking-[0.28em] uppercase transition-colors group/btn"
               >
                 <span>Generate</span>
                 <span
@@ -290,7 +283,7 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
                 <Link
                   key={chip}
                   href={buildCreateHref(chip)}
-                  className="font-mono text-[11px] tracking-[0.12em] uppercase text-white/55 hover:text-white transition-colors relative pb-0.5 border-b border-white/[0.08] hover:border-white/40"
+                  className="font-mono text-[11px] tracking-[0.12em] uppercase text-white/55 hover:text-white transition-colors relative pb-0.5 border-b border-white/8 hover:border-white/40"
                 >
                   {chip}
                 </Link>
@@ -317,84 +310,224 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
   );
 }
 
+const PHASES = [
+  { num: "01", name: "Intent" },
+  { num: "02", name: "Narrative" },
+  { num: "03", name: "Visualize" },
+  { num: "04", name: "Render" },
+];
+
+// Representative runtime the playhead scrubs across (product makes 30-60s clips).
+const TOTAL_SECONDS = 45;
+
+// One loop of the scrubber, in ms: play across, hold at the end, fade-reset.
+const TL_PLAY = 5200;
+const TL_HOLD = 750;
+const TL_RESET = 650;
+const TL_FADE_IN = 450;
+const TL_CYCLE = TL_PLAY + TL_HOLD + TL_RESET;
+
+function easeInOutQuad(k: number) {
+  return k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+}
+
+function pad2(n: number) {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+// A film-editor timeline standing in for the 12-stage pipeline: 12 stage ticks
+// grouped into 4 labelled phases, with a playhead that scrubs left -> right.
 function PhaseTimeline() {
-  const phases = [
-    { num: "01", name: "Intent" },
-    { num: "02", name: "Narrative" },
-    { num: "03", name: "Visualize" },
-    { num: "04", name: "Render" },
-  ];
+  const reduced = useReducedMotion();
+  const progress = useMotionValue(0); // 0..1, eased playhead position (60fps)
+  const liveOpacity = useMotionValue(0); // fades the playhead/fill on reset
+  const [pct, setPct] = useState(0); // 0..100, throttled mirror that drives text + lit states
+
+  useAnimationFrame((time) => {
+    // Reduced motion: settle on a finished, fully-lit timeline and stop.
+    if (reduced) {
+      progress.set(1);
+      liveOpacity.set(1);
+      setPct((prev) => (prev === 100 ? prev : 100));
+      return;
+    }
+    const e = time % TL_CYCLE;
+    let t: number;
+    let op: number;
+    if (e < TL_PLAY) {
+      t = easeInOutQuad(e / TL_PLAY);
+      op = e < TL_FADE_IN ? e / TL_FADE_IN : 1;
+    } else if (e < TL_PLAY + TL_HOLD) {
+      t = 1;
+      op = 1;
+    } else {
+      t = 1;
+      op = 1 - (e - TL_PLAY - TL_HOLD) / TL_RESET;
+    }
+    progress.set(t);
+    liveOpacity.set(op);
+    const next = Math.round(t * 100);
+    setPct((prev) => (prev === next ? prev : next));
+  });
+
+  const playheadLeft = useTransform(progress, (v) => `${(v * 100).toFixed(3)}%`);
+
+  const seconds = Math.min(
+    TOTAL_SECONDS,
+    Math.round((pct / 100) * TOTAL_SECONDS)
+  );
+  const activePhase = Math.min(
+    PHASES.length - 1,
+    Math.floor((pct / 100) * PHASES.length)
+  );
 
   return (
-    <div className="relative">
-      {/* Header strip */}
-      <div className="flex items-center gap-3 mb-3 font-mono text-[9.5px] tracking-[0.3em] uppercase text-white/35">
+    <div className="relative select-none">
+      {/* Header: label + running timecode readout */}
+      <div className="flex items-center gap-3 mb-4 font-mono text-[9.5px] tracking-[0.3em] uppercase text-white/35">
         <span className="text-white/55">12-Stage Pipeline</span>
-        <span className="h-px flex-1 bg-white/[0.08]" />
-        <span className="tabular-nums">4 Phases</span>
+        <span className="h-px flex-1 bg-white/8" />
+        <span className="flex items-center gap-1.5 tabular-nums">
+          <span className="text-white/70">00:{pad2(seconds)}</span>
+          <span className="text-white/20">/</span>
+          <span>00:{pad2(TOTAL_SECONDS)}</span>
+        </span>
       </div>
 
-      {/* Phase row */}
-      <div className="relative flex items-center">
-        {/* Base track */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-white/[0.08]" />
+      {/* Phase labels, left-aligned to each segment's start divider */}
+      <div className="grid grid-cols-4 mb-2.5">
+        {PHASES.map((ph, i) => {
+          const done = i < activePhase;
+          const active = i === activePhase;
+          return (
+            <div
+              key={ph.num}
+              className="flex items-baseline gap-1.5 font-mono text-[9px] sm:text-[10px] tracking-[0.18em] uppercase"
+            >
+              <span
+                className={`tabular-nums transition-colors duration-500 ${
+                  active
+                    ? "text-emerald-400"
+                    : done
+                    ? "text-emerald-400/60"
+                    : "text-emerald-400/20"
+                }`}
+              >
+                {ph.num}
+              </span>
+              <span
+                className={`transition-colors duration-500 ${
+                  active
+                    ? "text-white/95"
+                    : done
+                    ? "text-white/55"
+                    : "text-white/30"
+                }`}
+              >
+                {ph.name}
+              </span>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Animated emerald playhead sweep - sits ABOVE the phase boxes so it visibly crosses over them */}
-        <motion.div
+      {/* Track */}
+      <div className="relative h-9">
+        {/* Active-phase wash */}
+        {PHASES.map((_, i) => (
+          <span
+            key={`seg-${i}`}
+            aria-hidden
+            className={`absolute top-0 bottom-0 transition-colors duration-500 ${
+              i === activePhase ? "bg-emerald-400/[0.045]" : ""
+            }`}
+            style={{ left: `${(i / 4) * 100}%`, width: "25%" }}
+          />
+        ))}
+
+        {/* Phase dividers */}
+        {[1, 2, 3].map((i) => (
+          <span
+            key={`div-${i}`}
+            aria-hidden
+            className="absolute top-1.5 bottom-1.5 w-px bg-white/8"
+            style={{ left: `${(i / 4) * 100}%` }}
+          />
+        ))}
+
+        {/* Baseline groove */}
+        <span
           aria-hidden
-          className="absolute z-20 top-1/2 -translate-y-1/2 h-[2px] w-16 rounded-full"
+          className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-white/10"
+        />
+
+        {/* 12 stage ticks, 3 per phase */}
+        {PHASES.map((_, p) =>
+          [0, 1, 2].map((s) => {
+            const idx = p * 3 + s;
+            const pos = (idx + 0.5) / 12;
+            const passed = pos * 100 <= pct;
+            const isPhaseStart = s === 0;
+            return (
+              <span
+                key={`tick-${idx}`}
+                aria-hidden
+                className={`absolute top-1/2 w-[1.5px] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${
+                  passed
+                    ? "bg-emerald-400/80"
+                    : isPhaseStart
+                    ? "bg-white/25"
+                    : "bg-white/12"
+                }`}
+                style={{
+                  left: `${pos * 100}%`,
+                  height: isPhaseStart ? "15px" : "9px",
+                }}
+              />
+            );
+          })
+        )}
+
+        {/* Progress fill, scrubbed to the playhead */}
+        <motion.span
+          aria-hidden
+          className="absolute left-0 top-1/2 h-[2px] w-full origin-left -translate-y-1/2"
           style={{
+            scaleX: progress,
+            opacity: liveOpacity,
             background:
-              "linear-gradient(90deg, transparent, rgba(52,211,153,0.85), transparent)",
-            boxShadow: "0 0 14px rgba(52,211,153,0.55)",
-          }}
-          animate={{ left: ["-4%", "100%"] }}
-          transition={{
-            duration: 4.2,
-            repeat: Infinity,
-            ease: "easeInOut",
+              "linear-gradient(90deg, rgba(52,211,153,0) 0%, rgba(52,211,153,0.5) 100%)",
+            boxShadow: "0 0 10px rgba(52,211,153,0.35)",
           }}
         />
 
-        {/* Phase nodes */}
-        <div className="relative z-10 flex w-full justify-between">
-          {phases.map((p, i) => (
-            <motion.div
-              key={p.num}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.8 + i * 0.07 }}
-              className="flex flex-col items-center gap-2 bg-[#060606] px-3"
-            >
-              <div className="relative flex items-center justify-center">
-                <span
-                  className="w-2 h-2 rounded-full bg-white/15"
-                  style={{
-                    boxShadow:
-                      "inset 0 0 0 1px rgba(255,255,255,0.25)",
-                  }}
-                />
-                <motion.span
-                  aria-hidden
-                  className="absolute w-2 h-2 rounded-full bg-emerald-400"
-                  animate={{ opacity: [0, 1, 0], scale: [0.6, 1, 0.6] }}
-                  transition={{
-                    duration: 4.2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: (i / phases.length) * 4.2,
-                  }}
-                />
-              </div>
-              <div className="flex items-baseline gap-1.5 font-mono text-[10px] tracking-[0.22em] uppercase">
-                <span className="text-emerald-400/80 tabular-nums">
-                  {p.num}
-                </span>
-                <span className="text-white/70">{p.name}</span>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+        {/* Playhead: vertical line + diamond head */}
+        <motion.div
+          aria-hidden
+          className="absolute top-0 bottom-0 z-10"
+          style={{ left: playheadLeft, opacity: liveOpacity }}
+        >
+          <span
+            className="absolute inset-y-0 left-0 w-[1.5px] -translate-x-1/2 bg-emerald-400"
+            style={{ boxShadow: "0 0 12px rgba(52,211,153,0.7)" }}
+          />
+          <span
+            className="absolute left-0 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-emerald-400"
+            style={{ boxShadow: "0 0 8px rgba(52,211,153,0.85)" }}
+          />
+        </motion.div>
+
+        {/* Origin marker */}
+        <span
+          aria-hidden
+          className="absolute left-0 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400/70"
+        />
+      </div>
+
+      {/* Ruler bounds */}
+      <div className="mt-2 flex items-center justify-between font-mono text-[9px] tracking-[0.2em] uppercase text-white/25 tabular-nums">
+        <span>00:00</span>
+        <span>00:{pad2(TOTAL_SECONDS)}</span>
       </div>
     </div>
   );
