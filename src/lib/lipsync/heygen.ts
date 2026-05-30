@@ -285,9 +285,8 @@ async function uploadTalkingPhoto(
       if (result.freedCount === 0) {
         throw new Error(
           `HeyGen photo-avatar quota is full and auto-cleanup could not free any slot ` +
-          `(no orphans were deletable and no cached avatars exist to evict). ` +
-          `Delete unused avatars in the HeyGen dashboard (https://app.heygen.com/avatars), ` +
-          `or run "npx tsx scripts/cleanup-heygen-avatars.ts" for a one-shot cleanup.`
+          `(no orphans deletable, no cached avatars to evict). ` +
+          `Run scripts/cleanup-heygen-avatars.ts, or delete unused avatars at app.heygen.com/avatars.`
         );
       }
       console.log(
@@ -301,10 +300,10 @@ async function uploadTalkingPhoto(
         const retryText = await response.text();
         if (retryText.includes('"code":401028')) {
           throw new Error(
-            `HeyGen photo-avatar quota is STILL full after auto-cleanup freed ${result.freedCount} ` +
-            `avatar(s). ${result.orphansRemaining} orphan(s) remain in your account. ` +
-            `Run "npx tsx scripts/cleanup-heygen-avatars.ts --yes" to bulk-clean the rest, ` +
-            `or delete them at https://app.heygen.com/avatars.`
+            `HeyGen photo-avatar quota is still full after auto-cleanup freed ${result.freedCount} ` +
+            `avatar(s); ${result.orphansRemaining} orphan(s) remain. ` +
+            `Run scripts/cleanup-heygen-avatars.ts to bulk-clean the rest, ` +
+            `or delete them at app.heygen.com/avatars.`
           );
         }
         throw new Error(
