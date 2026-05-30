@@ -166,6 +166,32 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
   }
 
   let data = validation.data;
+
+  // assetIds (uploaded images) are only consumed by the Slideshow pipeline.
+  // A talking-object request carrying assetIds is malformed - the UI gates
+  // this, but reject server-side too so a stale or hand-rolled client can't
+  // slip them through into a render that ignores them.
+  if (
+    Array.isArray(data.assetIds) &&
+    data.assetIds.length > 0 &&
+    data.mode === "talking_object"
+  ) {
+    return apiError({
+      code: ErrorCode.VALIDATION_FAILED,
+      message: "Image uploads (assetIds) are only supported in Slideshow mode.",
+      status: 400,
+      details: {
+        errors: [
+          {
+            field: "assetIds",
+            message: "Only supported when mode is 'slideshow'.",
+          },
+        ],
+      },
+      headers,
+    });
+  }
+
   const previewJobIdStr = data.previewJobId;
   const renderModeValid = data.renderMode;
 

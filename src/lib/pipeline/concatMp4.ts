@@ -348,6 +348,181 @@ export function concatenateMp4s(inputPaths: string[], outputPath: string): void 
 }
 
 
+function getSpeechBounds(
+  filePath: string,
+  thresholdDb: number,
+  minSilenceDur: number
+): { speechStart: number; speechEnd: number; duration: number } {
+  const resolved = path.resolve(filePath);
+  const duration = getDuration(resolved);
+  if (duration <= 0) return { speechStart: 0, speechEnd: 0, duration: 0 };
+
+  const ffmpeg = getFfmpegPath();
+  const result = spawnSync(
+    ffmpeg,
+    [
+      "-hide_banner",
+      "-nostats",
+      "-i", resolved,
+      "-af", `silencedetect=noise=${thresholdDb}dB:d=${minSilenceDur}`,
+      "-f", "null",
+      "-",
+    ],
+    { encoding: "utf-8", timeout: 60_000 }
+  );
+
+  // silencedetect writes events to stderr; concatenate both streams defensively.
+  const log = `${result.stderr ?? ""}\n${result.stdout ?? ""}`;
+  const starts: number[] = [];
+  const ends: number[] = [];
+
+  const startRe = /silence_start:\s*([\d.]+)/g;
+  const endRe = /silence_end:\s*([\d.]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = startRe.exec(log))) {
+    const v = parseFloat(m[1]!);
+    if (Number.isFinite(v) && v >= 0) starts.push(v);
+  }
+  while ((m = endRe.exec(log))) {
+    const v = parseFloat(m[1]!);
+    if (Number.isFinite(v) && v >= 0) ends.push(v);
+  }
+
+  // Leading silence: if the first silence starts at ~0, speech begins at the
+  // first silence_end.
+  let speechStart = 0;
+  if (starts.length > 0 && starts[0]! < 0.06 && ends.length > 0) {
+    speechStart = ends[0]!;
+  }
+
+  // Trailing silence: ffmpeg sometimes omits the final silence_end when the
+  // file ends inside silence. Either an unmatched silence_start or a last
+  // silence_end sitting within ~0.1s of the file end signals trailing silence.
+  let speechEnd = duration;
+  if (starts.length > ends.length && starts.length > 0) {
+    speechEnd = starts[starts.length - 1]!;
+  } else if (starts.length > 0 && ends.length > 0) {
+    const lastEnd = ends[ends.length - 1]!;
+    if (duration - lastEnd < 0.1) {
+      speechEnd = starts[starts.length - 1]!;
+    }
+  }
+
+  if (!Number.isFinite(speechStart) || speechStart < 0) speechStart = 0;
+  if (!Number.isFinite(speechEnd) || speechEnd > duration) speechEnd = duration;
+  if (speechEnd <= speechStart) {
+    return { speechStart: 0, speechEnd: duration, duration };
+  }
+  return { speechStart, speechEnd, duration };
+}
+
+/**
+ * Trims leading and/or trailing silence from an MP4 in-place, by re-encoding
+ * with matching video+audio trims. VEO clips often arrive with a noticeable
+ * "settle in" silence at the start and a "trailing breath" at the end; left
+ * alone, those stack across chunks and become a multi-second gap between
+ * speakers in the concatenated talking video.
+ *
+ * Conservative defaults: -40 dB threshold, 0.15s minimum silence run, 0.05s
+ * safety buffer kept on each side so we never clip into speech. Silently
+ * no-ops if ffmpeg is unavailable or the result would be shorter than 0.5s.
+ */
+export function trimChunkSilence(
+  filePath: string,
+  options: {
+    trimLeading: boolean;
+    trimTrailing: boolean;
+    thresholdDb?: number;
+    minSilenceDur?: number;
+    bufferSec?: number;
+  }
+): void {
+  if (!options.trimLeading && !options.trimTrailing) return;
+  if (!isFfmpegAvailable()) return;
+  const resolved = path.resolve(filePath);
+  if (!fs.existsSync(resolved)) return;
+
+  const thresholdDb = options.thresholdDb ?? -40;
+  const minSilenceDur = options.minSilenceDur ?? 0.15;
+  const buffer = options.bufferSec ?? 0.05;
+
+  const { speechStart, speechEnd, duration } = getSpeechBounds(
+    resolved,
+    thresholdDb,
+    minSilenceDur
+  );
+  if (duration <= 0) return;
+
+  const newStart = options.trimLeading ? Math.max(0, speechStart - buffer) : 0;
+  const newEnd = options.trimTrailing
+    ? Math.min(duration, speechEnd + buffer)
+    : duration;
+
+  // Bail when there is nothing meaningful to trim.
+  if (newStart < 0.03 && duration - newEnd < 0.03) return;
+  if (newEnd - newStart < 0.5) return;
+
+  const dir = path.dirname(resolved);
+  const tag = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tmp = path.join(dir, `silence-trim-${tag}.mp4`);
+  const ffmpeg = getFfmpegPath();
+
+  const filter =
+    `[0:v]trim=start=${newStart.toFixed(3)}:end=${newEnd.toFixed(3)},setpts=PTS-STARTPTS[v];` +
+    `[0:a]atrim=start=${newStart.toFixed(3)}:end=${newEnd.toFixed(3)},asetpts=PTS-STARTPTS[a]`;
+
+  const result = spawnSync(
+    ffmpeg,
+    [
+      "-y",
+      "-i", resolved,
+      "-filter_complex", filter,
+      "-map", "[v]",
+      "-map", "[a]",
+      "-c:v", "libx264",
+      "-preset", "fast",
+      "-crf", "20",
+      "-c:a", "aac",
+      "-b:a", "192k",
+      "-movflags", "+faststart",
+      tmp,
+    ],
+    { encoding: "utf-8", timeout: 180_000 }
+  );
+
+  if (result.status !== 0 || !fs.existsSync(tmp)) {
+    try {
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    } catch {
+    }
+    return; // keep the untrimmed original
+  }
+
+  const outDur = getDuration(tmp);
+  if (outDur < 0.5) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+    }
+    return;
+  }
+
+  try {
+    fs.unlinkSync(resolved);
+    fs.renameSync(tmp, resolved);
+    console.log(
+      `[ffmpeg] Trimmed silence on chunk: ${duration.toFixed(2)}s -> ${outDur.toFixed(2)}s ` +
+      `(lead=${options.trimLeading ? "on" : "off"}, trail=${options.trimTrailing ? "on" : "off"})`
+    );
+  } catch {
+    try {
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    } catch {
+    }
+  }
+}
+
+
 export function mixBackgroundMusic(
   videoPath: string,
   outputPath: string,
