@@ -32,6 +32,7 @@ import { cleanupJobArtifacts } from "@/lib/storage/cleanup";
 import { isJobCancelled } from "@/lib/queue/cancelCheck";
 import { generateTalkingVideoWithVeo, VeoQuotaOrLimitError, VeoContentFilteredError } from "@/lib/veo";
 import { rewriteNarrationForSafety } from "@/lib/pipeline/safetyReword";
+import { resolveCartoonSubject } from "@/lib/pipeline/cartoonSubject";
 import {
   concatenateMp4s,
   isFfmpegAvailable,
@@ -40,6 +41,7 @@ import {
   mixBackgroundMusic,
   trimVideoIfLongerThan,
   trimAudioBufferIfLongerThan,
+  trimChunkSilence,
 } from "@/lib/pipeline/concatMp4";
 import { validateVideoChunk } from "@/lib/pipeline/validateChunk";
 import { burnSubtitlesIntoVideo, type SubtitleEntry } from "@/lib/pipeline/burnSubtitles";
@@ -267,7 +269,7 @@ function buildCinematicBasePrompt(
   const orientationHint = isPortrait
     ? "vertical phone-style framing"
     : "horizontal widescreen framing";
-  return `Ultra-real influencer-style video, ${orientationHint}, shot like a genuine creator reel. SUBJECT: ${subject}. LOCATION: ${setting}. The presenter speaks directly to camera while naturally inhabiting the space - small head movements, natural blinks, hands occasionally entering frame, breath between phrases, micro-pauses. Practical camera with subtle handheld movement, shallow depth of field, environmental details kept in soft focus. Avoid generic newsroom or static talking-head framing. Avoid corporate stock-footage look.`;
+  return `Ultra-real influencer-style video, ${orientationHint}, shot like a genuine creator reel. SUBJECT: ${subject}. LOCATION: ${setting}. The presenter speaks directly to camera while naturally inhabiting the space - small head movements, natural blinks, hands occasionally entering frame. DELIVERY: tight and continuous - begin speaking on the very first frame with no silent intro, breath, or warm-up; speak at a steady natural pace without mid-line drift; end on the final word with no afterthought pause or trailing thought. Practical camera with subtle handheld movement, shallow depth of field, environmental details kept in soft focus. Avoid generic newsroom or static talking-head framing. Avoid corporate stock-footage look.`;
 }
 
 function splitScriptIntoChunks(
@@ -1039,10 +1041,31 @@ async function runPipelineOnce(
         " " + (useMultiClip ? "multi-clip" : "single clip")
       );
 
-      const mainSubject =
-        intent.mainSubject && intent.mainSubject.trim() !== ""
-          ? intent.mainSubject
-          : "friendly character";
+      // Cartoon mode: figure out a sensible shape for the talking cartoon
+      // BEFORE building any prompt. If the topic is unambiguously about a
+      // specific physical object, the cartoon is shaped like that object;
+      // otherwise we fall back to a generic humanoid cartoon character.
+      // VEO improvises random shapes (screws, hooks, hammers...) when given
+      // an abstract topic with no clear subject, so this guards against that.
+      const isCartoon = talkingObjectStyle === "cartoon";
+      let cartoonBasePrompt =
+        `Cartoon humanoid character with a friendly face (eyes, eyebrows, nose, mouth), a stylized cartoon body with arms and simple hands, talking to camera. Approachable, topic-neutral cartoon person, NOT a recognizable real human or celebrity.`;
+      if (isCartoon) {
+        const cartoonSubject = await resolveCartoonSubject(intent.rawInput, {
+          proposedSubject: intent.mainSubject ?? null,
+          model: textModel,
+        });
+        if (cartoonSubject.shape === "object") {
+          cartoonBasePrompt =
+            `Cartoon ${cartoonSubject.subject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera. The character is clearly recognizable as a ${cartoonSubject.subject} - stylized but unambiguous in shape.`;
+        }
+        console.log(
+          "[pipeline] jobId=" + jobId + " cartoon shape=" +
+          (cartoonSubject.shape === "object"
+            ? "object:" + cartoonSubject.subject
+            : "humanoid")
+        );
+      }
       const fullScriptText = script.entries
         .slice()
         .sort((a, b) => a.order - b.order)
@@ -1056,7 +1079,7 @@ async function runPipelineOnce(
             ? talkingRealMode === "scenario"
               ? `${buildCinematicBasePrompt(jobId, aspectRatio)}${avatarPromptSuffix}`
               : `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
-            : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
+            : cartoonBasePrompt;
         const singleLock =
           talkingObjectStyle === "real" && talkingRealMode === "scenario"
             ? veoCharacterLockSuffix(options.characterLockId, { variant: "wardrobeAndSetOk" })
@@ -1210,7 +1233,7 @@ async function runPipelineOnce(
               ? talkingRealMode === "scenario"
                 ? `${buildCinematicBasePrompt(jobId, aspectRatio, i)}${avatarPromptSuffix}`
                 : `Real person, photorealistic human, living person, talking to camera. Natural setting or subtle scenery in the background.${avatarPromptSuffix}`
-              : `Cartoon ${mainSubject} with a friendly face (eyes, eyebrows, nose, mouth) and simple hands, talking to camera.`;
+              : cartoonBasePrompt;
           const multiRealBeat =
             talkingObjectStyle === "real" && N > 1
               ? talkingRealMode === "scenario"
@@ -1236,18 +1259,25 @@ async function runPipelineOnce(
               : veoCharacterLockSuffix(options.characterLockId);
           let flow: string;
           if (N === 1) {
-            flow = "Say exactly the following, naturally and at a steady pace: ";
+            flow = "Begin speaking on frame 1 with no silent intro, breath, or warm-up; say exactly the following at a steady natural pace and finish on the last word with no afterthought pause: ";
           } else if (i === 0) {
-            flow = "This is the opening of a continuous speech. Say exactly the following in about 8 seconds, finish the last word clearly with no long pause: ";
+            flow = isCinematicScenarioChunk
+              ? "Begin speaking on frame 1 with no silent intro, breath, or warm-up. Deliver this opening line tightly at a steady natural pace; end on the last word with no afterthought pause. Say exactly the following in about 8 seconds: "
+              : "This is the opening of a continuous speech. Begin speaking on frame 1 with no silent intro. Say exactly the following in about 8 seconds, finish the last word clearly with no long pause: ";
           } else if (i === N - 1) {
-            flow =
-              "This continues directly from the previous clip with no gap. Start immediately; say exactly the following as the closing segment. Complete the final sentence fully, then stop speaking with no extra clause or trailing thought: ";
+            flow = isCinematicScenarioChunk
+              ? "A NEW presenter (different person from prior clips) begins speaking on frame 1 with no silent intro, breath, or warm-up. Deliver the closing line tightly; complete the final sentence fully and stop immediately with no trailing thought or afterthought pause. Say exactly the following: "
+              : "This continues directly from the previous clip with no gap. Start immediately; say exactly the following as the closing segment. Complete the final sentence fully, then stop speaking with no extra clause or trailing thought: ";
           } else {
-            flow = "This continues directly from the previous clip with no gap. Start immediately, say exactly the following in about 8 seconds, and finish the last word clearly: ";
+            flow = isCinematicScenarioChunk
+              ? "A NEW presenter (different person from prior clips) begins speaking on frame 1 with no silent intro, breath, or warm-up. Deliver this segment tightly at a steady natural pace; end on the last word with no afterthought pause. Say exactly the following in about 8 seconds: "
+              : "This continues directly from the previous clip with no gap. Start immediately, say exactly the following in about 8 seconds, and finish the last word clearly: ";
           }
           const endInstruction =
             N > 1 && i < N - 1
-              ? " Do not pause at the end; the next clip will continue from here."
+              ? isCinematicScenarioChunk
+                ? " End on the last word with no afterthought pause; the video cuts to a different presenter immediately after."
+                : " Do not pause at the end; the next clip will continue from here."
               : N > 1 && i === N - 1
                 ? " Do not add another sentence after the final line."
                 : "";
@@ -1286,6 +1316,16 @@ async function runPipelineOnce(
               if (!validation.valid) {
                 throw new Error(validation.reason ?? "Chunk validation failed");
               }
+              // Strip leading silence from the first chunk (so the video starts
+              // on the first spoken word) and trailing silence from every chunk
+              // (so back-to-back chunks don't stack a multi-second pause between
+              // speakers/sentences after concatenation). Middle chunks keep their
+              // leading silence as the crossfade buffer so different speakers do
+              // not overlap audibly at the seam.
+              trimChunkSilence(chunkPath, {
+                trimLeading: i === 0,
+                trimTrailing: true,
+              });
               chunkPaths.push(chunkPath);
               finalChunkTexts.push(currentChunkText);
               lastChunkError = null;
