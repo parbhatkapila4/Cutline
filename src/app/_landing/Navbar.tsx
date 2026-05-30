@@ -162,14 +162,6 @@ export function Navbar() {
                             <p className="text-[11.5px] text-gray-500 truncate">{sessionUser.email}</p>
                           ) : null}
                         </div>
-                        <Link
-                          href="/dashboard"
-                          role="menuitem"
-                          onClick={() => setAccountMenuOpen(false)}
-                          className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                          Dashboard
-                        </Link>
                         <button
                           type="button"
                           role="menuitem"
