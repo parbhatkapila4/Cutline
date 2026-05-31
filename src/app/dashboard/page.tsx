@@ -85,6 +85,24 @@ export default function DashboardPage() {
   const [confirmTarget, setConfirmTarget] = useState<DashboardVideoItem | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // When the mobile drawer is open, lock body scroll and let Esc close it.
+  // Desktop (lg+) never opens the drawer, so this effect is mobile-only in
+  // practice — `mobileMenuOpen` simply stays false there.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileMenuOpen(false);
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [mobileMenuOpen]);
 
   const fetchVideos = useCallback(async () => {
     setVideosLoading(true);
@@ -259,8 +277,49 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : null}
+      {/* Mobile: floating hamburger that opens the same sidebar as a drawer.
+          Hidden on lg+ where the sidebar is already inline on the left. */}
+      <button
+        type="button"
+        onClick={() => setMobileMenuOpen(true)}
+        aria-label="Open menu"
+        aria-expanded={mobileMenuOpen}
+        aria-controls="dashboard-mobile-menu"
+        className="lg:hidden fixed top-3 left-3 z-40 inline-flex items-center justify-center w-10 h-10 rounded-xl border border-white/10 bg-zinc-950/80 backdrop-blur-md text-zinc-200 hover:text-white hover:bg-zinc-900 shadow-lg shadow-black/40 transition-colors"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+        </svg>
+      </button>
+      {/* Mobile: backdrop. Click closes the drawer. pointer-events-none when
+          closed so it doesn't trap input on desktop or when not visible. */}
+      <div
+        className={`lg:hidden fixed inset-0 z-40 bg-black transition-opacity duration-300 ${mobileMenuOpen ? "opacity-60" : "opacity-0 pointer-events-none"}`}
+        onClick={() => setMobileMenuOpen(false)}
+        aria-hidden
+      />
       <div className="flex flex-1 min-h-0 w-full">
-        <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-white/10 h-full overflow-hidden py-6 px-4 bg-zinc-950/40 backdrop-blur-sm">
+        {/* Same <aside> renders as a fixed slide-in drawer on mobile and as the
+            normal flex-child sidebar on lg+. lg: utilities reset the mobile
+            fixed/transform classes so desktop layout is unchanged. */}
+        <aside
+          id="dashboard-mobile-menu"
+          aria-label="Dashboard menu"
+          className={`fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] flex flex-col border-r border-white/10 overflow-hidden py-6 px-4 bg-zinc-950 shadow-2xl transition-transform duration-300 ease-out lg:static lg:z-auto lg:w-72 lg:max-w-none lg:shrink-0 lg:h-full lg:bg-zinc-950/40 lg:backdrop-blur-sm lg:shadow-none lg:transition-none lg:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        >
+          <div className="lg:hidden flex items-center justify-between mb-4 shrink-0">
+            <span className="text-sm font-semibold text-white">Menu</span>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close menu"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           <div className="flex flex-col flex-1 min-h-0 overflow-y-auto gap-6 scrollbar-hide">
             <div className="rounded-xl border border-white/10 bg-zinc-950/90 p-4 transition-colors hover:border-white/15">
               <h2 className="text-sm font-semibold text-white mb-3">Usage</h2>
@@ -504,7 +563,7 @@ export default function DashboardPage() {
           </div>
         </aside>
 
-        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto pt-8 pb-16 px-6 lg:px-10 xl:px-12 scrollbar-hide">
+        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto pt-20 lg:pt-8 pb-16 px-6 lg:px-10 xl:px-12 scrollbar-hide">
 
           <section id="overview" className="mb-10">
             {(() => {
