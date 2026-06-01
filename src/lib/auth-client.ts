@@ -34,20 +34,13 @@ function writeCachedSession(data: SessionData | null) {
       window.localStorage.removeItem(CACHED_SESSION_KEY);
     }
   } catch {
-    // ignore quota / privacy mode errors
   }
 }
 
-/**
- * Wraps better-auth's useSession with a localStorage cache so returning visitors
- * see their account state instantly instead of a loading skeleton.
- */
 export function useCachedSession() {
   const live = authClient.useSession();
-  // Captured once on first render; mirrors what we knew before the network responded.
   const [cached] = useState<SessionData | null>(() => readCachedSession());
 
-  // Persist resolved sessions to localStorage so the next visit skips the skeleton.
   useEffect(() => {
     if (live.isPending) return;
     writeCachedSession(live.data ?? null);

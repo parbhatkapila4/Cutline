@@ -8,14 +8,12 @@ function pickHighRes(
   orientation: UnsplashOrientation
 ): string | null {
   if (!urls) return null;
-  // Unsplash's raw URL accepts dynamic resizing. We pick dimensions that hint at
-  // the desired orientation so the CDN-delivered crop respects the canvas.
   const dimensions =
     orientation === "portrait"
       ? "w=2160&h=3840"
       : orientation === "squarish"
-      ? "w=2160&h=2160"
-      : "w=3840&h=2160";
+        ? "w=2160&h=2160"
+        : "w=3840&h=2160";
   if (typeof urls.raw === "string" && urls.raw) {
     const sep = urls.raw.includes("?") ? "&" : "?";
     return `${urls.raw}${sep}${dimensions}&q=92&fm=jpg&fit=crop`;

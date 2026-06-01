@@ -219,10 +219,6 @@ async function uploadTalkingPhoto(
     contentType = ext === ".png" ? "image/png" : "image/jpeg";
   }
 
-  // HeyGen accounts cap stored Photo Avatars per tier (3 on the lower tier).
-  // Re-uploading the same preset on every job burns through that quota fast,
-  // so dedupe by image bytes: once we've uploaded an exact image, reuse the
-  // returned talking_photo_id for every future job that uses the same image.
   const cached = getCachedTalkingPhotoId(imageBuffer);
   if (cached) {
     console.log(
@@ -231,8 +227,6 @@ async function uploadTalkingPhoto(
     return cached;
   }
 
-  // One upload attempt, timed out at 60s. Extracted so we can retry after
-  // auto-cleanup without duplicating the request setup.
   const attemptUpload = async (): Promise<Response> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60_000);
@@ -268,19 +262,11 @@ async function uploadTalkingPhoto(
 
   if (!response.ok) {
     const text = await response.text();
-    // HeyGen returns 400 with body code 401028 when the account's stored
-    // Photo-Avatar quota is exhausted (3 on the lower tier). Auto-recover by
-    // freeing a slot (orphans first - avatars HeyGen has but our cache does
-    // not know about - then LRU among cached) and retrying the upload once.
+
     if (text.includes('"code":401028')) {
       console.warn(
         `[heygen] jobId=${jobId} stage=upload-photo quota=full; attempting bulk auto-cleanup`
       );
-      // Bulk-delete every orphan in parallel batches. With a high default
-      // cap (10000) this handles historical accumulation from before the
-      // cache shipped — e.g. an account with thousands of leftovers gets
-      // cleaned to empty in one job (a few minutes, fully logged), and
-      // afterwards the cache prevents recurrence.
       const result = await freeUpHeyGenSlot(apiKey, jobId);
       if (result.freedCount === 0) {
         throw new Error(
@@ -291,9 +277,9 @@ async function uploadTalkingPhoto(
       }
       console.log(
         `[heygen] jobId=${jobId} stage=upload-photo retry after freeing ${result.freedCount} avatar(s)` +
-          (result.orphansRemaining > 0
-            ? ` (${result.orphansRemaining} orphan(s) still in account)`
-            : "")
+        (result.orphansRemaining > 0
+          ? ` (${result.orphansRemaining} orphan(s) still in account)`
+          : "")
       );
       response = await callUpload("upload retry");
       if (!response.ok) {
@@ -323,8 +309,6 @@ async function uploadTalkingPhoto(
       `HeyGen photo upload failed: ${data.message || "Invalid response"}`
     );
   }
-
-  // Persist for reuse on every future job that uses this exact image.
   const sourceHint = imagePathOrUrl.startsWith("http")
     ? imagePathOrUrl
     : path.basename(imagePathOrUrl);

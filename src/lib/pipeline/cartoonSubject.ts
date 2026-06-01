@@ -38,21 +38,6 @@ export type ResolveCartoonSubjectOptions = {
   proposedSubject?: string | null;
 };
 
-/**
- * Decides whether a cartoon-mode talking video should be shaped like a
- * specific physical object (matching the user's topic) or fall back to a
- * generic humanoid cartoon character.
- *
- * VEO needs a clear visual subject for cartoon mode; for abstract topics
- * ("copywriting tips", "growth strategy", "explain Redis") there is no good
- * cartoon shape and VEO will otherwise improvise a random object that has
- * nothing to do with the script (screws, hooks, hammers, etc.).
- *
- * Safe degradation: returns { shape: "humanoid" } on every failure mode
- * (no API key, non-2xx, malformed JSON, empty response, network error), so
- * the pipeline always gets a sensible default and never crashes the job
- * over a subject lookup.
- */
 export async function resolveCartoonSubject(
   userPrompt: string,
   options?: ResolveCartoonSubjectOptions

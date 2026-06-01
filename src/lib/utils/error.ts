@@ -37,20 +37,12 @@ export function mapFailedReasonToFailureCode(raw: string | null | undefined): Jo
   return "UNKNOWN";
 }
 
-// Match a short, well-formed "Provider [optional sub-context]: " prefix.
-// CRITICAL: the inner class must NOT use `[^:]*` — that's greedy across the
-// whole message and will happily eat through embedded URLs ("https:") and
-// leave the user with a fragment like "//app.heygen.com/avatars". Constrain
-// to letters/spaces/hyphens/apostrophes, ≤40 chars, then `: `.
 const PROVIDER_PREFIX_RE = /^(HeyGen|Gemini|OpenAI|Anthropic|Replicate|ElevenLabs|Veo|Kling|Runway|Pika)\b(?:[ \t][A-Za-z][A-Za-z \t'-]{0,40})?:\s+/i;
 
 function stripProviderPrefix(raw: string): string {
   return raw.replace(PROVIDER_PREFIX_RE, "").trim();
 }
 
-// HeyGen returns code 401028 when the account's Photo Avatar quota is full.
-// That's an account-level state the user has to resolve (cleanup or upgrade),
-// NOT a transient rate limit, so it deserves its own actionable message.
 function isHeyGenAvatarQuotaError(s: string): boolean {
   return (
     s.includes("heygen") &&
@@ -61,9 +53,6 @@ function isHeyGenAvatarQuotaError(s: string): boolean {
   );
 }
 
-// User-facing wording: never expose the provider name, the cleanup script
-// path, the avatar-management URL, or anything else only the operator can
-// act on. End users see this; technical detail stays in worker logs.
 const HEYGEN_AVATAR_QUOTA_MESSAGE =
   "Talking-character videos are temporarily unavailable. Please try Slideshow mode, or try again in a few minutes.";
 
@@ -71,8 +60,6 @@ export function getUserFriendlyErrorMessage(raw: string | null | undefined): str
   if (!raw || typeof raw !== "string") return GENERIC_MESSAGE;
   const cleaned = stripProviderPrefix(raw);
   const s = cleaned.toLowerCase();
-  // Check HeyGen Photo Avatar quota BEFORE the generic quota / rate-limit
-  // catch-all - it's not a transient rate limit, it's an account state.
   if (isHeyGenAvatarQuotaError(raw.toLowerCase()) || isHeyGenAvatarQuotaError(s)) {
     return HEYGEN_AVATAR_QUOTA_MESSAGE;
   }
@@ -151,11 +138,6 @@ export function getErrorPresentation(
     };
   }
 
-  // HeyGen Photo Avatar quota: account state, not a transient rate limit.
-  // Check on BOTH the cleaned message and the original so we still match
-  // when the error has been re-processed once already (the create page runs
-  // getUserFriendlyErrorMessage first, then getErrorPresentation on the
-  // result, so the raw "HeyGen ... quota" string may already be normalized).
   if (
     isHeyGenAvatarQuotaError(s) ||
     isHeyGenAvatarQuotaError(original.toLowerCase())

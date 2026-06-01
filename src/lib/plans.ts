@@ -47,8 +47,6 @@ export function isEnterprisePlan(plan: string | undefined | null): boolean {
   return plan === "enterprise";
 }
 
-// "Pro and above": Professional or Enterprise. The single source of truth for
-// every Pro-gated feature (badge visibility, UI locks, and server enforcement).
 export function isProPlan(plan: string | undefined | null): boolean {
   return plan === "professional" || plan === "enterprise";
 }

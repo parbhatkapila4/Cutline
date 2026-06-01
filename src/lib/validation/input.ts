@@ -141,15 +141,8 @@ export type JobIdValidationResult =
   | { valid: true }
   | { valid: false; error: string };
 
-/**
- * Returns true when a hostname points at the local host, a private/internal
- * network, or a cloud metadata endpoint — i.e. somewhere a server-side webhook
- * fetch must not be allowed to reach (SSRF defense).
- */
 function isPrivateOrInternalHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, ""); // strip IPv6 brackets
-
-  // Hostnames that are never legitimate webhook targets.
   if (
     host === "localhost" ||
     host.endsWith(".localhost") ||
@@ -158,34 +151,29 @@ function isPrivateOrInternalHost(hostname: string): boolean {
   ) {
     return true;
   }
-
-  // Cloud metadata service — the single highest-value SSRF target.
   if (host === "169.254.169.254" || host === "metadata.google.internal") {
     return true;
   }
-
-  // IPv4 literal checks.
   const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (ipv4) {
     const o = ipv4.slice(1).map(Number);
-    if (o.some((n) => n > 255)) return true; // malformed → reject
+    if (o.some((n) => n > 255)) return true;
     const [a, b] = o as [number, number, number, number];
-    if (a === 0) return true; // 0.0.0.0/8
-    if (a === 10) return true; // 10.0.0.0/8
-    if (a === 127) return true; // loopback
-    if (a === 169 && b === 254) return true; // link-local + metadata
-    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
-    if (a === 192 && b === 168) return true; // 192.168.0.0/16
-    if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 CGNAT
+    if (a === 0) return true;
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
     return false;
   }
 
-  // IPv6 literal checks.
   if (host.includes(":")) {
-    if (host === "::1" || host === "::") return true; // loopback / unspecified
-    if (host.startsWith("fc") || host.startsWith("fd")) return true; // ULA fc00::/7
-    if (host.startsWith("fe80")) return true; // link-local
-    if (host.startsWith("::ffff:")) return true; // IPv4-mapped — block conservatively
+    if (host === "::1" || host === "::") return true;
+    if (host.startsWith("fc") || host.startsWith("fd")) return true;
+    if (host.startsWith("fe80")) return true;
+    if (host.startsWith("::ffff:")) return true;
     return false;
   }
 

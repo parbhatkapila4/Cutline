@@ -12,8 +12,8 @@ function pickHighRes(
     orientation === "portrait"
       ? "w=2160&h=3840"
       : orientation === "square"
-      ? "w=2160&h=2160"
-      : "w=3840&h=2160";
+        ? "w=2160&h=2160"
+        : "w=3840&h=2160";
   if (typeof src.original === "string" && src.original) {
     const sep = src.original.includes("?") ? "&" : "?";
     return `${src.original}${sep}auto=compress&cs=tinysrgb&${dimensions}&fit=crop`;

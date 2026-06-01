@@ -73,16 +73,6 @@ function toImageUrl(filePath: string, jobId?: string): string {
 
 const FALLBACK_IMAGE_PATH = "/fallback.png";
 
-/**
- * Maps a "W:H" aspect ratio string to a stock-photo orientation bucket.
- *
- * - `r < 0.7`  → portrait (covers 9:16 = 0.5625)
- * - `r ≤ 1.3`  → square (covers 4:5 = 0.8, 1:1 = 1.0, 5:4 = 1.25)
- * - otherwise  → landscape (covers 3:2 = 1.5, 16:9 = 1.78, 21:9 = 2.33)
- *
- * Defaults to landscape when the ratio is missing/unparseable so legacy callers
- * keep their old behavior.
- */
 function aspectRatioToOrientation(
   ratio?: string
 ): "landscape" | "portrait" | "square" {

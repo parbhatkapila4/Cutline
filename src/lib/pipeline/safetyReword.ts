@@ -11,11 +11,6 @@ Rules:
 
 export type RewriteForSafetyOptions = { model?: string };
 
-/**
- * Rewrites a single spoken line so VEO's RAI/content-safety filter is more
- * likely to accept it, keeping meaning and length. Used to recover a talking-
- * object chunk whose audio was blocked, instead of retrying identical text.
- */
 export async function rewriteNarrationForSafety(
   line: string,
   options?: RewriteForSafetyOptions
@@ -40,7 +35,6 @@ export async function rewriteNarrationForSafety(
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userContent },
       ],
-      // Higher temperature so a second attempt differs from the first.
       temperature: 0.7,
       max_tokens: 300,
     }),
@@ -60,7 +54,5 @@ export async function rewriteNarrationForSafety(
   if (typeof content !== "string" || !content.trim()) {
     throw new Error("Safety reword failed: empty response from model");
   }
-
-  // Strip wrapping quotes the model may add.
   return content.trim().replace(/^["'“”]+|["'“”]+$/g, "").trim();
 }

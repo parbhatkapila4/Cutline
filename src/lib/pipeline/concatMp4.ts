@@ -3,8 +3,6 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-
-
 export const CROSSFADE_DURATION_SECONDS = 0.6;
 
 function getFfmpegPath(): string {
@@ -261,10 +259,6 @@ function crossfadeTwoClips(
   const resolvedB = path.resolve(pathB);
   const resolvedOut = path.resolve(outputPath);
 
-  // "fade" = soft cross-dissolve, the standard cinematic transition between
-  // shots. The previous "slideleft" looked like an iMovie 2008 wipe — wrong
-  // register for the brand. tri curves on the audio give a smooth equal-power
-  // crossfade so the voice doesn't dip into silence at the seam.
   const filterWithAudioCrossfade =
     `[0:v][1:v]xfade=transition=fade:duration=${crossfadeSec}:offset=${offsetSec}[v];` +
     `[0:a][1:a]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[a]`;
@@ -371,7 +365,6 @@ function getSpeechBounds(
     { encoding: "utf-8", timeout: 60_000 }
   );
 
-  // silencedetect writes events to stderr; concatenate both streams defensively.
   const log = `${result.stderr ?? ""}\n${result.stdout ?? ""}`;
   const starts: number[] = [];
   const ends: number[] = [];
@@ -388,16 +381,11 @@ function getSpeechBounds(
     if (Number.isFinite(v) && v >= 0) ends.push(v);
   }
 
-  // Leading silence: if the first silence starts at ~0, speech begins at the
-  // first silence_end.
   let speechStart = 0;
   if (starts.length > 0 && starts[0]! < 0.06 && ends.length > 0) {
     speechStart = ends[0]!;
   }
 
-  // Trailing silence: ffmpeg sometimes omits the final silence_end when the
-  // file ends inside silence. Either an unmatched silence_start or a last
-  // silence_end sitting within ~0.1s of the file end signals trailing silence.
   let speechEnd = duration;
   if (starts.length > ends.length && starts.length > 0) {
     speechEnd = starts[starts.length - 1]!;
@@ -416,17 +404,6 @@ function getSpeechBounds(
   return { speechStart, speechEnd, duration };
 }
 
-/**
- * Trims leading and/or trailing silence from an MP4 in-place, by re-encoding
- * with matching video+audio trims. VEO clips often arrive with a noticeable
- * "settle in" silence at the start and a "trailing breath" at the end; left
- * alone, those stack across chunks and become a multi-second gap between
- * speakers in the concatenated talking video.
- *
- * Conservative defaults: -40 dB threshold, 0.15s minimum silence run, 0.05s
- * safety buffer kept on each side so we never clip into speech. Silently
- * no-ops if ffmpeg is unavailable or the result would be shorter than 0.5s.
- */
 export function trimChunkSilence(
   filePath: string,
   options: {
@@ -457,8 +434,6 @@ export function trimChunkSilence(
   const newEnd = options.trimTrailing
     ? Math.min(duration, speechEnd + buffer)
     : duration;
-
-  // Bail when there is nothing meaningful to trim.
   if (newStart < 0.03 && duration - newEnd < 0.03) return;
   if (newEnd - newStart < 0.5) return;
 
@@ -495,7 +470,7 @@ export function trimChunkSilence(
       if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
     } catch {
     }
-    return; // keep the untrimmed original
+    return;
   }
 
   const outDur = getDuration(tmp);

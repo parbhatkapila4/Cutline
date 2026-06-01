@@ -31,9 +31,6 @@ export class VeoQuotaOrLimitError extends Error {
   }
 }
 
-// VEO's Responsible-AI / content-safety filter rejected the request (commonly
-// the generated audio for a spoken line). Distinct from transient errors:
-// retrying the identical prompt is futile — the caller must change the input.
 export class VeoContentFilteredError extends Error {
   constructor(message: string) {
     super(message);

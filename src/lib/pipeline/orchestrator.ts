@@ -187,14 +187,6 @@ function scenarioVisualBeatForChunk(chunkIndex: number): string {
   return ` ${beats[chunkIndex % beats.length]}`;
 }
 
-/**
- * Without an explicit subject description, Veo falls into its trained mean -
- * which is basically "young business-casual woman in a glass-walled office."
- * Every cinematic render ends up looking like the same person. These two
- * pools give the model concrete, varied human + setting briefs. Selection is
- * keyed on jobId so the same job is deterministic but different jobs get
- * meaningfully different output.
- */
 const CINEMATIC_SUBJECT_POOL: readonly string[] = [
   "warm middle-aged East Asian man with salt-and-pepper hair and round wire-frame glasses, charcoal henley shirt with rolled sleeves",
   "early-30s Afro-Latina woman with a curly bob, gold hoop earrings, mustard denim jacket over a white tee",
@@ -261,10 +253,6 @@ function buildCinematicBasePrompt(
 ): string {
   const subject = pickCinematicSubject(jobId, chunkIndex);
   const setting = pickCinematicSetting(jobId, chunkIndex);
-  // Orientation hint must AGREE with the config.aspectRatio we pass to Veo.
-  // Saying "vertical" in the prompt while requesting a landscape config makes
-  // Veo non-deterministically return portrait clips that then render rotated
-  // sideways in the landscape composition. Derive from the user's choice.
   const isPortrait = aspectRatio === "9:16" || aspectRatio === "4:5";
   const orientationHint = isPortrait
     ? "vertical phone-style framing"
@@ -1041,12 +1029,6 @@ async function runPipelineOnce(
         " " + (useMultiClip ? "multi-clip" : "single clip")
       );
 
-      // Cartoon mode: figure out a sensible shape for the talking cartoon
-      // BEFORE building any prompt. If the topic is unambiguously about a
-      // specific physical object, the cartoon is shaped like that object;
-      // otherwise we fall back to a generic humanoid cartoon character.
-      // VEO improvises random shapes (screws, hooks, hammers...) when given
-      // an abstract topic with no clear subject, so this guards against that.
       const isCartoon = talkingObjectStyle === "cartoon";
       let cartoonBasePrompt =
         `Cartoon humanoid character with a friendly face (eyes, eyebrows, nose, mouth), a stylized cartoon body with arms and simple hands, talking to camera. Approachable, topic-neutral cartoon person, NOT a recognizable real human or celebrity.`;
@@ -1201,9 +1183,6 @@ async function runPipelineOnce(
       }
 
       const textChunks = splitScriptIntoChunks(combinedScript, wordsPerChunk).slice(0, targetChunks);
-      // Tracks the text actually spoken in each rendered chunk. If a chunk's
-      // audio is reworded to pass the safety filter, captions must use the
-      // reworded line — not the original — so they stay in sync with the video.
       const finalChunkTexts: string[] = [];
       await checkCancelledAndThrow();
       logEvent({ jobId, event: "stage_start", stage: "veo" });
@@ -1242,10 +1221,6 @@ async function runPipelineOnce(
               : "";
           const baseAugmented = `${base}${multiRealBeat}`;
           const chunkText = textChunks[i]!;
-          // Cinematic mode intentionally uses a NEW person per chunk, so we
-          // must NOT apply the character-lock suffix — that suffix tells Veo
-          // "keep the same person across clips," which is the opposite of
-          // what cinematic mode wants. Studio mode still gets the lock.
           const isCinematicScenarioChunk =
             talkingObjectStyle === "real" && talkingRealMode === "scenario";
           const lockVariant =
@@ -1284,11 +1259,6 @@ async function runPipelineOnce(
           const buildChunkPrompt = (text: string) =>
             `${baseAugmented} ${flow}${text}${endInstruction}${lockSuffix}`;
 
-          // VEO's RAI filter blocks the AUDIO (the spoken line), not the visual
-          // base prompt, so retrying identical text is futile. On a content-
-          // safety block we reword just this chunk's narration (meaning + length
-          // preserved) and re-render. Transient/validation errors still get the
-          // plain identical retry, on a separate budget.
           let currentChunkText = chunkText;
           let prompt = buildChunkPrompt(currentChunkText);
           const MAX_GENERATE_ATTEMPTS = VEO_CHUNK_VALIDATE_RETRIES + 1;
@@ -1316,12 +1286,6 @@ async function runPipelineOnce(
               if (!validation.valid) {
                 throw new Error(validation.reason ?? "Chunk validation failed");
               }
-              // Strip leading silence from the first chunk (so the video starts
-              // on the first spoken word) and trailing silence from every chunk
-              // (so back-to-back chunks don't stack a multi-second pause between
-              // speakers/sentences after concatenation). Middle chunks keep their
-              // leading silence as the crossfade buffer so different speakers do
-              // not overlap audibly at the seam.
               trimChunkSilence(chunkPath, {
                 trimLeading: i === 0,
                 trimTrailing: true,
@@ -1340,8 +1304,6 @@ async function runPipelineOnce(
                 }
               }
 
-              // Content-safety block: rewording the identical line won't help —
-              // rewrite this chunk's narration and re-render (separate budget).
               if (lastChunkError instanceof VeoContentFilteredError) {
                 if (safetyRewords >= VEO_SAFETY_REWORDS) {
                   throw new Error(
@@ -1372,7 +1334,6 @@ async function runPipelineOnce(
                 continue;
               }
 
-              // Transient / validation error: retry the identical prompt.
               genAttempt++;
               if (genAttempt >= MAX_GENERATE_ATTEMPTS) {
                 throw new Error(

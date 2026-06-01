@@ -8,7 +8,6 @@ const pool =
       connectionString,
       max: Math.min(25, Math.max(5, Number(process.env.PG_POOL_MAX ?? "12") || 12)),
       idleTimeoutMillis: 30_000,
-      /** Neon / remote Postgres can exceed 10s under load; failing fast is handled in getSessionSafe. */
       connectionTimeoutMillis: Math.min(
         60_000,
         Math.max(5000, Number(process.env.PG_CONNECTION_TIMEOUT_MS ?? "15000") || 15_000)
@@ -49,10 +48,6 @@ export const auth = betterAuth({
         google: {
           clientId: process.env.GOOGLE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          // Force Google to surface its account chooser every time. Without this,
-          // Google silently completes OAuth using whatever Google session the
-          // browser already has, which manifests as "auto sign-in" with the
-          // previous account whenever a user lands on /auth/sign-in.
           prompt: "select_account",
         },
       }

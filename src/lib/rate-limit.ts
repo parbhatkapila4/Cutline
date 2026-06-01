@@ -61,8 +61,6 @@ function getConfig(type: RateLimitType): { points: number; durationSeconds: numb
       return { points: max, durationSeconds: window };
     }
     case "generateDaily": {
-      // Hard 24h ceiling per identifier — a circuit breaker against runaway
-      // AI spend (each generation burns OpenRouter + TTS + Veo credits).
       const max =
         Number(process.env.AI_DAILY_CAP) ||
         Number(process.env.RATE_LIMIT_GENERATE_PER_DAY) ||
@@ -91,23 +89,6 @@ function getConfig(type: RateLimitType): { points: number; durationSeconds: numb
       return { points: DEFAULT_GENERAL_PER_MINUTE, durationSeconds: 60 };
   }
 }
-
-/**
- * Resolve the client IP for rate-limiting and ownership keys.
- *
- * The previous implementation trusted the LEFTMOST `x-forwarded-for` entry,
- * which is fully client-controlled: an attacker rotates that value to mint a
- * fresh rate-limit bucket on every request and bypass the limiter entirely.
- *
- * Correct order of trust:
- *  1. `x-real-ip` — set by the reverse proxy / platform (Vercel, nginx) to the
- *     real client; not client-spoofable when a proxy is in front.
- *  2. The RIGHTMOST `x-forwarded-for` hop — appended by our own trusted proxy,
- *     so it reflects the real client for a single-proxy deployment. An attacker
- *     can only prepend entries on the LEFT, never append on the right.
- *     `TRUSTED_PROXY_HOPS` (default 1) selects how many trailing hops are ours.
- *  3. `"anonymous"` fallback.
- */
 export function getClientIdentifier(request: Request): string {
   const realIp = request.headers.get("x-real-ip");
   if (realIp && realIp.trim()) return realIp.trim();
@@ -120,8 +101,6 @@ export function getClientIdentifier(request: Request): string {
       .filter(Boolean);
     if (parts.length > 0) {
       const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1);
-      // Pick the entry `hops` positions from the right (the client as seen by
-      // the outermost trusted proxy), clamped to the first entry.
       const idx = Math.max(0, parts.length - hops);
       const candidate = parts[idx];
       if (candidate) return candidate;
