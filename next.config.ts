@@ -1,9 +1,5 @@
 import type { NextConfig } from "next";
 
-// Browser-hardening headers applied to every response. CSP is intentionally
-// permissive on script/style ('unsafe-inline' is required by Next.js's inline
-// bootstrap and styled-jsx) but locks down framing, object embeds, and base-uri
-// — the controls that actually block clickjacking and injection pivots.
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },

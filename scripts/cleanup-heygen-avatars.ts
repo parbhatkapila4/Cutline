@@ -1,28 +1,3 @@
-/**
- * One-shot cleanup for accumulated HeyGen Photo Avatars.
- *
- * Lists every Photo Avatar in the HeyGen account, partitions them into
- * "orphans" (HeyGen has them, our cache does not — almost always leftovers
- * from runs before the cache landed) and "cached" (we actively manage these,
- * deleting them just forces a re-upload next time), then deletes the
- * orphans in parallel batches.
- *
- * Usage:
- *   # Dry run (default) — only prints what would be deleted.
- *   npx tsx scripts/cleanup-heygen-avatars.ts
- *
- *   # Actually delete every orphan (the usual case after years of testing).
- *   npx tsx scripts/cleanup-heygen-avatars.ts --yes
- *
- *   # Nuclear: also delete the cached ones. Use after a fresh start.
- *   npx tsx scripts/cleanup-heygen-avatars.ts --yes --include-cached
- *
- *   # Override the parallelism (default 10):
- *   npx tsx scripts/cleanup-heygen-avatars.ts --yes --concurrency 25
- *
- * Reads HEYGEN_API_KEY from .env.local automatically (loaded via dotenv).
- */
-
 import { config as loadEnv } from "dotenv";
 import path from "path";
 import {
@@ -75,7 +50,7 @@ async function main(): Promise<void> {
 
   console.log(
     `[cleanup] will delete ${toDelete.length} avatar(s) ` +
-      `(concurrency=${concurrency})${includeCached ? " — INCLUDING cached" : ""}`
+    `(concurrency=${concurrency})${includeCached ? " — INCLUDING cached" : ""}`
   );
 
   if (!yes) {
@@ -86,9 +61,6 @@ async function main(): Promise<void> {
   const start = Date.now();
   let freed = 0;
   let failed = 0;
-
-  // Sort oldest first so the most stale entries go first; less likely to
-  // accidentally delete something the user just uploaded by hand.
   const targets = toDelete
     .slice()
     .sort((a, b) => (a.createdAtMs ?? 0) - (b.createdAtMs ?? 0))
@@ -107,7 +79,7 @@ async function main(): Promise<void> {
     const pct = ((processed / targets.length) * 100).toFixed(1);
     process.stdout.write(
       `\r[cleanup] progress: ${freed} freed, ${failed} failed, ` +
-        `${processed}/${targets.length} (${pct}%)        `
+      `${processed}/${targets.length} (${pct}%)        `
     );
   }
   process.stdout.write("\n");

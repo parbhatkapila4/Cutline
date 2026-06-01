@@ -87,9 +87,6 @@ export default function DashboardPage() {
   const [toast, setToast] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // When the mobile drawer is open, lock body scroll and let Esc close it.
-  // Desktop (lg+) never opens the drawer, so this effect is mobile-only in
-  // practice — `mobileMenuOpen` simply stays false there.
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -277,8 +274,6 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : null}
-      {/* Mobile: floating hamburger that opens the same sidebar as a drawer.
-          Hidden on lg+ where the sidebar is already inline on the left. */}
       <button
         type="button"
         onClick={() => setMobileMenuOpen(true)}
@@ -291,17 +286,12 @@ export default function DashboardPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
         </svg>
       </button>
-      {/* Mobile: backdrop. Click closes the drawer. pointer-events-none when
-          closed so it doesn't trap input on desktop or when not visible. */}
       <div
         className={`lg:hidden fixed inset-0 z-40 bg-black transition-opacity duration-300 ${mobileMenuOpen ? "opacity-60" : "opacity-0 pointer-events-none"}`}
         onClick={() => setMobileMenuOpen(false)}
         aria-hidden
       />
       <div className="flex flex-1 min-h-0 w-full">
-        {/* Same <aside> renders as a fixed slide-in drawer on mobile and as the
-            normal flex-child sidebar on lg+. lg: utilities reset the mobile
-            fixed/transform classes so desktop layout is unchanged. */}
         <aside
           id="dashboard-mobile-menu"
           aria-label="Dashboard menu"
@@ -577,7 +567,6 @@ export default function DashboardPage() {
 
               return (
                 <>
-                  {/* Slate strip: plan + key counts */}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-7 font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-500">
                     <span className="inline-flex items-center gap-2">
                       <span className="relative inline-flex w-1.5 h-1.5" aria-hidden>
@@ -605,7 +594,6 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  {/* Massive title - silver gradient (matches landing hero + /create done view) */}
                   <h1
                     className="font-black uppercase leading-[0.86] tracking-[-0.04em] text-[clamp(2.6rem,6.5vw,5.5rem)] text-transparent bg-clip-text mb-4 max-w-[14ch]"
                     style={{

@@ -10,9 +10,6 @@ export interface AssetMetadata {
   path: string;
   originalFilename: string;
   mimeType: string;
-  /** Canonical identifier of the uploader (userId / anon session / IP). Used
-   *  to authorize the asset GET route. Optional for backward compatibility
-   *  with assets uploaded before owner tracking existed. */
   ownerId?: string;
 }
 

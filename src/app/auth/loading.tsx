@@ -1,7 +1,6 @@
 export default function Loading() {
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center bg-[#060606] text-white overflow-hidden">
-      {/* Film grain - visual continuity with the hero */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.07] mix-blend-overlay"
@@ -11,7 +10,6 @@ export default function Loading() {
         }}
       />
 
-      {/* Corner brackets - frame the loader the same way the hero is framed */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <span className="absolute top-5 left-5 w-9 h-px bg-white/70" />
         <span className="absolute top-5 left-5 h-9 w-px bg-white/70" />
@@ -23,29 +21,23 @@ export default function Loading() {
         <span className="absolute bottom-5 right-5 h-9 w-px bg-white/70" />
       </div>
 
-      {/* Centered cinema spinner stack */}
       <div className="relative flex flex-col items-center gap-10">
         <div className="relative w-[112px] h-[112px]" aria-hidden>
-          {/* Outer ring - slow CW, white marker */}
           <div className="absolute inset-0 rounded-full border border-white/[0.10] auth-spin-cw-slow">
             <span className="absolute -top-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-white/65 shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
           </div>
 
-          {/* Middle ring - faster CCW, emerald marker */}
           <div className="absolute inset-4 rounded-full border border-emerald-400/[0.18] auth-spin-ccw-mid">
             <span className="absolute -top-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400/85 shadow-[0_0_10px_rgba(52,211,153,0.65)]" />
           </div>
 
-          {/* Inner ring - fastest CW, bright marker */}
           <div className="absolute inset-9 rounded-full border border-emerald-400/[0.35] auth-spin-cw-fast">
             <span className="absolute -top-[3px] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,0.7)]" />
           </div>
 
-          {/* Center pulse */}
           <span className="absolute top-1/2 left-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400 auth-pulse" />
         </div>
 
-        {/* Status: "AUTHENTICATING ●●●" */}
         <div className="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.42em] uppercase text-white/55">
           <span>Authenticating</span>
           <span className="inline-flex gap-[3px]">
@@ -55,7 +47,6 @@ export default function Loading() {
           </span>
         </div>
 
-        {/* Slate footer */}
         <div className="font-mono text-[9px] tracking-[0.32em] uppercase text-white/25 flex items-center gap-3">
           <span>Cutline</span>
           <span className="text-white/10">/</span>

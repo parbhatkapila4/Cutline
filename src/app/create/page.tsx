@@ -164,9 +164,6 @@ const PROMPT_CHIPS = [
 
 const PLATFORM_OPTIONS: readonly Platform[] = ["general", "youtube_shorts", "twitter", "linkedin"] as const;
 
-// Each platform has a canonical frame. Shorts is hard-locked to vertical by YouTube;
-// the rest default to 16:9. Users can still override the aspect ratio after picking
-// a platform - selection just nudges them to the right starting point.
 const PLATFORM_DEFAULT_ASPECT: Record<Platform, AspectRatio> = {
   general: "16:9",
   linkedin: "16:9",
@@ -294,18 +291,12 @@ export default function CreatePage() {
     }
   }, [canUseCinematicMode, talkingRealMode]);
 
-  // Pro-only inputs must never linger for free/starter users (e.g. after a
-  // downgrade): drop custom avatars and uploaded images back to safe defaults.
   useEffect(() => {
     if (isPro) return;
     setAvatarMode((prev) => (PRO_AVATAR_MODES.includes(prev) ? "default" : prev));
     setImgs((prev) => (prev.length ? [] : prev));
   }, [isPro]);
 
-  // "Your images" only applies to Slideshow mode — the talking-object pipeline
-  // does not consume assetIds. Drop any uploaded images the moment the user
-  // switches modes so they don't get sent (or quietly carried) into a render
-  // that ignores them.
   useEffect(() => {
     if (mode !== "slideshow") {
       setImgs((prev) => (prev.length ? [] : prev));
@@ -408,9 +399,6 @@ export default function CreatePage() {
     try {
       let assetIds: string[] = [];
       let avatarUploadAssetId: string | undefined;
-      // assetIds are only consumed by the Slideshow pipeline. The mode-change
-      // effect already clears imgs, but guard here too so a race or stale
-      // state can't push uploads into a talking-object render that ignores them.
       if (imgs.length && isSlideshow) {
         const fd = new FormData();
         imgs.forEach((f) => fd.append("productPhotos", f));
@@ -844,7 +832,6 @@ export default function CreatePage() {
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               className="relative min-h-[calc(100dvh-64px)] w-full max-w-[980px] mx-auto px-4 sm:px-6 py-10 sm:py-14"
             >
-              {/* Slate header - director-monitor chrome */}
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -876,7 +863,6 @@ export default function CreatePage() {
                 </span>
               </motion.div>
 
-              {/* Massive title - film-slate moment */}
               <motion.h1
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -914,14 +900,12 @@ export default function CreatePage() {
                 </motion.div>
               ) : null}
 
-              {/* Video - center stage with cinema frame */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4, duration: 0.7, ease: [0.2, 0.7, 0.2, 1] }}
                 className="relative mb-6"
               >
-                {/* Cinema corner brackets */}
                 <span aria-hidden className="pointer-events-none absolute -top-2 -left-2 w-3.5 h-px bg-white/40 z-20" />
                 <span aria-hidden className="pointer-events-none absolute -top-2 -left-2 h-3.5 w-px bg-white/40 z-20" />
                 <span aria-hidden className="pointer-events-none absolute -top-2 -right-2 w-3.5 h-px bg-white/40 z-20" />
@@ -941,9 +925,6 @@ export default function CreatePage() {
                     style={{
                       aspectRatio: aspectRatio.replace(":", " / "),
                       maxHeight: "78vh",
-                      // For vertical / square ratios the height bound kicks in first;
-                      // letting width auto-compute keeps the player narrow + centered
-                      // instead of being stretched into a landscape box.
                       width: "auto",
                       maxWidth: "100%",
                     }}
@@ -967,7 +948,6 @@ export default function CreatePage() {
                 </div>
               </motion.div>
 
-              {/* Primary action toolbar - single dominant Download + utility actions */}
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1053,7 +1033,6 @@ export default function CreatePage() {
                 </button>
               </motion.div>
 
-              {/* Refine - full-width card, deliberate next-step CTA */}
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1096,7 +1075,6 @@ export default function CreatePage() {
                 </Link>
               </motion.div>
 
-              {/* Footer: Create another + library shortcuts */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1310,7 +1288,6 @@ export default function CreatePage() {
                         </button>
                         {imgUrls.map((u, i) => (
                           <div key={u} className="relative w-16 h-16 rounded-[9px] overflow-hidden bg-zinc-900 ring-1 ring-white/10">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={u} alt="" className="w-full h-full object-cover" />
                             <button onClick={(e) => { e.stopPropagation(); rmImg(i); }} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/80 rounded-full flex items-center justify-center text-white hover:bg-rose-500 transition-colors">
                               <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1598,7 +1575,6 @@ export default function CreatePage() {
                                 >
                                   {id === "studio" ? (
                                     <>
-                                      {/* Studio backdrop with key light */}
                                       <div
                                         className="absolute inset-0"
                                         style={{ background: "radial-gradient(ellipse at 50% 38%, #2c2c34, #14141a 60%, #0a0a0e)" }}
@@ -1610,7 +1586,6 @@ export default function CreatePage() {
                                             "radial-gradient(ellipse at 50% 30%, rgba(255,218,180,0.13), transparent 55%)",
                                         }}
                                       />
-                                      {/* Frame brackets (cinema viewfinder) */}
                                       <span className="absolute top-[3px] left-[3px] w-[5px] h-px bg-white/55" />
                                       <span className="absolute top-[3px] left-[3px] h-[5px] w-px bg-white/55" />
                                       <span className="absolute top-[3px] right-[3px] w-[5px] h-px bg-white/55" />
@@ -1619,7 +1594,6 @@ export default function CreatePage() {
                                       <span className="absolute bottom-[3px] left-[3px] h-[5px] w-px bg-white/55" />
                                       <span className="absolute bottom-[3px] right-[3px] w-[5px] h-px bg-white/55" />
                                       <span className="absolute bottom-[3px] right-[3px] h-[5px] w-px bg-white/55" />
-                                      {/* Portrait silhouette - head + shoulders, gently breathing */}
                                       <motion.svg
                                         className="absolute"
                                         style={{ left: "50%", top: "52%", x: "-50%", y: "-50%" }}
@@ -1641,7 +1615,6 @@ export default function CreatePage() {
                                           fill="url(#studio-head)"
                                         />
                                       </motion.svg>
-                                      {/* Live REC dot */}
                                       <span className="absolute top-[4px] right-[4px] inline-flex w-[5px] h-[5px]">
                                         <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400/80 animate-ping" />
                                         <span className="relative inline-flex w-[5px] h-[5px] rounded-full bg-emerald-400" />
@@ -1649,7 +1622,6 @@ export default function CreatePage() {
                                     </>
                                   ) : (
                                     <>
-                                      {/* Cinema landscape backdrop */}
                                       <div
                                         className="absolute inset-0"
                                         style={{
@@ -1664,10 +1636,8 @@ export default function CreatePage() {
                                             "radial-gradient(ellipse at 22% 35%, rgba(245,180,110,0.32), transparent 55%)",
                                         }}
                                       />
-                                      {/* Top + bottom film sprocket rails */}
                                       <span className="absolute top-[3px] left-[2px] right-[2px] h-px bg-white/12" />
                                       <span className="absolute bottom-[3px] left-[2px] right-[2px] h-px bg-white/12" />
-                                      {/* Scrolling film-strip thumbnails */}
                                       <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[18px] overflow-hidden">
                                         <motion.div
                                           className="flex gap-[2px] h-full"
@@ -1696,7 +1666,6 @@ export default function CreatePage() {
                                           })}
                                         </motion.div>
                                       </div>
-                                      {/* Center playhead */}
                                       <span
                                         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1.5px] h-[22px] rounded-full"
                                         style={{
@@ -1816,7 +1785,6 @@ export default function CreatePage() {
                               }}
                             >
                               <div className="relative shrink-0 w-[46px] h-[46px]" aria-hidden>
-                                {/* Expanding sound-wave rings - signals "live presenter" */}
                                 <motion.span
                                   className="absolute inset-0 rounded-full border border-emerald-400/40 pointer-events-none"
                                   animate={{ scale: [1, 1.45], opacity: [0.55, 0] }}
@@ -1833,7 +1801,6 @@ export default function CreatePage() {
                                   }}
                                 />
 
-                                {/* Avatar disc with portrait silhouette */}
                                 <div
                                   className="relative w-full h-full rounded-full overflow-hidden"
                                   style={{
@@ -1858,7 +1825,6 @@ export default function CreatePage() {
                                   </svg>
                                 </div>
 
-                                {/* Active status dot */}
                                 <span
                                   className="absolute bottom-0 right-0 w-[10px] h-[10px] rounded-full bg-emerald-400"
                                   style={{

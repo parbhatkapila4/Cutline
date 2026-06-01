@@ -22,7 +22,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Record who uploaded each asset so the asset GET route can authorize reads.
   const ownerId = await resolveOwnerIdentifier(request);
 
   let formData: FormData;

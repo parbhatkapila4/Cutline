@@ -103,7 +103,6 @@ export default function DashboardVideoDetailPage() {
     });
   }, [editInProgress]);
   const isPro = isProPlan(usagePlan);
-  // Editing (custom + quick) is a Pro+ feature; free/starter get the upgrade prompt.
   const canUseCustomEdits = isPro;
   const resolvedLoading = missingJobId ? false : loading;
   const resolvedNotFound = missingJobId ? true : notFound;

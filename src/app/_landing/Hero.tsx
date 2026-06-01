@@ -317,10 +317,8 @@ const PHASES = [
   { num: "04", name: "Render" },
 ];
 
-// Representative runtime the playhead scrubs across (product makes 30-60s clips).
 const TOTAL_SECONDS = 45;
 
-// One loop of the scrubber, in ms: play across, hold at the end, fade-reset.
 const TL_PLAY = 5200;
 const TL_HOLD = 750;
 const TL_RESET = 650;
@@ -335,16 +333,13 @@ function pad2(n: number) {
   return n < 10 ? `0${n}` : `${n}`;
 }
 
-// A film-editor timeline standing in for the 12-stage pipeline: 12 stage ticks
-// grouped into 4 labelled phases, with a playhead that scrubs left -> right.
 function PhaseTimeline() {
   const reduced = useReducedMotion();
-  const progress = useMotionValue(0); // 0..1, eased playhead position (60fps)
-  const liveOpacity = useMotionValue(0); // fades the playhead/fill on reset
-  const [pct, setPct] = useState(0); // 0..100, throttled mirror that drives text + lit states
+  const progress = useMotionValue(0);
+  const liveOpacity = useMotionValue(0);
+  const [pct, setPct] = useState(0);
 
   useAnimationFrame((time) => {
-    // Reduced motion: settle on a finished, fully-lit timeline and stop.
     if (reduced) {
       progress.set(1);
       liveOpacity.set(1);
@@ -383,7 +378,6 @@ function PhaseTimeline() {
 
   return (
     <div className="relative select-none">
-      {/* Header: label + running timecode readout */}
       <div className="flex items-center gap-3 mb-4 font-mono text-[9.5px] tracking-[0.3em] uppercase text-white/35">
         <span className="text-white/55">12-Stage Pipeline</span>
         <span className="h-px flex-1 bg-white/8" />
@@ -394,7 +388,6 @@ function PhaseTimeline() {
         </span>
       </div>
 
-      {/* Phase labels, left-aligned to each segment's start divider */}
       <div className="grid grid-cols-4 mb-2.5">
         {PHASES.map((ph, i) => {
           const done = i < activePhase;
@@ -405,24 +398,22 @@ function PhaseTimeline() {
               className="flex items-baseline gap-1.5 font-mono text-[9px] sm:text-[10px] tracking-[0.18em] uppercase"
             >
               <span
-                className={`tabular-nums transition-colors duration-500 ${
-                  active
+                className={`tabular-nums transition-colors duration-500 ${active
                     ? "text-emerald-400"
                     : done
-                    ? "text-emerald-400/60"
-                    : "text-emerald-400/20"
-                }`}
+                      ? "text-emerald-400/60"
+                      : "text-emerald-400/20"
+                  }`}
               >
                 {ph.num}
               </span>
               <span
-                className={`transition-colors duration-500 ${
-                  active
+                className={`transition-colors duration-500 ${active
                     ? "text-white/95"
                     : done
-                    ? "text-white/55"
-                    : "text-white/30"
-                }`}
+                      ? "text-white/55"
+                      : "text-white/30"
+                  }`}
               >
                 {ph.name}
               </span>
@@ -431,21 +422,17 @@ function PhaseTimeline() {
         })}
       </div>
 
-      {/* Track */}
       <div className="relative h-9">
-        {/* Active-phase wash */}
         {PHASES.map((_, i) => (
           <span
             key={`seg-${i}`}
             aria-hidden
-            className={`absolute top-0 bottom-0 transition-colors duration-500 ${
-              i === activePhase ? "bg-emerald-400/[0.045]" : ""
-            }`}
+            className={`absolute top-0 bottom-0 transition-colors duration-500 ${i === activePhase ? "bg-emerald-400/[0.045]" : ""
+              }`}
             style={{ left: `${(i / 4) * 100}%`, width: "25%" }}
           />
         ))}
 
-        {/* Phase dividers */}
         {[1, 2, 3].map((i) => (
           <span
             key={`div-${i}`}
@@ -455,13 +442,11 @@ function PhaseTimeline() {
           />
         ))}
 
-        {/* Baseline groove */}
         <span
           aria-hidden
           className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-white/10"
         />
 
-        {/* 12 stage ticks, 3 per phase */}
         {PHASES.map((_, p) =>
           [0, 1, 2].map((s) => {
             const idx = p * 3 + s;
@@ -472,13 +457,12 @@ function PhaseTimeline() {
               <span
                 key={`tick-${idx}`}
                 aria-hidden
-                className={`absolute top-1/2 w-[1.5px] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${
-                  passed
+                className={`absolute top-1/2 w-[1.5px] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${passed
                     ? "bg-emerald-400/80"
                     : isPhaseStart
-                    ? "bg-white/25"
-                    : "bg-white/12"
-                }`}
+                      ? "bg-white/25"
+                      : "bg-white/12"
+                  }`}
                 style={{
                   left: `${pos * 100}%`,
                   height: isPhaseStart ? "15px" : "9px",
@@ -488,7 +472,6 @@ function PhaseTimeline() {
           })
         )}
 
-        {/* Progress fill, scrubbed to the playhead */}
         <motion.span
           aria-hidden
           className="absolute left-0 top-1/2 h-[2px] w-full origin-left -translate-y-1/2"
@@ -501,7 +484,6 @@ function PhaseTimeline() {
           }}
         />
 
-        {/* Playhead: vertical line + diamond head */}
         <motion.div
           aria-hidden
           className="absolute top-0 bottom-0 z-10"
@@ -517,14 +499,12 @@ function PhaseTimeline() {
           />
         </motion.div>
 
-        {/* Origin marker */}
         <span
           aria-hidden
           className="absolute left-0 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400/70"
         />
       </div>
 
-      {/* Ruler bounds */}
       <div className="mt-2 flex items-center justify-between font-mono text-[9px] tracking-[0.2em] uppercase text-white/25 tabular-nums">
         <span>00:00</span>
         <span>00:{pad2(TOTAL_SECONDS)}</span>
@@ -651,16 +631,15 @@ function PhotoMarquee() {
         const photoRect = photo.getBoundingClientRect();
         const photoCenter = photoRect.left + photoRect.width / 2;
         const wrapperCenter = wrapperLeft + halfWidth;
-        const offset = (photoCenter - wrapperCenter) / halfWidth; // -1..+1 across the wrapper
+        const offset = (photoCenter - wrapperCenter) / halfWidth;
 
         const clamped = Math.max(-1.15, Math.min(1.15, offset));
-        // Easing: photos stay flatter near the center, bend sharply at the edges
         const eased =
           Math.sign(clamped) * Math.pow(Math.abs(clamped), 1.4);
 
-        const rotateY = eased * 72; // up to ±72°
-        const translateZ = -Math.abs(eased) * 110; // push edges back
-        const translateY = Math.abs(eased) * 8; // slight lift at edges
+        const rotateY = eased * 72;
+        const translateZ = -Math.abs(eased) * 110;
+        const translateY = Math.abs(eased) * 8;
 
         photo.style.transform = `translate3d(0, ${translateY}px, ${translateZ}px) rotateY(${rotateY}deg)`;
       }

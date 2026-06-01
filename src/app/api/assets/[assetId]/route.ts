@@ -15,10 +15,6 @@ export async function GET(
   if (!meta) {
     return NextResponse.json({ error: "Asset not found." }, { status: 404 });
   }
-
-  // Ownership: assets with a recorded owner are only served to that owner.
-  // Assets without an ownerId are pre-fix uploads (they age out within
-  // UPLOAD_RETENTION_HOURS) and remain accessible for backward compatibility.
   if (typeof meta.ownerId === "string" && meta.ownerId.trim() !== "") {
     const owns = await requestOwnsResource(request, meta.ownerId);
     if (!owns) {

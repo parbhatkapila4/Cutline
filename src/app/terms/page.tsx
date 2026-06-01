@@ -64,19 +64,6 @@ export default function TermsPage() {
               <p className="text-zinc-400 text-sm">Effective: {EFFECTIVE_DATE}</p>
             </section>
 
-            {/*
-              LEGAL REVIEW (terms of service): this document was drafted to mirror the
-              actual operations of the Cutline service as implemented in this codebase.
-              Before launch, qualified counsel should:
-                - confirm the named operating entity (Delaware C-Corp, LLC, etc.) and registration details,
-                - validate the liability cap against unwaivable consumer-protection rules in target markets (EU, UK, California, Quebec, Australia),
-                - validate the indemnification clause and consider mutual indemnity for B2B customers,
-                - validate the refund clause against statutory withdrawal rights (EU/UK 14-day cooling-off, California auto-renewal disclosures),
-                - confirm whether a separate enterprise / commercial agreement is needed for B2B contracts,
-                - decide whether to add a binding-arbitration / class-action waiver clause for US consumers,
-                - confirm that the AI-output and acceptable-use clauses cover regulatory regimes you ship under (EU AI Act, US state deepfake laws, etc.).
-            */}
-
             <section id="summary" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Summary</h2>
               <ul className="space-y-2 text-zinc-400 text-sm leading-relaxed list-disc pl-5">
@@ -109,7 +96,6 @@ export default function TermsPage() {
               </ul>
             </section>
 
-            {/* LEGAL REVIEW (acceptable use): the prohibitions below should be cross-checked against local content laws (deepfake statutes, election-period speech rules, EU AI Act content-labelling) in target markets. Consider adding a content-takedown / DMCA agent contact if you start receiving notices. */}
             <section id="acceptable-use" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Acceptable use</h2>
               <p className="text-zinc-400 text-sm leading-relaxed mb-4">You agree not to use Cutline (and not to permit anyone else to use Cutline) to create, request, or distribute content that:</p>
@@ -138,7 +124,6 @@ export default function TermsPage() {
               </div>
             </section>
 
-            {/* LEGAL REVIEW (AI output): EU AI Act Article 50 requires certain AI-generated or AI-manipulated content to be marked as such where it could mislead viewers. US state laws (e.g. California AB 2655, Texas SB 751) impose deepfake disclosures around elections and identifiable people. Confirm whether output watermarking / C2PA provenance metadata is required for your target markets. */}
             <section id="ai-output" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">AI-generated output</h2>
               <div className="space-y-4 text-zinc-400 text-sm leading-relaxed">
@@ -155,7 +140,6 @@ export default function TermsPage() {
               <p className="text-zinc-400 text-sm leading-relaxed">Cutline relies on third-party APIs (LLM providers, TTS providers, image-search providers, payment processors, hosting). Their availability and terms are outside our control. If a sub-processor changes its terms, has an outage, or refuses a request (for example, content filtering by an upstream LLM), the Cutline service may be affected. We are not liable for downtime or failures caused by third-party services beyond what is required by law.</p>
             </section>
 
-            {/* LEGAL REVIEW (billing / refunds): California Auto-Renewal Law (Bus. & Prof. Code §17600) requires specific in-checkout disclosures and an easy online-cancellation method; verify the checkout flow complies. EU/UK consumers have a 14-day statutory withdrawal right under the Consumer Rights Directive that may override the no-refund default for non-business buyers. Confirm refund handling with DODO Payments and Stripe contractually. */}
             <section id="billing" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Plans, billing, refunds</h2>
               <div className="space-y-4 text-zinc-400 text-sm leading-relaxed">
@@ -178,20 +162,17 @@ export default function TermsPage() {
               <p className="text-zinc-400 text-sm leading-relaxed">To the maximum extent permitted by law, Cutline is provided &quot;as is&quot; and &quot;as available&quot;, without warranties of any kind, express or implied, including warranties of merchantability, fitness for a particular purpose, non-infringement, accuracy, or uninterrupted operation. We do not guarantee that the service will be error-free, that any specific output will match your expectations, or that defects will be corrected.</p>
             </section>
 
-            {/* LEGAL REVIEW (liability cap): the USD $100 / 12-month-fees floor is a common SaaS pattern but is unenforceable against consumers in several jurisdictions (UK Consumer Rights Act 2015, EU Unfair Contract Terms Directive, certain Australian Consumer Law provisions). Counsel should confirm the cap holds in target markets and consider adding a higher cap for paid plans. */}
             <section id="liability" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Limitation of liability</h2>
               <p className="text-zinc-400 text-sm leading-relaxed mb-4">To the maximum extent permitted by law, in no event will Cutline, its affiliates, officers, employees, or agents be liable for any indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, lost revenue, lost data, or business interruption, arising out of or relating to the service, even if advised of the possibility.</p>
               <p className="text-zinc-400 text-sm leading-relaxed">Our total aggregate liability arising out of or relating to these terms or the service is limited to the greater of: (a) the total amount you paid us in the 12 months before the event giving rise to the claim, or (b) USD 100. Some jurisdictions do not allow these limitations, in which case they apply only to the extent permitted.</p>
             </section>
 
-            {/* LEGAL REVIEW (indemnification): unilateral indemnity from consumers is rarely fully enforceable in EU/UK; counsel should consider scoping this to business users only, or carving out consumers, and consider whether to offer mutual IP-indemnity to enterprise customers. */}
             <section id="indemnity" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Indemnification</h2>
               <p className="text-zinc-400 text-sm leading-relaxed">You agree to indemnify and hold us harmless from claims, losses, and reasonable legal fees arising from (a) content you submit or generate via Cutline, (b) your breach of these terms, or (c) your violation of any third-party right or applicable law. We may take exclusive control of the defence of any indemnified claim at our expense.</p>
             </section>
 
-            {/* LEGAL REVIEW (governing law / venue): Delaware is set as governing law and exclusive venue. If you market actively to EU/UK consumers, mandatory consumer-protection rules of the consumer's home jurisdiction may still apply notwithstanding this choice; counsel should confirm. Consider also adding a binding-arbitration / class-action-waiver clause for US consumers if appropriate to your risk profile. */}
             <section id="governing-law" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Governing law and disputes</h2>
               <p className="text-zinc-400 text-sm leading-relaxed mb-4">These terms and any dispute arising out of or relating to them or the service are governed by the laws of the State of Delaware, United States, without regard to its conflict-of-laws rules. The United Nations Convention on Contracts for the International Sale of Goods does not apply.</p>

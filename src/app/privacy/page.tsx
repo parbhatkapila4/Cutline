@@ -63,18 +63,6 @@ export default function PrivacyPage() {
               <p className="text-zinc-400 text-sm">Effective: {EFFECTIVE_DATE}</p>
             </section>
 
-            {/*
-              LEGAL REVIEW (privacy policy): this document was drafted to mirror the
-              actual data flows of the Cutline service as implemented in this codebase.
-              Before launch, qualified counsel should:
-                - confirm the named operating entity and registered address,
-                - validate the GDPR legal-basis mapping (Art. 6(1) bases used per processing activity),
-                - validate the CCPA/CPRA categories listed against the latest CDPA regulations,
-                - confirm international-transfer safeguards (SCCs, UK IDTA, Swiss addendum) with each sub-processor,
-                - confirm whether a Data Processing Agreement template is needed for B2B customers,
-                - confirm whether a cookie-consent banner is required given target markets.
-            */}
-
             <section id="summary" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Summary</h2>
               <ul className="space-y-2 text-zinc-400 text-sm leading-relaxed list-disc pl-5">
@@ -205,7 +193,6 @@ export default function PrivacyPage() {
               <p className="text-zinc-400 text-sm leading-relaxed mt-4">To exercise any of these, write to {CONTACT_EMAIL} from the email address associated with your account. We will respond within 30 days. We will not retaliate against you for exercising your rights.</p>
             </section>
 
-            {/* LEGAL REVIEW (GDPR): confirm the legal-basis mapping for each processing activity, controller/processor split if you onboard B2B customers, and whether you need to appoint an EU representative under Art. 27 GDPR. */}
             <section id="gdpr" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">GDPR (EU / UK)</h2>
               <p className="text-zinc-400 text-sm leading-relaxed mb-4">If you are in the European Economic Area, the United Kingdom, or Switzerland, the General Data Protection Regulation (and the equivalent UK GDPR / Swiss FADP) gives you the rights summarised in &quot;Your rights&quot; above. This section explains how we apply those rules.</p>
@@ -234,7 +221,6 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* LEGAL REVIEW (CCPA/CPRA): confirm categories of personal information against current CPPA regulations and decide whether to provide a "Do Not Sell or Share" link in the footer. We currently do not sell or share PI as defined by CPRA, but a link is still customary. */}
             <section id="ccpa" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">CCPA / CPRA (California)</h2>
               <p className="text-zinc-400 text-sm leading-relaxed mb-4">If you are a California resident, the California Consumer Privacy Act and California Privacy Rights Act give you specific rights regarding your personal information.</p>

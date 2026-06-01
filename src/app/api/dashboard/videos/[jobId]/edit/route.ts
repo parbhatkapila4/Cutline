@@ -122,8 +122,7 @@ export async function POST(
       if (typeof uid === "string" && uid.trim()) sessionUserId = uid.trim();
     } catch {
     }
-    // Editing is a Pro+ feature. Enforced only when a database is configured
-    // (no DB = open dev mode, consistent with the generate handler).
+
     if (isDatabaseConfigured()) {
       const plan = await getUserPlan(sessionUserId);
       if (!isProPlan(plan.id)) {

@@ -424,7 +424,6 @@ export type FeatureTabPreview = {
 };
 
 export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
-  // 0: Content Creators
   {
     card1: {
       filename: "vlog-ep-12.md",
@@ -488,7 +487,6 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ E",
     },
   },
-  // 1: Marketers
   {
     card1: {
       filename: "q4-launch-ad.md",
@@ -553,7 +551,6 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ ↵",
     },
   },
-  // 2: Educators
   {
     card1: {
       filename: "biology-ch08.md",
@@ -617,7 +614,6 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ ↵",
     },
   },
-  // 3: E-commerce
   {
     card1: {
       filename: "drop-22-launch.md",
@@ -681,7 +677,6 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ ↵",
     },
   },
-  // 4: Social Media
   {
     card1: {
       filename: "reel-trend-08.md",
@@ -745,7 +740,6 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       shortcut: "⌘ S",
     },
   },
-  // 5: Agencies
   {
     card1: {
       filename: "acme-q4-master.md",

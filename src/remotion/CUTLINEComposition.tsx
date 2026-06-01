@@ -18,15 +18,11 @@ function OutroOverlay({ durationInFrames }: { durationInFrames: number }) {
   const frame = useCurrentFrame();
   const progress = durationInFrames > 0 ? frame / durationInFrames : 0;
 
-  // Dim the underlying frame to ~78% black, with the bulk of the dimming
-  // happening in the first 70% so the wordmark gets a clean stage to land on.
   const dimOpacity = interpolate(progress, [0, 0.7, 1], [0, 0.6, 0.82], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Wordmark fades in starting at 30% (after the dim has begun) and settles
-  // into full opacity by 75% - last 25% of the outro the mark holds.
   const markOpacity = interpolate(progress, [0.3, 0.75], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -245,8 +241,6 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
       )}
 
       {(() => {
-        // Always wrap up with a fixed-length Cutline outro so the last 2 seconds
-        // read as a deliberate conclusion regardless of how shots fall.
         const outroFrames = Math.min(
           Math.round(OUTRO_DURATION_SECONDS * fps),
           compositionDurationInFrames

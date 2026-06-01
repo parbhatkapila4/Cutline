@@ -119,8 +119,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     });
   }
 
-  // Daily AI-spend circuit breaker (per identifier / per API key), on top of
-  // the hourly limit above. Caps total generations in any 24h window.
   const dailyKey = fromApiKeyEarly ? `apk:${fromApiKeyEarly.keyId}` : identifier;
   const dailyLimit = await checkRateLimit(dailyKey, "generateDaily");
   if (!dailyLimit.allowed) {
@@ -167,10 +165,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
 
   let data = validation.data;
 
-  // assetIds (uploaded images) are only consumed by the Slideshow pipeline.
-  // A talking-object request carrying assetIds is malformed - the UI gates
-  // this, but reject server-side too so a stale or hand-rolled client can't
-  // slip them through into a render that ignores them.
   if (
     Array.isArray(data.assetIds) &&
     data.assetIds.length > 0 &&
@@ -294,9 +288,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
-  // Pro-only feature gate: image uploads, custom avatars, and cinematic scenes
-  // require Professional or Enterprise. Anonymous callers are treated as free.
-  // Only enforced when a database is configured (no DB = open dev mode).
   if (isDatabaseConfigured()) {
     const usesImages = Array.isArray(data.assetIds) && data.assetIds.length > 0;
     const usesProAvatar =
@@ -414,11 +405,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(remixSourceJobId ? { remixFromJobId: remixSourceJobId } : {}),
     };
 
-    // Assign an unguessable UUID as the BullMQ jobId for every job (the anon
-    // flow already supplies its own UUID). This stops the previous behavior
-    // where non-anon jobs got sequential integer IDs (1, 2, 3…) that an
-    // attacker could enumerate. Ownership checks are the primary control;
-    // this is defense-in-depth so IDs can't be guessed in the first place.
     const anonJobId = anonFlow?.result.allowed ? anonFlow.result.job_id : undefined;
     const newJobId = anonJobId ?? randomUUID();
     const queueAddOptions = { jobId: newJobId };
@@ -525,8 +511,6 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       });
     }
 
-    // Ownership: only the caller who created this job may read its status.
-    // Return 404 (not 403) so we don't confirm the existence of others' jobs.
     const owns = await requestOwnsResource(
       request,
       (job.data as { clientId?: string } | undefined)?.clientId
@@ -635,8 +619,6 @@ export async function handleCancelPost(request: Request, jobId: string): Promise
     });
   }
 
-  // Ownership: only the creator may cancel their own job. Fetch first and
-  // verify before cancelling so an attacker can't kill other users' renders.
   try {
     const queue = getVideoQueue();
     const job = await queue.getJob(jobId);
@@ -731,7 +713,6 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
         headers: corsHeaders,
       });
     }
-    // Downloading is a Pro+ feature.
     const apiKeyUser = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
     let downloaderId: string | undefined;
     try {
@@ -763,10 +744,6 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
         headers: corsHeaders,
       });
     }
-
-    // Ownership: only the creator may download the MP4. The DB-backed gate
-    // above only blocks anonymous-owned jobs; this closes the case where any
-    // caller could pull another user's finished video by jobId.
     const owns = await requestOwnsResource(
       request,
       (job.data as { clientId?: string } | undefined)?.clientId

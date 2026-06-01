@@ -1,1026 +1,183 @@
-<div align="center">
+# CUTLINE
 
-  <img src="public/header.svg" alt="CUTLINE - One sentence → One video" width="920" />
+> One sentence in, one finished MP4 out — directed by a 12-stage pipeline, not a template engine.
 
-  **AI-directed video editing.** Describe your idea in a single sentence and get a 30-45 second edited video. The system handles narrative, shots, pacing, motion, subtitles, voice, and images,no templates, no manual config. Images are optional: we fetch from the web (Unsplash / DALL·E / Pexels) from your description, or use a placeholder if APIs fail.
-
-  **Tech stack**
-
-  [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-  [![Remotion](https://img.shields.io/badge/Remotion-4-000?style=flat-square&logo=remotion)](https://www.remotion.dev/)
-  [![BullMQ](https://img.shields.io/badge/BullMQ-5-FF6B6B?style=flat-square)](https://docs.bullmq.io/)
-  [![Redis](https://img.shields.io/badge/Redis-ioredis-DC382D?style=flat-square&logo=redis)](https://redis.io/)
-  [![Neon](https://img.shields.io/badge/Neon-Postgres-00E599?style=flat-square&logo=neon)](https://neon.tech/)
-  [![Better Auth](https://img.shields.io/badge/Better%20Auth-Sign--in%20%2B%20OAuth-6B4EFF?style=flat-square)](https://www.better-auth.com/)
-  [![OpenRouter](https://img.shields.io/badge/OpenRouter-AI-000?style=flat-square)](https://openrouter.ai/)
-  [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
-
-</div>
+**Live:** [cutline.cloud](https://cutline.cloud) · **Repo:** [github.com/parbhatkapila4/Cutline](https://github.com/parbhatkapila4/Cutline)
 
 ---
 
-## Overview
+## The problem
 
-Creating short-form video today means writing scripts, picking templates, sourcing B-roll, and editing by hand. By the time you’re done, the idea has aged and the format feels generic.
+Short-form video has eaten attention, but the production loop has not compressed. Script, storyboard, b-roll, cut, caption, render — every step has a tool, the assembly is still manual, and by the time the idea is on screen it has aged. The "AI video" category mostly automates the cut, not the editorial work that decides what to cut to.
 
-CUTLINE adds an **AI director layer**. You give one sentence of intent (e.g. “Explain why coffee makes you feel awake in 30 seconds”). The system infers audience, goal, and tone; plans a narrative arc; breaks it into shots; writes the script; generates voice and subtitles; sources or generates images; and composes a finished MP4. No templates, no storyboards, every video is directed from intent. Optional asset uploads (logo, product photos, brand colors) enrich the pipeline; the system still owns all creative decisions.
-
----
-
-## Core Capabilities:
+The naïve AI version — "type what you want, we'll generate a video" — collapses into template fill-ins. Same Ken Burns pan over the same Unsplash photo, same kinetic-type intro, same captions. The output is generic because the system is generic: it picked a layout, not a narrative. CUTLINE takes the opposite bet.
 
 ---
 
-### Intent Interpretation
+## Thesis
 
-The pipeline starts by parsing your single sentence into a structured intent: **audience**, **goal**, **tone**, **complexity**, and **duration**. Ambiguity is resolved by the system. This representation drives every downstream stage.
+### Director layer, not template engine
 
-**Test:** `POST /api/intent` with `{ "input": "Explain why coffee makes you feel awake in 30 seconds" }` → `{ audience, goal, tone, complexity, durationSeconds, rawInput }`.
+The pipeline commits to editorial decisions before it touches a frame. From one sentence it infers audience, goal, tone, complexity, and duration; plans a 3–5 beat narrative arc; breaks that into 8–12 shots with per-shot purpose, motion hint, and text density; writes the script aligned to shot boundaries; sources or generates the imagery; composes the MP4. The user does not pick a template, voice, or layout. The system makes those calls. The product is "describe, receive," not "configure, render."
 
----
+### One sentence in, no creative knobs
 
-### Narrative Planning
+Optional brand kit and uploaded assets enrich the pipeline; they do not steer it. A user with a coffee brand can upload their logo + product photos, drop in two hex colors, set `banned_phrases` and `required_phrases` on a `brand_kits` row — the director still chooses the shot list and the cuts. Knobs would dilute the thesis.
 
-From the intent, the system produces a **narrative plan**: arc, 3-5 beats, pacing. No user-facing storyboard, this is an internal representation that drives shot and script decisions.
+### Pipeline over agent
 
----
+Twelve stages, each a pure function over the previous stage's output. Deterministic stage boundaries beat agent loops for debugging, retries, and per-stage cost control — full stop. When a render looks wrong, you bisect by stage. When a provider regresses, you swap one module. When token spend spikes, you isolate the stage and tighten its prompt. An agent loop hides all three.
 
-### Shot-Level Reasoning
+### Worker separate from app
 
-For each narrative beat, the system decides: what the shot represents (concept, example, transition), how long it holds, and how it relates to adjacent shots. Shot-level reasoning respects pacing (faster cuts for energy, longer holds for explanation) and maintains continuity. No templates; each shot is chosen for this video.
-
----
-
-### Script and Subtitles
-
-The system generates **spoken copy** aligned to shot boundaries. Script is passed to TTS (ElevenLabs or PlayHT) and to the subtitle stage. Subtitles are chunked and timed; when TTS returns **word-level timings**, the pipeline refines the subtitle track so chunks align to actual spoken words, subtitles appear and disappear in sync with the voice.
-
-**Refinement:** `POST /api/subtitles/refine` with `{ subtitleTrack, wordTimings?, script, shotList }` returns the refined track. **Rendering:** Captions flow from `generateSubtitles` → `refineSubtitles` → `getCaptionsRenderOption` → `renderInput` → `buildRemotionProps` → Remotion props → `CUTLINEComposition` → `SubtitleOverlay` (time in ms, global timeline; `useCurrentFrame()` is composition frame).
-
----
-
-### Motion and Visuals
-
-**Motion** specifies how each shot is composed and animated (scale, pan, zoom). **Visuals** specify colors and layout from intent and optional analyzed assets. Both are computed in-process from the shot list and intent; no user config.
-
----
-
-### Image Sourcing
-
-Every shot gets an image (URL or path). The pipeline derives a search query or image prompt per shot from intent and script (via OpenRouter). It then tries: **Unsplash** (primary) → **DALL·E 3** (AI fallback) → **Pexels** (alternate stock) → simplified query retry. If all fail, a **placeholder** is used so the video still generates.
-
-**Optional:** User-uploaded product photos can be assigned to shots by matching shot purpose to analyzed suggested shot types.
-
-**Test:** `POST /api/images/source` with `{ intent, shotList, script, analyzedAssets?, assetPaths? }` → `ImageSpec` (per-shot `shotId`, `imageUrl`, `source`, `fallbackUsed`).
-
----
-
-### Optional Asset Upload and Analysis
-
-You can upload **logo**, **product photos**, **reference video/images**, and **brand colors** (hex). Assets are stored; IDs and brand colors are passed into the job. When present, the pipeline runs **asset analysis** (OpenRouter vision) before the visual stage:
-
-- **Logo:** Dominant colors, aspect ratio, transparency, suggested placement (`outro` | `watermark` | `hero`).
-- **Product photos:** Dominant colors, aspect ratio, subject description, suggested shot types.
-- **Reference video:** Keyframes extracted (ffmpeg); vision analyzes color palette; optional cuts-per-minute.
-- **Reference images:** Color palette, mood/style description.
-- **Brand colors:** Pass-through (hex validated).
-
-Analysis output is passed to the visual layer and image sourcing. Logo placement is applied in the Remotion composition (watermark, outro, hero).
-
-**Test:** `POST /api/assets/analyze` with `{ assetIds, brandColors? }` → `AnalyzedAssets`.
-
----
-
-### Video Rendering
-
-The final stage takes the locked narrative plan, shot list, script, subtitles, motion spec, visual spec, **image spec**, and TTS audio and produces a single MP4 via **Remotion**. Output is written to `public/temp/[jobId].mp4` and served at `/temp/[jobId].mp4`. Cleanup runs automatically (configurable retention).
-
----
-
-### Hybrid anonymous → authenticated funnel
-
-When **DATABASE_URL** (Neon Postgres) is set, the app supports an anonymous-first flow:
-
-- **One free video without sign-in.** A first-time visitor can generate one video. The app creates an **anonymous session** (stored in DB), sets an HTTP-only cookie (`cutline_anon_session`), and tracks how many generations that session has used.
-- **Second video and download require auth.** If the same visitor tries to generate a second video or download their video without signing in, the API returns **403** with `ANON_LIMIT_REACHED` or `AUTH_REQUIRED` and a message to sign in.
-- **Seamless history after sign-in.** When the user signs in (Better Auth), **`migrateAnonToUserOnAuth(request, userId)`** is invoked from the auth sign-in callback (see `docs/BETTER_AUTH_SETUP.md`). All video jobs owned by that anonymous session are reassigned to the user so their history appears in one place. This migration is idempotent.
-
-**Database schema (Neon):**
-
-- **anon_sessions** - `id` (UUID), `created_at`, `generation_count` (default 0).
-- **video_jobs** - `id`, `owner_type` (`anon` | `user`), `owner_id` (anon_session_id or user_id), `prompt`, `status`, `preview_url`, `final_url`, `created_at`, optional `queue_job_id` (BullMQ).
-
-**Apply the schema once:** Open Neon Dashboard → your project → **SQL Editor**, paste the contents of **`src/lib/db/schema.sql`**, and run it. The script is idempotent (safe to run multiple times).
-
-**Without DATABASE_URL:** The anon funnel is skipped. Generation and download behave as before (no per-session limit, no download gating). The app does not require a database to run.
-
-**Implementation:** `src/lib/db/` (types, schema, client), `src/lib/anon/` (cookie, session service, middleware, generation flow, download gate, migrate-on-auth), `src/lib/jobs/` (video job service). Generate and download handlers use `isDatabaseConfigured()` to enable or skip the funnel.
-
----
-
-### Authentication (Better Auth)
-
-User sign-in and sign-up are handled by **[Better Auth](https://www.better-auth.com/)**. The app supports **email/password** and **Google OAuth**. When **DATABASE_URL** is set, Better Auth stores users and sessions in Postgres (same Neon DB as the anon funnel); its tables are created via the auth CLI migration.
-
-**Routes:**
-
-- **`/auth/sign-in`** - Custom sign-in page (email/password + “Continue with Google”). Nav “Generate” links here when auth is required.
-- **`/signin`** - Redirects to `/auth/sign-in`.
-- **`/auth/sign-up`**, **`/auth/forgot-password`** - Additional auth views (default Better Auth UI when used).
-- **`/api/auth/*`** - Better Auth API (session, sign-in, sign-out, OAuth callback, etc.). All handlers live under `src/app/api/auth/[...all]/route.ts`.
-
-**Environment variables:**
-
-| Variable | Purpose |
-| -------- | ------- |
-| `BETTER_AUTH_SECRET` | Secret for signing sessions/tokens (min 32 chars; e.g. `openssl rand -base64 32`). |
-| `NEXT_PUBLIC_APP_URL` | Base URL of the app (e.g. `http://localhost:3001`). Must match the origin you use in the browser so OAuth and API calls work. |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Required for “Continue with Google.” |
-
-**Google OAuth setup:** In the OAuth client, set **Authorized redirect URI** to `{NEXT_PUBLIC_APP_URL}/api/auth/callback/google` (e.g. `http://localhost:3001/api/auth/callback/google`).
-
-**Database migration:** Run once (or when Better Auth schema changes):
-
-```bash
-npm run auth:migrate
-```
-
-Or: `npx auth@latest migrate --yes --config src/lib/auth.ts`. This creates/updates the `user`, `session`, `account`, and related tables. **DATABASE_URL** must be set.
-
-**Implementation:** `src/lib/auth.ts` (server config), `src/lib/auth-client.ts` (client for `signIn`, `signOut`, `useSession`), `src/components/ui/sign-in.tsx` (custom sign-in UI), `src/app/auth/[...path]/page.tsx` (auth pages). After sign-in, call **`migrateAnonToUserOnAuth(request, userId)`** in the Better Auth sign-in callback so anonymous-session jobs are attached to the user (see **Hybrid anonymous → authenticated funnel** above and **docs/BETTER_AUTH_SETUP.md**).
-
----
-
-### Async Job Queue
-
-Video generation runs in the background so the UI doesn’t block. **Redis is required.**
-
-1. **Submit:** User enters one sentence (and optional assets) on `/generate` → **POST /api/generate** creates a BullMQ job, returns `jobId`.
-2. **Worker:** A separate process (`npm run worker`) picks up the job and runs the full pipeline (Intent → Narrative → Shots → Script → Subtitles → TTS → Subtitle refine → Motion → Asset analysis → Visuals → Image sourcing → Remotion render).
-3. **Poll:** UI calls **GET /api/generate/[jobId]** until `status` is `completed`, `failed`, or `cancelled`; then shows video or error. The generate flow uses exponential backoff for status polling (2s → 4s → 8s → 15s capped → …) to reduce API load; polling stops after 30 minutes with a user message.
-
-Rendered videos are written to `public/temp/[jobId].mp4`. Cleanup (repeatable BullMQ job when worker is running) deletes old temp videos, uploads, and per-job images.
-
-**Download and share:** When a job completes, the generate flow shows a **Download** button that uses `GET /api/generate/[jobId]/download` (with optional `?variant=N` for multi-variant jobs). The endpoint streams the file with `Content-Disposition: attachment` so browsers save it (e.g. `cutline-[jobId].mp4`). A **Copy link** button copies the full video URL to the clipboard for sharing. For jobs with multiple variations, Download and Copy link apply to the currently selected variant.
-
----
-
-### Job cancellation
-
-You can cancel a pending or running job. Cancellation is **best-effort**: if the pipeline is mid-stage (e.g. LLM or render call), it finishes that step before exiting. The pipeline checks a cancelled flag between stages.
-
-- **POST /api/generate/[jobId]/cancel**: Cancel the job. Returns `200 { cancelled: true, jobId }` if cancelled; `409 { error, reason }` if already completed/failed; `404` if job not found.
-- **Source of truth:** Redis SET `cutline:job:cancelled`; worker and API both read/write this.
-- **Cleanup:** When cancelled, the pipeline runs the same temp-artifact cleanup as on failure (`cleanupJobArtifacts`).
-- **Effect delay:** Cancellation may take up to one stage duration to take effect (checks are between stages only).
-
-**Edge cases:** Cancel twice → second call returns 409. Job not found → 404. Pending job cancelled before worker starts → worker picks up, checks status, skips pipeline and cleans up.
-
-In production you may want to restrict who can cancel (e.g. same client that started the job).
-
----
-
-### List recent jobs
-
-**GET /api/generate/jobs** (and **GET /api/v1/generate/jobs**) returns a list of recent video generation jobs so clients can show "Your recent generations" or resume polling. The list is global (all jobs in the queue); no auth or user identity in this version.
-
-- **Query param:** `limit` (optional). Default **20**, max **50**. Invalid values (e.g. negative or &gt; 50) return **400** with code `BAD_REQUEST`.
-- **Response:** `{ jobs: [{ jobId, status, createdAt, videoUrl?, topic?, error? }] }`
-  - **jobId** (string): Job ID.
-  - **status** (string): `pending` | `processing` | `completed` | `failed` | `cancelled`.
-  - **createdAt** (string): ISO 8601 timestamp when the job was created.
-  - **videoUrl** (string, optional): Present when status is `completed` (primary video URL).
-  - **topic** (string, optional): Input/topic from the job (e.g. the one-sentence prompt).
-  - **error** (string, optional): Present when status is `failed` (failure reason).
-- **Store empty:** Returns `{ jobs: [] }`.
-- Jobs removed by retention (e.g. `deleteStaleJobs`) are not in the list; only jobs still in the queue are returned.
-
-The generate page includes an optional **Recent generations** collapsible section that fetches this endpoint and lets users open a job (View/Watch) to resume polling or watch the result.
-
----
-
-### CORS
-
-The generate API (POST /api/generate, GET /api/generate/[jobId], POST cancel, GET download) supports cross-origin requests so it can be called from another domain or port. CORS is **configurable via environment** and applied **only to these routes**; admin and telemetry routes are not included (same-origin or protect separately).
-
-- **Config:** Set `CORS_ORIGIN` (single value) or `CORS_ORIGINS` (comma-separated). Examples: `CORS_ORIGIN=https://app.example.com`, `CORS_ORIGINS=https://app.example.com,https://admin.example.com`. For local dev: `CORS_ORIGIN=http://localhost:3000` or `CORS_ORIGIN=*`. If **unset or empty**, no `Access-Control-*` headers are sent (same-origin only).
-- **Preflight:** OPTIONS requests to the same paths return 204 with `Allow` and CORS headers so browsers can complete preflight before POST/GET.
-- **No Origin header** (e.g. same-origin or curl): no CORS headers are set; the response is readable by the caller.
-- **Origin not in list:** we do not set `Access-Control-Allow-Origin`; the browser will block the response for that cross-origin request. Use `*` only in development if at all.
-
-CORS is implemented per-route (not middleware) so admin/telemetry stay excluded.
-
----
-
-### Idempotency
-
-**POST /api/generate** accepts an optional **X-Idempotency-Key** header. If the client sends the same key again within a retention window (default 24 hours), the API returns the **same job ID** and response as the first request instead of creating a new job. This allows safe retries after network errors or timeouts.
-
-- **Header:** `X-Idempotency-Key` (case-insensitive). Any string up to **128 characters**; longer keys are rejected with 400 and message "Idempotency key too long".
-- **Matching:** Key-only. The same key within the retention window returns the original `{ jobId }`; request body is not hashed or compared. Two requests with the same key and different bodies will still return the first job’s ID (client should use one key per logical "create" attempt).
-- **Storage:** In-memory only. Keys and their stored results are **lost on server restart**. After a restart, the same key is treated as a new request and may create a new job.
-- **Retention:** Stored keys are removed after **IDEMPOTENCY_RETENTION_HOURS** (default 24, max 168). Expired entries are evicted when reading or when adding; keys older than retention are treated as new.
-- **Concurrent same key:** A per-key lock ensures only one job is created; concurrent requests with the same key serialize and the second receives the same `{ jobId }` from the store.
-- **Job later fails or is cancelled:** The stored response is the initial `{ jobId }`. Retries with the same key still get that job ID; the client can poll GET /api/generate/[jobId] for current status. The store is not updated when the job completes or fails.
-
----
-
-### Webhook
-
-When starting a job, you can optionally pass `callbackUrl` in **POST /api/generate**. When the job reaches a terminal state (completed, failed, or cancelled), the server sends a **POST** request to that URL with a JSON body. Best-effort, fire-and-forget; no retries, no auth/signing.
-
-**Payload shape:** `{ jobId, status, videoUrl?, variations?, completedAt, error? }`
-- `jobId` (string): Job ID
-- `status`: `"completed"` | `"failed"` | `"cancelled"`
-- `videoUrl` (string, optional): When completed, the primary video URL (e.g. `/temp/[jobId].mp4`)
-- `variations` (array, optional): When completed with multiple variants: `[{ videoUrl }, ...]`
-- `completedAt` (string): ISO timestamp when the job reached terminal state
-- `error` (string, optional): When failed/cancelled, the error message
-
-**Validation:** Only `http://` and `https://` URLs are allowed. Localhost is rejected in production; set `ALLOW_LOCALHOST_WEBHOOK=true` for development.
-
-**Edge cases:** If `callbackUrl` is not set, no webhook is sent. If the callback returns 4xx/5xx or times out (5s), the failure is logged and ignored-no retry.
-
----
-
-### Job retention
-
-Jobs in terminal state (completed, failed, cancelled) are kept in the BullMQ/Redis store. To prevent unbounded growth, set **JOB_RETENTION_DAYS** (e.g. 7). When the worker runs, it periodically removes jobs older than that. Run: once at startup (setImmediate) and every 24 hours.
-
-- **JOB_RETENTION_DAYS**: Remove completed/failed jobs older than N days. Set to 0 or leave unset to disable cleanup.
-- Only terminal-state jobs are removed; pending and running jobs are never deleted.
-- Video files and temp outputs are cleaned separately (VIDEO_RETENTION_HOURS, runCleanup); this only removes job metadata from Redis.
-
----
-
-### Video duration (10-60 seconds)
-
-You can choose a video length between 10 and 60 seconds on the main page. The value is sent as `durationSeconds` in **POST /api/generate** and used for both **Slideshow** and **Talking object** modes. For **Talking object**, videos longer than 8 seconds are built by generating multiple Veo clips (~8s each) and concatenating them. That concatenation step requires **ffmpeg** (on PATH or set `FFMPEG_PATH` in `.env.local`). If ffmpeg is not available and you request a talking_object video over 8 seconds, the job will fail with a clear message.
-
-**Global max duration:** A configurable cap **MAX_VIDEO_DURATION_SECONDS** (default 300, max 3600) is enforced. Requests with `durationSeconds` above this value are rejected at validation with a clear error (e.g. "Duration cannot exceed 300 seconds."). The pipeline also caps duration to this value so that even unvalidated input cannot exceed it; when capping, a log line is emitted. Platform-specific limits (e.g. YouTube Shorts 60s) are separate; when a platform is set, the effective max is the lower of the platform limit and this global max.
-
-**Output size limit (optional):** If **MAX_VIDEO_OUTPUT_MB** is set, after the final video file is written the pipeline checks its size. If it exceeds the limit (in MB), the job **fails** with a clear error ("Output video exceeds maximum size (N MB).") and normal failure cleanup runs. Each output is checked (including each variation), so no variant can exceed the limit. If not set, no size check is performed.
-
----
-
-### Telemetry
-
-Job and stage timings are recorded in memory for admin visibility. The telemetry store keeps up to 500 recent jobs; older entries are evicted by `startedAt`. Data resets when the server restarts unless **file persistence** is enabled: set `TELEMETRY_FILE` or `TELEMETRY_PERSIST_PATH` (e.g. `.data/telemetry.json`). When set, telemetry is loaded from the file on first use and saved after each job completes; the file is capped to the last 500 jobs. Single-process only multi-instance deployments that share the file will overwrite each other.
-
-- **GET /api/telemetry**: List recent jobs (query param `?limit=50`, max 500)
-- **GET /api/telemetry/[jobId]**: Single job with stage timings
-- **GET /api/telemetry/stats**: Aggregate stats (totalJobs, completed, failed, avgDurationMs)
-
-An admin page at **/admin** shows a table of jobs with status, duration, and expandable stage timings. **Admin auth is required:** set `ADMIN_SECRET` (or `ADMIN_API_SECRET`) in your environment. Without it, all admin/telemetry routes return 401 and the admin page shows "Admin not configured." Login uses a cookie-based session (POST /api/admin/auth with `{ secret }`); logout clears the cookie (GET /api/admin/logout).
-
----
-
-### Platform-aware generation
-
-You can target a specific platform (**General**, **LinkedIn**, **Twitter**, **YouTube Shorts**) when generating a video. The platform influences intent, narrative, shots, and script so output is tuned for that channel (length, tone, hooks, pacing). Send `platform` in **POST /api/generate** as one of `"general"`, `"linkedin"`, `"twitter"`, or `"youtube_shorts"`. **General** is the default and preserves previous behavior when platform is omitted. All platform-specific logic lives in `src/lib/platform/platformStrategy.ts`; the pipeline stages read from it and append prompt snippets accordingly.
+Rendering is CPU-heavy and runs 1–3 minutes per video. Serverless functions time out, and even when they don't, billing-by-execution is the wrong shape for long jobs. The Next.js app handles UI + API + job enqueue; a separate BullMQ worker pipelines and renders. This split is load-bearing for the deploy story: app on Vercel, worker on a long-running host (Railway / Render / Fly), same Redis.
 
 ---
 
 ## Architecture
 
 ```
-+-------------------------------------------------------------------+
-|  PRESENTATION                                                     |
-|  Next.js 16 · React 19 · Tailwind CSS · /generate · /test         |
-+-------------------------------------------------------------------+
-                                    |
-+-------------------------------------------------------------------+
-|  APPLICATION                                                      |
-|  API Routes · Rate limiting · Validation · Asset upload           |
-+-------------------------------------------------------------------+
-                                    |
-+-------------------------------------------------------------------+
-|  PIPELINE (worker process)                                        |
-|  Intent → Narrative → Shots → Script → Subtitles → TTS            |
-|  → Subtitle refine → Motion → Asset analysis → Visuals            |
-|  → Image sourcing → Remotion render → MP4                         |
-+-------------------------------------------------------------------+
-                                    |
-+---------------------------------------------------------------------+
-|  SERVICES                                                           |
-|  +------------------+  +------------------+  +------------------+   |
-|  | AI (OpenRouter)  |  | TTS              |  | Images           |   |
-|  | Intent, Narrative|  | ElevenLabs       |  | Unsplash, Pexels |   |
-|  | Shots, Script    |  | PlayHT           |  | DALL·E 3         |   |
-|  +------------------+  +------------------+  +------------------+   |
-|  BullMQ (Redis) · Remotion · Local / S3 storage                     |
-+---------------------------------------------------------------------+
+Browser
+  │ POST /api/generate
+  ▼
+Next.js API ──► BullMQ + Redis ──► Worker (npm run worker)
+  ▲                                   │
+  │ GET /api/generate/[jobId]         ▼
+  │ (2s → 15s backoff, 30min cap)   12-stage pipeline
+  │                                   │
+  │                                   ▼
+  └─────────── public/temp/[jobId].mp4
 ```
 
-**Pipeline flow (worker):**
+**The 12 stages, in order:** intent → narrative → shots → script → subtitles → TTS → subtitle refine → motion → asset analysis → visuals → image sourcing → render.
 
-```
-Input (one sentence + optional assetIds, brandColors)
-    ↓
-1. Intent        - LLM: audience, goal, tone, complexity, duration
-    ↓
-2. Narrative     - LLM: arc, 3-5 beats, pacing
-    ↓
-3. Shots         - LLM: 8-12 shots, purpose, motion, text density
-    ↓
-4. Script        - LLM: spoken text (or silence) per shot
-    ↓
-5. Subtitles     - In-process: chunk script, estimate timing
-    ↓
-6. TTS           - ElevenLabs/PlayHT: audio per segment, silence where text is null
-    ↓
-7. Subtitle refine - Word timings from TTS → align subtitle chunks
-    ↓
-8. Motion        - In-process: motion spec per shot
-    ↓
-9. Asset analysis - If uploads: LLM vision on logo, product photos, ref video/images
-    ↓
-10. Visuals      - In-process: visual spec from intent + assets
-    ↓
-11. Image sourcing - Per shot: LLM query → Unsplash → DALL·E → Pexels → placeholder
-    ↓
-12. Remotion render - Compose script, shots, subtitles, motion, images, audio → MP4
-    ↓
-Output: public/temp/[jobId].mp4
-```
+**The talking-character branch.** When `mode === "talking_object"` the renderer detours through one of three providers depending on `talkingObjectStyle` + `talkingRealMode`: cartoon goes through Google VEO with an LLM-resolved subject (humanoid fallback for abstract topics); studio framing goes through HeyGen + ElevenLabs; cinematic mode produces multi-clip VEO with a documentary-style different-presenter-per-chunk constraint, ffmpeg concat with crossfade, per-chunk silence trim.
+
+**Each stage has its own POST endpoint** (`/api/intent`, `/api/shots`, `/api/script`, `/api/images/source`, `/api/render`, etc.). That enables three things: (a) bisecting which stage produces a bad output by replaying just that stage with a saved input, (b) swapping a provider for one stage without touching the rest, and (c) writing integration tests against the slow stages in isolation. Cancellation is a Redis SET (`cutline:job:cancelled`) read between every stage; on hit the worker throws and the shared cleanup path runs.
 
 ---
 
-## Technology Decisions
+## Why this is hard
 
-| Component         | Choice                        | Rationale                                                                                                           |
-| ----------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Framework         | Next.js 16                    | App Router, API routes, Vercel-ready; no server-side render of video                                                |
-| Language          | TypeScript 5                  | Type safety, clear contracts for pipeline stages and API                                                            |
-| Video composition | Remotion 4                    | Programmatic video from React; same stack as app; deterministic render                                              |
-| Job queue         | BullMQ + Redis                | Reliable async jobs; repeatable cleanup; same Redis for rate limiting                                               |
-| AI                | OpenRouter                    | Single API for multiple models (Gemini, Claude, GPT); intent, narrative, shots, script, image query, asset analysis |
-| TTS               | ElevenLabs / PlayHT           | High-quality voice; PCM (ElevenLabs) for silence stitching; configurable                                            |
-| Images            | Unsplash, Pexels, DALL·E 3    | Stock first, AI fallback; placeholder if all fail so video still completes                                          |
-| Storage           | Local / S3                    | Uploads and temp files; job state in Redis/BullMQ; optional Neon for anon sessions, job ownership, and Better Auth (user/session) |
-| Auth              | Better Auth                   | Email/password + Google OAuth; session and user storage in Postgres when DATABASE_URL is set                      |
-| Rate limiting     | Redis + rate-limiter-flexible | Per-IP limits on generate, upload, status; abuse protection                                                         |
-| Testing           | Vitest                        | Unit tests next to source; integration test for POST /api/generate + poll                                           |
+- **Three talking-character modes, three different failure semantics.** Cartoon and cinematic both call Google VEO via `@google/genai`; studio framing calls HeyGen. VEO's RAI filter returns a deterministic content-safety block on the generated audio — retrying the identical prompt cannot succeed. The orchestrator throws a distinct `VeoContentFilteredError`, the retry classifier marks it non-retryable, and the chunk loop runs an LLM reword pass that varies the *narration* (what RAI blocks) while keeping the *visual* prompt intact. The reworded chunk text is threaded through to caption burn so audio and captions stay synced. After two failed rewords the job fails with an actionable message and stops burning quota.
+
+- **HeyGen Photo Avatar quota under at-least-once submissions.** Lower-tier HeyGen accounts cap stored Photo Avatars at 3. The upload path keys a SHA-256 cache (`heygenPhotoCache.ts`) on image bytes so identical inputs short-circuit. On `code:401028` (quota full), the orchestrator lists the account, partitions avatars into *orphans* (HeyGen has them, our cache doesn't) vs *cached*, and bulk-deletes orphans oldest-first in parallel batches (concurrency 10, cap 10,000) with LRU eviction over cached as backup. A standalone CLI (`scripts/cleanup-heygen-avatars.ts`) covers one-shot recovery on heavily cluttered accounts.
+
+- **Idempotency without a job-state table.** `X-Idempotency-Key` paired with an in-process `Map` and a per-key `Promise` lock (`withIdempotencyLock`) serializes concurrent submissions with the same key and returns the original `{ jobId }`; 24h retention, configurable. In-memory by design — BullMQ already owns job lifecycle and duplicating that into Postgres creates two sources of truth.
+
+- **12-stage cancellation across a long-running async pipeline.** Cancel writes a Redis SET; every stage reads it before starting work. On hit the worker throws and the same cleanup path runs as on success or failure (`cleanupJobArtifacts`). Cancellation is eventual, not preemptive — latency-to-cancel is bounded by the current stage's duration, not the job's. That's the right shape for a pipeline where each stage is an external API call you'd rather complete than abandon mid-flight.
+
+- **Plan entitlement enforced at three layers.** Free / Beginner / Professional / Enterprise with caps `1 / 10 / unlimited / unlimited` videos per month (from `src/lib/plans.ts`). Pro-only features (cinematic mode, custom avatars, image uploads, downloads, edits, sharing) are gated by UI (badges + lock states), the API handler (`isProPlan(getUserPlan(userId))` before BullMQ enqueue), and the DB (`user_plan_overrides` + `payments.stripe_checkout_session_id UNIQUE`). A tampered request body can't bypass the handler check; a tampered URL can't bypass the DB constraint.
+
+- **Image sourcing has to never fail.** A pipeline that finishes 11 stages and aborts on shot 7 is a wasted job. Per-shot fallback chain `Unsplash → DALL·E 3 → Pexels → placeholder`, query derived per shot from intent + script via OpenRouter, `shouldRetryForImage` classifier retries 429/5xx and gives up on other 4xx. The placeholder is deliberate: a render with one stock-filler shot beats a failed render every time.
 
 ---
 
-## Design Philosophy
+## Design decisions & tradeoffs
 
-**One sentence in, video out.** The user provides no script, no storyboard, and no creative knobs at MVP. The system behaves like a director and an editor: it infers intent, plans narrative, chooses shots, writes copy, and sources visuals. That keeps the product simple and the scope bounded.
+**Decision: pipeline, not LLM agent.**
+Why: deterministic stage boundaries beat agent loops for debugging, retries, and per-stage cost control.
+Tradeoff: less emergent behaviour, more handcrafted prompts per stage. We chose visibility over magic.
 
-**No templates.** Every video is directed from intent. Shot list, script, and motion are generated per request, not selected from a library. Repeatability (same intent → same output) is a goal where feasible; randomness in asset selection is minimized or seedable.
+**Decision: worker on a long-running host, not serverless.**
+Why: 1–3 minute renders die in serverless timeouts and per-execution billing is the wrong shape for long jobs.
+Tradeoff: deploy is two services (Vercel app + Railway/Render worker) sharing one Redis. Worth it.
 
-**Pipeline over monolith.** The video pipeline is a linear sequence of stages. Each stage consumes the previous output; failures throw and the job is marked failed. Retries (with backoff) apply to transient failures (LLM, TTS, image fetch, Remotion). Clear stage boundaries make it easy to test (e.g. `POST /api/intent`, `POST /api/images/source`) and to swap implementations later.
+**Decision: in-memory idempotency + Redis cancellation, not a job-state Postgres table.**
+Why: BullMQ already owns job lifecycle. Duplicating it in Postgres creates two sources of truth and a synchronization bug class.
+Tradeoff: the idempotency cache resets on app restart. A duplicate `POST` with the same key within 24h *after* a restart creates a second job. We carry the request ID through logs for support correlation.
 
-**Worker separate from app.** Rendering is long-running and CPU-heavy. The Next.js app enqueues jobs and serves the UI; a separate worker process runs the pipeline and writes MP4s. That keeps Vercel/serverless viable for the app and lets the worker run on a beefier host (Railway, Render, Fly.io).
+**Decision: placeholder image as terminal fallback in image sourcing.**
+Why: every shot must have an image. A pipeline that succeeds 99% is operationally worse than a pipeline that finishes with one filler frame.
+Tradeoff: a deployment with no image API keys produces watermark-looking output and will churn that user. Logs make it loud; the trade is conscious.
 
-**Images mandatory, sources flexible.** Every shot has an image. If Unsplash, Pexels, and DALL·E all fail, we use a placeholder so the job still completes. No “abstract-only” render mode. Optional asset uploads (logo, product photos, brand colors) enrich the pipeline without requiring them.
-
-**Validation and errors first.** All validation runs before the pipeline starts. Invalid input returns 400 with a clear message. The Generate page displays these messages. Pipeline and worker failures store a user-facing error in the job; the worker does not crash.
-
----
-
-## Engineering Constraints & Tradeoffs
-
-**Render time vs. interactivity.** Full pipeline (Intent → Render) typically takes 1-3 minutes. We use async jobs and polling so the UI stays responsive. Real-time streaming or “preview in 10s” would require a different architecture (e.g. lower-quality fast path).
-
-**Determinism vs. variety.** Same intent and same system version aim for same output. That simplifies debugging and quality control. Asset selection (e.g. which Unsplash photo) can vary; we don’t guarantee bit-identical reruns.
-
-**Rate limits and cost.** OpenRouter, TTS, and image APIs have rate limits and cost. We rate-limit per IP (e.g. 5 generate/hour, 20 upload/hour) to protect against abuse. Tuning is env-configurable.
-
-**Retries.** Transient failures (LLM timeout, TTS rate limit, external API 5xx, network errors) are retried up to 3 times with exponential backoff before marking the job failed. Retryable errors: HTTP 429, 5xx, network (ECONNRESET, ETIMEDOUT), timeout, "rate limit" in message. Non-retryable: 4xx (except 429), validation errors. Tune via `RETRY_LLM_MAX`, `RETRY_TTS_MAX`, `RETRY_IMAGE_MAX`, `RETRY_RENDER_MAX` in env.
-
-**Redis required for async.** The job queue and rate limiting use Redis. Without Redis, you can’t run the async generate flow or rate limiting. There is no in-memory fallback for the queue.
-
-**Cleanup and retention.** Temp videos, uploads, and per-job images are deleted automatically (e.g. 24h retention, hourly cleanup job). Job temp dirs (images, veo chunks, preview-artifacts) are deleted when the pipeline finishes (success or failure). Final MP4s are retained until periodic cleanup removes them by age. Set CLEANUP_EXPIRED_HOURS for orphan cleanup (dirs older than N hours). That keeps disk bounded. For long-term storage, you’d need to copy outputs to durable storage (S3, CDN) outside CUTLINE.
-
-**Optional DB for anon funnel and auth.** Pipeline state lives in BullMQ (Redis). When **DATABASE_URL** (Neon Postgres) is set, the app uses it for anonymous sessions, video job ownership, and Better Auth (user/session tables). That enables one free generation per anon session, download gating, sign-in (email + Google OAuth), and migration of anon jobs to the user on sign-in. Without DATABASE_URL, the app runs with no per-session limit and no sign-in.
+**Decision: `user_plan_overrides` table separate from the Better Auth `user` table.**
+Why: entitlement is a thin map keyed by `user_id`; identity is Better Auth's job. Coupling them locks billing to a specific auth provider.
+Tradeoff: `getUserPlan(userId)` reads two tables. Trivial query cost in exchange for an auth-provider swap that doesn't touch billing.
 
 ---
 
-## Run Locally
+## Failure modes
 
-**Quick start:**
+- **VEO content-safety block on chunk N.** Detected as `VeoContentFilteredError`. The orchestrator runs an LLM reword on that chunk's narration (meaning preserved, wording varied), regenerates the chunk, threads the reworded text into caption burn. After two failed rewords it stops, returns an actionable message ("change this part of your topic"), and burns no further VEO quota.
+
+- **HeyGen `401028` Photo Avatar quota full.** Bulk auto-cleanup partitions orphans vs cached, deletes oldest orphans in parallel batches, then retries the upload once. If retry still hits 401028, the *user-facing* error is generic ("talking-character videos are temporarily unavailable; try Slideshow mode"); the *operator* log carries the technical detail and points at the CLI cleanup script. End users never see internal URLs or script paths.
+
+- **Image provider 5xx / 429.** `shouldRetryForImage` retries transient failures with exponential backoff, then falls through Unsplash → DALL·E → Pexels → placeholder. Render completes.
+
+- **Worker process killed mid-render.** Per-job temp dir is deleted on success, failure, and cancel via one shared cleanup path. An orphan-sweep job (`CLEANUP_EXPIRED_HOURS`) runs every 60 minutes as a backstop for dirs from crashed processes. Final MP4 retention is separate (`VIDEO_RETENTION_HOURS`, default 24h).
+
+- **Stripe webhook replay or out-of-order delivery.** `payments.stripe_checkout_session_id` has a `UNIQUE` constraint; `verifyAndUpgrade` checks status before writing `user_plan_overrides`. Replays log "already processed" and return 200. Double-credit is structurally impossible.
+
+---
+
+## Security model
+
+- **Browser hardening (`next.config.ts`).** CSP with `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `upgrade-insecure-requests`. HSTS `max-age=63072000; includeSubDomains; preload`. `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Permitted-Cross-Domain-Policies: none`. Applied to every response.
+
+- **API keys (`api_keys` table).** Format `clk_<48 hex>` generated from `crypto.randomBytes(24)`. Stored as **SHA-256 of the full key**, with a 16-char prefix kept as the indexed lookup column. Plaintext is returned exactly once at creation; the DB never has it.
+
+- **Stripe webhook HMAC verification.** `stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET)` runs before any business logic. Missing or invalid signature → 400.
+
+- **SSRF guard on `callbackUrl`.** Validates scheme (`http` / `https` only), rejects `localhost` / `127.0.0.1` in production unless `ALLOW_LOCALHOST_WEBHOOK=true` is explicitly set. Fire-and-forget, 5-second timeout, no retries. Receivers must be idempotent.
+
+- **Plan entitlement.** Gated at UI, API handler (before BullMQ enqueue), and DB (`user_plan_overrides` + `payments.stripe_checkout_session_id UNIQUE`). Pro-only features cannot be reached by tampering with the request body alone.
+
+- **Prompt-injection rejection.** `validateGenerateInput` rejects topics matching the injection-pattern set with a field-level `VALIDATION_FAILED`.
+
+- **Rate limiting.** Redis-backed sliding window per client (`rate-limiter-flexible`), per-route caps via env: generate (5/h default), upload (20/h), status (60/min).
+
+- **CORS.** Per-route allowlist via `CORS_ORIGIN` / `CORS_ORIGINS`. Admin and telemetry routes are excluded from CORS by design.
+
+---
+
+## Stack
+
+Next 16.1.6 · React 19.2.3 · TypeScript 5 · Remotion 4.0.414 · BullMQ 5 + ioredis 5 · Better Auth 1.5.5 (+ passkey) on Neon Postgres · Stripe 21 · Zod 4 · Google VEO via `@google/genai` 1.39 · HeyGen · ElevenLabs / PlayHT · Vitest 2.
+
+Worker runs uncompiled via `tsx`. React Compiler enabled in production.
+
+---
+
+## What's intentionally NOT built yet
+
+- **Multi-seat / team accounts** — single-tenant. Multi-seat when a multi-seat customer is on the line to design against.
+- **Job approvals + comments review flow** — `job_approvals` and `job_comments` tables scaffolded; review/collaboration flow deferred until usage shape demands it.
+- **Worker horizontal scaling** — single worker process. The BullMQ side already supports N workers; the file-storage layer needs to move to S3 first.
+- **Public template marketplace** — explicit non-goal. "No templates" is the thesis, not a stopgap.
+
+**Followups (real, not features):** CAPTCHA libraries (`@hcaptcha/react-hcaptcha`, `@captchafox/react`, `@marsidev/react-turnstile`) are in `dependencies` with no production wiring. Audit and consolidate to one provider before sign-in goes public.
+
+---
+
+## Run locally
 
 ```bash
-git clone <repo-url>
-cd cutline
+git clone https://github.com/parbhatkapila4/Cutline.git
+cd Cutline
 npm install
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with required variables (see [Required Environment Variables](#required-environment-variables) below). Then:
+**Required env:** `REDIS_URL`, `OPENROUTER_API_KEY`, `ELEVENLABS_API_KEY`.
+**Recommended:** at least one of `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, `OPENAI_API_KEY` (DALL·E).
+**For auth + billing:** `DATABASE_URL` (Neon), `BETTER_AUTH_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+
+**Schema bootstrap** (only when `DATABASE_URL` is set): paste `src/lib/db/schema.sql` into the Neon SQL Editor and run it; then `npm run auth:migrate` for Better Auth tables.
+
+Two terminals:
 
 ```bash
-# Terminal 1: Redis (if not already running)
-# docker run -d -p 6379:6379 redis   # or redis-server
-
-npx next dev
+npx next dev       # terminal 1, port 3000
+npm run worker     # terminal 2, same .env.local
 ```
 
-App runs at `http://localhost:3000` (or another port if 3000 is in use). Open `/generate` for video generation, `/test` for pipeline stage testing. **Sign-in** is at `/auth/sign-in` (or `/signin`). If you use the anonymous funnel and auth, set `DATABASE_URL` and `BETTER_AUTH_SECRET`, then run **`npm run auth:migrate`** once to create auth tables.
+Without the worker, jobs sit in `pending` forever. That's deliberate — there is no in-process fallback.
 
-**Worker (required for async video generation):**
-
-```bash
-# Terminal 2: same directory, same .env.local
-npm run worker
-```
-
-Keep the worker running while you use the Generate page. It runs the full pipeline and cleanup.
-
-For full setup (env vars, Redis, Vercel + worker deployment), see **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)**.
+Full env reference, API spec, error codes, and troubleshooting live in [`docs/REFERENCE.md`](docs/REFERENCE.md).
 
 ---
 
-## Required Environment Variables
+## About
 
-The app and worker validate configuration at startup. If required vars are missing, they exit immediately with a clear error (e.g. "Missing required environment variables: OPENROUTER_API_KEY, ELEVENLABS_API_KEY").
-
-**Validated at startup (must be set):**
-
-| Variable | Purpose |
-| -------- | ------- |
-| `REDIS_URL` | BullMQ job queue, rate limiting, usage tracking |
-| `OPENROUTER_API_KEY` | LLM for intent, narrative, shots, script |
-| `ELEVENLABS_API_KEY` | TTS (default provider). Or `PLAYHT_API_KEY` + `PLAYHT_USER_ID` when `TTS_PROVIDER=playht` |
-
-**Recommended (pipeline uses placeholders if missing):** At least one image source (`UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, or `OPENAI_API_KEY`) for real images. If none are set, placeholders are used.
-
-**Optional - anonymous funnel and auth:** Set **`DATABASE_URL`** (Neon Postgres) to enable the hybrid anonymous → authenticated flow and Better Auth (user/session storage). If unset, the app runs without the funnel and without sign-in.
-
-**Required for authentication (when using sign-in / Google OAuth):** Set **`BETTER_AUTH_SECRET`** (min 32 chars, e.g. `openssl rand -base64 32`) and **`NEXT_PUBLIC_APP_URL`** (e.g. `http://localhost:3001`) so the auth client and OAuth redirects use the correct origin. For Google sign-in, also set **`GOOGLE_CLIENT_ID`** and **`GOOGLE_CLIENT_SECRET`** from Google Cloud Console.
-
-```bash
-REDIS_URL=redis://localhost:6379
-OPENROUTER_API_KEY=sk-or-...
-ELEVENLABS_API_KEY=...   # or PLAYHT_API_KEY + PLAYHT_USER_ID with TTS_PROVIDER=playht
-UNSPLASH_ACCESS_KEY=...  # recommended; or PEXELS_API_KEY / OPENAI_API_KEY
-# DATABASE_URL=postgresql://...  # optional; Neon Postgres for anon funnel + Better Auth
-# BETTER_AUTH_SECRET=...         # required for auth; min 32 chars
-# NEXT_PUBLIC_APP_URL=http://localhost:3001
-# GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...  # for "Continue with Google"
-```
-
-**Serverless (Vercel):** Validation runs when the Node.js runtime initializes. On cold start, missing required vars cause a 500 on the first request; check logs for the error message.
-
----
-
-## Optional Environment Variables
-
-```bash
-# OpenRouter
-OPENROUTER_MODEL=google/gemini-2.0-flash-lite-001
-OPENROUTER_VISION_MODEL=google/gemini-2.0-flash-lite-001
-
-# TTS
-TTS_PROVIDER=elevenlabs
-TTS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
-ELEVENLABS_USE_MP3=true
-PLAYHT_API_KEY=...
-PLAYHT_USER_ID=...
-
-# Images
-PEXELS_API_KEY=...
-OPENAI_API_KEY=...
-
-# Storage (uploads, temp)
-STORAGE_TYPE=local
-UPLOAD_DIR=uploads
-# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION (if STORAGE_TYPE=s3)
-
-# Video duration and output limits
-# MAX_VIDEO_DURATION_SECONDS=300  - global max duration (default 300, max 3600)
-# MAX_VIDEO_OUTPUT_MB=            - optional; job fails if output file exceeds N MB
-
-# Cleanup
-CLEANUP_ENABLED=true
-VIDEO_RETENTION_HOURS=24
-UPLOAD_RETENTION_HOURS=24
-CLEANUP_INTERVAL_HOURS=1
-CLEANUP_SECRET=...
-# Optional: periodic orphan cleanup - delete temp dirs older than N hours (e.g. from crashed jobs)
-# CLEANUP_EXPIRED_HOURS=24
-# TEMP_DIR - override temp root (default: public/temp)
-
-# CORS (generate API only; admin/telemetry not included)
-# CORS_ORIGIN (single) or CORS_ORIGINS (comma-separated). Unset = no CORS (same-origin only).
-# Dev: CORS_ORIGIN=http://localhost:3000 or CORS_ORIGIN=*
-# Prod: CORS_ORIGIN=https://app.example.com or CORS_ORIGINS=https://app.example.com,https://admin.example.com
-# CORS_ORIGIN=
-
-# Rate limiting
-RATE_LIMIT_ENABLED=true
-RATE_LIMIT_GENERATE=5
-RATE_LIMIT_UPLOAD=20
-RATE_LIMIT_STATUS=60
-RATE_LIMIT_GENERAL=100
-# POST /api/generate: RATE_LIMIT_MAX and RATE_LIMIT_WINDOW_SECONDS override generate limit when both set.
-# If RATE_LIMIT_MAX unset, RATE_LIMIT_GENERATE (5) per 3600s (1h) applies. Example: 10 per 60s:
-# RATE_LIMIT_MAX=10
-# RATE_LIMIT_WINDOW_SECONDS=60
-
-# Database (optional - anonymous funnel + Better Auth user/session storage)
-# DATABASE_URL=postgresql://user:pass@host.neon.tech/db?sslmode=require
-# Apply anon funnel schema once: Neon Dashboard → SQL Editor → paste src/lib/db/schema.sql → Run
-# Then run: npm run auth:migrate  (creates Better Auth tables)
-
-# Authentication (Better Auth)
-# BETTER_AUTH_SECRET=...          # min 32 chars (e.g. openssl rand -base64 32)
-# NEXT_PUBLIC_APP_URL=http://localhost:3001   # must match app origin
-# GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...   # for Google OAuth; redirect URI: {NEXT_PUBLIC_APP_URL}/api/auth/callback/google
-
-# Retry (LLM, TTS, image, render)
-RETRY_ENABLED=true
-RETRY_LLM_MAX=3
-RETRY_TTS_MAX=3
-RETRY_IMAGE_MAX=2
-RETRY_RENDER_MAX=2
-
-# Cost estimation (optional; defaults to 0)
-# COST_PER_1K_TOKENS - USD per 1k LLM tokens (OpenRouter)
-# COST_PER_TTS_SECOND - USD per second of TTS audio
-# COST_PER_VIDEO_SECOND - USD per second of Veo/video output
-# COST_PER_IMAGE_CALL - USD per image API call (Unsplash, DALL·E, etc.)
-
-# Usage / plan limits (credits and dashboard)
-# DEFAULT_TOKENS=100 - initial token balance per client
-# TOKENS_PER_VIDEO=10 - tokens per completed video
-# FREE_PLAN_VIDEOS_PER_MONTH=10 - free plan videos limit
-# FREE_PLAN_API_CALLS_PER_MONTH=10000 - free plan API calls limit
-```
-
-**Temp file cleanup.** Job temp dirs (`public/temp/{jobId}/`) contain intermediates (images, veo chunks, preview-artifacts). These are deleted when the pipeline finishes (success or failure). Final MP4s stay until periodic `runCleanup` (VIDEO_RETENTION_HOURS). If `CLEANUP_EXPIRED_HOURS` is set, the worker runs `cleanupExpiredTempDirs` every 60 minutes to remove orphaned dirs from crashed processes.
-
----
-
-## API Reference
-
-### API versioning
-
-The current API version is **v1**. The **canonical base path** is **/api/v1**. New clients should use the versioned paths so future breaking changes can be introduced under /api/v2 without affecting them.
-
-**v1 endpoints (canonical):**
-
-| Method | Endpoint                              | Description |
-| ------ | ------------------------------------- | ----------- |
-| POST   | `/api/v1/generate`                    | Create video job. Returns `{ jobId }`. Same as unversioned POST /api/generate. |
-| GET    | `/api/v1/generate/[jobId]`            | Job status. Returns `{ status, videoUrl?, error?, ... }`. |
-| POST   | `/api/v1/generate/[jobId]/cancel`     | Cancel a pending or running job. |
-| GET    | `/api/v1/generate/[jobId]/download`   | Stream completed video (attachment). Optional `?variant=N`. |
-| GET    | `/api/v1/generate/jobs`               | List recent jobs. Query: `?limit=20` (default 20, max 50). Returns `{ jobs: [{ jobId, status, createdAt, videoUrl?, topic?, error? }] }`. |
-
-All v1 responses include the header **X-API-Version: 1** so clients can detect the version.
-
-**Unversioned paths** `/api/generate`, `/api/generate/[jobId]`, and the cancel/download sub-routes **remain supported** and behave identically to v1 (same handlers, no redirect). They are kept for backward compatibility; existing links and webhooks that point at unversioned URLs continue to work. **Recommendation:** use `/api/v1/...` for new integrations. Future breaking changes will be introduced under **/api/v2** (and documented).
-
-Implementation: unversioned and v1 routes share the same handler logic (`src/app/api/generate/handlers.ts`); route files under `/api/generate` and `/api/v1/generate` call these handlers so business logic is not duplicated.
-
----
-
-### Endpoints
-
-#### Video generation
-
-| Method | Endpoint                | Description                                                                                                                                             |
-| ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/generate`         | Create video job. Body: `{ input, assetIds?, brandColors?, mode? }`. Returns `{ jobId }`. Rate limited per client (IP or X-Forwarded-For). Use `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_SECONDS` when set; otherwise `RATE_LIMIT_GENERATE` per hour. Returns 429 when exceeded. **Also:** POST `/api/v1/generate`. |
-| GET    | `/api/generate/[jobId]` | Job status. Returns `{ status, videoUrl?, error? }`. `status`: `pending` \| `processing` \| `completed` \| `failed`. Rate limited (e.g. 60/min per IP). **Also:** GET `/api/v1/generate/[jobId]`. |
-| GET    | `/api/generate/jobs`    | List recent jobs. Query: `?limit=20` (default 20, max 50). Returns `{ jobs: [{ jobId, status, createdAt, videoUrl?, topic?, error? }] }`. **Also:** GET `/api/v1/generate/jobs`. |
-
-#### Prompt suggestions
-
-| Method | Endpoint             | Description                                                                                                                                                                               |
-| ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/suggest-prompt` | Expand or refine a video prompt. Body: `{ prompt?: string, refine?: boolean, durationSeconds?: number }`. Returns `{ suggestion: string }`. Rate limited (general limit, e.g. 100/min per IP). Optional prompt; if empty, returns a suggested example. `refine=true` improves an existing prompt; `refine=false` expands a fragment. |
-
-#### Pipeline stages (test in isolation)
-
-| Method | Endpoint                | Description                                                                                    |
-| ------ | ----------------------- | ---------------------------------------------------------------------------------------------- |
-| POST   | `/api/intent`           | Intent from one sentence. Body: `{ input }`.                                                   |
-| POST   | `/api/narrative`        | Narrative plan from intent. Body: `{ intent }`.                                                |
-| POST   | `/api/shots`            | Shot list from narrative + intent. Body: `{ narrative, intent }`.                              |
-| POST   | `/api/script`           | Script from shots + narrative. Body: `{ shots, narrative, intent }`.                           |
-| POST   | `/api/subtitles`        | Subtitle track from script + shots. Body: `{ script, shotList }`.                              |
-| POST   | `/api/subtitles/refine` | Refine subtitles with word timings. Body: `{ subtitleTrack, wordTimings?, script, shotList }`. |
-| POST   | `/api/tts`              | TTS audio from script + shot list. Body: `{ script, shotList }`.                               |
-| POST   | `/api/motion`           | Motion spec from shot list. Body: `{ shotList }`.                                              |
-| POST   | `/api/visuals`          | Visual spec from intent + optional assets. Body: `{ intent, analyzedAssets? }`.                |
-| POST   | `/api/images/source`    | Image spec per shot. Body: `{ intent, shotList, script, analyzedAssets?, assetPaths? }`.       |
-| POST   | `/api/render`           | Remotion render to MP4. Body: full pipeline payload + imageSpec, optional audioBase64.         |
-
-#### Assets
-
-| Method | Endpoint                | Description                                                                                                           |
-| ------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/assets/upload`    | Upload logo, product photos, reference video/images. Returns `{ assetIds, ... }`. Rate limited (e.g. 20/hour per IP). |
-| GET    | `/api/assets/[assetId]` | Get asset (redirect or URL).                                                                                          |
-| POST   | `/api/assets/analyze`   | Analyze uploaded assets + brand colors. Body: `{ assetIds, brandColors? }`. Returns `AnalyzedAssets`.                 |
-
-#### Operations
-
-| Method | Endpoint       | Description                                                                                                         |
-| ------ | -------------- | ------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/health`       | Combined health (same as readiness). 200 when env + Redis OK; 503 + `{ status: "unhealthy", checks }` otherwise. No auth. |
-| GET    | `/api/health/live`   | Liveness probe. 200 + `{ status: "ok" }` if process is up. No dependency checks. For k8s livenessProbe. |
-| GET    | `/api/health/ready`  | Readiness probe. 200 when ready to accept work; 503 + `{ status: "not_ready", checks }` when not. For k8s readinessProbe. |
-| POST   | `/api/cleanup`       | Manual cleanup (temp videos, uploads, per-job images). Optional header: `X-Cleanup-Secret` if `CLEANUP_SECRET` set. |
-
-#### Authentication (Better Auth)
-
-| Method | Endpoint           | Description                                                                 |
-| ------ | ------------------ | --------------------------------------------------------------------------- |
-| GET/POST | `/api/auth/[...all]` | Catch-all for Better Auth: session, sign-in (email + social), sign-out, OAuth callback (e.g. `/api/auth/callback/google`). See **Authentication (Better Auth)** in Core Capabilities and **docs/BETTER_AUTH_SETUP.md**. |
-
-#### Health check
-
-**GET /api/health**: Idempotent, no side effects. **Equivalent to readiness:** returns 200 when env and Redis are OK, 503 otherwise. Use for a single combined check; for separate liveness and readiness (e.g. Kubernetes), use **GET /api/health/live** and **GET /api/health/ready** below.
-
-- **200 OK**: `{ status: "ok" }`: App and critical dependencies (required env vars, Redis) are ready.
-- **503 Service Unavailable**: `{ status: "unhealthy", checks: { env?: string, redis?: string } }`: A check failed (e.g. missing `OPENROUTER_API_KEY` or `REDIS_URL`, Redis unreachable). `checks` indicates which dependency failed.
-
----
-
-#### Liveness and readiness
-
-For orchestrators (e.g. Kubernetes) that need separate **liveness** (is the process running?) and **readiness** (can the app accept traffic?):
-
-| Probe      | Endpoint              | Purpose                                                                 |
-| ---------- | --------------------- | ----------------------------------------------------------------------- |
-| **Liveness**  | **GET /api/health/live**  | Process is up. Returns **200** with `{ status: "ok" }`. No dependency checks, no I/O. Use to decide whether to **kill and restart** the process. |
-| **Readiness** | **GET /api/health/ready** | App can accept work. Returns **200** when required env and Redis are OK; **503** when not ready with `{ status: "not_ready", checks: { env?: string, redis?: string } }`. Use to decide whether to **send traffic** (e.g. remove from load balancer when 503). |
-
-- **Relationship to GET /api/health:** Health is equivalent to readiness (same checks). Use **/api/health** as a general combined check; use **/api/health/live** and **/api/health/ready** for separate k8s probes.
-- **No auth** on these endpoints intentional for probes. Do not expose secrets in response bodies; probes should be reachable only from the cluster or LB.
-- **Readiness** reuses the same logic as `/api/health` (required env vars, Redis ping). If the check throws, readiness returns 503 with `checks.ready = "check failed"`.
-
-**Example Kubernetes probes:**
-
-```yaml
-livenessProbe:
-  httpGet:
-    path: /api/health/live
-    port: 3000
-  initialDelaySeconds: 5
-  periodSeconds: 10
-readinessProbe:
-  httpGet:
-    path: /api/health/ready
-    port: 3000
-  initialDelaySeconds: 5
-  periodSeconds: 5
-```
-
----
-
-### API error codes
-
-Error responses from the generate API and job status/cancel/download use a consistent shape so clients can branch on a stable code instead of parsing messages.
-
-**Response shape:** `{ error: string; code: string; details?: unknown }`
-
-- **error**: Human-readable message (do not rely on for logic).
-- **code**: Machine-readable UPPER_SNAKE_CASE code; stable and documented below.
-- **details**: Optional extra data (e.g. `errors`, `retryAfter`, `reason`).
-
-| Code | HTTP status | When returned |
-|------|-------------|----------------------------------------------------------------|
-| `VALIDATION_FAILED` | 400 | Request body fails validation. `details.errors` has field-level errors. |
-| `INVALID_JSON` | 400 | Request body is not valid JSON. |
-| `BAD_REQUEST` | 400 | Generic bad request (e.g. invalid jobId format). |
-| `PREVIEW_JOB_NOT_FOUND` | 400 | Final render references a preview job that does not exist or is not completed. |
-| `INSUFFICIENT_CREDITS` | 402 | Not enough credits to start a video. `details`: `tokensRemaining`, `tokensRequired`. |
-| `MONTHLY_LIMIT_REACHED` | 402 | Monthly video limit reached. `details`: `videosUsed`, `videosLimit`. |
-| `RATE_LIMITED` | 429 | Too many requests. `details.retryAfter` (seconds); response includes `Retry-After` header. |
-| `JOB_NOT_FOUND` | 404 | Job does not exist (status, cancel, or download). |
-| `JOB_NOT_READY` | 404 | Job exists but is not completed (download only). |
-| `VIDEO_NOT_FOUND` | 404 | Video file or path missing (e.g. file cleaned up). |
-| `JOB_CANNOT_CANCEL` | 409 | Job already completed or cancelled. `details.reason`: `already_finished`. |
-| `ANON_LIMIT_REACHED` | 403 | Anonymous user has used their one free generation; must sign in to generate more, download, or access dashboard. |
-| `AUTH_REQUIRED` | 403 | Action requires authentication (e.g. download anon-owned video, second video, dashboard). |
-| `INTERNAL_ERROR` | 500 | Unhandled server error. Message is generic; do not leak internals. |
-
-Codes are stable; do not change them in a backward-incompatible way. Additional codes (e.g. `WEBHOOK_INVALID_URL`) may be added for new flows.
-
----
-
-### Generate request (POST /api/generate)
-
-All inputs are validated in one place (`validateGenerateInput`). On failure, the API returns **400** with `{ error: string, code: "VALIDATION_FAILED", details: { errors: Array<{ field: string, message: string }> } }` so the UI can show field-level errors.
-
-| Field            | Required | Type    | Limits / values                                                                          |
-| ---------------- | -------- | ------- | ---------------------------------------------------------------------------------------- |
-| `input`          | yes      | string  | Non-empty topic, 5-2000 chars. Trimmed. Prompt-injection patterns rejected.              |
-| `durationSeconds`| yes      | number  | Integer 10-60. Coerced from string (e.g. `"60"` → 60).                                    |
-| `assetIds`       | no       | string[]| Array of asset IDs from upload.                                                          |
-| `brandColors`    | no       | object  | `{ primary?: string, secondary?: string }` - hex colors (e.g. `#FF0000`).                 |
-| `mode`           | no       | string  | `"slideshow"` \| `"talking_object"`.                                                      |
-| `platform`       | no       | string  | `"general"` \| `"linkedin"` \| `"twitter"` \| `"youtube_shorts"`.                         |
-| `variationCount` | no       | number  | Integer 1-5. Default 1.                                                                   |
-| `textModel`      | no       | string  | OpenRouter model override.                                                                |
-| `captions`       | no       | string  | `"on"` \| `"off"`. Default `"on"`.                                                        |
-| `talkingObjectStyle` | no   | string  | `"cartoon"` \| `"real"`.                                                                  |
-| `renderMode`     | no       | string  | `"preview"` \| `"final"`.                                                                 |
-| `previewJobId`   | no       | string  | Required when `renderMode` is `"final"` (final render from preview).                      |
-
-**400 response shape**: `{ error: "Invalid JSON" | "Validation failed", errors: [{ field, message }] }`. Unknown fields are ignored.
-
-#### Request ID
-
-Every `POST /api/generate` request gets a **request ID** for log correlation and support. The API reads `X-Request-ID` or `X-Correlation-ID` from the request header; if present and non-empty (max 128 chars), that value is used. Otherwise a UUID is generated. The response always echoes the ID in the `X-Request-ID` header so the client can reference it (e.g. in support requests). The request ID is stored on the job, passed through the pipeline, and included in pipeline logs and telemetry.
-
----
-
-### Example: Create job and poll
-
-**Create job:**
-
-```bash
-curl -X POST "http://localhost:3000/api/generate" \
-  -H "Content-Type: application/json" \
-  -d '{"input": "Explain why coffee makes you feel awake in 30 seconds", "durationSeconds": 30}'
-```
-
-**Response:**
-
-```json
-{
-  "jobId": "abc123..."
-}
-```
-
-**Poll status:**
-
-```bash
-curl "http://localhost:3000/api/generate/abc123..."
-```
-
-**Response (completed):**
-
-```json
-{
-  "status": "completed",
-  "videoUrl": "/temp/abc123....mp4"
-}
-```
-
-**Response (failed):**
-
-```json
-{
-  "status": "failed",
-  "error": "TTS failed after 3 retries."
-}
-```
-
----
-
-### Example: Intent only
-
-```bash
-curl -X POST "http://localhost:3000/api/intent" \
-  -H "Content-Type: application/json" \
-  -d '{"input": "Explain why coffee makes you feel awake in 30 seconds"}'
-```
-
-**Response:**
-
-```json
-{
-  "audience": "general",
-  "goal": "explain",
-  "tone": "informative",
-  "complexity": "simple",
-  "durationSeconds": 30,
-  "rawInput": "Explain why coffee makes you feel awake in 30 seconds"
-}
-```
-
----
-
-### Input validation and errors
-
-`POST /api/generate` validates all fields in one pass and returns all errors: `{ error: "Validation failed", errors: [{ field, message }] }`. Field-level errors let the UI highlight the failing field.
-
-| Constraint                | Behavior | Example message                                                                     |
-| ------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| Invalid JSON body         | 400      | `{ error: "Invalid JSON", errors: [{ field: "body", message: "Invalid JSON" }] }`   |
-| Empty input / whitespace  | 400      | `{ field: "input", message: "Topic is required" }`                                  |
-| Too short (< 5 chars)     | 400      | `{ field: "input", message: "Topic is too short. Please describe what you want in a sentence." }` |
-| Too long (> 2000 chars)   | 400      | `{ field: "input", message: "Topic must be at most 2000 characters" }`              |
-| Prompt-injection patterns | 400      | `{ field: "input", message: "Input contains invalid instructions..." }`             |
-| Missing durationSeconds   | 400      | `{ field: "durationSeconds", message: "durationSeconds is required" }`              |
-| Invalid durationSeconds   | 400      | `{ field: "durationSeconds", message: "durationSeconds must be at least 10" }` or `"Duration cannot exceed N seconds."` (N = MAX_VIDEO_DURATION_SECONDS) |
-| Invalid platform          | 400      | `{ field: "platform", message: "platform must be one of \"general\", \"linkedin\", \"twitter\", \"youtube_shorts\"" }` |
-| Invalid job ID            | 400      | `Invalid job ID.`                                                                   |
-| Job not found             | 404      | `Job not found.`                                                                    |
-| Rate limit exceeded       | 429      | JSON: `{ error: "Too Many Requests", retryAfter?: number }` for `/api/generate`. `Retry-After` header (seconds). Other endpoints: `Too many requests. Please try again later.` |
-
-Asset upload validation (file type, size, count) is documented in the existing README sections and implemented in `src/lib/assets/validation.ts`.
-
----
-
-## Troubleshooting
-
-- **403 ANON_LIMIT_REACHED / AUTH_REQUIRED**: With the anonymous funnel enabled (DATABASE_URL set), anonymous users get one free generation; a second video or download requires sign-in. Sign in and retry, or call `migrateAnonToUserOnAuth(request, userId)` after auth to attach anon jobs to the user.
-- **402 Payment Required / Not enough credits**: The app returned this because your token balance is below the cost per video, or you've hit the monthly video limit. Wait for reset, or check your usage on the dashboard.
-- **429 Too many requests**: You're rate limited (e.g. too many generate or suggest-prompt requests). For `POST /api/generate`, the body is `{ error: "Too Many Requests", retryAfter?: number }`. Wait for the time indicated in the `Retry-After` header or the response body, then try again.
-- **500 Server error**: Something failed on the server. Check worker and app logs; ensure env vars and Redis are correct. For generate jobs, check the job status endpoint for a failed reason.
-
----
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── api/
-│   │   ├── assets/
-│   │   │   ├── [assetId]/     # GET asset
-│   │   │   ├── analyze/       # POST analyze assets
-│   │   │   └── upload/        # POST upload
-│   │   ├── cleanup/           # POST manual cleanup
-│   │   ├── generate/
-│   │   │   ├── [jobId]/       # GET job status
-│   │   │   └── route.ts       # POST create job
-│   │   ├── images/source/     # POST image spec per shot
-│   │   ├── intent/            # POST intent
-│   │   ├── motion/            # POST motion spec
-│   │   ├── narrative/        # POST narrative
-│   │   ├── render/            # POST Remotion render
-│   │   ├── script/            # POST script
-│   │   ├── shots/             # POST shot list
-│   │   ├── subtitles/
-│   │   │   ├── refine/        # POST refine subtitles
-│   │   │   └── route.ts       # POST subtitles
-│   │   ├── tts/               # POST TTS
-│   │   └── visuals/           # POST visual spec
-│   ├── generate/              # Generate page (UI)
-│   ├── test/                  # Pipeline test page
-│   ├── page.tsx               # Landing
-│   └── layout.tsx
-├── components/
-│   ├── GenerateFlow.tsx
-│   ├── Hero.tsx
-│   ├── HowItWorks.tsx
-│   └── ...
-├── lib/
-│   ├── anon/                  # Anonymous funnel: cookie, session service, middleware, generation flow, download gate, migrate-on-auth
-│   ├── assets/                # Storage, analysis, validation, types
-│   ├── db/                    # Neon Postgres: types, schema.sql, client
-│   ├── images/                # Unsplash, Pexels, DALL·E, source.ts
-│   ├── jobs/                  # Video job service (ownership, create, migrate)
-│   ├── pipeline/              # Orchestrator, intent, narrative, shots, script, subtitles, tts, motion, visuals, renderVideo
-│   ├── queue/                 # BullMQ videoQueue
-│   ├── rate-limit.ts
-│   ├── storage/               # Cleanup
-│   ├── tts/                   # WAV utils
-│   ├── types/                 # Intent, narrative, shots, script, subtitles, tts, motion, visuals
-│   ├── utils/                 # retry, error
-│   ├── validation/            # input.ts
-│   └── veo/                   # (future) video generation
-├── remotion/
-│   ├── CUTLINEComposition.tsx
-│   ├── components/            # ImageBackground, SubtitleOverlay, MotionLayer, LogoOverlay, ...
-│   ├── index.tsx
-│   └── Root.tsx
-└── worker.ts                  # BullMQ worker entry
-```
-
----
-
-## Testing
-
-| Command                 | Description                     |
-| ----------------------- | ------------------------------- |
-| `npm run test`          | Vitest watch mode               |
-| `npm run test:run`      | Unit tests (CI)                 |
-| `npm run test:coverage` | Coverage report (if configured) |
-
-Unit tests live next to source (`*.test.ts`). Integration test: `src/app/api/generate/generate.integration.test.ts` (POST /api/generate + poll until completed/failed). It is skipped when `REDIS_URL` is not set. Run `npm run dev` and `npm run worker` separately if you want the integration test to reach completion.
-
----
-
-## Deployment
-
-### Vercel + worker
-
-- **Vercel:** Deploy the Next.js app (API routes + UI). Set env vars in the Vercel dashboard. API routes handle: create job, poll job status, asset upload. No video rendering on Vercel.
-- **Worker + Redis:** Run the worker and Redis on a separate service (e.g. [Railway](https://railway.app), [Render](https://render.com), [Fly.io](https://fly.io)):
-  - Provision Redis (or use [Upstash](https://upstash.com) and set `REDIS_URL` with ioredis-compatible URL).
-  - Run `npm run worker` as a long-running process.
-  - Use the same env vars as the app (OpenRouter, TTS, image keys, `REDIS_URL`).
-- **Storage:** For uploads and temp files, use local disk on the worker host or set `STORAGE_TYPE=s3` and configure AWS. Vercel serverless has no persistent disk.
-
-### All-in-one
-
-Deploy Next.js and the worker on the same host (e.g. Railway, Render): run `npm run build && npm run start` for the app and `npm run worker` in a second process. Both must use the same Redis.
-
-See **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** before going live.
-
----
-
-## Security
-
-- **Input validation:** All text and asset input validated before the pipeline (Zod/validation modules). Prompt-injection patterns rejected.
-- **Rate limiting:** Redis-backed per-IP limits on generate, upload, and status to reduce abuse and runaway cost.
-- **Cleanup:** Optional `CLEANUP_SECRET` to restrict manual `POST /api/cleanup` to authorized callers.
-- **Auth (optional).** Better Auth is integrated for sign-in (email/password + Google OAuth). When DATABASE_URL is set, the anonymous funnel and auth are enabled; generate and download can require sign-in. For production with multiple users, scope jobs/assets by user (e.g. via session in generate handler).
-- **Secrets:** API keys and secrets only in env; never logged or returned in responses.
-
----
-
-## Scripts (package.json)
-
-| Script                    | Purpose                                                                    |
-| ------------------------- | -------------------------------------------------------------------------- |
-| `npm run dev`             | Next.js dev server (UI + API).                                             |
-| `npm run build`           | Next.js production build.                                                  |
-| `npm run start`           | Next.js production server.                                                 |
-| `npm run worker`          | BullMQ worker (separate process). Runs pipeline + cleanup; requires Redis. |
-| `npm run remotion:studio` | Remotion studio for composition preview.                                   |
-| `npm run remotion:render` | Remotion CLI render with default props.                                    |
-| `npm run test`            | Vitest watch mode.                                                         |
-| `npm run test:run`        | Vitest single run (CI).                                                    |
-| `npm run lint`            | ESLint.                                                                    |
-
----
-
-## Documentation
-
-- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Pipeline flow, job queue, key modules, storage, data flow.
-- **[docs/FEATURE_SPEC.md](docs/FEATURE_SPEC.md)**: Core principle, user experience, capabilities, non-goals, future extensions.
-- **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)**: Env, worker, Redis, API keys, rate limiting, cleanup, smoke test.
-- **[docs/IMAGE_API_KEYS.md](docs/IMAGE_API_KEYS.md)**: Image API keys and setup (if present).
-- **[docs/BETTER_AUTH_SETUP.md](docs/BETTER_AUTH_SETUP.md)**: Better Auth setup (env, DB migration, Google OAuth, sign-in callback, anon migration).
-- **[docs/AUTH_AND_BILLING.md](docs/AUTH_AND_BILLING.md)**: Current identity (IP-based), usage, and roadmap for auth and billing.
-
----
-
-## Limitations
-
-- **Rate limits:** App and provider rate limits apply. Default: 5 generate/hour, 20 upload/hour per IP.
-- **Retention:** Rendered videos and uploads cleaned automatically (default 24h). Configure `VIDEO_RETENTION_HOURS`, `UPLOAD_RETENTION_HOURS`.
-- **Render time:** Full pipeline typically 1-3 minutes depending on length and image sourcing.
-- **Worker required:** Async video generation needs the worker process and Redis; Vercel alone cannot run the pipeline.
-- **Anonymous funnel and auth (optional):** When DATABASE_URL is set, one free video per anon session; download and second video require sign-in. Auth is provided by Better Auth (email/password + Google OAuth) at `/auth/sign-in`. After sign-in, `migrateAnonToUserOnAuth` runs in the auth callback to merge anon jobs into the user. See **docs/BETTER_AUTH_SETUP.md**. Without DATABASE_URL, no per-session limit and no sign-in.
-
----
-
-## If Running at Scale
-
-- **Worker scaling:** Run multiple worker processes (same Redis queue) for higher throughput. Ensure storage (temp/output) is shared or per-worker and cleanup accounts for it.
-- **Redis:** Use a managed Redis (Upstash, Redis Cloud) with persistence. Monitor queue depth and job failure rate.
-- **Storage:** Use S3 (or equivalent) for uploads and consider moving rendered MP4s to a CDN or durable bucket; cleanup can then focus on temp dirs only.
-- **Rate limiting:** Keep Redis-backed limits; consider stricter tiers or per-user limits (auth is integrated via Better Auth).
-- **Observability:** Log pipeline stage duration and failure reasons; add metrics (e.g. job completed/failed per hour, TTS/LLM latency) for tuning and alerting.
-- **Cost:** OpenRouter, TTS, and image APIs dominate cost. Cap context size and image resolution where possible; monitor usage per job.
-
----
-
-## Contributing
-
-We welcome contributions. Before submitting a pull request:
-
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/my-feature`).
-3. Commit your changes (`git commit -m 'Add my feature'`).
-4. Push to the branch (`git push origin feature/my-feature`).
-5. Open a Pull Request.
-
-Run `npm run test:run` and `npm run lint` before submitting.
-
----
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-  <br />
-  <p>
-    <sub>
-      Built with precision by <a href="https://github.com/parbhatkapila4"><strong>Parbhat Kapila</strong></a>
-    </sub>
-  </p>
-  <p>
-    <a href="https://x.com/Parbhat03">Twitter</a>
-    ·
-    <a href="https://linkedin.com/in/parbhat-kapila">LinkedIn</a>
-    ·
-    <a href="https://github.com/parbhatkapila4">GitHub</a>
-  </p>
-  <br />
-  <p>
-    <sub>If CUTLINE helped you, consider giving it a star.</sub>
-  </p>
-  <p>
-    <a href="https://github.com/parbhatkapila4/cutline">
-      <img src="https://img.shields.io/github/stars/parbhatkapila4/cutline?style=social" alt="Star on GitHub" />
-    </a>
-  </p>
-</div>
+Built by **Parbhat Kapila** — full-stack engineer focused on production AI systems. Currently building Sentinel (CRM revenue intelligence), VectorMail (AI email client), Visura, and RepoDocs (codebase RAG). Portfolio: [parbhat.dev](https://parbhat.dev).

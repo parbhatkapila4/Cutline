@@ -59,42 +59,42 @@ const TIME_ROWS: {
   time: string;
   status: "done" | "active" | "blocked";
 }[] = [
-  {
-    stage: "Brief & alignment",
-    who: "PM",
-    whoColor: "from-violet-300 to-indigo-400",
-    time: "18h",
-    status: "done",
-  },
-  {
-    stage: "Script writing",
-    who: "SH",
-    whoColor: "from-pink-300 to-rose-400",
-    time: "22h",
-    status: "done",
-  },
-  {
-    stage: "Voiceover record",
-    who: "BC",
-    whoColor: "from-amber-300 to-orange-400",
-    time: "16h",
-    status: "active",
-  },
-  {
-    stage: "Visual sourcing",
-    who: "MV",
-    whoColor: "from-emerald-300 to-teal-400",
-    time: "24h",
-    status: "blocked",
-  },
-  {
-    stage: "Edit & compose",
-    who: "JT",
-    whoColor: "from-sky-300 to-blue-400",
-    time: "20h",
-    status: "blocked",
-  },
-];
+    {
+      stage: "Brief & alignment",
+      who: "PM",
+      whoColor: "from-violet-300 to-indigo-400",
+      time: "18h",
+      status: "done",
+    },
+    {
+      stage: "Script writing",
+      who: "SH",
+      whoColor: "from-pink-300 to-rose-400",
+      time: "22h",
+      status: "done",
+    },
+    {
+      stage: "Voiceover record",
+      who: "BC",
+      whoColor: "from-amber-300 to-orange-400",
+      time: "16h",
+      status: "active",
+    },
+    {
+      stage: "Visual sourcing",
+      who: "MV",
+      whoColor: "from-emerald-300 to-teal-400",
+      time: "24h",
+      status: "blocked",
+    },
+    {
+      stage: "Edit & compose",
+      who: "JT",
+      whoColor: "from-sky-300 to-blue-400",
+      time: "20h",
+      status: "blocked",
+    },
+  ];
 
 const FORMAT_ROWS: {
   ratio: string;
@@ -104,47 +104,47 @@ const FORMAT_ROWS: {
   progress: number;
   state: "active" | "done" | "queued";
 }[] = [
-  {
-    ratio: "9:16",
-    platform: "Reels",
-    res: "1080×1920",
-    size: "12.4 MB",
-    progress: 0,
-    state: "active",
-  },
-  {
-    ratio: "1:1",
-    platform: "Square",
-    res: "1080×1080",
-    size: "8.2 MB",
-    progress: 100,
-    state: "done",
-  },
-  {
-    ratio: "16:9",
-    platform: "YouTube",
-    res: "1920×1080",
-    size: "18.6 MB",
-    progress: 62,
-    state: "queued",
-  },
-  {
-    ratio: "9:16",
-    platform: "Stories",
-    res: "1080×1920",
-    size: "9.8 MB",
-    progress: 28,
-    state: "queued",
-  },
-  {
-    ratio: "4:5",
-    platform: "Meta Ads",
-    res: "1080×1350",
-    size: "11.2 MB",
-    progress: 8,
-    state: "queued",
-  },
-];
+    {
+      ratio: "9:16",
+      platform: "Reels",
+      res: "1080×1920",
+      size: "12.4 MB",
+      progress: 0,
+      state: "active",
+    },
+    {
+      ratio: "1:1",
+      platform: "Square",
+      res: "1080×1080",
+      size: "8.2 MB",
+      progress: 100,
+      state: "done",
+    },
+    {
+      ratio: "16:9",
+      platform: "YouTube",
+      res: "1920×1080",
+      size: "18.6 MB",
+      progress: 62,
+      state: "queued",
+    },
+    {
+      ratio: "9:16",
+      platform: "Stories",
+      res: "1080×1920",
+      size: "9.8 MB",
+      progress: 28,
+      state: "queued",
+    },
+    {
+      ratio: "4:5",
+      platform: "Meta Ads",
+      res: "1080×1350",
+      size: "11.2 MB",
+      progress: 8,
+      state: "queued",
+    },
+  ];
 
 const COST_ROWS: {
   role: string;
@@ -153,12 +153,12 @@ const COST_ROWS: {
   line: number;
   delay: number;
 }[] = [
-  { role: "Copywriter", hours: "8h", rate: 120, line: 960, delay: 0.1 },
-  { role: "Voice talent", hours: "4h", rate: 200, line: 800, delay: 0.25 },
-  { role: "Researcher", hours: "6h", rate: 80, line: 480, delay: 0.4 },
-  { role: "Editor", hours: "6h", rate: 150, line: 900, delay: 0.55 },
-  { role: "Producer", hours: "1.5h", rate: 180, line: 270, delay: 0.7 },
-];
+    { role: "Copywriter", hours: "8h", rate: 120, line: 960, delay: 0.1 },
+    { role: "Voice talent", hours: "4h", rate: 200, line: 800, delay: 0.25 },
+    { role: "Researcher", hours: "6h", rate: 80, line: 480, delay: 0.4 },
+    { role: "Editor", hours: "6h", rate: 150, line: 900, delay: 0.55 },
+    { role: "Producer", hours: "1.5h", rate: 180, line: 270, delay: 0.7 },
+  ];
 
 export function PainPoint() {
   return (
@@ -338,7 +338,6 @@ export function PainPoint() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-4">
-          {/* Pain 01: Linear-style timeline */}
           <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
             <div className="flex items-center justify-between mb-5">
               <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">
@@ -363,9 +362,8 @@ export function PainPoint() {
                 {TIME_ROWS.map((row, i) => (
                   <div
                     key={i}
-                    className={`relative flex items-center gap-2 px-3 py-1.5 ${
-                      row.status === "active" ? "bg-amber-50/50" : ""
-                    }`}
+                    className={`relative flex items-center gap-2 px-3 py-1.5 ${row.status === "active" ? "bg-amber-50/50" : ""
+                      }`}
                   >
                     {row.status === "active" && (
                       <motion.div
@@ -379,13 +377,12 @@ export function PainPoint() {
                       />
                     )}
                     <span
-                      className={`relative ${
-                        row.status === "done"
+                      className={`relative ${row.status === "done"
                           ? "w-2.5 h-2.5 rounded-full border border-emerald-500 bg-emerald-500 flex items-center justify-center shrink-0"
                           : row.status === "active"
                             ? "w-2.5 h-2.5 rounded-full border-[1.5px] border-amber-500 flex items-center justify-center shrink-0"
                             : "w-2.5 h-2.5 rounded-full border border-gray-300 flex items-center justify-center shrink-0"
-                      }`}
+                        }`}
                     >
                       {row.status === "done" && (
                         <svg
@@ -479,7 +476,6 @@ export function PainPoint() {
             </div>
           </div>
 
-          {/* Pain 02: Premiere-style export queue */}
           <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
             <div className="flex items-center justify-between mb-5">
               <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">
@@ -586,11 +582,10 @@ export function PainPoint() {
                         />
                       ) : (
                         <div
-                          className={`h-full ${
-                            row.state === "done"
+                          className={`h-full ${row.state === "done"
                               ? "bg-gradient-to-r from-emerald-300 to-emerald-500"
                               : "bg-gradient-to-r from-gray-300 to-gray-400"
-                          }`}
+                            }`}
                           style={{ width: `${row.progress}%` }}
                         />
                       )}
@@ -636,7 +631,6 @@ export function PainPoint() {
             </div>
           </div>
 
-          {/* Pain 03: Stripe-style invoice */}
           <div className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all duration-300 hover:border-gray-300 hover:shadow-[0_20px_40px_-20px_rgba(15,23,42,0.22)] hover:-translate-y-0.5">
             <div className="flex items-center justify-between mb-5">
               <span className="text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase tabular-nums">

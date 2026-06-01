@@ -70,11 +70,6 @@ export interface CaptionedVideoProps {
 }
 
 const getFontFamily = (family: string = "Inter"): string => {
-  // Remotion's headless Chrome doesn't ship with custom fonts unless they're
-  // explicitly loaded. Without a chain, "TikTok Sans" falls back to a heavy
-  // default Arial-like sans-serif that reads chunky and unprofessional.
-  // Inter is the closest universally-available equivalent; Helvetica Neue +
-  // SF Pro Text cover macOS, Segoe UI covers Windows hosts.
   return `"${family}", "Inter", "Helvetica Neue", "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif`;
 };
 

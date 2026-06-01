@@ -18,8 +18,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   } else if (process.env.NODE_ENV === "production") {
-    // Fail closed in production: never expose the cleanup trigger without a
-    // configured secret. (Dev keeps it open for local convenience.)
     return NextResponse.json(
       { error: "Cleanup endpoint is disabled: set CLEANUP_SECRET." },
       { status: 503 }

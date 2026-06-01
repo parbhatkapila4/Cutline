@@ -16,7 +16,7 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
   shotId,
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, height } = useVideoConfig();
   const currentMs = (frame / fps) * 1000;
 
   const shotChunks = chunks.filter((c) => c.shotId === shotId);
@@ -25,24 +25,33 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
   );
 
   if (!visible) return null;
+  const fontSize = Math.max(28, Math.round(height * 0.045));
+  const paddingBottom = Math.round(height * 0.1);
+  const strokeWidth = Math.max(2, Math.round(height * 0.0035));
 
   return (
     <AbsoluteFill
       style={{
         justifyContent: "flex-end",
         alignItems: "center",
-        paddingBottom: "20%",
+        paddingBottom,
       }}
     >
       <div
         style={{
-          fontFamily: "system-ui, sans-serif",
-          fontSize: 26,
-          fontWeight: 500,
+          fontFamily:
+            "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+          fontSize,
+          fontWeight: 700,
           color: "white",
-          textShadow: "0 1px 3px rgba(0,0,0,0.7)",
           textAlign: "center",
-          maxWidth: "85%",
+          maxWidth: "86%",
+          lineHeight: 1.25,
+          letterSpacing: "0.005em",
+          WebkitTextStroke: `${strokeWidth}px rgba(0, 0, 0, 0.9)`,
+          paintOrder: "stroke fill",
+          textShadow:
+            "0 2px 6px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.55)",
         }}
       >
         {visible.text}
