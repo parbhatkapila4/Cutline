@@ -25,11 +25,6 @@ export const TEXT_MODEL_OPTIONS: { value: string; label: string; desc: string }[
     label: "Gemini 2.5 Flash",
     desc: "Latest: ~10K req/day",
   },
-  {
-    value: "google/gemini-2.0-flash-lite-001",
-    label: "Gemini 2 Flash Lite",
-    desc: "Lightweight & fast",
-  },
 ];
 
 export const STAGES = [

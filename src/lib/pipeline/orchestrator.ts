@@ -54,6 +54,9 @@ import {
   recordJobEnd,
   recordStageStart,
   recordStageEnd,
+  recordStageProgress,
+  setActiveJob,
+  clearActiveJob,
 } from "@/lib/telemetry/store";
 import { savePreviewArtifacts, loadPreviewArtifacts } from "@/lib/preview/artifacts";
 import { getCaptionsRenderOption } from "@/lib/pipeline/captionsRenderOption";
@@ -420,6 +423,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       });
     } catch {
     }
+    if (job) {
+      try {
+        setActiveJob(jobId, job);
+      } catch {
+      }
+    }
   }
 
   try {
@@ -474,6 +483,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     throw e;
   } finally {
     if (jobId) {
+      try {
+        clearActiveJob(jobId);
+      } catch {
+      }
       try {
         await cleanupJobArtifacts(jobId);
       } catch (cleanupErr) {
@@ -1267,6 +1280,14 @@ async function runPipelineOnce(
           let lastChunkError: Error | null = null;
 
           while (true) {
+            try {
+              const progressDetail =
+                `chunk ${i + 1} of ${N}` +
+                (safetyRewords > 0 ? ` (reword ${safetyRewords}/${VEO_SAFETY_REWORDS})` : "") +
+                (genAttempt > 0 ? ` (retry ${genAttempt}/${VEO_CHUNK_VALIDATE_RETRIES})` : "");
+              recordStageProgress(jobId, "veo", progressDetail);
+            } catch {
+            }
             try {
               if (genAttempt > 0 || safetyRewords > 0) {
                 console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N + " (gen " + genAttempt + "/" + VEO_CHUNK_VALIDATE_RETRIES + ", reword " + safetyRewords + "/" + VEO_SAFETY_REWORDS + ")");

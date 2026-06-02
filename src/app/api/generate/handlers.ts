@@ -538,6 +538,9 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       queuePosition?: number | null;
       queueEtaSeconds?: number | null;
       isPreview?: boolean;
+      stage?: string;
+      stageDetail?: string;
+      stageStartedAt?: string;
       cost?: { llm: number; tts: number; video: number; images: number; total: number };
       variations?: Array<{ videoUrl: string; cost?: { llm: number; tts: number; video: number; images: number; total: number } }>;
       qualityReport?: { passed: boolean; score: number; issues: string[] };
@@ -548,6 +551,21 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       if (qm) {
         response.queuePosition = qm.queuePosition;
         response.queueEtaSeconds = qm.queueEtaSeconds;
+      }
+    }
+    if (status === "processing") {
+      const progress = job.progress;
+      if (progress && typeof progress === "object" && !Array.isArray(progress)) {
+        const p = progress as Record<string, unknown>;
+        if (typeof p.stage === "string" && p.stage.trim()) {
+          response.stage = p.stage.trim();
+        }
+        if (typeof p.detail === "string" && p.detail.trim()) {
+          response.stageDetail = p.detail.trim();
+        }
+        if (typeof p.startedAt === "string" && p.startedAt.trim()) {
+          response.stageStartedAt = p.startedAt.trim();
+        }
       }
     }
 

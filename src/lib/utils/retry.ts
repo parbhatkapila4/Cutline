@@ -58,10 +58,13 @@ export function isRetryableNetworkOrTimeout(err: unknown): boolean {
 }
 
 export function shouldRetryForLLM(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
   const status = parseHttpStatus(err);
   if (status != null) {
     if (status === 429 || status === 408 || status === 504) return true;
     if (status >= 500 && status < 600) return true;
+    if (status === 404 && lower.includes("no endpoints found")) return true;
     if (status === 400 || status === 401 || status === 403) return false;
   }
   return isRetryableNetworkOrTimeout(err);

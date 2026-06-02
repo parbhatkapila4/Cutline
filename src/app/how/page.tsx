@@ -203,7 +203,7 @@ export default function HowPage() {
             <div className="space-y-6 text-zinc-400 text-sm">
               <div className="rounded-xl border border-white/10 bg-white/2 p-5">
                 <h3 className="font-semibold text-white mb-2">Default model (all jobs)</h3>
-                <p className="mb-2">Set <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> in <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">.env.local</code>. For example, <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">google/gemini-2.0-flash-lite-001</code> is a good default: fast and cheap. This model is used for every LLM stage unless you override it for a specific job.</p>
+                <p className="mb-2">Set <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> in <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">.env.local</code>. For example, <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">anthropic/claude-3.5-haiku</code> is a fast default. This model is used for every LLM stage unless you override it for a specific job.</p>
                 <p className="text-zinc-500">For asset analysis (when you upload images), you can set <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_VISION_MODEL</code> to a vision-capable model. If you don’t, the same <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> is used.</p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/2 p-5">
@@ -218,7 +218,7 @@ export default function HowPage() {
               <div>• google/gemini-2.0-flash-exp - ~500/day</div>
               <div>• google/gemini-2.5-flash-preview-05-20 - ~10K/day</div>
               <div>• google/gemini-2.5-flash-image - ~2K/day</div>
-              <div>• google/gemini-2.0-flash-lite-001 - default Gemini Flash Lite</div>
+              <div>• anthropic/claude-3.5-haiku - fast default text model</div>
             </div>
           </section>
 

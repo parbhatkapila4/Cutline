@@ -1,9 +1,30 @@
-import type { JobTelemetry, StageTelemetry } from "./types";
+import type { JobTelemetry } from "./types";
+import type { Job } from "bullmq";
 import {
   getTelemetryFilePath,
   loadTelemetryFromFile,
   saveTelemetryToFile,
 } from "./persistence";
+const activeJobs = new Map<string, Job>();
+
+export function setActiveJob(jobId: string, job: Job): void {
+  if (!jobId || !job) return;
+  activeJobs.set(jobId, job);
+}
+
+export function clearActiveJob(jobId: string): void {
+  if (!jobId) return;
+  activeJobs.delete(jobId);
+}
+
+function pushProgress(
+  jobId: string,
+  payload: { stage: string; detail?: string; startedAt: string }
+): void {
+  const job = activeJobs.get(jobId);
+  if (!job) return;
+  void Promise.resolve(job.updateProgress(payload)).catch(() => { });
+}
 
 const MAX_JOBS = 500;
 const ERROR_MAX_LENGTH = 500;
@@ -113,8 +134,32 @@ export function recordStageStart(jobId: string, stageName: string): void {
       if (idx >= 0) order.splice(idx, 1);
       order.push(jobId);
     }
+    pushProgress(jobId, { stage: stageName, startedAt: now });
   } catch (e) {
     safeLog("recordStageStart failed", e);
+  }
+}
+
+export function recordStageProgress(
+  jobId: string,
+  stageName: string,
+  detail: string
+): void {
+  if (!jobId || !stageName) return;
+  try {
+    ensureLoaded();
+    const job = store.get(jobId);
+    let startedAt = new Date().toISOString();
+    if (job) {
+      const stage = job.stages.find((s) => s.name === stageName && !s.completedAt);
+      if (stage) {
+        stage.progress = detail;
+        startedAt = stage.startedAt;
+      }
+    }
+    pushProgress(jobId, { stage: stageName, detail, startedAt });
+  } catch (e) {
+    safeLog("recordStageProgress failed", e);
   }
 }
 

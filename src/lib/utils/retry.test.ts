@@ -40,6 +40,16 @@ describe("shouldRetryForLLM", () => {
     expect(shouldRetryForLLM(new Error("403 forbidden"))).toBe(false);
   });
 
+  it("returns true for OpenRouter models with no active endpoints", () => {
+    expect(
+      shouldRetryForLLM(
+        new Error(
+          'API returned 404. {"error":{"message":"No endpoints found for google/gemini-2.0-flash-lite-001.","code":404}}'
+        )
+      )
+    ).toBe(true);
+  });
+
   it("returns true for message containing 'timeout' with no status", () => {
     expect(shouldRetryForLLM(new Error("request timeout"))).toBe(true);
   });

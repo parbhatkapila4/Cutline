@@ -88,6 +88,25 @@ type StageMeta = {
   icon: React.ReactElement;
 };
 
+const STAGE_GROUP_MAP: Record<string, number> = {
+  intent: 0,
+  narrative: 0,
+  shots: 1,
+  script: 1,
+  asset_analysis: 2,
+  visuals: 2,
+  image_sourcing: 2,
+  motion: 2,
+  tts: 3,
+  subtitles: 3,
+  subtitle_refine: 3,
+  veo: 4,
+  heygen: 4,
+  concat: 4,
+  burn_subtitles: 4,
+  render: 4,
+};
+
 const STAGE_META: StageMeta[] = [
   {
     title: "Analyzing prompt",
@@ -226,6 +245,8 @@ export default function CreatePage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState(0);
+  const [pipelineStage, setPipelineStage] = useState<string | null>(null);
+  const [stageDetail, setStageDetail] = useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [videoDurationSec, setVideoDurationSec] = useState<number | null>(null);
   const [shareSupported, setShareSupported] = useState(false);
@@ -341,6 +362,8 @@ export default function CreatePage() {
       const d = await r.json();
       if (!r.ok) { setError(getUserFriendlyErrorMessage(d.error || "Error")); setStatus("failed"); stop(); return; }
       setStatus(d.status);
+      setPipelineStage(typeof d.stage === "string" && d.stage.trim() ? d.stage.trim() : null);
+      setStageDetail(typeof d.stageDetail === "string" && d.stageDetail.trim() ? d.stageDetail.trim() : null);
       if (d.status === "completed" && d.videoUrl) {
         setVideoUrl(d.videoUrl);
         setCompletionMessage(typeof d.message === "string" && d.message.trim() ? d.message.trim() : null);
@@ -358,9 +381,18 @@ export default function CreatePage() {
   }, [jobId, poll]);
 
   useEffect(() => {
-    if (jobId && (status === "pending" || status === "processing")) {
+    if (!jobId) return;
+    if (status !== "pending" && status !== "processing") return;
+    if (!pipelineStage) {
       setStage(0);
-      stageRef.current = setInterval(() => setStage((s) => Math.min(s + 1, STAGES.length - 1)), 18000);
+      return;
+    }
+    const idx = STAGE_GROUP_MAP[pipelineStage];
+    if (typeof idx === "number") setStage(idx);
+  }, [jobId, status, pipelineStage]);
+
+  useEffect(() => {
+    if (jobId && (status === "pending" || status === "processing")) {
       return () => { if (stageRef.current) clearInterval(stageRef.current); };
     }
   }, [jobId, status]);
@@ -760,7 +792,7 @@ export default function CreatePage() {
                                     className={`text-[11px] mt-0.5 leading-snug truncate transition-colors duration-300 ${active ? "text-zinc-400" : "text-zinc-600"
                                       }`}
                                   >
-                                    {meta.description}
+                                    {active && stageDetail ? stageDetail : meta.description}
                                   </p>
                                 </div>
 

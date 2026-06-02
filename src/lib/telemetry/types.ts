@@ -10,6 +10,7 @@ export interface StageTelemetry {
   completedAt?: string;
   durationMs?: number;
   error?: string;
+  progress?: string;
 }
 
 export interface JobTelemetry {
