@@ -250,6 +250,7 @@ export default function CreatePage() {
   const [elapsedSec, setElapsedSec] = useState(0);
   const [videoDurationSec, setVideoDurationSec] = useState<number | null>(null);
   const [workerOnline, setWorkerOnline] = useState<boolean | null>(null);
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [shareSupported, setShareSupported] = useState(false);
 
   useEffect(() => {
@@ -366,6 +367,7 @@ export default function CreatePage() {
       setPipelineStage(typeof d.stage === "string" && d.stage.trim() ? d.stage.trim() : null);
       setStageDetail(typeof d.stageDetail === "string" && d.stageDetail.trim() ? d.stageDetail.trim() : null);
       setWorkerOnline(typeof d.workerOnline === "boolean" ? d.workerOnline : null);
+      setQueuePosition(typeof d.queuePosition === "number" ? d.queuePosition : null);
       if (d.status === "completed" && d.videoUrl) {
         setVideoUrl(d.videoUrl);
         setCompletionMessage(typeof d.message === "string" && d.message.trim() ? d.message.trim() : null);
@@ -695,18 +697,22 @@ export default function CreatePage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h2 className="text-[17px] font-semibold text-white tracking-tight leading-tight">
-                                {activeMeta.title}
+                                {status === "pending" ? "Queued" : activeMeta.title}
                               </h2>
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-amber-500/12 text-amber-200 border border-amber-400/30">
                                 <span className="relative flex h-1.5 w-1.5">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-70" />
                                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400" />
                                 </span>
-                                In progress
+                                {status === "pending" ? "Queued" : "In progress"}
                               </span>
                             </div>
                             <p className="text-[12.5px] text-zinc-400 mt-1 leading-relaxed">
-                              {activeMeta.description}
+                              {status === "pending"
+                                ? (queuePosition != null && queuePosition > 1
+                                  ? `Waiting for the worker — #${queuePosition} in line.`
+                                  : "Waiting for the worker to pick up your video.")
+                                : activeMeta.description}
                             </p>
                           </div>
                         </div>
@@ -804,7 +810,7 @@ export default function CreatePage() {
                                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                                       <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                     </svg>
-                                    Working
+                                    {status === "pending" ? "Queued" : "Working"}
                                   </span>
                                 ) : past ? (
                                   <span className="shrink-0 text-[10.5px] font-medium text-emerald-400/75">Done</span>
@@ -1027,11 +1033,10 @@ export default function CreatePage() {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className={`group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border text-[13px] font-medium transition-colors ${
-                    copied
+                  className={`group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border text-[13px] font-medium transition-colors ${copied
                       ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
                       : "border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22]"
-                  }`}
+                    }`}
                   aria-live="polite"
                 >
                   {copied ? (
@@ -1375,17 +1380,17 @@ export default function CreatePage() {
                                 style={
                                   selected
                                     ? {
-                                        background: "#232323",
-                                        border: "1px solid rgba(255,255,255,0.22)",
-                                        color: "#ededed",
-                                        fontWeight: 500,
-                                        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
-                                      }
+                                      background: "#232323",
+                                      border: "1px solid rgba(255,255,255,0.22)",
+                                      color: "#ededed",
+                                      fontWeight: 500,
+                                      boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
+                                    }
                                     : {
-                                        background: "#161616",
-                                        border: "1px solid rgba(255,255,255,0.09)",
-                                        color: "rgba(255,255,255,0.72)",
-                                      }
+                                      background: "#161616",
+                                      border: "1px solid rgba(255,255,255,0.09)",
+                                      color: "rgba(255,255,255,0.72)",
+                                    }
                                 }
                               >
                                 <span style={{ color: selected ? "#ededed" : "rgba(255,255,255,0.48)" }}>{PLATFORM_ICONS[p]}</span>
@@ -1418,16 +1423,16 @@ export default function CreatePage() {
                                 style={
                                   selected
                                     ? {
-                                        background: "#232323",
-                                        border: "1px solid rgba(255,255,255,0.22)",
-                                        color: "#ededed",
-                                        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
-                                      }
+                                      background: "#232323",
+                                      border: "1px solid rgba(255,255,255,0.22)",
+                                      color: "#ededed",
+                                      boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
+                                    }
                                     : {
-                                        background: "#161616",
-                                        border: "1px solid rgba(255,255,255,0.09)",
-                                        color: "rgba(255,255,255,0.72)",
-                                      }
+                                      background: "#161616",
+                                      border: "1px solid rgba(255,255,255,0.09)",
+                                      color: "rgba(255,255,255,0.72)",
+                                    }
                                 }
                               >
                                 <span
@@ -1521,14 +1526,14 @@ export default function CreatePage() {
                               style={
                                 selected
                                   ? {
-                                      background: "#1c1c1c",
-                                      border: "1px solid rgba(255,255,255,0.22)",
-                                      boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
-                                    }
+                                    background: "#1c1c1c",
+                                    border: "1px solid rgba(255,255,255,0.22)",
+                                    boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
+                                  }
                                   : {
-                                      background: "#161616",
-                                      border: "1px solid rgba(255,255,255,0.09)",
-                                    }
+                                    background: "#161616",
+                                    border: "1px solid rgba(255,255,255,0.09)",
+                                  }
                               }
                             >
                               <div className="flex items-center justify-between gap-2">
@@ -1606,14 +1611,14 @@ export default function CreatePage() {
                                 style={
                                   selected
                                     ? {
-                                        background: "#232323",
-                                        border: "1px solid rgba(255,255,255,0.22)",
-                                        boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
-                                      }
+                                      background: "#232323",
+                                      border: "1px solid rgba(255,255,255,0.22)",
+                                      boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
+                                    }
                                     : {
-                                        background: "#1c1c1c",
-                                        border: "1px solid rgba(255,255,255,0.06)",
-                                      }
+                                      background: "#1c1c1c",
+                                      border: "1px solid rgba(255,255,255,0.06)",
+                                    }
                                 }
                               >
                                 <div
@@ -1753,230 +1758,230 @@ export default function CreatePage() {
                         {(() => {
                           const avatarDisabled = talkingRealMode === "scenario";
                           return (
-                        <div className="pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-                            <div
-                              className="inline-flex items-center gap-2 text-[12.5px] font-medium tracking-[-0.005em] transition-colors"
-                              style={{ color: avatarDisabled ? "rgba(255,255,255,0.4)" : "#ededed" }}
-                            >
-                              <CircleUserRound
-                                className="w-3.5 h-3.5"
-                                strokeWidth={1.8}
-                                style={{ color: avatarDisabled ? "rgba(255,255,255,0.25)" : "rgb(113,113,122)" }}
-                              />
-                              <span>Avatar</span>
-                              {avatarDisabled && (
-                                <span
-                                  className="ml-1 text-[9.5px] font-mono tracking-[0.18em] uppercase px-[7px] py-[2px] rounded-full"
-                                  style={{
-                                    color: "rgba(255,255,255,0.45)",
-                                    background: "rgba(255,255,255,0.04)",
-                                    border: "1px solid rgba(255,255,255,0.08)",
-                                  }}
-                                >
-                                  Not used in cinematic
-                                </span>
-                              )}
-                            </div>
-                            <div
-                              className="inline-flex items-center gap-0.5 p-[2px] rounded-[7px] transition-opacity"
-                              style={{
-                                background: "rgba(0,0,0,0.35)",
-                                border: "1px solid rgba(255,255,255,0.06)",
-                                opacity: avatarDisabled ? 0.4 : 1,
-                                pointerEvents: avatarDisabled ? "none" : "auto",
-                              }}
-                              aria-disabled={avatarDisabled}
-                            >
-                              {([
-                                { tab: "default" as const, label: "Default" },
-                                { tab: "preset" as const, label: "Preset" },
-                                { tab: "upload" as const, label: "Upload" },
-                              ]).map(({ tab, label }) => {
-                                const active = avatarMode === tab;
-                                const locked = PRO_AVATAR_MODES.includes(tab) && !isPro;
-                                return (
-                                  <button
-                                    key={tab}
-                                    type="button"
-                                    onClick={() => {
-                                      if (locked) { router.push("/pricing"); return; }
-                                      setAvatarMode(tab);
-                                    }}
-                                    disabled={avatarDisabled}
-                                    className={`inline-flex items-center gap-1 px-3 py-[4px] rounded-[5px] text-[11.5px] tracking-[-0.003em] transition-colors ${active ? "text-[#ededed]" : "text-zinc-500 hover:text-[#ededed]"}`}
-                                    style={active ? { background: "#232323", fontWeight: 500, boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset" } : undefined}
-                                  >
-                                    {label}
-                                    {PRO_AVATAR_MODES.includes(tab) && <ProBadge plan={userPlan} size="xs" />}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          <div
-                            className="transition-opacity"
-                            style={{
-                              opacity: avatarDisabled ? 0.35 : 1,
-                              pointerEvents: avatarDisabled ? "none" : "auto",
-                              filter: avatarDisabled ? "saturate(0.55)" : "none",
-                            }}
-                            aria-disabled={avatarDisabled}
-                          >
-
-                          {avatarMode === "default" && (
-                            <div
-                              className="rounded-[9px] p-[13px_14px] flex items-center gap-3"
-                              style={{
-                                background: "#1c1c1c",
-                                border: "1px solid rgba(255,255,255,0.06)",
-                              }}
-                            >
-                              <div className="relative shrink-0 w-[46px] h-[46px]" aria-hidden>
-                                <motion.span
-                                  className="absolute inset-0 rounded-full border border-emerald-400/40 pointer-events-none"
-                                  animate={{ scale: [1, 1.45], opacity: [0.55, 0] }}
-                                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
-                                />
-                                <motion.span
-                                  className="absolute inset-0 rounded-full border border-emerald-400/30 pointer-events-none"
-                                  animate={{ scale: [1, 1.45], opacity: [0.45, 0] }}
-                                  transition={{
-                                    duration: 2.2,
-                                    repeat: Infinity,
-                                    ease: "easeOut",
-                                    delay: 1.1,
-                                  }}
-                                />
-
+                            <div className="pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                              <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
                                 <div
-                                  className="relative w-full h-full rounded-full overflow-hidden"
-                                  style={{
-                                    background:
-                                      "radial-gradient(circle at 32% 26%, #f0d4b4 25%, #d2ad8a 55%, #6a4c38 95%)",
-                                    border: "1px solid rgba(255,255,255,0.09)",
-                                    boxShadow:
-                                      "inset 0 1px 0 rgba(255,255,255,0.18), 0 2px 6px rgba(0,0,0,0.3)",
-                                  }}
+                                  className="inline-flex items-center gap-2 text-[12.5px] font-medium tracking-[-0.005em] transition-colors"
+                                  style={{ color: avatarDisabled ? "rgba(255,255,255,0.4)" : "#ededed" }}
                                 >
-                                  <svg
-                                    className="absolute inset-0 m-auto"
-                                    width="32"
-                                    height="32"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <circle cx="12" cy="9" r="3.6" fill="rgba(60,40,28,0.5)" />
-                                    <path
-                                      d="M4.4 24 Q 4.4 14.4 12 14.4 Q 19.6 14.4 19.6 24 Z"
-                                      fill="rgba(60,40,28,0.5)"
-                                    />
-                                  </svg>
-                                </div>
-
-                                <span
-                                  className="absolute bottom-0 right-0 w-[10px] h-[10px] rounded-full bg-emerald-400"
-                                  style={{
-                                    boxShadow:
-                                      "0 0 0 2px #1c1c1c, 0 0 6px rgba(52,211,153,0.55)",
-                                  }}
-                                />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-[12.5px] font-medium text-[#ededed] mb-[3px] flex items-center gap-[7px] tracking-[-0.005em]">
-                                  Default presenter
-                                  <span
-                                    className="text-[9.5px] tracking-[0.04em] uppercase font-medium px-[7px] py-[1px] rounded-full"
-                                    style={{
-                                      background: "rgba(78,201,160,0.1)",
-                                      color: "#4ec9a0",
-                                      border: "1px solid rgba(78,201,160,0.18)",
-                                    }}
-                                  >
-                                    Recommended
-                                  </span>
-                                </div>
-                                <div className="text-[11px] text-zinc-500 leading-[1.4]">Neutral, professional look. Best when you want focus on the message.</div>
-                              </div>
-                            </div>
-                          )}
-
-                          {avatarMode === "preset" && (
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {AVATAR_PRESETS.map((preset) => {
-                                const selected = avatarPresetId === preset.id;
-                                return (
-                                  <button
-                                    key={preset.id}
-                                    type="button"
-                                    onClick={() => setAvatarPresetId(preset.id)}
-                                    className="relative rounded-[9px] cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5"
-                                    style={{
-                                      aspectRatio: "3/4",
-                                      background: "#1c1c1c",
-                                      border: selected ? "1.5px solid #ededed" : "1.5px solid rgba(255,255,255,0.06)",
-                                      boxShadow: selected ? "0 0 0 2px rgba(255,255,255,0.08)" : undefined,
-                                    }}
-                                  >
-                                    <div
-                                      className="w-full h-full transition-transform duration-300"
+                                  <CircleUserRound
+                                    className="w-3.5 h-3.5"
+                                    strokeWidth={1.8}
+                                    style={{ color: avatarDisabled ? "rgba(255,255,255,0.25)" : "rgb(113,113,122)" }}
+                                  />
+                                  <span>Avatar</span>
+                                  {avatarDisabled && (
+                                    <span
+                                      className="ml-1 text-[9.5px] font-mono tracking-[0.18em] uppercase px-[7px] py-[2px] rounded-full"
                                       style={{
-                                        backgroundImage: `linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.94)), url('${preset.imageSrc}')`,
-                                        backgroundSize: "cover",
-                                        backgroundPosition: "center 25%",
+                                        color: "rgba(255,255,255,0.45)",
+                                        background: "rgba(255,255,255,0.04)",
+                                        border: "1px solid rgba(255,255,255,0.08)",
                                       }}
-                                    />
-                                    <div className="absolute bottom-[7px] left-[9px] right-[9px]">
-                                      <div className="text-[11px] font-medium text-white tracking-[-0.003em]">{preset.label}</div>
-                                      <div className="text-[9.5px] font-mono uppercase tracking-[0.02em] text-white/65 mt-[2px]">{preset.hint}</div>
-                                    </div>
-                                    {selected && (
-                                      <div
-                                        className="absolute top-[7px] right-[7px] w-[18px] h-[18px] rounded-full flex items-center justify-center"
-                                        style={{ background: "#ededed", color: "#111111", boxShadow: "0 2px 6px rgba(0,0,0,0.4)" }}
+                                    >
+                                      Not used in cinematic
+                                    </span>
+                                  )}
+                                </div>
+                                <div
+                                  className="inline-flex items-center gap-0.5 p-[2px] rounded-[7px] transition-opacity"
+                                  style={{
+                                    background: "rgba(0,0,0,0.35)",
+                                    border: "1px solid rgba(255,255,255,0.06)",
+                                    opacity: avatarDisabled ? 0.4 : 1,
+                                    pointerEvents: avatarDisabled ? "none" : "auto",
+                                  }}
+                                  aria-disabled={avatarDisabled}
+                                >
+                                  {([
+                                    { tab: "default" as const, label: "Default" },
+                                    { tab: "preset" as const, label: "Preset" },
+                                    { tab: "upload" as const, label: "Upload" },
+                                  ]).map(({ tab, label }) => {
+                                    const active = avatarMode === tab;
+                                    const locked = PRO_AVATAR_MODES.includes(tab) && !isPro;
+                                    return (
+                                      <button
+                                        key={tab}
+                                        type="button"
+                                        onClick={() => {
+                                          if (locked) { router.push("/pricing"); return; }
+                                          setAvatarMode(tab);
+                                        }}
+                                        disabled={avatarDisabled}
+                                        className={`inline-flex items-center gap-1 px-3 py-[4px] rounded-[5px] text-[11.5px] tracking-[-0.003em] transition-colors ${active ? "text-[#ededed]" : "text-zinc-500 hover:text-[#ededed]"}`}
+                                        style={active ? { background: "#232323", fontWeight: 500, boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset" } : undefined}
                                       >
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                                      </div>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {avatarMode === "upload" && (
-                            <div
-                              onClick={() => avatarFileRef.current?.click()}
-                              className="rounded-[9px] cursor-pointer text-center px-4 py-[26px] transition-all"
-                              style={{
-                                background: "#1c1c1c",
-                                border: "1px dashed rgba(255,255,255,0.14)",
-                              }}
-                              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.22)"; e.currentTarget.style.background = "#232323"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; e.currentTarget.style.background = "#1c1c1c"; }}
-                            >
-                              <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)} />
+                                        {label}
+                                        {PRO_AVATAR_MODES.includes(tab) && <ProBadge plan={userPlan} size="xs" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                               <div
-                                className="inline-flex items-center justify-center w-9 h-9 rounded-[9px] mx-auto mb-[11px] text-zinc-300"
+                                className="transition-opacity"
                                 style={{
-                                  background: "#232323",
-                                  border: "1px solid rgba(255,255,255,0.09)",
-                                  boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
+                                  opacity: avatarDisabled ? 0.35 : 1,
+                                  pointerEvents: avatarDisabled ? "none" : "auto",
+                                  filter: avatarDisabled ? "saturate(0.55)" : "none",
                                 }}
+                                aria-disabled={avatarDisabled}
                               >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 16l-4-4-4 4m4-4v9m9-7v3a4 4 0 01-4 4H7a4 4 0 01-4-4v-3m0-4l9-9 9 9" />
-                                </svg>
-                              </div>
-                              <div className="text-[12.5px] font-medium text-[#ededed] mb-[3px] tracking-[-0.005em]">{avatarFile ? avatarFile.name : "Upload avatar image"}</div>
-                              <div className="text-[11px] text-zinc-500 leading-[1.5]">
-                                Use a clear face photo for best results.
-                                <br />
-                                JPG or PNG · up to 8 MB
+
+                                {avatarMode === "default" && (
+                                  <div
+                                    className="rounded-[9px] p-[13px_14px] flex items-center gap-3"
+                                    style={{
+                                      background: "#1c1c1c",
+                                      border: "1px solid rgba(255,255,255,0.06)",
+                                    }}
+                                  >
+                                    <div className="relative shrink-0 w-[46px] h-[46px]" aria-hidden>
+                                      <motion.span
+                                        className="absolute inset-0 rounded-full border border-emerald-400/40 pointer-events-none"
+                                        animate={{ scale: [1, 1.45], opacity: [0.55, 0] }}
+                                        transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
+                                      />
+                                      <motion.span
+                                        className="absolute inset-0 rounded-full border border-emerald-400/30 pointer-events-none"
+                                        animate={{ scale: [1, 1.45], opacity: [0.45, 0] }}
+                                        transition={{
+                                          duration: 2.2,
+                                          repeat: Infinity,
+                                          ease: "easeOut",
+                                          delay: 1.1,
+                                        }}
+                                      />
+
+                                      <div
+                                        className="relative w-full h-full rounded-full overflow-hidden"
+                                        style={{
+                                          background:
+                                            "radial-gradient(circle at 32% 26%, #f0d4b4 25%, #d2ad8a 55%, #6a4c38 95%)",
+                                          border: "1px solid rgba(255,255,255,0.09)",
+                                          boxShadow:
+                                            "inset 0 1px 0 rgba(255,255,255,0.18), 0 2px 6px rgba(0,0,0,0.3)",
+                                        }}
+                                      >
+                                        <svg
+                                          className="absolute inset-0 m-auto"
+                                          width="32"
+                                          height="32"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <circle cx="12" cy="9" r="3.6" fill="rgba(60,40,28,0.5)" />
+                                          <path
+                                            d="M4.4 24 Q 4.4 14.4 12 14.4 Q 19.6 14.4 19.6 24 Z"
+                                            fill="rgba(60,40,28,0.5)"
+                                          />
+                                        </svg>
+                                      </div>
+
+                                      <span
+                                        className="absolute bottom-0 right-0 w-[10px] h-[10px] rounded-full bg-emerald-400"
+                                        style={{
+                                          boxShadow:
+                                            "0 0 0 2px #1c1c1c, 0 0 6px rgba(52,211,153,0.55)",
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-[12.5px] font-medium text-[#ededed] mb-[3px] flex items-center gap-[7px] tracking-[-0.005em]">
+                                        Default presenter
+                                        <span
+                                          className="text-[9.5px] tracking-[0.04em] uppercase font-medium px-[7px] py-[1px] rounded-full"
+                                          style={{
+                                            background: "rgba(78,201,160,0.1)",
+                                            color: "#4ec9a0",
+                                            border: "1px solid rgba(78,201,160,0.18)",
+                                          }}
+                                        >
+                                          Recommended
+                                        </span>
+                                      </div>
+                                      <div className="text-[11px] text-zinc-500 leading-[1.4]">Neutral, professional look. Best when you want focus on the message.</div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {avatarMode === "preset" && (
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {AVATAR_PRESETS.map((preset) => {
+                                      const selected = avatarPresetId === preset.id;
+                                      return (
+                                        <button
+                                          key={preset.id}
+                                          type="button"
+                                          onClick={() => setAvatarPresetId(preset.id)}
+                                          className="relative rounded-[9px] cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5"
+                                          style={{
+                                            aspectRatio: "3/4",
+                                            background: "#1c1c1c",
+                                            border: selected ? "1.5px solid #ededed" : "1.5px solid rgba(255,255,255,0.06)",
+                                            boxShadow: selected ? "0 0 0 2px rgba(255,255,255,0.08)" : undefined,
+                                          }}
+                                        >
+                                          <div
+                                            className="w-full h-full transition-transform duration-300"
+                                            style={{
+                                              backgroundImage: `linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.94)), url('${preset.imageSrc}')`,
+                                              backgroundSize: "cover",
+                                              backgroundPosition: "center 25%",
+                                            }}
+                                          />
+                                          <div className="absolute bottom-[7px] left-[9px] right-[9px]">
+                                            <div className="text-[11px] font-medium text-white tracking-[-0.003em]">{preset.label}</div>
+                                            <div className="text-[9.5px] font-mono uppercase tracking-[0.02em] text-white/65 mt-[2px]">{preset.hint}</div>
+                                          </div>
+                                          {selected && (
+                                            <div
+                                              className="absolute top-[7px] right-[7px] w-[18px] h-[18px] rounded-full flex items-center justify-center"
+                                              style={{ background: "#ededed", color: "#111111", boxShadow: "0 2px 6px rgba(0,0,0,0.4)" }}
+                                            >
+                                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                            </div>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {avatarMode === "upload" && (
+                                  <div
+                                    onClick={() => avatarFileRef.current?.click()}
+                                    className="rounded-[9px] cursor-pointer text-center px-4 py-[26px] transition-all"
+                                    style={{
+                                      background: "#1c1c1c",
+                                      border: "1px dashed rgba(255,255,255,0.14)",
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.22)"; e.currentTarget.style.background = "#232323"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; e.currentTarget.style.background = "#1c1c1c"; }}
+                                  >
+                                    <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)} />
+                                    <div
+                                      className="inline-flex items-center justify-center w-9 h-9 rounded-[9px] mx-auto mb-[11px] text-zinc-300"
+                                      style={{
+                                        background: "#232323",
+                                        border: "1px solid rgba(255,255,255,0.09)",
+                                        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
+                                      }}
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 16l-4-4-4 4m4-4v9m9-7v3a4 4 0 01-4 4H7a4 4 0 01-4-4v-3m0-4l9-9 9 9" />
+                                      </svg>
+                                    </div>
+                                    <div className="text-[12.5px] font-medium text-[#ededed] mb-[3px] tracking-[-0.005em]">{avatarFile ? avatarFile.name : "Upload avatar image"}</div>
+                                    <div className="text-[11px] text-zinc-500 leading-[1.5]">
+                                      Use a clear face photo for best results.
+                                      <br />
+                                      JPG or PNG · up to 8 MB
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          )}
-                          </div>
-                        </div>
                           );
                         })()}
                       </div>
@@ -2004,14 +2009,14 @@ export default function CreatePage() {
                               style={
                                 selected
                                   ? {
-                                      background: "#1c1c1c",
-                                      border: "1px solid rgba(255,255,255,0.22)",
-                                      boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
-                                    }
+                                    background: "#1c1c1c",
+                                    border: "1px solid rgba(255,255,255,0.22)",
+                                    boxShadow: "0 0 0 1px rgba(255,255,255,0.09), 0 1px 0 rgba(255,255,255,0.04) inset",
+                                  }
                                   : {
-                                      background: "#161616",
-                                      border: "1px solid rgba(255,255,255,0.09)",
-                                    }
+                                    background: "#161616",
+                                    border: "1px solid rgba(255,255,255,0.09)",
+                                  }
                               }
                             >
                               <span
@@ -2019,15 +2024,15 @@ export default function CreatePage() {
                                 style={
                                   selected
                                     ? {
-                                        background: "#111111",
-                                        border: "1px solid rgba(255,255,255,0.14)",
-                                        color: "#ededed",
-                                      }
+                                      background: "#111111",
+                                      border: "1px solid rgba(255,255,255,0.14)",
+                                      color: "#ededed",
+                                    }
                                     : {
-                                        background: "#232323",
-                                        border: "1px solid rgba(255,255,255,0.09)",
-                                        color: "rgba(255,255,255,0.72)",
-                                      }
+                                      background: "#232323",
+                                      border: "1px solid rgba(255,255,255,0.09)",
+                                      color: "rgba(255,255,255,0.72)",
+                                    }
                                 }
                               >
                                 <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
