@@ -34,6 +34,7 @@
     "@remotion/bundler": "4.0.414",
     "@remotion/cli": "4.0.414",
     "@remotion/renderer": "4.0.414",
+    "@vercel/blob": "^2.4.0",
     "better-auth": "^1.5.5",
     "bullmq": "^5",
     "class-variance-authority": "^0.7.1",

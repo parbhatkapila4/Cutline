@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { cleanupExpiredBlobs } from "./publish";
 
 const DEFAULT_VIDEO_RETENTION_HOURS = 24;
 export function getTempDirForJob(jobId: string): string {
@@ -243,6 +244,17 @@ export async function runCleanup(): Promise<CleanupResult> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     result.errors.push(`rendered videos cleanup: ${msg}`);
+  }
+
+  try {
+    const retentionHours =
+      Number(process.env.VIDEO_RETENTION_HOURS) || DEFAULT_VIDEO_RETENTION_HOURS;
+    const blobRes = await cleanupExpiredBlobs(retentionHours);
+    result.videosDeleted += blobRes.deleted;
+    if (blobRes.errors > 0) result.errors.push(`blob video cleanup: ${blobRes.errors} error(s)`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    result.errors.push(`blob video cleanup: ${msg}`);
   }
 
   try {

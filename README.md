@@ -46,8 +46,14 @@ Next.js API ──► BullMQ + Redis ──► Worker (npm run worker)
   │ (2s → 15s backoff, 30min cap)   12-stage pipeline
   │                                   │
   │                                   ▼
-  └─────────── public/temp/[jobId].mp4
+  └─────────── Vercel Blob (https URL)   ◄── worker renders to public/temp,
+                                              then uploads the final MP4
 ```
+
+In the split deploy the worker's `public/temp` is not reachable from the Vercel
+app, so the finished MP4 is uploaded to **Vercel Blob** and the job result stores
+the public https URL. Set `BLOB_READ_WRITE_TOKEN` on **both** services. With the
+token unset (single-host/local dev) the worker serves from `public/temp` directly.
 
 **The 12 stages, in order:** intent → narrative → shots → script → subtitles → TTS → subtitle refine → motion → asset analysis → visuals → image sourcing → render.
 
@@ -143,7 +149,7 @@ Worker runs uncompiled via `tsx`. React Compiler enabled in production.
 
 - **Multi-seat / team accounts** — single-tenant. Multi-seat when a multi-seat customer is on the line to design against.
 - **Job approvals + comments review flow** — `job_approvals` and `job_comments` tables scaffolded; review/collaboration flow deferred until usage shape demands it.
-- **Worker horizontal scaling** — single worker process. The BullMQ side already supports N workers; the file-storage layer needs to move to S3 first.
+- **Worker horizontal scaling** — single worker process. The BullMQ side already supports N workers; finished MP4s now land in Vercel Blob (durable, cross-host), so multiple workers no longer fight over one local `public/temp`.
 - **Public template marketplace** — explicit non-goal. "No templates" is the thesis, not a stopgap.
 
 **Followups (real, not features):** CAPTCHA libraries (`@hcaptcha/react-hcaptcha`, `@captchafox/react`, `@marsidev/react-turnstile`) are in `dependencies` with no production wiring. Audit and consolidate to one provider before sign-in goes public.

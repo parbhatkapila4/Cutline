@@ -15,8 +15,10 @@ try {
 
 import { scheduleCleanupJob, startVideoWorker, deleteStaleJobs } from "@/lib/queue/videoQueue";
 import { cleanupExpiredTempDirs } from "@/lib/storage/cleanup";
+import { startWorkerHeartbeat, stopWorkerHeartbeat } from "@/lib/queue/heartbeat";
 
 const worker = startVideoWorker();
+startWorkerHeartbeat();
 
 const expiredHours = process.env.CLEANUP_EXPIRED_HOURS ? Number(process.env.CLEANUP_EXPIRED_HOURS) : 0;
 if (expiredHours > 0) {
@@ -57,12 +59,14 @@ console.log("[worker] Video generation worker started. Queue: video-generation")
 
 process.on("SIGTERM", async () => {
   console.log("[worker] SIGTERM received, closing worker…");
+  await stopWorkerHeartbeat();
   await worker.close();
   process.exit(0);
 });
 
 process.on("SIGINT", async () => {
   console.log("[worker] SIGINT received, closing worker…");
+  await stopWorkerHeartbeat();
   await worker.close();
   process.exit(0);
 });

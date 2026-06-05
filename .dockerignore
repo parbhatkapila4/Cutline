@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.github
+.remotion-temp
+public/temp
+public/output
+uploads
+*.log
+npm-debug.log*
+.env
+.env.local
+.env.*.local
+.DS_Store
+tsconfig.tsbuildinfo
+coverage

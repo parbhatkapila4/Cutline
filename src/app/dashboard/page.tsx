@@ -51,6 +51,11 @@ const statusStyles: Record<VideoStatus, string> = {
   failed: "bg-red-500/15 text-red-400 border-red-500/30",
 };
 
+function toDownloadHref(url: string): string {
+  if (!/^https?:\/\//i.test(url)) return url;
+  return url + (url.includes("?") ? "&" : "?") + "download=1";
+}
+
 const DEFAULT_USAGE: UsageData = {
   plan: "free",
   planLabel: "Free",
@@ -777,7 +782,7 @@ export default function DashboardPage() {
                     <div className="px-4 pb-4 flex gap-2 items-center">
                       <Link href={`/dashboard/videos/${video.id}`} className="flex-1 text-center text-sm font-medium text-white bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2 rounded-lg transition-colors">View</Link>
                       {video.status === "completed" && video.videoUrl ? (
-                        <a href={video.videoUrl} download className="flex-1 text-center text-sm font-medium text-black bg-white hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors">Download</a>
+                        <a href={toDownloadHref(video.videoUrl)} download className="flex-1 text-center text-sm font-medium text-black bg-white hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors">Download</a>
                       ) : null}
                       {video.status === "completed" && video.videoUrl ? (
                         <button type="button" className="p-2 rounded-lg border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 transition-colors" title="Copy link">

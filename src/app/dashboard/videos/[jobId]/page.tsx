@@ -52,6 +52,11 @@ function formatElapsed(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function toDownloadHref(url: string): string {
+  if (!/^https?:\/\//i.test(url)) return url;
+  return url + (url.includes("?") ? "&" : "?") + "download=1";
+}
+
 const EDIT_OUTCOMES: Record<string, string> = {
   "Make the tone more casual and friendly": "Warmer voice, contractions, lighter phrasing",
   "Change to a more professional tone": "Crisper, authoritative, B2B-friendly",
@@ -533,7 +538,7 @@ export default function DashboardVideoDetailPage() {
                       <div className="mt-5 flex flex-col sm:flex-row gap-2.5">
                         {isPro ? (
                           <a
-                            href={currentVideoUrl ?? video.videoUrl}
+                            href={toDownloadHref(currentVideoUrl ?? video.videoUrl)}
                             download={`cutline-${jobId}.mp4`}
                             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-black/30"
                           >

@@ -249,6 +249,7 @@ export default function CreatePage() {
   const [stageDetail, setStageDetail] = useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [videoDurationSec, setVideoDurationSec] = useState<number | null>(null);
+  const [workerOnline, setWorkerOnline] = useState<boolean | null>(null);
   const [shareSupported, setShareSupported] = useState(false);
 
   useEffect(() => {
@@ -364,6 +365,7 @@ export default function CreatePage() {
       setStatus(d.status);
       setPipelineStage(typeof d.stage === "string" && d.stage.trim() ? d.stage.trim() : null);
       setStageDetail(typeof d.stageDetail === "string" && d.stageDetail.trim() ? d.stageDetail.trim() : null);
+      setWorkerOnline(typeof d.workerOnline === "boolean" ? d.workerOnline : null);
       if (d.status === "completed" && d.videoUrl) {
         setVideoUrl(d.videoUrl);
         setCompletionMessage(typeof d.message === "string" && d.message.trim() ? d.message.trim() : null);
@@ -816,6 +818,20 @@ export default function CreatePage() {
                           })}
                         </div>
                       </div>
+
+                      {workerOnline === false && elapsedSec >= 12 ? (
+                        <div className="px-5 sm:px-7 pb-4">
+                          <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-3.5 py-3 text-[12px] leading-relaxed text-amber-100/90">
+                            <svg className="w-4 h-4 mt-0.5 shrink-0 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                            </svg>
+                            <span>
+                              <span className="font-semibold text-amber-200">Render worker offline.</span>{" "}
+                              Your video is queued and will start automatically once a worker is running. Nothing is wrong with your prompt — the server-side render process just isn&apos;t up right now.
+                            </span>
+                          </div>
+                        </div>
+                      ) : null}
 
                       <div className="relative px-6 py-3.5 border-t border-white/8 bg-black/40 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 text-[11px] font-medium text-zinc-500">

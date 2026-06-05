@@ -3,9 +3,10 @@ import path from "path";
 
 import { deleteVideoJobRelatedDbRows } from "@/lib/jobs/videoJobService";
 import { deletePreviewArtifactsFromRedis } from "@/lib/preview/artifacts";
-import { cancelJob, CLEANUP_JOB_NAME, getVideoQueue, type VideoJobData } from "@/lib/queue/videoQueue";
+import { cancelJob, CLEANUP_JOB_NAME, getVideoQueue, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { deleteRegenSnapshot } from "@/lib/regen/snapshotStore";
 import { cleanupJobArtifacts } from "@/lib/storage/cleanup";
+import { deletePublishedBlob } from "@/lib/storage/publish";
 
 function deleteMp4OutputsForJob(jobId: string): void {
   if (!jobId || typeof jobId !== "string") return;
@@ -51,6 +52,8 @@ export async function purgeUserVideo(
     return { ok: false, status: 404, error: "Video not found." };
   }
 
+  const result = job.returnvalue as VideoJobResult | undefined;
+
   try {
     await job.remove();
   } catch (e) {
@@ -80,6 +83,12 @@ export async function purgeUserVideo(
   await deletePreviewArtifactsFromRedis(jobId);
   cleanupJobArtifacts(jobId);
   deleteMp4OutputsForJob(jobId);
+  await deletePublishedBlob(result?.videoPath);
+  if (result?.variations?.length) {
+    for (const v of result.variations) {
+      await deletePublishedBlob(v?.videoUrl);
+    }
+  }
   await deleteVideoJobRelatedDbRows(jobId, String(clientId));
 
   return { ok: true };

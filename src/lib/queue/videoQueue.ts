@@ -5,6 +5,7 @@ import Redis from "ioredis";
 import { createManagedRedis } from "@/lib/redis/managedRedis";
 import { runPipeline } from "@/lib/pipeline/orchestrator";
 import { runCleanup } from "@/lib/storage/cleanup";
+import { publishRenderedVideo } from "@/lib/storage/publish";
 import { CANCELLED_JOBS_KEY, isJobCancelled } from "./cancelCheck";
 import { notifyWebhook } from "@/lib/webhook/notify";
 
@@ -363,6 +364,23 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
           ...(regenFromJobId ? { regenFromJobId } : {}),
           ...(regenerateShotIds?.length ? { regenerateShotIds } : {}),
         });
+
+        const publishCache = new Map<string, string>();
+        const publish = async (url: string): Promise<string> => {
+          const cached = publishCache.get(url);
+          if (cached !== undefined) return cached;
+          const out = await publishRenderedVideo(url, jobIdStr);
+          publishCache.set(url, out);
+          return out;
+        };
+        if (result?.videoPath) {
+          result.videoPath = await publish(result.videoPath);
+        }
+        if (result?.variations?.length) {
+          for (const v of result.variations) {
+            if (v?.videoUrl) v.videoUrl = await publish(v.videoUrl);
+          }
+        }
         return result;
       } catch (e) {
         const message =

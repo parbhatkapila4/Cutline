@@ -541,6 +541,7 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       stage?: string;
       stageDetail?: string;
       stageStartedAt?: string;
+      workerOnline?: boolean;
       cost?: { llm: number; tts: number; video: number; images: number; total: number };
       variations?: Array<{ videoUrl: string; cost?: { llm: number; tts: number; video: number; images: number; total: number } }>;
       qualityReport?: { passed: boolean; score: number; issues: string[] };
@@ -552,6 +553,10 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
         response.queuePosition = qm.queuePosition;
         response.queueEtaSeconds = qm.queueEtaSeconds;
       }
+    }
+    if (status === "pending" || status === "processing") {
+      const { isWorkerAlive } = await import("@/lib/queue/heartbeat");
+      response.workerOnline = await isWorkerAlive(queue);
     }
     if (status === "processing") {
       const progress = job.progress;
@@ -801,6 +806,14 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
         message: "Video path not found.",
         status: 404,
         headers: corsHeaders,
+      });
+    }
+
+    if (/^https?:\/\//i.test(videoPath)) {
+      const downloadUrl = videoPath + (videoPath.includes("?") ? "&" : "?") + "download=1";
+      return new NextResponse(null, {
+        status: 302,
+        headers: { ...corsHeaders, Location: downloadUrl },
       });
     }
 
