@@ -3,8 +3,8 @@ import type Redis from "ioredis";
 import { createRedisConnection } from "./videoQueue";
 
 export const WORKER_HEARTBEAT_KEY = "cutline:worker:heartbeat";
-const HEARTBEAT_TTL_SEC = 30;
-const DEFAULT_INTERVAL_MS = 10_000;
+const HEARTBEAT_TTL_SEC = 180;
+const DEFAULT_INTERVAL_MS = 20_000;
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let heartbeatRedis: Redis | null = null;
