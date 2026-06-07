@@ -90,3 +90,19 @@ CREATE TABLE IF NOT EXISTS brand_kits (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_brand_kits_user_id ON brand_kits (user_id);
+CREATE TABLE IF NOT EXISTS processed_webhook_events (
+  event_key TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  user_id TEXT,
+  plan TEXT,
+  provider_ref TEXT,
+  dodo_customer_id TEXT,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_processed_webhook_events_user ON processed_webhook_events (user_id);
+CREATE TABLE IF NOT EXISTS billing_customers (
+  user_id TEXT PRIMARY KEY,
+  dodo_customer_id TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_billing_customers_dodo ON billing_customers (dodo_customer_id);

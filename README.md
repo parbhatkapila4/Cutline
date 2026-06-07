@@ -14,7 +14,7 @@
 
 <p align="center">
   <b>One sentence in, one finished MP4 out</b> - directed by a 12-stage pipeline, not a template engine.<br />
-  <a href="https://cutline.cloud"><b>cutline.cloud</b></a> &nbsp;·&nbsp; <a href="https://github.com/parbhatkapila4/Cutline">github.com/parbhatkapila4/Cutline</a> &nbsp;·&nbsp; <a href="docs/REFERENCE.md">reference</a>
+  <a href="https://cutline.cloud"><b>cutline.cloud</b></a> &nbsp;·&nbsp;</a>
 </p>
 
 ---
@@ -96,7 +96,7 @@ token unset (single-host/local dev) the worker serves from `public/temp` directl
 
 - **12-stage cancellation across a long-running async pipeline.** Cancel writes a Redis SET; every stage reads it before starting work. On hit the worker throws and the same cleanup path runs as on success or failure (`cleanupJobArtifacts`). Cancellation is eventual, not preemptive - latency-to-cancel is bounded by the current stage's duration, not the job's. That's the right shape for a pipeline where each stage is an external API call you'd rather complete than abandon mid-flight.
 
-- **Plan entitlement enforced at three layers.** Free / Beginner / Professional / Enterprise with caps `1 / 10 / unlimited / unlimited` videos per month (from `src/lib/plans.ts`). Pro-only features (cinematic mode, custom avatars, image uploads, downloads, edits, sharing) are gated by UI (badges + lock states), the API handler (`isProPlan(getUserPlan(userId))` before BullMQ enqueue), and the DB (`user_plan_overrides` + `payments.stripe_checkout_session_id UNIQUE`). A tampered request body can't bypass the handler check; a tampered URL can't bypass the DB constraint.
+- **Plan entitlement enforced at three layers.** Free / Beginner / Professional / Enterprise with caps `1 / 10 / unlimited / unlimited` videos per month (from `src/lib/plans.ts`). Pro-only features (cinematic mode, custom avatars, image uploads, downloads, edits, sharing) are gated by UI (badges + lock states), the API handler (`isProPlan(getUserPlan(userId))` before BullMQ enqueue), and the DB (`user_plan_overrides`, written only by the verified Dodo webhook). A tampered request body can't bypass the handler check; entitlement is set server-side from the signed webhook, never the client.
 
 - **Image sourcing has to never fail.** A pipeline that finishes 11 stages and aborts on shot 7 is a wasted job. Per-shot fallback chain `Unsplash → DALL·E 3 → Pexels → placeholder`, query derived per shot from intent + script via OpenRouter, `shouldRetryForImage` classifier retries 429/5xx and gives up on other 4xx. The placeholder is deliberate: a render with one stock-filler shot beats a failed render every time.
 
@@ -136,7 +136,7 @@ Tradeoff: `getUserPlan(userId)` reads two tables. Trivial query cost in exchange
 
 - **Worker process killed mid-render.** Per-job temp dir is deleted on success, failure, and cancel via one shared cleanup path. An orphan-sweep job (`CLEANUP_EXPIRED_HOURS`) runs every 60 minutes as a backstop for dirs from crashed processes. Final MP4 retention is separate (`VIDEO_RETENTION_HOURS`, default 24h).
 
-- **Stripe webhook replay or out-of-order delivery.** `payments.stripe_checkout_session_id` has a `UNIQUE` constraint; `verifyAndUpgrade` checks status before writing `user_plan_overrides`. Replays log "already processed" and return 200. Double-credit is structurally impossible.
+- **Dodo webhook replay or retries.** Dodo delivers at-least-once; the webhook claims each event in `processed_webhook_events` atomically (`INSERT … ON CONFLICT DO NOTHING RETURNING`) before granting, so duplicates no-op. Double-grant is structurally impossible.
 
 ---
 
@@ -146,11 +146,11 @@ Tradeoff: `getUserPlan(userId)` reads two tables. Trivial query cost in exchange
 
 - **API keys (`api_keys` table).** Format `clk_<48 hex>` generated from `crypto.randomBytes(24)`. Stored as **SHA-256 of the full key**, with a 16-char prefix kept as the indexed lookup column. Plaintext is returned exactly once at creation; the DB never has it.
 
-- **Stripe webhook HMAC verification.** `stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET)` runs before any business logic. Missing or invalid signature → 400.
+- **Dodo webhook signature verification.** `@dodopayments/nextjs` `Webhooks({ webhookKey })` verifies the Standard-Webhooks signature before any handler runs. Missing or invalid signature → 401.
 
 - **SSRF guard on `callbackUrl`.** Validates scheme (`http` / `https` only), rejects `localhost` / `127.0.0.1` in production unless `ALLOW_LOCALHOST_WEBHOOK=true` is explicitly set. Fire-and-forget, 5-second timeout, no retries. Receivers must be idempotent.
 
-- **Plan entitlement.** Gated at UI, API handler (before BullMQ enqueue), and DB (`user_plan_overrides` + `payments.stripe_checkout_session_id UNIQUE`). Pro-only features cannot be reached by tampering with the request body alone.
+- **Plan entitlement.** Gated at UI, API handler (before BullMQ enqueue), and DB (`user_plan_overrides`, written only by the verified Dodo webhook). Pro-only features cannot be reached by tampering with the request body alone.
 
 - **Prompt-injection rejection.** `validateGenerateInput` rejects topics matching the injection-pattern set with a field-level `VALIDATION_FAILED`.
 
@@ -162,7 +162,7 @@ Tradeoff: `getUserPlan(userId)` reads two tables. Trivial query cost in exchange
 
 ## Stack
 
-Next 16.1.6 · React 19.2.3 · TypeScript 5 · Remotion 4.0.414 · BullMQ 5 + ioredis 5 · Better Auth 1.5.5 (+ passkey) on Neon Postgres · Stripe 21 · Zod 4 · Google VEO via `@google/genai` 1.39 · HeyGen · ElevenLabs / PlayHT · Vitest 2.
+Next 16.1.6 · React 19.2.3 · TypeScript 5 · Remotion 4.0.414 · BullMQ 5 + ioredis 5 · Better Auth 1.5.5 (+ passkey) on Neon Postgres · Dodo Payments · Zod 4 · Google VEO via `@google/genai` 1.39 · HeyGen · ElevenLabs / PlayHT · Vitest 2.
 
 Worker runs uncompiled via `tsx`. React Compiler enabled in production.
 
@@ -190,7 +190,7 @@ cp .env.example .env.local
 
 **Required env:** `REDIS_URL`, `OPENROUTER_API_KEY`, `ELEVENLABS_API_KEY`.
 **Recommended:** at least one of `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, `OPENAI_API_KEY` (DALL·E).
-**For auth + billing:** `DATABASE_URL` (Neon), `BETTER_AUTH_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+**For auth + billing:** `DATABASE_URL` (Neon), `BETTER_AUTH_SECRET`, `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_WEBHOOK_KEY`, `DODO_PAYMENTS_RETURN_URL`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
 
 **Schema bootstrap** (only when `DATABASE_URL` is set): paste `src/lib/db/schema.sql` into the Neon SQL Editor and run it; then `npm run auth:migrate` for Better Auth tables.
 

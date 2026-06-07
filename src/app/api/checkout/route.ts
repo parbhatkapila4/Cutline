@@ -1,80 +1,41 @@
-import { NextResponse } from "next/server";
+import { Checkout } from "@dodopayments/nextjs";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getStripe, PURCHASABLE_PLANS } from "@/lib/stripe";
-import { getSql, isDatabaseConfigured } from "@/lib/db";
-import { getUserPlan } from "@/lib/users/planService";
+import { dodoEnvironment } from "@/lib/payments/dodo";
+import { isKnownProductId } from "@/lib/products";
 
-export async function POST(request: Request) {
+const staticCheckout = Checkout({
+  bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+  returnUrl: process.env.DODO_PAYMENTS_RETURN_URL,
+  environment: dodoEnvironment(),
+  type: "static",
+});
+
+export async function GET(req: NextRequest) {
   let userId: string | undefined;
+  let email: string | undefined;
   try {
-    const session = await auth.api.getSession({ headers: request.headers });
+    const session = await auth.api.getSession({ headers: req.headers });
     userId = session?.user?.id ? String(session.user.id) : undefined;
+    email = session?.user?.email ?? undefined;
   } catch {
     userId = undefined;
   }
-
   if (!userId) {
     return NextResponse.json(
-      { error: "Please sign in to purchase a plan.", code: "AUTH_REQUIRED" },
+      { error: "Please sign in to continue.", code: "AUTH_REQUIRED" },
       { status: 401 },
     );
   }
 
-  let body: { planId?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  const productId = req.nextUrl.searchParams.get("productId");
+  if (!isKnownProductId(productId)) {
+    return NextResponse.json({ error: "Unknown or missing productId." }, { status: 400 });
   }
 
-  const planId = body.planId;
-  if (!planId || !(planId in PURCHASABLE_PLANS)) {
-    return NextResponse.json({ error: "Invalid plan selected." }, { status: 400 });
-  }
+  const url = new URL(req.url);
+  url.searchParams.set("metadata_userId", userId);
+  if (email) url.searchParams.set("email", email);
 
-  const currentPlan = await getUserPlan(userId);
-  if (currentPlan.id === planId) {
-    return NextResponse.json(
-      { error: `You are already on the ${currentPlan.label} plan.` },
-      { status: 409 },
-    );
-  }
-
-  const planConfig = PURCHASABLE_PLANS[planId];
-  const stripe = getStripe();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: `Cutline ${planConfig.label} Plan`,
-            description: `${planConfig.label} plan - automated video generation`,
-          },
-          unit_amount: planConfig.amountCents,
-        },
-        quantity: 1,
-      },
-    ],
-    metadata: {
-      userId,
-      planId,
-    },
-    success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${appUrl}/pricing`,
-  });
-
-  if (isDatabaseConfigured()) {
-    const sql = getSql();
-    await sql`
-      INSERT INTO payments (user_id, plan, amount_cents, currency, stripe_checkout_session_id, status)
-      VALUES (${userId}, ${planId}, ${planConfig.amountCents}, 'usd', ${session.id}, 'pending')
-    `;
-  }
-
-  return NextResponse.json({ url: session.url });
+  return staticCheckout(new NextRequest(url, { headers: req.headers }));
 }

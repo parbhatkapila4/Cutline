@@ -70,7 +70,7 @@ export default function PrivacyPage() {
                 <li>We send your prompts and scripts to third-party AI providers (OpenRouter, ElevenLabs or PlayHT, OpenAI, optionally Google Veo) so they can run the pipeline. Your prompts leave our servers when this happens.</li>
                 <li>Generated videos and uploaded assets are deleted automatically after roughly 24 hours.</li>
                 <li>We do not run third-party analytics, ad-tracking, or behavioural profiling on this site.</li>
-                <li>Payments are processed by DODO Payments and Stripe. We never see or store your card number.</li>
+                <li>Payments are processed by Dodo Payments. We never see or store your card number.</li>
                 <li>You can request access, export, or deletion of your data at any time by writing to {CONTACT_EMAIL}.</li>
               </ul>
             </section>
@@ -100,7 +100,7 @@ export default function PrivacyPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-zinc-200 mb-1">Billing data</h3>
-                  <p>If you subscribe to a paid plan, our payment processors (DODO Payments and Stripe) handle your card data directly. They send us the plan you purchased, the status of your subscription, and a customer reference identifier. We do not see, store, or process your card number, CVV, or banking credentials.</p>
+                  <p>If you subscribe to a paid plan, our payment processor (Dodo Payments) handles your card data directly. They send us the plan you purchased, the status of your subscription, and a customer reference identifier. We do not see, store, or process your card number, CVV, or banking credentials.</p>
                 </div>
               </div>
             </section>
@@ -130,7 +130,7 @@ export default function PrivacyPage() {
                   { name: "Unsplash and Pexels", what: "Image search queries derived from your shot list.", why: "Returns stock photos used as the visual layer of each shot. Standard image-search API requests." },
                   { name: "Google (Gemini / Veo)", what: "Used only if you select \"Talking object\" mode. The script text is sent to Google Veo to generate the talking character clip.", why: "Generates AI character video. Optional and only triggered when you explicitly choose this mode." },
                   { name: "Better Auth + Google OAuth", what: "If you sign in with Google: your Google email, name, and OAuth identifier.", why: "Authenticates you and creates your account record." },
-                  { name: "DODO Payments and Stripe", what: "Your email address and the plan you are purchasing. Card data goes directly to them, not to us.", why: "Process subscriptions and one-time payments. They are PCI-DSS compliant; we are not in scope for cardholder data." },
+                  { name: "Dodo Payments", what: "Your email address and the plan you are purchasing. Card data goes directly to them, not to us.", why: "Processes subscriptions and one-time payments. PCI-DSS compliant; we are not in scope for cardholder data." },
                   { name: "Neon (Postgres)", what: "Account records, job metadata, anonymous-session records, subscription state.", why: "Database hosting." },
                   { name: "Redis", what: "Job queue entries, cancellation flags, rate-limit counters.", why: "Queue and ephemeral state. May be hosted by a managed Redis provider." },
                   { name: "Object storage (optional)", what: "Uploaded assets and generated videos.", why: "Either local disk on our server or S3-compatible object storage. Files are deleted on the retention schedule below." },
