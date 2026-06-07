@@ -1,16 +1,29 @@
-# CUTLINE
+<p align="center">
+  <img src="public/header.svg" alt="CUTLINE - One sentence in, one video out." width="100%" />
+</p>
 
-> One sentence in, one finished MP4 out — directed by a 12-stage pipeline, not a template engine.
+<p align="center">
+  <a href="https://cutline.cloud"><img alt="live · cutline.cloud" src="https://img.shields.io/badge/live-cutline.cloud-e8e0d4?style=flat-square&labelColor=0a0a0c" /></a>&nbsp;
+  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-fafafa?style=flat-square&labelColor=0a0a0c" />&nbsp;
+  <img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript-5-d8d2c6?style=flat-square&labelColor=0a0a0c" />&nbsp;
+  <img alt="Remotion 4" src="https://img.shields.io/badge/Remotion-4-d8d2c6?style=flat-square&labelColor=0a0a0c" />&nbsp;
+  <img alt="BullMQ + Redis" src="https://img.shields.io/badge/BullMQ-Redis-d8d2c6?style=flat-square&labelColor=0a0a0c" />&nbsp;
+  <img alt="Better Auth" src="https://img.shields.io/badge/Better_Auth-passkey-d8d2c6?style=flat-square&labelColor=0a0a0c" />&nbsp;
+  <img alt="Dodo Payments" src="https://img.shields.io/badge/Dodo_Payments-billing-d8d2c6?style=flat-square&labelColor=0a0a0c" />
+</p>
 
-**Live:** [cutline.cloud](https://cutline.cloud) · **Repo:** [github.com/parbhatkapila4/Cutline](https://github.com/parbhatkapila4/Cutline)
+<p align="center">
+  <b>One sentence in, one finished MP4 out</b> - directed by a 12-stage pipeline, not a template engine.<br />
+  <a href="https://cutline.cloud"><b>cutline.cloud</b></a> &nbsp;·&nbsp; <a href="https://github.com/parbhatkapila4/Cutline">github.com/parbhatkapila4/Cutline</a> &nbsp;·&nbsp; <a href="docs/REFERENCE.md">reference</a>
+</p>
 
 ---
 
 ## The problem
 
-Short-form video has eaten attention, but the production loop has not compressed. Script, storyboard, b-roll, cut, caption, render — every step has a tool, the assembly is still manual, and by the time the idea is on screen it has aged. The "AI video" category mostly automates the cut, not the editorial work that decides what to cut to.
+Short-form video has eaten attention, but the production loop has not compressed. Script, storyboard, b-roll, cut, caption, render - every step has a tool, the assembly is still manual, and by the time the idea is on screen it has aged. The "AI video" category mostly automates the cut, not the editorial work that decides what to cut to.
 
-The naïve AI version — "type what you want, we'll generate a video" — collapses into template fill-ins. Same Ken Burns pan over the same Unsplash photo, same kinetic-type intro, same captions. The output is generic because the system is generic: it picked a layout, not a narrative. CUTLINE takes the opposite bet.
+The naïve AI version - "type what you want, we'll generate a video" - collapses into template fill-ins. Same Ken Burns pan over the same Unsplash photo, same kinetic-type intro, same captions. The output is generic because the system is generic: it picked a layout, not a narrative. CUTLINE takes the opposite bet.
 
 ---
 
@@ -22,11 +35,11 @@ The pipeline commits to editorial decisions before it touches a frame. From one 
 
 ### One sentence in, no creative knobs
 
-Optional brand kit and uploaded assets enrich the pipeline; they do not steer it. A user with a coffee brand can upload their logo + product photos, drop in two hex colors, set `banned_phrases` and `required_phrases` on a `brand_kits` row — the director still chooses the shot list and the cuts. Knobs would dilute the thesis.
+Optional brand kit and uploaded assets enrich the pipeline; they do not steer it. A user with a coffee brand can upload their logo + product photos, drop in two hex colors, set `banned_phrases` and `required_phrases` on a `brand_kits` row - the director still chooses the shot list and the cuts. Knobs would dilute the thesis.
 
 ### Pipeline over agent
 
-Twelve stages, each a pure function over the previous stage's output. Deterministic stage boundaries beat agent loops for debugging, retries, and per-stage cost control — full stop. When a render looks wrong, you bisect by stage. When a provider regresses, you swap one module. When token spend spikes, you isolate the stage and tighten its prompt. An agent loop hides all three.
+Twelve stages, each a pure function over the previous stage's output. Deterministic stage boundaries beat agent loops for debugging, retries, and per-stage cost control - full stop. When a render looks wrong, you bisect by stage. When a provider regresses, you swap one module. When token spend spikes, you isolate the stage and tighten its prompt. An agent loop hides all three.
 
 ### Worker separate from app
 
@@ -35,6 +48,16 @@ Rendering is CPU-heavy and runs 1–3 minutes per video. Serverless functions ti
 ---
 
 ## Architecture
+
+<p align="center">
+  <img src="public/architecture.svg" alt="CUTLINE architecture - a Next.js control plane on Vercel supervising a separate long-running BullMQ worker (the data plane) over a Redis backbone. One sentence enters via POST /api/generate, a 12-stage pipeline renders it, the talking-character branch fans out to HeyGen / VEO, and the finished MP4 is uploaded to Vercel Blob." width="100%" />
+</p>
+
+The diagram is the system, not a sketch of it: a **control plane** (the stateless
+Next.js app on Vercel - validation, entitlement, idempotency, status polling) sits
+over a **data plane** (a separate, long-running BullMQ worker on Railway/Render/Fly),
+with **Redis** as the coordination backbone both planes wire into. The job crosses
+exactly one process boundary - the queue.
 
 ```
 Browser
@@ -65,13 +88,13 @@ token unset (single-host/local dev) the worker serves from `public/temp` directl
 
 ## Why this is hard
 
-- **Three talking-character modes, three different failure semantics.** Cartoon and cinematic both call Google VEO via `@google/genai`; studio framing calls HeyGen. VEO's RAI filter returns a deterministic content-safety block on the generated audio — retrying the identical prompt cannot succeed. The orchestrator throws a distinct `VeoContentFilteredError`, the retry classifier marks it non-retryable, and the chunk loop runs an LLM reword pass that varies the *narration* (what RAI blocks) while keeping the *visual* prompt intact. The reworded chunk text is threaded through to caption burn so audio and captions stay synced. After two failed rewords the job fails with an actionable message and stops burning quota.
+- **Three talking-character modes, three different failure semantics.** Cartoon and cinematic both call Google VEO via `@google/genai`; studio framing calls HeyGen. VEO's RAI filter returns a deterministic content-safety block on the generated audio - retrying the identical prompt cannot succeed. The orchestrator throws a distinct `VeoContentFilteredError`, the retry classifier marks it non-retryable, and the chunk loop runs an LLM reword pass that varies the *narration* (what RAI blocks) while keeping the *visual* prompt intact. The reworded chunk text is threaded through to caption burn so audio and captions stay synced. After two failed rewords the job fails with an actionable message and stops burning quota.
 
 - **HeyGen Photo Avatar quota under at-least-once submissions.** Lower-tier HeyGen accounts cap stored Photo Avatars at 3. The upload path keys a SHA-256 cache (`heygenPhotoCache.ts`) on image bytes so identical inputs short-circuit. On `code:401028` (quota full), the orchestrator lists the account, partitions avatars into *orphans* (HeyGen has them, our cache doesn't) vs *cached*, and bulk-deletes orphans oldest-first in parallel batches (concurrency 10, cap 10,000) with LRU eviction over cached as backup. A standalone CLI (`scripts/cleanup-heygen-avatars.ts`) covers one-shot recovery on heavily cluttered accounts.
 
-- **Idempotency without a job-state table.** `X-Idempotency-Key` paired with an in-process `Map` and a per-key `Promise` lock (`withIdempotencyLock`) serializes concurrent submissions with the same key and returns the original `{ jobId }`; 24h retention, configurable. In-memory by design — BullMQ already owns job lifecycle and duplicating that into Postgres creates two sources of truth.
+- **Idempotency without a job-state table.** `X-Idempotency-Key` paired with an in-process `Map` and a per-key `Promise` lock (`withIdempotencyLock`) serializes concurrent submissions with the same key and returns the original `{ jobId }`; 24h retention, configurable. In-memory by design - BullMQ already owns job lifecycle and duplicating that into Postgres creates two sources of truth.
 
-- **12-stage cancellation across a long-running async pipeline.** Cancel writes a Redis SET; every stage reads it before starting work. On hit the worker throws and the same cleanup path runs as on success or failure (`cleanupJobArtifacts`). Cancellation is eventual, not preemptive — latency-to-cancel is bounded by the current stage's duration, not the job's. That's the right shape for a pipeline where each stage is an external API call you'd rather complete than abandon mid-flight.
+- **12-stage cancellation across a long-running async pipeline.** Cancel writes a Redis SET; every stage reads it before starting work. On hit the worker throws and the same cleanup path runs as on success or failure (`cleanupJobArtifacts`). Cancellation is eventual, not preemptive - latency-to-cancel is bounded by the current stage's duration, not the job's. That's the right shape for a pipeline where each stage is an external API call you'd rather complete than abandon mid-flight.
 
 - **Plan entitlement enforced at three layers.** Free / Beginner / Professional / Enterprise with caps `1 / 10 / unlimited / unlimited` videos per month (from `src/lib/plans.ts`). Pro-only features (cinematic mode, custom avatars, image uploads, downloads, edits, sharing) are gated by UI (badges + lock states), the API handler (`isProPlan(getUserPlan(userId))` before BullMQ enqueue), and the DB (`user_plan_overrides` + `payments.stripe_checkout_session_id UNIQUE`). A tampered request body can't bypass the handler check; a tampered URL can't bypass the DB constraint.
 
@@ -147,10 +170,10 @@ Worker runs uncompiled via `tsx`. React Compiler enabled in production.
 
 ## What's intentionally NOT built yet
 
-- **Multi-seat / team accounts** — single-tenant. Multi-seat when a multi-seat customer is on the line to design against.
-- **Job approvals + comments review flow** — `job_approvals` and `job_comments` tables scaffolded; review/collaboration flow deferred until usage shape demands it.
-- **Worker horizontal scaling** — single worker process. The BullMQ side already supports N workers; finished MP4s now land in Vercel Blob (durable, cross-host), so multiple workers no longer fight over one local `public/temp`.
-- **Public template marketplace** — explicit non-goal. "No templates" is the thesis, not a stopgap.
+- **Multi-seat / team accounts** - single-tenant. Multi-seat when a multi-seat customer is on the line to design against.
+- **Job approvals + comments review flow** - `job_approvals` and `job_comments` tables scaffolded; review/collaboration flow deferred until usage shape demands it.
+- **Worker horizontal scaling** - single worker process. The BullMQ side already supports N workers; finished MP4s now land in Vercel Blob (durable, cross-host), so multiple workers no longer fight over one local `public/temp`.
+- **Public template marketplace** - explicit non-goal. "No templates" is the thesis, not a stopgap.
 
 **Followups (real, not features):** CAPTCHA libraries (`@hcaptcha/react-hcaptcha`, `@captchafox/react`, `@marsidev/react-turnstile`) are in `dependencies` with no production wiring. Audit and consolidate to one provider before sign-in goes public.
 
@@ -178,7 +201,7 @@ npx next dev       # terminal 1, port 3000
 npm run worker     # terminal 2, same .env.local
 ```
 
-Without the worker, jobs sit in `pending` forever. That's deliberate — there is no in-process fallback.
+Without the worker, jobs sit in `pending` forever. That's deliberate - there is no in-process fallback.
 
 Full env reference, API spec, error codes, and troubleshooting live in [`docs/REFERENCE.md`](docs/REFERENCE.md).
 
@@ -186,4 +209,4 @@ Full env reference, API spec, error codes, and troubleshooting live in [`docs/RE
 
 ## About
 
-Built by **Parbhat Kapila** — full-stack engineer focused on production AI systems. Currently building Sentinel (CRM revenue intelligence), VectorMail (AI email client), Visura, and RepoDocs (codebase RAG). Portfolio: [parbhat.dev](https://parbhat.dev).
+Built by **Parbhat Kapila** - full-stack engineer focused on production AI systems. Currently building Sentinel (CRM revenue intelligence), VectorMail (AI email client), Visura, and RepoDocs (codebase RAG). Portfolio: [parbhat.dev](https://parbhat.dev).

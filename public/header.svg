@@ -1,84 +1,222 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 200" aria-hidden="true">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" role="img" aria-label="CUTLINE — One sentence in, one video out. A director-layer, 12-stage video pipeline from intent to a rendered MP4.">
   <defs>
     <style>
-      @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(8px); }
-        to { opacity: 1; transform: translateY(0); }
+      :root { color-scheme: dark; }
+      .sans { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      .mono { font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace; }
+
+      @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes fadeInUp { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes drawX    { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+      @keyframes drawXr   { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+      @keyframes drawY    { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+      @keyframes pop      { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+      @keyframes blink    { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+      @keyframes heartbeat{ 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+      @keyframes dash     { to { stroke-dashoffset: 0; } }
+      @keyframes flow {
+        0%   { opacity: 0; transform: translateX(0); }
+        4%   { opacity: 1; }
+        46%  { opacity: 1; transform: translateX(844px); }
+        52%  { opacity: 0; transform: translateX(844px); }
+        100% { opacity: 0; transform: translateX(844px); }
       }
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes drawLine {
-        from { transform: scaleX(0); }
-        to { transform: scaleX(1); }
-      }
-      @keyframes drawBottom {
-        from { transform: scaleX(0); }
-        to { transform: scaleX(1); }
-      }
-      .header-logo {
-        opacity: 0;
-        animation: fadeInUp 0.5s ease-out forwards;
-      }
-      .header-underline {
-        transform-origin: 320px 80px;
-        animation: drawLine 0.5s 0.15s ease-out forwards;
-      }
-      .header-tagline {
-        opacity: 0;
-        animation: fadeIn 0.35s 0.25s ease-out forwards;
-      }
-      .header-sub {
-        opacity: 0;
-        animation: fadeIn 0.35s 0.4s ease-out forwards;
-      }
-      .header-bottom {
-        transform-origin: 0 198px;
-        animation: drawBottom 0.6s 0.2s ease-out forwards;
+
+      .a-field   { opacity: 0; animation: fadeIn .5s ease-out both; }
+      .a-word    { opacity: 0; animation: fadeInUp .6s .15s cubic-bezier(.22,1,.36,1) both; }
+      .a-clipL   { transform-origin: 230px 167px; animation: drawXr .45s .30s cubic-bezier(.22,1,.36,1) both; }
+      .a-clipR   { transform-origin: 230px 167px; animation: drawX  .45s .30s cubic-bezier(.22,1,.36,1) both; }
+      .a-head    { transform-origin: 230px 167px; opacity: 0; animation: drawY .35s .52s cubic-bezier(.22,1,.36,1) both, fadeIn .2s .52s both; }
+      .a-eyebrow { opacity: 0; animation: fadeIn .4s .30s ease-out both; }
+      .a-status  { opacity: 0; animation: fadeIn .4s .15s ease-out both; }
+      .a-tag     { opacity: 0; animation: fadeInUp .5s .50s ease-out both; }
+      .a-sub     { opacity: 0; animation: fadeIn .45s .62s ease-out both; }
+      .a-band    { opacity: 0; animation: fadeIn .5s .70s ease-out both; }
+      .a-track   { transform-origin: 238px 326px; animation: drawX .9s .80s cubic-bezier(.4,0,.2,1) both; }
+      .a-frame   { stroke-dasharray: 300; stroke-dashoffset: 300; animation: dash .9s 1.85s linear forwards; }
+      .a-out     { opacity: 0; animation: fadeIn .4s 2.15s ease-out both; }
+      .a-foot    { opacity: 0; animation: fadeIn .5s 1.0s ease-out both; }
+      .a-base    { transform-origin: 0 418px; animation: drawX .7s .2s cubic-bezier(.4,0,.2,1) both; }
+      .a-caret   { animation: blink 1.06s steps(1) infinite; }
+      .a-beat    { animation: heartbeat 2.2s 1s ease-in-out infinite; }
+      .a-pulse   { opacity: 0; animation: flow 6s 2.3s ease-in-out infinite; }
+
+      .node      { opacity: 0; animation: pop .3s ease-out both; transform-box: fill-box; transform-origin: center; }
+      .lbl       { opacity: 0; animation: fadeIn .3s ease-out both; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .a-field,.a-word,.a-eyebrow,.a-status,.a-tag,.a-sub,.a-band,.a-out,.a-foot,.a-head,.node,.lbl { opacity: 1; animation: none; transform: none; }
+        .a-clipL,.a-clipR,.a-track,.a-base { animation: none; transform: scaleX(1); }
+        .a-frame { animation: none; stroke-dashoffset: 0; }
+        .a-caret { animation: blink 1.06s steps(1) infinite; }
+        .a-beat  { animation: heartbeat 2.6s ease-in-out infinite; }
+        .a-pulse { display: none; }
       }
     </style>
-    <linearGradient id="header-bg" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
-      <stop offset="0" stop-color="#0c0c0e" />
-      <stop offset="1" stop-color="#0a0a0c" />
+
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c0c0e"/>
+      <stop offset="1" stop-color="#0a0a0c"/>
     </linearGradient>
-    <linearGradient id="header-accent" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
-      <stop offset="0" stop-color="#f5f0e8" />
-      <stop offset="1" stop-color="#e8e0d4" />
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f5f0e8"/>
+      <stop offset="1" stop-color="#e8e0d4"/>
     </linearGradient>
+    <radialGradient id="vignette" cx="50%" cy="42%" r="75%">
+      <stop offset="60%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.45"/>
+    </radialGradient>
+    <clipPath id="bandClip"><rect x="248" y="284" width="844" height="84"/></clipPath>
   </defs>
 
-  <rect width="640" height="200" fill="url(#header-bg)" />
+  <!-- field -->
+  <rect width="1280" height="420" fill="url(#bg)"/>
+  <rect width="1280" height="420" fill="url(#vignette)"/>
 
-  <g stroke="#1c1c1e" stroke-width="0.8" fill="none" opacity="0.5">
-    <rect x="72" y="48" width="56" height="32" rx="2" />
-    <rect x="140" y="56" width="48" height="27" rx="2" />
-    <rect x="500" y="52" width="52" height="29" rx="2" />
-    <rect x="564" y="44" width="48" height="27" rx="2" />
+  <!-- ghost wireframe rects (schematic texture) -->
+  <g class="a-field" stroke="#1c1c1e" stroke-width="0.8" fill="none" opacity="0.4">
+    <rect x="1150" y="250" width="60" height="40" rx="2"/>
+    <rect x="70" y="362" width="48" height="30" rx="2"/>
   </g>
 
-  <g fill="#1a1a1c" opacity="0.7">
-    <rect x="0" y="88" width="12" height="8" />
-    <rect x="0" y="104" width="12" height="8" />
-    <rect x="0" y="120" width="12" height="8" />
-    <rect x="628" y="88" width="12" height="8" />
-    <rect x="628" y="104" width="12" height="8" />
-    <rect x="628" y="120" width="12" height="8" />
+  <!-- 35mm edge sprockets (inherited DNA) -->
+  <g class="a-field" fill="#1a1a1c" opacity="0.7">
+    <rect x="8" y="194" width="12" height="8" rx="1"/>
+    <rect x="8" y="210" width="12" height="8" rx="1"/>
+    <rect x="8" y="226" width="12" height="8" rx="1"/>
+    <rect x="1260" y="194" width="12" height="8" rx="1"/>
+    <rect x="1260" y="210" width="12" height="8" rx="1"/>
+    <rect x="1260" y="226" width="12" height="8" rx="1"/>
   </g>
 
-  <text class="header-logo" x="320" y="68" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="42" font-weight="700" letter-spacing="-0.04em">
-    <tspan fill="#fafafa">CUT</tspan><tspan fill="url(#header-accent)">LINE</tspan>
-  </text>
+  <!-- film-gate corner brackets (L-marks) -->
+  <g class="a-field" stroke="#1c1c1e" stroke-width="1" fill="none">
+    <path d="M44 66 V44 H66"/>
+    <path d="M1236 66 V44 H1214"/>
+    <path d="M44 354 V376 H66"/>
+    <path d="M1236 354 V376 H1214"/>
+  </g>
 
-  <rect class="header-underline" x="148" y="78" width="344" height="5" rx="2.5" fill="url(#header-accent)" />
+  <!-- ===================== IDENTITY BLOCK ===================== -->
 
-  <text class="header-tagline" x="320" y="108" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" font-weight="500" fill="#fafafa">
-    One sentence in, one video out.
-  </text>
+  <!-- status cluster -->
+  <g class="a-status">
+    <circle class="a-beat" cx="76" cy="44" r="4" fill="#34d399"/>
+    <text class="mono" x="90" y="48" font-size="12" fill="#52525b">worker · alive<tspan fill="#3f3f46">  ·  beat 20s</tspan></text>
+  </g>
 
-  <text class="header-sub" x="320" y="132" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="400" fill="#52525b">
-    Script to video. One platform. Export anywhere.
-  </text>
+  <!-- eyebrow -->
+  <text class="mono a-eyebrow" x="72" y="86" font-size="11" letter-spacing="0.28em" fill="#52525b">DIRECTOR LAYER — NOT A TEMPLATE ENGINE</text>
 
-  <rect class="header-bottom" x="0" y="196" width="640" height="4" fill="url(#header-accent)" />
+  <!-- upper-right instrument readout -->
+  <text class="mono a-eyebrow" x="1208" y="86" font-size="11" letter-spacing="0.06em" text-anchor="end" fill="#52525b"><tspan fill="#e8e0d4" font-weight="600">12</tspan> STAGES   ·   <tspan fill="#e8e0d4" font-weight="600">2</tspan> RENDER PATHS   ·   <tspan fill="#e8e0d4" font-weight="600">3</tspan> PROVIDERS</text>
+
+  <!-- wordmark CUTLINE with playhead "I" -->
+  <g class="a-word">
+    <text class="sans" x="221" y="150" text-anchor="end" font-size="60" font-weight="700" letter-spacing="-0.04em" fill="#fafafa">CUTL</text>
+    <text class="sans" x="239" y="150" text-anchor="start" font-size="60" font-weight="700" letter-spacing="-0.04em" fill="url(#accent)">NE</text>
+  </g>
+  <!-- playhead-I -->
+  <g class="a-head">
+    <path d="M223 106 L237 106 L230 116 Z" fill="url(#accent)"/>
+    <rect x="227.5" y="112" width="5" height="55" fill="url(#accent)"/>
+    <rect x="225" y="163" width="10" height="10" rx="1.5" transform="rotate(45 230 168)" fill="url(#accent)"/>
+  </g>
+
+  <!-- split underline: cool CUT clip + warm LINE clip -->
+  <rect class="a-clipL" x="72"  y="164.5" width="158" height="5" rx="2.5" fill="#2a2a2e"/>
+  <rect class="a-clipR" x="230" y="164.5" width="92"  height="5" rx="2.5" fill="url(#accent)"/>
+
+  <!-- tagline + sub-line -->
+  <text class="sans a-tag" x="72" y="204" font-size="18" font-weight="500" fill="#fafafa">One sentence in, one video out.</text>
+  <text class="mono a-sub" x="72" y="228" font-size="12" fill="#52525b">director layer · 12-stage pipeline · remotion + veo · ships an mp4</text>
+
+  <!-- section divider -->
+  <g class="a-band">
+    <text class="mono" x="72" y="274" font-size="9" letter-spacing="0.22em" fill="#3f3f46">PIPELINE · INTENT → RENDER</text>
+    <line x1="302" y1="270" x2="1208" y2="270" stroke="#1c1c1e" stroke-width="1"/>
+  </g>
+
+  <!-- ===================== PIPELINE BAND ===================== -->
+  <g class="a-band">
+    <!-- faint band lane lines -->
+    <g clip-path="url(#bandClip)" stroke="#161618" stroke-width="0.8" opacity="0.5">
+      <line x1="248" y1="298" x2="1092" y2="298"/>
+      <line x1="248" y1="354" x2="1092" y2="354"/>
+    </g>
+
+    <!-- input capsule -->
+    <rect x="64" y="312" width="172" height="28" rx="6" fill="#0c0c0e" stroke="#1c1c1e"/>
+    <text class="mono" x="76" y="330" font-size="11" fill="#fafafa"><tspan fill="#52525b">› </tspan>a robot reviews my app</text>
+    <rect class="a-caret" x="222" y="319" width="6" height="14" fill="#f5f0e8"/>
+  </g>
+
+  <!-- main track -->
+  <line class="a-track" x1="238" y1="326" x2="982" y2="326" stroke="#1c1c1e" stroke-width="1.5"/>
+
+  <!-- quality gate diamond (after script) -->
+  <g class="node" style="animation-delay:1.15s">
+    <rect x="510" y="319" width="14" height="14" rx="1.5" transform="rotate(45 517 326)" fill="#0c0c0e" stroke="#1c1c1e"/>
+    <path d="M513 326 l2.6 3 l5.4 -6.4" fill="none" stroke="#34d399" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- 12 nodes + labels -->
+  <g fill="#0c0c0e" stroke="#1c1c1e" stroke-width="1.2">
+    <circle class="node" style="animation-delay:.80s"  cx="300" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:.86s"  cx="362" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:.92s"  cx="424" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:.98s"  cx="486" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:1.04s" cx="548" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:1.10s" cx="610" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:1.16s" cx="672" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:1.22s" cx="734" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:1.28s" cx="796" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:1.34s" cx="858" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:1.40s" cx="920" cy="326" r="5"/>
+    <circle class="node" style="animation-delay:1.46s" cx="982" cy="326" r="6" stroke="url(#accent)"/>
+  </g>
+  <g class="mono" font-size="10" fill="#52525b" text-anchor="middle">
+    <text class="lbl" style="animation-delay:.84s"  x="300" y="306">intent</text>
+    <text class="lbl" style="animation-delay:.90s"  x="362" y="350">narrative</text>
+    <text class="lbl" style="animation-delay:.96s"  x="424" y="306">shots</text>
+    <text class="lbl" style="animation-delay:1.02s" x="486" y="350">script</text>
+    <text class="lbl" style="animation-delay:1.08s" x="548" y="306">subtitles</text>
+    <text class="lbl" style="animation-delay:1.14s" x="610" y="350">tts</text>
+    <text class="lbl" style="animation-delay:1.20s" x="672" y="306">refine</text>
+    <text class="lbl" style="animation-delay:1.26s" x="734" y="350">motion</text>
+    <text class="lbl" style="animation-delay:1.32s" x="796" y="306">assets</text>
+    <text class="lbl" style="animation-delay:1.38s" x="858" y="350">visuals</text>
+    <text class="lbl" style="animation-delay:1.44s" x="920" y="306">sourcing</text>
+    <text class="lbl" style="animation-delay:1.50s" x="982" y="306" fill="#fafafa">render</text>
+  </g>
+
+  <!-- render fork -> output -->
+  <g class="a-out">
+    <circle cx="1018" cy="326" r="4" fill="#0c0c0e" stroke="#1c1c1e"/>
+    <path d="M1022 326 Q1050 326 1062 314 Q1070 306 1080 306" fill="none" stroke="#1c1c1e" stroke-width="1"/>
+    <path d="M1022 326 Q1050 326 1062 338 Q1070 346 1080 346" fill="none" stroke="#1c1c1e" stroke-width="1"/>
+    <text class="mono" x="1026" y="302" font-size="8" fill="#52525b">veo · heygen</text>
+    <text class="mono" x="1026" y="356" font-size="8" fill="#52525b">remotion</text>
+  </g>
+
+  <!-- output frame (16:9) -->
+  <g class="a-out">
+    <rect class="a-frame" x="1080" y="299" width="96" height="54" rx="2" fill="#0c0c0e" stroke="url(#accent)" stroke-width="1.5"/>
+    <g stroke="#1c1c1e" stroke-width="0.8" opacity="0.4">
+      <line x1="1112" y1="299" x2="1112" y2="353"/>
+      <line x1="1144" y1="299" x2="1144" y2="353"/>
+      <line x1="1080" y1="317" x2="1176" y2="317"/>
+      <line x1="1080" y1="335" x2="1176" y2="335"/>
+    </g>
+    <rect x="1084" y="303" width="4" height="4" rx="0.5" fill="#1c1c1e"/>
+    <rect x="1168" y="345" width="4" height="4" rx="0.5" fill="#1c1c1e"/>
+    <text class="mono" x="1128" y="370" font-size="9" fill="#52525b" text-anchor="middle">final.mp4 · blob://</text>
+  </g>
+
+  <!-- travelling signal pulse -->
+  <circle class="a-pulse" cx="244" cy="326" r="3" fill="url(#accent)"/>
+
+  <!-- footer + baseline -->
+  <text class="mono a-foot" x="1208" y="396" font-size="10" fill="#52525b" text-anchor="end">12-stage · zod-gated · idempotent · dodo-billed</text>
+  <rect class="a-base" x="0" y="416" width="1280" height="4" fill="url(#accent)"/>
 </svg>

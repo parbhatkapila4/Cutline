@@ -1,0 +1,313 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 980" role="img" aria-label="CUTLINE architecture — a control plane (Next.js app on Vercel) supervising a data plane (a separate long-running BullMQ worker) over a Redis backbone. One sentence enters, a 12-stage pipeline renders it, and a finished MP4 is uploaded to Vercel Blob.">
+  <defs>
+    <style>
+      :root { color-scheme: dark; }
+      .sans { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      .mono { font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace; }
+      .ttl  { fill: #fafafa; font-weight: 600; }
+      .sub  { fill: #a1a1aa; }
+      .mut  { fill: #52525b; }
+      .num  { fill: #e8e0d4; font-weight: 700; }
+
+      .card { fill: #0e0e11; stroke: #1c1c1e; stroke-width: 0.9; }
+      .band { fill: #111114; stroke: #1c1c1e; stroke-width: 0.9; }
+      .ext  { fill: #0b0b0d; stroke: #3f3f46; stroke-width: 0.9; }
+      .chip { fill: #0c0c0e; stroke: #1c1c1e; stroke-width: 0.8; }
+
+      .edge   { stroke: #2a2a2e; stroke-width: 1.1; fill: none; }
+      .edgeA  { stroke: url(#accent); stroke-width: 2.4; fill: none; }
+      .edgeD  { stroke: #2a2a2e; stroke-width: 1; fill: none; stroke-dasharray: 4 4; }
+      .cancel { stroke: #a23b3b; stroke-width: 1; fill: none; stroke-dasharray: 3 3; opacity: .85; }
+      .amber  { stroke: #e8b06a; stroke-width: 1.2; fill: none; stroke-dasharray: 5 3; }
+
+      @keyframes hb { 0%,100% { opacity: 1; } 50% { opacity: .28; } }
+      @keyframes dw { from { transform: scaleX(0);} to { transform: scaleX(1);} }
+      @keyframes fi { from { opacity: 0;} to { opacity: 1;} }
+      .beat { animation: hb 2.2s ease-in-out infinite; }
+      .draw { transform-origin: 0 978px; animation: dw .8s .2s cubic-bezier(.4,0,.2,1) both; }
+      .rise { opacity: 0; animation: fi .6s .2s ease-out both; }
+      @media (prefers-reduced-motion: reduce) {
+        .draw { animation: none; transform: scaleX(1); }
+        .rise { animation: none; opacity: 1; }
+      }
+    </style>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c0c0e"/><stop offset="1" stop-color="#0a0a0c"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f5f0e8"/><stop offset="1" stop-color="#e8e0d4"/>
+    </linearGradient>
+    <linearGradient id="accentV" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#e8e0d4"/><stop offset="1" stop-color="#f5f0e8"/>
+    </linearGradient>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 L6 4 L1 7" fill="none" stroke="#2a2a2e" stroke-width="1.2"/></marker>
+    <marker id="arA" markerWidth="9" markerHeight="9" refX="6.5" refY="4.5" orient="auto"><path d="M1 1 L7 4.5 L1 8" fill="none" stroke="#e8e0d4" stroke-width="1.6"/></marker>
+    <marker id="arC" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 L6 4 L1 7" fill="none" stroke="#a23b3b" stroke-width="1.2"/></marker>
+    <marker id="arM" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 L6 4 L1 7" fill="none" stroke="#e8b06a" stroke-width="1.2"/></marker>
+    <symbol id="chk" viewBox="0 0 10 10"><path d="M2 5.2 l2 2 l4 -5" fill="none" stroke="#34d399" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+
+  <rect width="1400" height="980" fill="url(#bg)"/>
+
+  <!-- edge sprockets + ghost texture -->
+  <g fill="#1a1a1c" opacity="0.6">
+    <rect x="4" y="474" width="10" height="7" rx="1"/><rect x="4" y="488" width="10" height="7" rx="1"/><rect x="4" y="502" width="10" height="7" rx="1"/>
+    <rect x="1386" y="474" width="10" height="7" rx="1"/><rect x="1386" y="488" width="10" height="7" rx="1"/><rect x="1386" y="502" width="10" height="7" rx="1"/>
+  </g>
+
+  <!-- ===================== TITLE STRIP ===================== -->
+  <text class="sans" x="110" y="48" font-size="30" font-weight="700" letter-spacing="-0.04em"><tspan fill="#fafafa">CUT</tspan><tspan fill="url(#accent)">LINE</tspan></text>
+  <text class="mono mut" x="296" y="48" font-size="12" letter-spacing="0.16em">THE DIRECTOR LAYER</text>
+  <text class="sans" x="1370" y="40" font-size="14" fill="#fafafa" text-anchor="end">One sentence in, one video out.</text>
+  <text class="mono mut" x="1370" y="57" font-size="10" text-anchor="end">system architecture · control plane over data plane</text>
+  <rect x="110" y="64" width="1260" height="1" fill="url(#accent)" opacity="0.55"/>
+
+  <!-- ===================== MACRO SPINE ===================== -->
+  <g class="rise">
+    <!-- connecting arrows (bright accent thread) -->
+    <line class="edgeA" x1="247" y1="120" x2="301" y2="120" marker-end="url(#arA)"/>
+    <line class="edgeA" x1="437" y1="120" x2="491" y2="120" marker-end="url(#arA)"/>
+    <line class="edgeA" x1="683" y1="120" x2="737" y2="120" marker-end="url(#arA)"/>
+    <line class="edgeA" x1="909" y1="120" x2="963" y2="120" marker-end="url(#arA)"/>
+    <line class="edgeA" x1="1137" y1="120" x2="1223" y2="120" marker-end="url(#arA)"/>
+    <text class="mono mut" x="274" y="111" font-size="8.5" text-anchor="middle">POST</text>
+    <text class="mono mut" x="464" y="111" font-size="8.5" text-anchor="middle">validate</text>
+    <text class="mono mut" x="710" y="111" font-size="8.5" text-anchor="middle">enqueue</text>
+    <text class="mono mut" x="936" y="111" font-size="8.5" text-anchor="middle">consume</text>
+    <text class="mono mut" x="1180" y="111" font-size="8.5" text-anchor="middle">render → blob</text>
+
+    <!-- INPUT capsule -->
+    <rect x="110" y="100" width="134" height="40" rx="20" fill="#0c0c0e" stroke="url(#accent)" stroke-width="1.4"/>
+    <text class="mono ttl" x="177" y="117" font-size="11" text-anchor="middle">INPUT</text>
+    <text class="mono mut" x="177" y="131" font-size="8.5" text-anchor="middle">one sentence</text>
+    <!-- beacons -->
+    <rect class="card" x="304" y="100" width="130" height="40" rx="8"/>
+    <text class="sans ttl" x="369" y="117" font-size="12" text-anchor="middle">Browser</text>
+    <text class="mono mut" x="369" y="131" font-size="8.5" text-anchor="middle">client</text>
+    <rect class="card" x="494" y="100" width="186" height="40" rx="8"/>
+    <text class="sans ttl" x="587" y="116" font-size="12" text-anchor="middle">Next.js 16 · App Router</text>
+    <text class="mono mut" x="587" y="131" font-size="8.5" text-anchor="middle">Vercel · UI + API + enqueue</text>
+    <rect class="card" x="740" y="100" width="166" height="40" rx="8"/>
+    <text class="sans ttl" x="823" y="116" font-size="12" text-anchor="middle">Redis · BullMQ</text>
+    <text class="mono mut" x="823" y="131" font-size="8.5" text-anchor="middle">durable job queue</text>
+    <rect class="card" x="966" y="100" width="168" height="40" rx="8"/>
+    <text class="sans ttl" x="1050" y="116" font-size="12" text-anchor="middle">Worker</text>
+    <text class="mono mut" x="1050" y="131" font-size="8.5" text-anchor="middle">long-lived · separate host</text>
+    <!-- OUTPUT capsule -->
+    <rect x="1226" y="100" width="144" height="40" rx="20" fill="#0c0c0e" stroke="url(#accent)" stroke-width="1.4"/>
+    <text class="mono ttl" x="1298" y="117" font-size="11" text-anchor="middle">OUTPUT</text>
+    <text class="mono mut" x="1298" y="131" font-size="8.5" text-anchor="middle">finished MP4</text>
+  </g>
+
+  <!-- ===================== CONTROL PLANE ===================== -->
+  <rect class="band" x="92" y="176" width="1284" height="250" rx="12"/>
+  <rect x="92" y="176" width="1284" height="2" rx="1" fill="url(#accent)" opacity="0.5"/>
+  <text class="mono mut" x="74" y="301" font-size="10" letter-spacing="0.14em" text-anchor="middle" transform="rotate(-90 74 301)">CONTROL PLANE · SUPERVISES, NEVER RENDERS</text>
+  <text class="mono mut" x="116" y="200" font-size="10">APP · Next.js route handlers (stateless, on Vercel)</text>
+
+  <!-- Browser (client) -->
+  <rect class="card" x="214" y="296" width="116" height="58" rx="8"/>
+  <text class="sans ttl" x="272" y="320" font-size="12" text-anchor="middle">Browser</text>
+  <text class="mono mut" x="272" y="337" font-size="8.5" text-anchor="middle">client · POST</text>
+  <line class="edge" x1="330" y1="312" x2="356" y2="300" marker-end="url(#ar)"/>
+  <!-- browser polls status (top gap) -->
+  <path class="edgeD" d="M272 296 V162 H1100 V244" marker-end="url(#ar)"/>
+  <text class="mono mut" x="690" y="157" font-size="8.5" text-anchor="middle">browser polls status</text>
+
+  <!-- POST gate card -->
+  <rect class="card" x="358" y="218" width="300" height="184" rx="8"/>
+  <text class="mono ttl" x="374" y="240" font-size="12">POST /api/generate</text>
+  <text class="mono mut" x="374" y="254" font-size="8.5">request guards — first failure rejects</text>
+  <g class="mono" font-size="9.5" fill="#a1a1aa">
+    <rect class="chip" x="372" y="262" width="272" height="24" rx="4"/><use href="#chk" x="380" y="268" width="11" height="11"/><text x="398" y="277">Zod schema validation</text>
+    <rect class="chip" x="372" y="290" width="272" height="24" rx="4"/><use href="#chk" x="380" y="296" width="11" height="11"/><text x="398" y="305">prompt-injection reject</text>
+    <rect class="chip" x="372" y="318" width="272" height="24" rx="4"/><use href="#chk" x="380" y="324" width="11" height="11"/><text x="398" y="333">per-route CORS allowlist</text>
+    <rect class="chip" x="372" y="346" width="272" height="24" rx="4"/><use href="#chk" x="380" y="352" width="11" height="11"/><text x="398" y="361">Redis rate-limit · sliding window</text>
+    <rect class="chip" x="372" y="374" width="272" height="24" rx="4"/><use href="#chk" x="380" y="380" width="11" height="11"/><text x="398" y="389">plan entitlement · isProPlan (UI+API+DB)</text>
+  </g>
+  <line class="edge" x1="658" y1="296" x2="700" y2="296" marker-end="url(#ar)"/>
+
+  <!-- Idempotency -->
+  <rect class="card" x="700" y="262" width="300" height="68" rx="8"/>
+  <text class="mono ttl" x="716" y="285" font-size="11">X-Idempotency-Key</text>
+  <text class="mono sub" x="716" y="301" font-size="9">in-proc lock + per-key Promise</text>
+  <text class="mono mut" x="716" y="316" font-size="9">cache hit → returns prior jobId · 24h</text>
+  <path class="edge" d="M850 262 q0 -22 24 -22 q24 0 24 22" marker-end="url(#ar)"/>
+
+  <!-- Status polling (control, right) -->
+  <rect class="card" x="1042" y="244" width="318" height="100" rx="8"/>
+  <text class="mono ttl" x="1058" y="266" font-size="11">GET /api/generate/[jobId]</text>
+  <text class="mono sub" x="1058" y="282" font-size="9">poll · 2s → 15s backoff · 30 min cap</text>
+  <text class="mono mut" x="1058" y="299" font-size="8.5">→ status · stage · queuePosition</text>
+  <text class="mono mut" x="1058" y="312" font-size="8.5">→ queueEtaSeconds · workerOnline · videoUrl</text>
+
+  <!-- security footnote (lower-right of control plane) -->
+  <text class="mono mut" x="1058" y="372" font-size="8.5">edge · CSP / HSTS · X-Frame DENY · SSRF guard · webhook signature</text>
+
+  <!-- ===================== REDIS BACKBONE ===================== -->
+  <rect x="110" y="300" width="86" height="372" rx="10" fill="#0e0e11" stroke="url(#accent)" stroke-width="1.3"/>
+  <text class="mono ttl" x="153" y="324" font-size="12" text-anchor="middle">REDIS</text>
+  <text class="mono mut" x="153" y="338" font-size="8" text-anchor="middle">ioredis</text>
+  <g class="mono" font-size="8.6" fill="#a1a1aa" text-anchor="middle">
+    <rect class="chip" x="120" y="350" width="66" height="54" rx="4"/><text x="153" y="369">BullMQ</text><text x="153" y="382">jobs</text><text class="mut" x="153" y="398" font-size="7.5">wait·active</text>
+    <rect class="chip" x="120" y="420" width="66" height="54" rx="4"/><text x="153" y="439">cancel</text><text x="153" y="452">SET</text><text class="mut" x="153" y="467" font-size="7.5">cutline:job</text>
+    <rect class="chip" x="120" y="482" width="66" height="46" rx="4"/><text x="153" y="501">rate</text><text x="153" y="514">limit</text>
+    <rect class="chip" x="120" y="536" width="66" height="46" rx="4"/><text x="153" y="556">idem-</text><text x="153" y="569">potency</text>
+  </g>
+  <text class="mono mut" x="153" y="612" font-size="8" text-anchor="middle">coordination bus</text>
+  <text class="mono mut" x="153" y="624" font-size="8" text-anchor="middle">both planes wire in</text>
+
+  <!-- enqueue: idempotency -> redis (down across, into bus) -->
+  <path class="edgeA" d="M740 330 V412 H196" marker-end="url(#arA)"/>
+  <text class="mono mut" x="460" y="424" font-size="9" text-anchor="middle">queue.add('video-generation', payload)</text>
+
+  <!-- ===================== QUEUE SEAM ===================== -->
+  <line x1="92" y1="448" x2="1376" y2="448" stroke="#2a2a2e" stroke-width="1" stroke-dasharray="6 5"/>
+  <rect x="560" y="440" width="280" height="17" rx="8" fill="#0a0a0c"/>
+  <text class="mono mut" x="700" y="452" font-size="9" text-anchor="middle">— PROCESS BOUNDARY —</text>
+  <text class="mono mut" x="210" y="440" font-size="8.5">▲ APP PROCESS — Vercel · serverless · stateless</text>
+  <text class="mono mut" x="210" y="467" font-size="8.5">▼ WORKER PROCESS — Railway / Render / Fly · long-lived · tsx · CPU 1–3 min</text>
+
+  <!-- redis -> worker consume (down out of bus) -->
+  <line class="edgeA" x1="196" y1="500" x2="206" y2="500" marker-end="url(#arA)"/>
+
+  <!-- ===================== DATA PLANE ===================== -->
+  <rect class="band" x="92" y="472" width="1284" height="398" rx="12"/>
+  <rect x="92" y="472" width="1284" height="2" rx="1" fill="url(#accent)" opacity="0.5"/>
+  <text class="mono mut" x="74" y="672" font-size="10" letter-spacing="0.14em" text-anchor="middle" transform="rotate(-90 74 672)">DATA PLANE · THE SEPARATE LONG-RUNNING WORKER</text>
+
+  <!-- worker consume cluster -->
+  <rect class="card" x="208" y="484" width="320" height="50" rx="8"/>
+  <text class="mono ttl" x="224" y="504" font-size="11">BullMQ Worker</text>
+  <text class="mono mut" x="224" y="520" font-size="8.5">concurrency 1 · lock 30m · renew 30s · maxStalled 0</text>
+  <!-- heartbeat -->
+  <rect class="card" x="208" y="540" width="320" height="44" rx="8"/>
+  <circle class="beat" cx="226" cy="562" r="5" fill="#34d399"/>
+  <text class="mono sub" x="240" y="558" font-size="9">SET cutline:worker:heartbeat</text>
+  <text class="mono mut" x="240" y="572" font-size="8.5">EX 180s · beat every 20s → workerOnline</text>
+  <path class="edgeD" d="M208 562 H196" marker-end="url(#ar)"/>
+
+  <!-- image sourcing: never fails (top-right) -->
+  <rect class="card" x="556" y="484" width="500" height="62" rx="8"/>
+  <rect x="568" y="494" width="150" height="16" rx="8" fill="#0c0c0e" stroke="url(#accent)" stroke-width="0.9"/>
+  <text class="mono num" x="643" y="506" font-size="9" text-anchor="middle">NEVER FAILS</text>
+  <text class="mono ttl" x="726" y="506" font-size="10">image sourcing · first-success-wins</text>
+  <g class="mono" font-size="9.5">
+    <text x="568" y="532" fill="#a1a1aa">Unsplash</text><text x="640" y="532" fill="#3f3f46">›</text>
+    <text x="654" y="532" fill="#a1a1aa">Pexels</text><text x="710" y="532" fill="#3f3f46">›</text>
+    <text x="724" y="532" fill="#a1a1aa">DALL·E 3</text><text x="794" y="532" fill="#3f3f46">›</text>
+    <text x="808" y="532" fill="#52525b">placeholder /fallback.png</text>
+  </g>
+
+  <!-- cancellation comb label -->
+  <text class="mono" x="214" y="612" font-size="8.5" fill="#a23b3b">cancelled-jobs SET · checkCancelledAndThrow between every stage</text>
+
+  <!-- ===== 12-STAGE FILM STRIP ===== -->
+  <!-- cancellation comb: horizontal rail + ticks into each gap -->
+  <path class="cancel" d="M196 618 H1300"/>
+  <g class="cancel">
+    <line x1="224" y1="618" x2="224" y2="632"/><line x1="316" y1="618" x2="316" y2="632"/><line x1="408" y1="618" x2="408" y2="632"/>
+    <line x1="500" y1="618" x2="500" y2="632"/><line x1="592" y1="618" x2="592" y2="632"/><line x1="684" y1="618" x2="684" y2="632"/>
+    <line x1="776" y1="618" x2="776" y2="632"/><line x1="868" y1="618" x2="868" y2="632"/><line x1="960" y1="618" x2="960" y2="632"/>
+    <line x1="1052" y1="618" x2="1052" y2="632"/><line x1="1144" y1="618" x2="1144" y2="632"/><line x1="1236" y1="618" x2="1236" y2="632"/>
+  </g>
+
+  <!-- stage cells -->
+  <g>
+    <!-- track under cells -->
+    <line class="edge" x1="150" y1="662" x2="1300" y2="662"/>
+    <!-- cells: pitch 92, width 74, gate at slot 4 -->
+    <g class="cell">
+      <rect class="card" x="150" y="632" width="74" height="60" rx="6"/><text class="mono num" x="160" y="650" font-size="9">01</text><text class="sans ttl" x="187" y="668" font-size="10" text-anchor="middle">intent</text>
+      <rect class="card" x="242" y="632" width="74" height="60" rx="6"/><text class="mono num" x="252" y="650" font-size="9">02</text><text class="sans ttl" x="279" y="664" font-size="9.5" text-anchor="middle">narra-</text><text class="sans ttl" x="279" y="676" font-size="9.5" text-anchor="middle">tive</text>
+      <rect class="card" x="334" y="632" width="74" height="60" rx="6"/><text class="mono num" x="344" y="650" font-size="9">03</text><text class="sans ttl" x="371" y="668" font-size="10" text-anchor="middle">shots</text>
+      <rect class="card" x="426" y="632" width="74" height="60" rx="6"/><text class="mono num" x="436" y="650" font-size="9">04</text><text class="sans ttl" x="463" y="668" font-size="10" text-anchor="middle">script</text>
+      <!-- quality gate -->
+      <rect x="525" y="645" width="30" height="30" rx="3" transform="rotate(45 540 660)" fill="#0e0e11" stroke="url(#accent)" stroke-width="1.2"/>
+      <use href="#chk" x="534" y="654" width="13" height="13"/>
+      <text class="mono mut" x="540" y="700" font-size="7.5" text-anchor="middle">QA gate</text>
+      <text class="mono mut" x="540" y="709" font-size="7" text-anchor="middle">off/warn/fail</text>
+      <rect class="card" x="610" y="632" width="74" height="60" rx="6"/><text class="mono num" x="620" y="650" font-size="9">05</text><text class="sans ttl" x="647" y="664" font-size="9.5" text-anchor="middle">subti-</text><text class="sans ttl" x="647" y="676" font-size="9.5" text-anchor="middle">tles</text>
+      <rect class="card" x="702" y="632" width="74" height="60" rx="6"/><text class="mono num" x="712" y="650" font-size="9">06</text><text class="sans ttl" x="739" y="668" font-size="10" text-anchor="middle">TTS</text>
+      <rect class="card" x="794" y="632" width="74" height="60" rx="6"/><text class="mono num" x="804" y="650" font-size="9">07</text><text class="sans ttl" x="831" y="664" font-size="9.5" text-anchor="middle">subtitle</text><text class="sans ttl" x="831" y="676" font-size="9.5" text-anchor="middle">refine</text>
+      <rect class="card" x="886" y="632" width="74" height="60" rx="6"/><text class="mono num" x="896" y="650" font-size="9">08</text><text class="sans ttl" x="923" y="668" font-size="10" text-anchor="middle">motion</text>
+      <rect class="card" x="978" y="632" width="74" height="60" rx="6"/><text class="mono num" x="988" y="650" font-size="9">09</text><text class="sans ttl" x="1015" y="664" font-size="9.5" text-anchor="middle">asset</text><text class="sans ttl" x="1015" y="676" font-size="9.5" text-anchor="middle">analysis</text>
+      <rect class="card" x="1070" y="632" width="74" height="60" rx="6"/><text class="mono num" x="1080" y="650" font-size="9">10</text><text class="sans ttl" x="1107" y="668" font-size="10" text-anchor="middle">visuals</text>
+      <rect class="card" x="1162" y="632" width="74" height="60" rx="6"/><text class="mono num" x="1172" y="650" font-size="9">11</text><text class="sans ttl" x="1199" y="664" font-size="9.5" text-anchor="middle">image</text><text class="sans ttl" x="1199" y="676" font-size="9.5" text-anchor="middle">sourcing</text>
+      <rect class="card" x="1254" y="632" width="74" height="60" rx="6" stroke="url(#accent)"/><text class="mono num" x="1264" y="650" font-size="9">12</text><text class="sans ttl" x="1291" y="668" font-size="10" text-anchor="middle">render</text>
+    </g>
+  </g>
+  <text class="mono mut" x="300" y="710" font-size="8.5" text-anchor="middle">each stage = pure fn · own POST endpoint · replay · bisect</text>
+  <!-- image fallback connector to cell 11 -->
+  <path class="edgeD" d="M806 546 V600 H1199 V632" marker-end="url(#ar)"/>
+
+  <!-- ===== RENDER FORK ===== -->
+  <path class="edge" d="M1291 692 V724 H566" marker-end="url(#ar)"/>
+  <text class="mono mut" x="980" y="719" font-size="8.5" text-anchor="middle">render → branches by mode</text>
+  <rect x="540" y="724" width="52" height="30" rx="3" transform="rotate(45 566 739)" fill="#0e0e11" stroke="#2a2a2e"/>
+  <text class="mono ttl" x="566" y="742" font-size="9" text-anchor="middle">mode?</text>
+
+  <!-- Branch A: slideshow -->
+  <path class="edge" d="M540 750 H360 V770" marker-end="url(#ar)"/>
+  <rect class="card" x="180" y="770" width="330" height="66" rx="8"/>
+  <text class="mono ttl" x="196" y="792" font-size="11">mode = slideshow</text>
+  <text class="mono sub" x="196" y="808" font-size="9">Remotion 4 render → public/temp/{jobId}.mp4</text>
+  <text class="mono mut" x="196" y="823" font-size="8.5">audio-scaled shot durations · burn captions</text>
+
+  <!-- Branch B: talking_object -->
+  <path class="edge" d="M592 750 H700 V764" marker-end="url(#ar)"/>
+  <rect class="band" x="556" y="764" width="618" height="92" rx="8"/>
+  <text class="mono ttl" x="570" y="781" font-size="11">mode = talking_object</text>
+  <rect class="ext" x="568" y="786" width="194" height="46" rx="6"/>
+  <text class="sans ttl" x="578" y="802" font-size="9.5">cartoon → Google VEO</text>
+  <text class="mono mut" x="578" y="815" font-size="7.8">resolveCartoonSubject ·</text>
+  <text class="mono mut" x="578" y="825" font-size="7.8">humanoid fallback</text>
+  <rect class="ext" x="770" y="786" width="194" height="46" rx="6"/>
+  <text class="sans ttl" x="780" y="802" font-size="9.5">studio → HeyGen + 11Labs</text>
+  <text class="mono mut" x="780" y="815" font-size="7.8">Photo Avatar · SHA-256 cache</text>
+  <text class="mono mut" x="780" y="825" font-size="7.8">auto-cleanup on 401028</text>
+  <rect class="ext" x="972" y="786" width="194" height="46" rx="6"/>
+  <text class="sans ttl" x="982" y="802" font-size="9.5">cinematic → multi-clip VEO</text>
+  <text class="mono mut" x="982" y="815" font-size="7.8">8s/18-word chunks · 1 presenter/clip</text>
+  <text class="mono mut" x="982" y="825" font-size="7.8">ffmpeg concat + crossfade · trim</text>
+  <text class="mono" x="570" y="849" font-size="8" fill="#e8b06a">VEO RAI filter → VeoContentFilteredError → LLM reword ×2 → actionable fail</text>
+
+  <!-- amber fallback B -> A -->
+  <path class="amber" d="M556 814 H524 V834 H512" marker-end="url(#arM)"/>
+  <text class="mono" x="318" y="853" font-size="8" fill="#e8b06a" text-anchor="middle">VEO quota / 429 → fallback to slideshow</text>
+
+  <!-- convergence to Blob (below the talking_object container) -->
+  <path class="edge" d="M490 836 V866 H1276 V838" marker-end="url(#ar)"/>
+  <text class="mono mut" x="900" y="861" font-size="8" text-anchor="middle">public/temp/{jobId}.mp4 → upload</text>
+  <path class="edge" d="M1174 804 H1196" marker-end="url(#ar)"/>
+  <rect x="1196" y="764" width="166" height="74" rx="8" fill="#0e0e11" stroke="url(#accent)" stroke-width="1.2"/>
+  <text class="mono ttl" x="1279" y="786" font-size="11" text-anchor="middle">Vercel Blob</text>
+  <text class="mono mut" x="1279" y="801" font-size="8" text-anchor="middle">put · public · mp4</text>
+  <text class="mono mut" x="1279" y="814" font-size="8" text-anchor="middle">https URL → job.result</text>
+  <text class="mono mut" x="1279" y="828" font-size="7.5" text-anchor="middle">single-host → serve public/temp</text>
+
+  <!-- accent riser closing the loop to OUTPUT -->
+  <path class="edgeA" d="M1362 776 H1384 V150 H1372" marker-end="url(#arA)"/>
+  <text class="mono mut" x="1390" y="460" font-size="8.5" text-anchor="middle" transform="rotate(-90 1390 460)">https url → polled result</text>
+
+  <!-- ===================== DATASTORES RAIL ===================== -->
+  <text class="mono mut" x="110" y="884" font-size="9">PERSISTENCE</text>
+  <rect class="card" x="110" y="890" width="546" height="62" rx="8"/>
+  <text class="sans ttl" x="126" y="912" font-size="11">Neon Postgres</text>
+  <text class="mono mut" x="126" y="928" font-size="8.3">Better Auth identity + passkey · user_plan_overrides · brand_kits</text>
+  <text class="mono mut" x="126" y="941" font-size="8.3">payments [checkout_session_id UNIQUE] · api_keys (SHA-256)</text>
+
+  <rect class="card" x="668" y="890" width="300" height="62" rx="8"/>
+  <text class="sans ttl" x="684" y="912" font-size="11">Redis (ioredis)</text>
+  <text class="mono mut" x="684" y="928" font-size="8.3">BullMQ queue · cancellation SET</text>
+  <text class="mono mut" x="684" y="941" font-size="8.3">rate-limit window · idempotency · heartbeat</text>
+
+  <rect class="ext" x="980" y="890" width="390" height="62" rx="8"/>
+  <text class="sans ttl" x="996" y="912" font-size="11">Dodo Payments</text>
+  <text class="mono mut" x="996" y="928" font-size="8.3">webhook signature verify · idempotent verifyAndUpgrade</text>
+  <text class="mono mut" x="996" y="941" font-size="8.3">Free / Beginner / Pro / Enterprise = 1 / 10 / ∞ / ∞</text>
+
+  <!-- footer + baseline -->
+  <text class="mono mut" x="110" y="971" font-size="8.5">Next 16.1.6 · React 19.2.3 · TypeScript 5 · Remotion 4 · BullMQ 5 + ioredis 5 · Better Auth 1.5.5 · Dodo Payments · Zod 4 · @google/genai 1.39 · HeyGen · ElevenLabs / PlayHT</text>
+  <rect class="draw" x="0" y="976" width="1400" height="4" fill="url(#accent)"/>
+</svg>
