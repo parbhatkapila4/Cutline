@@ -5,7 +5,7 @@ import path from "path";
 import { getDuration } from "@/lib/pipeline/concatMp4";
 import { isValidAspectRatio, type AspectRatio } from "@/lib/validation/aspectRatio";
 
-const VEO_MODEL = "veo-3.1-generate-preview";
+const VEO_MODEL = process.env.VEO_MODEL || "veo-3.1-generate-preview";
 const POLL_INTERVAL_MS = 10_000;
 
 const QUOTA_LIMIT_PATTERNS = [
@@ -24,6 +24,24 @@ function isQuotaOrLimitError(message: string): boolean {
   return QUOTA_LIMIT_PATTERNS.some((p) => lower.includes(p));
 }
 
+const TRANSIENT_INTERNAL_PATTERNS = [
+  "internal server",
+  "internal error",
+  "internalservererror",
+  "try again in a few minutes",
+  "try again later",
+  "please try again",
+  "503",
+  "500",
+  "backend error",
+  "temporarily unavailable",
+];
+
+function isTransientInternalError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return TRANSIENT_INTERNAL_PATTERNS.some((p) => lower.includes(p));
+}
+
 export class VeoQuotaOrLimitError extends Error {
   constructor(message: string) {
     super(message);
@@ -38,10 +56,23 @@ export class VeoContentFilteredError extends Error {
   }
 }
 
+export class VeoInternalServerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VeoInternalServerError";
+  }
+}
+
 function throwFromVeoRaw(raw: string): never {
   if (isQuotaOrLimitError(raw)) {
     throw new VeoQuotaOrLimitError(
       "We couldn’t create the talking-character video right now. The service may be busy or temporarily full. Please try again in a few minutes."
+    );
+  }
+  if (isTransientInternalError(raw)) {
+    console.error("[veo] transient internal error (raw):", raw);
+    throw new VeoInternalServerError(
+      "The video service had a temporary internal error. Please try again in a few minutes."
     );
   }
   console.error("[veo] generation error (raw):", raw);

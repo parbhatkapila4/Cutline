@@ -161,6 +161,7 @@ const VEO_WORDS_PER_CHUNK = 18;
 const VEO_CHUNK_SECONDS = 8;
 const VEO_CHUNK_VALIDATE_RETRIES = 2;
 const VEO_SAFETY_REWORDS = 2;
+const VEO_FILTER_REROLLS = 1;
 
 function maxVeoChunksForTargetDuration(targetSec: number): number {
   const L = VEO_CHUNK_SECONDS;
@@ -1277,20 +1278,17 @@ async function runPipelineOnce(
           const MAX_GENERATE_ATTEMPTS = VEO_CHUNK_VALIDATE_RETRIES + 1;
           let genAttempt = 0;
           let safetyRewords = 0;
+          let filterRerolls = 0;
           let lastChunkError: Error | null = null;
 
           while (true) {
             try {
-              const progressDetail =
-                `chunk ${i + 1} of ${N}` +
-                (safetyRewords > 0 ? ` (reword ${safetyRewords}/${VEO_SAFETY_REWORDS})` : "") +
-                (genAttempt > 0 ? ` (retry ${genAttempt}/${VEO_CHUNK_VALIDATE_RETRIES})` : "");
-              recordStageProgress(jobId, "veo", progressDetail);
+              recordStageProgress(jobId, "veo", `chunk ${i + 1} of ${N}`);
             } catch {
             }
             try {
-              if (genAttempt > 0 || safetyRewords > 0) {
-                console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N + " (gen " + genAttempt + "/" + VEO_CHUNK_VALIDATE_RETRIES + ", reword " + safetyRewords + "/" + VEO_SAFETY_REWORDS + ")");
+              if (genAttempt > 0 || safetyRewords > 0 || filterRerolls > 0) {
+                console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N + " (gen " + genAttempt + "/" + VEO_CHUNK_VALIDATE_RETRIES + ", reroll " + filterRerolls + "/" + VEO_FILTER_REROLLS + ", reword " + safetyRewords + "/" + VEO_SAFETY_REWORDS + ")");
                 if (fs.existsSync(chunkPath)) fs.unlinkSync(chunkPath);
               } else {
                 console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N);
@@ -1301,7 +1299,7 @@ async function runPipelineOnce(
                     talkingObjectStyle,
                     aspectRatio,
                   }),
-                { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
+                { maxAttempts: 4, baseDelayMs: 2000, maxDelayMs: 20000 }
               );
               const validation = validateVideoChunk(chunkPath, VEO_CHUNK_SECONDS);
               if (!validation.valid) {
@@ -1326,9 +1324,15 @@ async function runPipelineOnce(
               }
 
               if (lastChunkError instanceof VeoContentFilteredError) {
+                if (filterRerolls < VEO_FILTER_REROLLS) {
+                  filterRerolls++;
+                  console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " blocked by content-safety filter; retrying same prompt unchanged (reroll " + filterRerolls + "/" + VEO_FILTER_REROLLS + ")");
+                  await new Promise((r) => setTimeout(r, 2000));
+                  continue;
+                }
                 if (safetyRewords >= VEO_SAFETY_REWORDS) {
                   throw new Error(
-                    `Chunk ${i + 1}/${N} was blocked by the content-safety filter after ${VEO_SAFETY_REWORDS} rewrites. ` +
+                    `Chunk ${i + 1}/${N} was blocked by the content-safety filter after ${1 + VEO_FILTER_REROLLS + VEO_SAFETY_REWORDS} attempts (including rewording). ` +
                     `Try changing this part of your topic. Last error: ${lastChunkError.message}`
                   );
                 }
@@ -1344,13 +1348,11 @@ async function runPipelineOnce(
                   console.warn("[pipeline] jobId=" + jobId + " safety reword failed: " + (rwErr instanceof Error ? rwErr.message : String(rwErr)));
                 }
                 if (!reworded || !reworded.trim() || reworded.trim() === currentChunkText.trim()) {
-                  throw new Error(
-                    `Chunk ${i + 1}/${N} was blocked by the content-safety filter and could not be safely reworded. ` +
-                    `Try changing this part of your topic. Last error: ${lastChunkError.message}`
-                  );
+                  console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " reword produced no usable variation; retrying generation with current narration (reword " + safetyRewords + "/" + VEO_SAFETY_REWORDS + ")");
+                } else {
+                  currentChunkText = reworded.trim();
+                  prompt = buildChunkPrompt(currentChunkText);
                 }
-                currentChunkText = reworded.trim();
-                prompt = buildChunkPrompt(currentChunkText);
                 await new Promise((r) => setTimeout(r, 2000));
                 continue;
               }

@@ -2,28 +2,28 @@ import { DODO_PAYMENT_URL } from "@/lib/payments/links";
 
 export const POLL_INTERVAL_MS = 2500;
 
-export const DEFAULT_TEXT_MODEL = "anthropic/claude-3.5-haiku";
+export const DEFAULT_TEXT_MODEL = "anthropic/claude-haiku-4.5";
 
 export const TEXT_MODEL_OPTIONS: { value: string; label: string; desc: string }[] = [
   {
     value: "",
-    label: "Default (Haiku 3)",
-    desc: "Uses server default: Claude 3.5 Haiku",
+    label: "Default (Haiku 4.5)",
+    desc: "Uses server default: Claude Haiku 4.5",
   },
   {
-    value: "anthropic/claude-3.5-haiku",
-    label: "Claude 3.5 Haiku",
+    value: "anthropic/claude-haiku-4.5",
+    label: "Claude Haiku 4.5",
     desc: "Fast, capable default for script & intent",
   },
   {
-    value: "google/gemini-2.0-flash-exp",
-    label: "Gemini 2 Flash Exp",
-    desc: "Experimental: ~500 req/day",
+    value: "google/gemini-2.5-flash-lite",
+    label: "Gemini 2.5 Flash Lite",
+    desc: "Fastest, lowest-cost Gemini",
   },
   {
-    value: "google/gemini-2.5-flash-preview-05-20",
+    value: "google/gemini-2.5-flash",
     label: "Gemini 2.5 Flash",
-    desc: "Latest: ~10K req/day",
+    desc: "Stable Gemini Flash",
   },
 ];
 

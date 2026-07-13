@@ -11,7 +11,11 @@ import { notifyWebhook } from "@/lib/webhook/notify";
 
 export { isJobCancelled };
 
-const QUEUE_NAME = "video-generation";
+const QUEUE_NAME = process.env.VIDEO_QUEUE_NAME || "video-generation";
+
+export function getVideoQueueName(): string {
+  return QUEUE_NAME;
+}
 
 function getRedisConnection(): Redis {
   const url = process.env.REDIS_URL ?? "redis://localhost:6379";

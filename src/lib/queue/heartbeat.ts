@@ -1,8 +1,10 @@
 import type { Queue } from "bullmq";
 import type Redis from "ioredis";
-import { createRedisConnection } from "./videoQueue";
+import { createRedisConnection, getVideoQueueName } from "./videoQueue";
 
-export const WORKER_HEARTBEAT_KEY = "cutline:worker:heartbeat";
+export function workerHeartbeatKey(queueName: string): string {
+  return "cutline:worker:heartbeat:" + queueName;
+}
 const HEARTBEAT_TTL_SEC = 180;
 const DEFAULT_INTERVAL_MS = 20_000;
 
@@ -14,7 +16,7 @@ export function startWorkerHeartbeat(intervalMs: number = DEFAULT_INTERVAL_MS): 
   heartbeatRedis = createRedisConnection();
   const beat = () => {
     heartbeatRedis
-      ?.set(WORKER_HEARTBEAT_KEY, String(Date.now()), "EX", HEARTBEAT_TTL_SEC)
+      ?.set(workerHeartbeatKey(getVideoQueueName()), String(Date.now()), "EX", HEARTBEAT_TTL_SEC)
       .catch(() => {
       });
   };
@@ -37,7 +39,7 @@ export async function stopWorkerHeartbeat(): Promise<void> {
 export async function isWorkerAlive(queue: Queue): Promise<boolean> {
   try {
     const client = await queue.client;
-    const v = await client.get(WORKER_HEARTBEAT_KEY);
+    const v = await client.get(workerHeartbeatKey(queue.name));
     return v != null;
   } catch {
     return true;

@@ -14,9 +14,10 @@ import type {
   ReferenceVideoAnalysis,
 } from "@/lib/assets/types";
 import type { AssetMetadata } from "@/lib/assets/types";
+import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_VISION_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_VISION_MODEL = "anthropic/claude-haiku-4.5";
 const HEX_REGEX = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
 
 function normalizeHex(s: string): string {
@@ -109,7 +110,7 @@ async function visionAnalyzeImage(
   }
 
   try {
-    return JSON.parse(raw) as Record<string, unknown>;
+    return JSON.parse(extractJsonFromModelOutput(raw)) as Record<string, unknown>;
   } catch {
     throw new Error("Vision API returned invalid JSON");
   }

@@ -7,7 +7,7 @@ import { shouldRetryForLLM } from "@/lib/utils/retry";
 import { getModelCandidates } from "@/lib/pipeline/modelFallback";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 export async function mapStrictScriptToShots(
   intent: Intent,
   plan: NarrativePlan,

@@ -203,22 +203,22 @@ export default function HowPage() {
             <div className="space-y-6 text-zinc-400 text-sm">
               <div className="rounded-xl border border-white/10 bg-white/2 p-5">
                 <h3 className="font-semibold text-white mb-2">Default model (all jobs)</h3>
-                <p className="mb-2">Set <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> in <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">.env.local</code>. For example, <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">anthropic/claude-3.5-haiku</code> is a fast default. This model is used for every LLM stage unless you override it for a specific job.</p>
+                <p className="mb-2">Set <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> in <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">.env.local</code>. For example, <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">anthropic/claude-haiku-4.5</code> is a fast default. This model is used for every LLM stage unless you override it for a specific job.</p>
                 <p className="text-zinc-500">For asset analysis (when you upload images), you can set <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_VISION_MODEL</code> to a vision-capable model. If you don’t, the same <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> is used.</p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/2 p-5">
                 <h3 className="font-semibold text-white mb-2">Per-job override</h3>
                 <p className="mb-2">On the main page, the “Text model” dropdown lets you pick a different model for that single video. When you start a job, the app sends <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">textModel</code> in the request body. That model is then used for every LLM stage in that job (Intent, Narrative, Shots, Script, image query, asset analysis). Useful when you want to try a more capable model for one video without changing .env.</p>
-                <p className="text-zinc-500">You can use any model ID that OpenRouter supports (e.g. anthropic/claude-3.5-sonnet, openai/gpt-4o) as long as your OpenRouter API key has access.</p>
+                <p className="text-zinc-500">You can use any model ID that OpenRouter supports (e.g. anthropic/claude-sonnet-4.5, openai/gpt-4o) as long as your OpenRouter API key has access.</p>
               </div>
             </div>
             <p className="text-zinc-400 mt-6 mb-2 text-sm">Example options in the dropdown (approximate limits are from the providers):</p>
             <div className="rounded-xl border border-white/10 bg-white/2 p-4 font-mono text-sm text-zinc-400 space-y-1">
               <div>• Default (from env) - uses OPENROUTER_MODEL</div>
-              <div>• google/gemini-2.0-flash-exp - ~500/day</div>
-              <div>• google/gemini-2.5-flash-preview-05-20 - ~10K/day</div>
+              <div>• google/gemini-2.5-flash-lite - fastest, lowest-cost Gemini</div>
+              <div>• google/gemini-2.5-flash - stable Gemini Flash</div>
               <div>• google/gemini-2.5-flash-image - ~2K/day</div>
-              <div>• anthropic/claude-3.5-haiku - fast default text model</div>
+              <div>• anthropic/claude-haiku-4.5 - fast default text model</div>
             </div>
           </section>
 
@@ -310,7 +310,7 @@ export default function HowPage() {
                 <strong className="text-zinc-300">mode</strong> - Either <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">&quot;slideshow&quot;</code> or <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">&quot;talking_object&quot;</code>. Default is slideshow.
               </li>
               <li>
-                <strong className="text-zinc-300">textModel</strong> - An OpenRouter model ID (e.g. <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">google/gemini-2.5-flash-preview-05-20</code>). Overrides <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> for this job only; every LLM stage in that job uses this model.
+                <strong className="text-zinc-300">textModel</strong> - An OpenRouter model ID (e.g. <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">google/gemini-2.5-flash</code>). Overrides <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">OPENROUTER_MODEL</code> for this job only; every LLM stage in that job uses this model.
               </li>
             </ul>
           </section>

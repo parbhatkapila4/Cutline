@@ -1,9 +1,10 @@
 import type { Intent } from "@/lib/types";
 import type { Shot } from "@/lib/types";
 import type { Script } from "@/lib/types";
+import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 export type DeriveResult = {
   searchQuery: string;
@@ -94,7 +95,7 @@ export async function deriveImageQuery(
 
   let parsed: { searchQuery?: string; imagePrompt?: string };
   try {
-    parsed = JSON.parse(raw) as { searchQuery?: string; imagePrompt?: string };
+    parsed = JSON.parse(extractJsonFromModelOutput(raw)) as { searchQuery?: string; imagePrompt?: string };
   } catch {
     throw new Error("Query derivation returned invalid JSON");
   }

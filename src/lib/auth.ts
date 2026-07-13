@@ -12,6 +12,8 @@ const pool =
         60_000,
         Math.max(5000, Number(process.env.PG_CONNECTION_TIMEOUT_MS ?? "15000") || 15_000)
       ),
+      query_timeout: Math.min(30_000, Math.max(3000, Number(process.env.PG_QUERY_TIMEOUT_MS ?? "10000") || 10_000)),
+      statement_timeout: Math.min(30_000, Math.max(3000, Number(process.env.PG_STATEMENT_TIMEOUT_MS ?? "10000") || 10_000)),
       allowExitOnIdle: true,
       keepAlive: true,
     })

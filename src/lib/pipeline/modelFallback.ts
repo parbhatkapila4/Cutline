@@ -1,4 +1,4 @@
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 export function getModelCandidates(primaryModel: string): string[] {
   const configuredFallbacks = (process.env.OPENROUTER_FALLBACK_MODELS ?? "")

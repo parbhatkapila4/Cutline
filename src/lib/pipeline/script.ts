@@ -6,9 +6,10 @@ import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
 import type { BrandBrainInput } from "@/lib/types/pipelineEnhancements";
 import { shouldRetryForLLM } from "@/lib/utils/retry";
 import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const BASE_SYSTEM_PROMPT = `You are a script writer for a short video. Structure (beats, shots) is already decided. You fill each shot with spoken text or silence.
 
@@ -139,7 +140,7 @@ export function parseAndValidateScript(
 ): Script {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw) as Record<string, unknown>;
+    parsed = JSON.parse(extractJsonFromModelOutput(raw)) as Record<string, unknown>;
   } catch {
     throw new Error("Script generation failed: invalid JSON from model");
   }

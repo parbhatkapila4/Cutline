@@ -39,7 +39,7 @@ No fixes were required for wiring; tests were added to lock behavior.
 
 ## API keys and quotas
 
-- [ ] **OpenRouter** key has quota and correct model (e.g. `OPENROUTER_MODEL=anthropic/claude-3.5-sonnet`).
+- [ ] **OpenRouter** key has quota and correct model (e.g. `OPENROUTER_MODEL=anthropic/claude-haiku-4.5`). Verify the slug is still listed at https://openrouter.ai/api/v1/models — retired slugs fail every LLM stage with a 404.
 - [ ] **TTS** key valid and voice ID correct; check provider rate limits.
 - [ ] **Unsplash / Pexels** keys valid; check rate limits.
 - [ ] **OpenAI** key valid if using DALL·E fallback.

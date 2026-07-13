@@ -6,9 +6,10 @@ import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
 import { shouldRetryForLLM } from "@/lib/utils/retry";
 import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 export type PlanNarrativeOptions = {
   model?: string;
@@ -113,7 +114,7 @@ function isBeatPacing(s: string): s is BeatPacing {
 function parseAndValidatePlan(raw: string, targetDuration: number): NarrativePlan {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw) as Record<string, unknown>;
+    parsed = JSON.parse(extractJsonFromModelOutput(raw)) as Record<string, unknown>;
   } catch {
     throw new Error("Narrative planning failed: invalid JSON from model");
   }

@@ -1,5 +1,5 @@
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const SYSTEM_PROMPT = `You rewrite ONE line of spoken video narration so it passes an automated content-safety / Responsible-AI filter for AI video generation, while preserving the original meaning and length.
 
@@ -7,7 +7,8 @@ Rules:
 - Output ONLY the rewritten line. No quotes, no preamble, no notes.
 - Keep the same meaning, key facts, and roughly the same word count (the line is timed to on-screen video).
 - Neutralize anything that commonly trips safety filters: references to real, identifiable or named people (public figures, celebrities, politicians), violence or self-harm, hate or harassment, sexual content, graphic medical content, and explicit brand names. Replace a named real person with a neutral description of their role.
-- Keep it natural, spoken, and plain. No disclaimers, no meta commentary.`;
+- Keep it natural, spoken, and plain. No disclaimers, no meta commentary.
+- Even if the line already seems safe, rewrite it with meaningfully different wording — the filter may have flagged it by mistake, and a fresh phrasing gives a new attempt. NEVER return the input verbatim.`;
 
 export type RewriteForSafetyOptions = { model?: string };
 

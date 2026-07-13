@@ -5,6 +5,7 @@ export function isRetryableError(err: unknown): boolean {
 
   if (name === "AbortError" && lower.includes("cancel")) return false;
   if (name === "VeoContentFilteredError") return false;
+  if (name === "VeoInternalServerError") return true;
 
   const status = parseHttpStatus(err);
   if (status != null) {

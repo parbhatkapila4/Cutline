@@ -1,5 +1,5 @@
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const SYSTEM_PROMPT = `You are an edit interpreter for a video generation system. You are given:
 1. The original video prompt (what the current video was generated from).

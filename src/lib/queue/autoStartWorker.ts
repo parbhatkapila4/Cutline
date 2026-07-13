@@ -22,6 +22,15 @@ export async function ensureInProcessWorkerStarted(): Promise<void> {
   globalThis.__cutlineInProcessWorker = worker;
   globalThis.__cutlineInProcessWorkerStarted = true;
   try {
+    const { startWorkerHeartbeat } = await import("@/lib/queue/heartbeat");
+    startWorkerHeartbeat();
+  } catch (e) {
+    console.warn(
+      "[worker] startWorkerHeartbeat failed:",
+      e instanceof Error ? e.message : String(e)
+    );
+  }
+  try {
     await scheduleCleanupJob();
   } catch (e) {
     console.warn(

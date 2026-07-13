@@ -13,7 +13,7 @@ try {
   process.exit(1);
 }
 
-import { scheduleCleanupJob, startVideoWorker, deleteStaleJobs } from "@/lib/queue/videoQueue";
+import { scheduleCleanupJob, startVideoWorker, deleteStaleJobs, getVideoQueueName } from "@/lib/queue/videoQueue";
 import { cleanupExpiredTempDirs } from "@/lib/storage/cleanup";
 import { startWorkerHeartbeat, stopWorkerHeartbeat } from "@/lib/queue/heartbeat";
 
@@ -55,7 +55,7 @@ if (retentionDays > 0) {
   console.log("[worker] Stale job cleanup scheduled every 24h (retentionDays=" + retentionDays + ")");
 }
 
-console.log("[worker] Video generation worker started. Queue: video-generation");
+console.log("[worker] Video generation worker started. Queue: " + getVideoQueueName());
 
 process.on("SIGTERM", async () => {
   console.log("[worker] SIGTERM received, closing worker…");

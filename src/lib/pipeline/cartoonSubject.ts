@@ -1,5 +1,7 @@
+import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
+
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const SYSTEM_PROMPT = `You decide whether an AI-generated talking cartoon should be SHAPED LIKE a specific physical object, or whether it should fall back to a GENERIC HUMANOID cartoon character.
 
@@ -97,7 +99,7 @@ export async function resolveCartoonSubject(
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(extractJsonFromModelOutput(raw));
     } catch {
       return { shape: "humanoid" };
     }
