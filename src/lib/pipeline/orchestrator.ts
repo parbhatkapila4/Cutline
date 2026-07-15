@@ -1215,6 +1215,7 @@ async function runPipelineOnce(
         const jobTempDir = path.join(outputDir, jobId);
         fs.mkdirSync(jobTempDir, { recursive: true });
         const chunkPaths: string[] = [];
+        let droppedChunks = 0;
         const N = textChunks.length;
         for (let i = 0; i < N; i++) {
           if (job?.token) {
@@ -1331,10 +1332,14 @@ async function runPipelineOnce(
                   continue;
                 }
                 if (safetyRewords >= VEO_SAFETY_REWORDS) {
-                  throw new Error(
-                    `Chunk ${i + 1}/${N} was blocked by the content-safety filter after ${1 + VEO_FILTER_REROLLS + VEO_SAFETY_REWORDS} attempts (including rewording). ` +
-                    `Try changing this part of your topic. Last error: ${lastChunkError.message}`
+                  droppedChunks++;
+                  console.warn(
+                    "[pipeline] jobId=" + jobId + " chunk " + (i + 1) + "/" + N +
+                    " permanently blocked by content-safety filter after all retries; skipping this segment and continuing. Last error: " +
+                    lastChunkError.message
                   );
+                  lastChunkError = null;
+                  break;
                 }
                 safetyRewords++;
                 console.warn("[pipeline] jobId=" + jobId + " chunk " + (i + 1) + " blocked by content-safety filter; rewording narration (" + safetyRewords + "/" + VEO_SAFETY_REWORDS + ")");
@@ -1371,6 +1376,24 @@ async function runPipelineOnce(
           }
         }
 
+        if (chunkPaths.length === 0) {
+          throw new Error(
+            "Every segment was blocked by the content-safety filter, so no video could be assembled. " +
+            "Try changing your topic or wording, switch to Cartoon style, or use Slideshow mode."
+          );
+        }
+        if (droppedChunks > 0) {
+          const seg = droppedChunks === 1 ? "segment" : "segments";
+          const wasWere = droppedChunks === 1 ? "was" : "were";
+          message =
+            (message ? message + " " : "") +
+            `${droppedChunks} ${seg} couldn't clear the content-safety filter and ${wasWere} skipped, so your video is a little shorter than ${targetDurationSec}s.`;
+          console.log(
+            "[pipeline] jobId=" + jobId + " delivered " + chunkPaths.length + "/" + N +
+            " segments (" + droppedChunks + " dropped by content filter)."
+          );
+        }
+
         for (let i = 0; i < chunkPaths.length; i++) {
           const v = validateVideoChunk(chunkPaths[i]!, VEO_CHUNK_SECONDS);
           if (!v.valid) {
@@ -1400,17 +1423,18 @@ async function runPipelineOnce(
           const videoDurationSec = totalVideoSec > 0 ? totalVideoSec : (() => {
             const chunkDurations = chunkPaths.map((p) => getDuration(p) || 8);
             const crossfadeSec = CROSSFADE_DURATION_SECONDS;
-            return chunkDurations.reduce((a, b) => a + b, 0) - (textChunks.length - 1) * crossfadeSec;
+            return chunkDurations.reduce((a, b) => a + b, 0) - Math.max(0, chunkPaths.length - 1) * crossfadeSec;
           })();
           if (videoDurationSec <= 0) {
             throw new Error("Could not get video duration for captions. Captions were requested but cannot be added.");
           } else {
-            const n = Math.max(1, textChunks.length);
+            const captionTexts = finalChunkTexts.length > 0 ? finalChunkTexts : textChunks;
+            const n = Math.max(1, captionTexts.length);
             const durationMs = videoDurationSec * 1000;
             const minCaptionMs = 1000;
             const entries: SubtitleEntry[] = [];
-            for (let i = 0; i < textChunks.length; i++) {
-              const text = (finalChunkTexts[i] ?? textChunks[i] ?? "").trim();
+            for (let i = 0; i < captionTexts.length; i++) {
+              const text = (captionTexts[i] ?? "").trim();
               if (!text) continue;
               const startMs = Math.round((i / n) * durationMs);
               let endMs = Math.round(((i + 1) / n) * durationMs);
