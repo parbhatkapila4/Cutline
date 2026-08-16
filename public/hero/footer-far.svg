@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 810" width="2400" height="810" role="presentation">
+<defs>
+  <!-- The first stop is nearly the page's own paper. The band butts straight
+       up against the #f4f3f3 link grid, and starting the sky on full cool blue
+       put a hard colour seam along that join. -->
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#eff1f2"/>
+    <stop offset="0.17" stop-color="#dde5f0"/>
+    <stop offset="0.4" stop-color="#ecedea"/>
+    <stop offset="0.66" stop-color="#f8e9cf"/>
+    <stop offset="0.9" stop-color="#fcdfae"/>
+  </linearGradient>
+  <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="rgba(252,213,146,0.88)"/>
+    <stop offset="0.34" stop-color="rgba(250,206,138,0.32)"/>
+    <stop offset="1" stop-color="rgba(250,206,138,0)"/>
+  </radialGradient>
+  <linearGradient id="m1g" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#aab5ca"/>
+    <stop offset="1" stop-color="#c0c9d8"/>
+  </linearGradient>
+  <linearGradient id="m2g" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#8190ac"/>
+    <stop offset="1" stop-color="#97a4bd"/>
+  </linearGradient>
+  <!-- Shade faces die out well above the base: a flat fill leaves a hard
+       horizontal cut across the range where the wedge ends. -->
+  <linearGradient id="sh1" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#9caac1"/>
+    <stop offset="0.55" stop-color="#9caac1" stop-opacity="0.35"/>
+    <stop offset="1" stop-color="#9caac1" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="sh2" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#74839e"/>
+    <stop offset="0.5" stop-color="#74839e" stop-opacity="0.35"/>
+    <stop offset="1" stop-color="#74839e" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="haze1" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="rgba(251,235,209,0)"/>
+    <stop offset="1" stop-color="rgba(251,235,209,0.72)"/>
+  </linearGradient>
+  <linearGradient id="trail" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#5f6b79" stop-opacity="0.42"/>
+    <stop offset="1" stop-color="#5f6b79" stop-opacity="0"/>
+  </linearGradient>
+  <clipPath id="clipR1"><path d="M-90,283L-57,270L-17,226L9,297L147,352L276,346L309,310L360,360L483,356L601,376L642,332L666,360L773,436L830,412L887,400L923,411L1000,426L1098,391L1129,373L1185,389L1269,439L1415,411L1466,393L1519,410L1571,448L1646,400L1709,377L1751,406L1886,409L1998,345L2054,318L2103,343L2170,361L2276,266L2323,207L2365,285L2490,246L2490,540L-90,540Z"/></clipPath>
+  <clipPath id="clipR2"><path d="M-90,411L-52,401L-9,374L26,413L146,445L224,437L270,408L292,434L325,453L362,457L398,435L423,448L523,481L630,474L666,461L702,474L800,525L852,491L891,481L917,488L1002,527L1097,481L1126,474L1157,480L1215,496L1290,477L1327,466L1358,478L1409,499L1435,459L1476,441L1512,466L1595,459L1713,452L1744,423L1782,439L1820,465L1889,405L1936,358L1975,389L2063,413L2152,398L2192,368L2228,398L2276,396L2327,388L2376,338L2418,388L2490,378L2490,580L-90,580Z"/></clipPath>
+  <filter id="wobFar" filterUnits="userSpaceOnUse" x="-100" y="110" width="2600" height="820" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency="0.005" numOctaves="2" seed="3" result="t"/>
+<feDisplacementMap in="SourceGraphic" in2="t" scale="10" xChannelSelector="R" yChannelSelector="G"/>
+</filter>
+  <filter id="soften" filterUnits="userSpaceOnUse" x="-100" y="0" width="2600" height="810" color-interpolation-filters="sRGB">
+<feGaussianBlur stdDeviation="7"/>
+</filter>
+  
+<filter id="grainF" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/>
+  <feColorMatrix type="saturate" values="0"/>
+</filter>
+<pattern id="grain" width="200" height="200" patternUnits="userSpaceOnUse">
+  <rect width="200" height="200" filter="url(#grainF)"/>
+</pattern>
+</defs>
+
+<rect width="2400" height="810" fill="url(#sky)"/>
+<ellipse cx="1944" cy="356" rx="900" ry="480" fill="url(#sunGlow)"/>
+<circle cx="1944" cy="356" r="31" fill="#fdf5e3"/>
+
+<g fill="#ffffff"><g opacity="0.66"><ellipse cx="20" cy="100" rx="107" ry="15"/><ellipse cx="160" cy="94" rx="93" ry="27"/><ellipse cx="300" cy="91" rx="83" ry="32"/><ellipse cx="440" cy="95" rx="109" ry="24"/><ellipse cx="580" cy="100" rx="84" ry="15"/><rect x="20" y="98" width="560" height="4" rx="2"/></g><g opacity="0.46"><ellipse cx="1010" cy="164" rx="70" ry="10"/><ellipse cx="1070" cy="161" rx="43" ry="16"/><ellipse cx="1130" cy="160" rx="51" ry="19"/><ellipse cx="1190" cy="158" rx="43" ry="22"/><ellipse cx="1250" cy="158" rx="65" ry="21"/><ellipse cx="1310" cy="162" rx="71" ry="14"/><ellipse cx="1370" cy="164" rx="74" ry="10"/><rect x="1010" y="162" width="360" height="4" rx="2"/></g><g opacity="0.4"><ellipse cx="1670" cy="76" rx="60" ry="9"/><ellipse cx="1750" cy="72" rx="46" ry="16"/><ellipse cx="1830" cy="70" rx="49" ry="20"/><ellipse cx="1910" cy="74" rx="59" ry="13"/><ellipse cx="1990" cy="76" rx="66" ry="9"/><rect x="1670" y="74" width="320" height="4" rx="2"/></g><g opacity="0.28"><ellipse cx="1350" cy="218" rx="74" ry="10"/><ellipse cx="1434" cy="215" rx="82" ry="16"/><ellipse cx="1518" cy="211" rx="55" ry="23"/><ellipse cx="1602" cy="212" rx="67" ry="22"/><ellipse cx="1686" cy="216" rx="84" ry="15"/><ellipse cx="1770" cy="218" rx="67" ry="10"/><rect x="1350" y="216" width="420" height="4" rx="2"/></g><g opacity="0.3"><ellipse cx="635" cy="192" rx="30" ry="7"/><ellipse cx="677" cy="190" rx="34" ry="12"/><ellipse cx="718" cy="189" rx="32" ry="13"/><ellipse cx="760" cy="187" rx="38" ry="16"/><ellipse cx="802" cy="188" rx="44" ry="15"/><ellipse cx="843" cy="190" rx="36" ry="11"/><ellipse cx="885" cy="192" rx="41" ry="7"/><rect x="635" y="190" width="250" height="4" rx="2"/></g></g>
+
+<!-- Trail fades out behind rather than running at one value to the frame edge:
+     a uniform dashed line reads as a drawn rule, a fading one as air. -->
+<path d="M452,226 C578,180 736,174 892,206" fill="none" stroke="url(#trail)" stroke-width="2.2" stroke-dasharray="7 15" stroke-linecap="round"/>
+<g color="#5f6b79" opacity="0.66" transform="translate(392,236) scale(1.1)">
+<g transform="rotate(-5)">
+  <path d="M-6,-2 L-21,-7 M6,-2 L21,-7 M-6.5,2 L-24,9 M6.5,2 L24,9"
+        fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <rect x="-9.5" y="-4.6" width="19" height="10" rx="4.2"/>
+    <path d="M-9,-0.4 L-13.6,0.6 L-9,1.6 Z"/>
+    <path d="M-2,5 L2.4,5 L2,7.2 L-1.6,7.2 Z"/>
+    <circle cx="0.3" cy="8.4" r="2.5"/>
+    <circle cx="-21" cy="-7" r="1.9"/>
+    <circle cx="21" cy="-7" r="1.9"/>
+    <circle cx="-24" cy="9" r="2.1"/>
+    <circle cx="24" cy="9" r="2.1"/>
+  </g>
+  <g fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-opacity="0.6" stroke-width="1.3">
+    <ellipse cx="-21" cy="-9.1" rx="12.5" ry="2.8"/>
+    <ellipse cx="21" cy="-9.1" rx="12.5" ry="2.8"/>
+    <ellipse cx="-24" cy="6.7" rx="14.5" ry="3.3"/>
+    <ellipse cx="24" cy="6.7" rx="14.5" ry="3.3"/>
+  </g>
+</g></g>
+
+<g filter="url(#wobFar)">
+  <path fill="url(#m1g)" d="M-90,283L-57,270L-17,226L9,297L147,352L276,346L309,310L360,360L483,356L601,376L642,332L666,360L773,436L830,412L887,400L923,411L1000,426L1098,391L1129,373L1185,389L1269,439L1415,411L1466,393L1519,410L1571,448L1646,400L1709,377L1751,406L1886,409L1998,345L2054,318L2103,343L2170,361L2276,266L2323,207L2365,285L2490,246L2490,540L-90,540Z"/>
+  <g clip-path="url(#clipR1)">
+    <g filter="url(#soften)">
+      <path fill="url(#sh1)" d="M-90,283L-57,270L-17,226L96,540L-90,540ZM147,352L276,346L309,310L392,540L147,540ZM360,360L483,356L549,540L360,540ZM601,376L642,332L717,540L601,540ZM773,436L830,412L887,400L937,540L773,540ZM1000,426L1098,391L1129,373L1190,540L1000,540ZM1269,439L1415,411L1466,393L1519,540L1269,540ZM1571,448L1646,400L1709,377L1768,540L1571,540ZM1886,409L1998,345L2054,318L2134,540L1886,540ZM2170,361L2276,266L2323,207L2443,540L2170,540Z"/>
+    </g>
+    <path fill="#f3f6fb" d="M-90,283L-57,270L-17,226L9,297L147,352L276,346L309,310L360,360L483,356L483,417L421,375L360,417L334,347L309,372L293,360L276,415L212,361L147,404L78,337L9,383L-4,286L-17,328L-37,255L-57,368L-74,298L-90,341ZM642,332L666,360L666,414L654,390L642,377ZM1998,345L2054,318L2103,343L2170,361L2276,266L2323,207L2365,285L2490,246L2490,367L2427,308L2365,371L2344,254L2323,337L2300,266L2276,356L2223,325L2170,400L2137,386L2103,402L2078,361L2054,375L2026,353L1998,397Z"/>
+  </g>
+
+  <path fill="url(#m2g)" d="M-90,411L-52,401L-9,374L26,413L146,445L224,437L270,408L292,434L325,453L362,457L398,435L423,448L523,481L630,474L666,461L702,474L800,525L852,491L891,481L917,488L1002,527L1097,481L1126,474L1157,480L1215,496L1290,477L1327,466L1358,478L1409,499L1435,459L1476,441L1512,466L1595,459L1713,452L1744,423L1782,439L1820,465L1889,405L1936,358L1975,389L2063,413L2152,398L2192,368L2228,398L2276,396L2327,388L2376,338L2418,388L2490,378L2490,580L-90,580Z"/>
+  <g clip-path="url(#clipR2)">
+    <g filter="url(#soften)">
+      <path fill="url(#sh2)" d="M-90,411L-52,401L-9,374L65,580L-90,580ZM146,445L224,437L270,408L332,580L146,580ZM362,457L398,435L451,580L362,580ZM523,481L630,474L666,461L709,580L523,580ZM800,525L852,491L891,481L927,580L800,580ZM1002,527L1097,481L1126,474L1164,580L1002,580ZM1215,496L1290,477L1327,466L1368,580L1215,580ZM1409,499L1435,459L1476,441L1526,580L1409,580ZM1512,466L1595,459L1713,452L1744,423L1800,580L1512,580ZM1820,465L1889,405L1936,358L2015,580L1820,580ZM2063,413L2152,398L2192,368L2268,580L2063,580ZM2228,398L2276,396L2327,388L2376,338L2463,580L2228,580Z"/>
+    </g>
+    <path fill="#e3e9f2" d="M1936,358L1975,389L1975,416L1955,397L1936,411ZM2327,388L2376,338L2418,388L2490,378L2490,405L2454,403L2418,411L2397,390L2376,400L2351,391L2327,423Z"/>
+  </g>
+  <rect x="-90" y="430" width="2580" height="150" fill="url(#haze1)"/>
+</g>
+
+<rect width="2400" height="810" fill="url(#grain)" opacity="0.05" style="mix-blend-mode:multiply"/>
+</svg>

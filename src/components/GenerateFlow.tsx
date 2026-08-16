@@ -6,6 +6,7 @@ import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
 import type { Platform } from "@/lib/platform/types";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import { CopyLinkButton } from "@/components/generate/CopyLinkButton";
+import { PendingLabel, Skeleton } from "@/components/ui/skeleton";
 import {
   DEFAULT_ASPECT_RATIO,
   DURATION_DEFAULT,
@@ -340,13 +341,7 @@ export function GenerateFlow({ embedded = false }: Props) {
                   className="inline-flex items-center gap-2 bg-white text-zinc-900 font-medium px-5 py-2.5 rounded-lg hover:bg-zinc-200 disabled:opacity-50 transition-colors text-sm"
                 >
                   {submitting ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Starting...
-                    </>
+                    <PendingLabel>Starting the render</PendingLabel>
                   ) : (
                     <>
                       Render Final Version
@@ -400,13 +395,14 @@ export function GenerateFlow({ embedded = false }: Props) {
               <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center">
                 <span className="text-2xl">{STAGES[stage].icon}</span>
               </div>
-              <div className="absolute inset-0 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin"></div>
+              <div className="absolute inset-0 rounded-full border-2 border-blue-500/25" />
             </div>
           </div>
 
           <div className="text-center mb-8">
             <p className="text-lg font-medium text-white mb-1">{STAGES[stage].label}</p>
             <p className="text-sm text-zinc-500">Step {stage + 1} of {STAGES.length}</p>
+            <Skeleton tone="dark" className="mx-auto mt-4 h-1 w-40 rounded-full" />
           </div>
 
           <div className="space-y-3 mb-8">
@@ -772,13 +768,7 @@ export function GenerateFlow({ embedded = false }: Props) {
             className="inline-flex items-center justify-center gap-2 bg-zinc-700 text-white font-medium px-5 py-3 rounded-lg hover:bg-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {submitting ? (
-              <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Starting...
-              </>
+              <PendingLabel>Starting the render</PendingLabel>
             ) : (
               "Generate Preview"
             )}
@@ -789,13 +779,7 @@ export function GenerateFlow({ embedded = false }: Props) {
             className="inline-flex items-center justify-center gap-2 bg-white text-zinc-900 font-semibold px-6 py-3 rounded-lg hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {submitting ? (
-              <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Starting...
-              </>
+              <PendingLabel>Starting the render</PendingLabel>
             ) : (
               <>
                 Generate video

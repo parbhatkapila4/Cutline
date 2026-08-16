@@ -14,15 +14,13 @@ import type {
 } from "@/lib/types";
 import Link from "next/link";
 import { useCallback, useState } from "react";
+import { PendingLabel, SkeletonText } from "@/components/ui/skeleton";
 
 function StageLoading({ message }: { message: string }) {
   return (
-    <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
-      <span
-        className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600"
-        aria-hidden
-      />
-      {message}
+    <div className="mt-6 text-sm text-zinc-500">
+      <PendingLabel>{message}</PendingLabel>
+      <SkeletonText className="mt-3 max-w-md" lines={2} lineClassName="h-3" />
     </div>
   );
 }

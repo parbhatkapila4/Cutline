@@ -13,8 +13,8 @@ function copyShotAssetBetweenJobs(
   cwd: string
 ): string | null {
   if (!imageUrl.startsWith("/temp/")) return null;
-  const rel = imageUrl.replace(/^\//, "");
-  const absOld = path.join(cwd, "public", rel);
+  const relWithinTemp = imageUrl.slice("/temp/".length);
+  const absOld = path.join(cwd, "public", "temp", relWithinTemp);
   if (!fs.existsSync(absOld) || !fs.statSync(absOld).isFile()) return null;
   const ext = path.extname(absOld) || ".png";
   const destDir = path.join(cwd, "public", "temp", newJobId, "images");

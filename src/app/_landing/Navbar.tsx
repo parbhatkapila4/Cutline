@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { authClient, useCachedSession } from "@/lib/auth-client";
+import { PendingLabel } from "@/components/ui/skeleton";
 
 export function Navbar() {
   const { data: sessionData, isPending: sessionPending } = useCachedSession();
@@ -192,11 +193,10 @@ export function Navbar() {
                 aria-label={isSigningIn ? "Opening sign-in" : "Sign in"}
                 className="relative inline-flex items-center justify-center min-w-[88px] px-4 py-2 rounded-full bg-[#0a0a0a] hover:bg-black text-white text-[12px] font-bold tracking-[0.06em] uppercase shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors disabled:cursor-default"
               >
-                <span className={isSigningIn ? "invisible" : ""}>Sign in</span>
-                {isSigningIn && (
-                  <span className="absolute inset-0 flex items-center justify-center" aria-hidden>
-                    <span className="block w-3.5 h-3.5 rounded-full border-[1.5px] border-white/15 border-t-emerald-400 animate-spin" />
-                  </span>
+                {isSigningIn ? (
+                  <PendingLabel>Opening…</PendingLabel>
+                ) : (
+                  <span>Sign in</span>
                 )}
               </button>
             )}

@@ -260,7 +260,7 @@ async function analyzeReferenceImage(
 
 function extractKeyframes(videoPath: string, assetId: string): string[] {
   const cwd = process.cwd();
-  const uploadDir = path.join(cwd, process.env.UPLOAD_DIR ?? "uploads");
+  const uploadDir = path.join(cwd, "uploads");
   const keyframesDir = path.join(uploadDir, "_keyframes", assetId);
   fs.mkdirSync(keyframesDir, { recursive: true });
 

@@ -55,4 +55,22 @@ export const auth = betterAuth({
       }
       : {}),
   },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          const { ensureUserPlan } = await import("@/lib/users/planService");
+          await ensureUserPlan(String(user.id));
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (session) => {
+          const { ensureUserPlan } = await import("@/lib/users/planService");
+          await ensureUserPlan(String(session.userId));
+        },
+      },
+    },
+  },
 });

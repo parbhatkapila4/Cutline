@@ -182,10 +182,15 @@ export async function GET(request: Request) {
 
     const plan = await getUserPlan(planUserId);
 
-    let tokensRemaining: number = DEFAULT_TOKENS;
+    const monthlyGrant = plan.tokensPerMonth ?? DEFAULT_TOKENS;
+
+    let tokensRemaining: number = monthlyGrant;
     let apiCallsUsed = 0;
     try {
-      const [t, a] = await Promise.all([getTokens(identifier), getApiCallsThisMonth(identifier)]);
+      const [t, a] = await Promise.all([
+        getTokens(identifier, monthlyGrant),
+        getApiCallsThisMonth(identifier),
+      ]);
       tokensRemaining = t;
       apiCallsUsed = a;
     } catch (redisErr) {
@@ -195,10 +200,10 @@ export async function GET(request: Request) {
     const tokensUnlimited = plan.tokensUnlimited;
     const tokenCapDisplay = tokensUnlimited
       ? null
-      : Math.max(DEFAULT_TOKENS, tokensRemaining + totalTokensSpent);
+      : Math.max(monthlyGrant, tokensRemaining + totalTokensSpent);
     const usedThisPeriod = tokensUnlimited
       ? totalTokensSpent
-      : Math.max(0, (tokenCapDisplay ?? DEFAULT_TOKENS) - tokensRemaining);
+      : Math.max(0, (tokenCapDisplay ?? monthlyGrant) - tokensRemaining);
 
     const totalCostUsd = completedForClient.reduce((sum, job) => {
       const result = job.returnvalue as VideoJobResult | undefined;

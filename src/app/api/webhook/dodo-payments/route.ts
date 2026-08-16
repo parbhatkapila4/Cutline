@@ -19,7 +19,19 @@ export const POST = Webhooks({
   onSubscriptionActive: async (payload) => {
     const d = payload.data;
     await grantPlanFromWebhook({
-      eventKey: `subscription.active:${d.subscription_id}`,
+      eventKey: `subscription.active:${d.subscription_id}:${d.product_id}:${cycleKey(d.next_billing_date, d.previous_billing_date)}`,
+      eventType: payload.type,
+      userId: userIdOf(d.metadata as Record<string, unknown>),
+      productId: d.product_id,
+      providerRef: d.subscription_id,
+      customerId: d.customer?.customer_id ?? null,
+    });
+  },
+
+  onSubscriptionPlanChanged: async (payload) => {
+    const d = payload.data;
+    await grantPlanFromWebhook({
+      eventKey: `subscription.plan_changed:${d.subscription_id}:${d.product_id}`,
       eventType: payload.type,
       userId: userIdOf(d.metadata as Record<string, unknown>),
       productId: d.product_id,

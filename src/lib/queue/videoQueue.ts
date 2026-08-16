@@ -448,10 +448,17 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
       try {
         const { calculateTokensFromCost } = await import("@/lib/cost/pricing");
         const { decrementTokens } = await import("@/lib/usage");
+        const { getUserPlan } = await import("@/lib/users/planService");
         tokensCharged = result?.cost
           ? calculateTokensFromCost(result.cost)
           : 1;
-        await decrementTokens(clientId, tokensCharged);
+    
+        const plan = await getUserPlan(
+          typeof data?.userId === "string" ? data.userId : undefined,
+        );
+        if (!plan.tokensUnlimited) {
+          await decrementTokens(clientId, tokensCharged, plan.tokensPerMonth ?? undefined);
+        }
       } catch (e) {
         console.error("[worker] jobId=" + job?.id + " decrementTokens error=" + (e instanceof Error ? e.message : String(e)));
       }

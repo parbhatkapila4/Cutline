@@ -128,8 +128,8 @@ export const FEATURES = [
         />
       </svg>
     ),
-    title: "Background Music",
-    desc: "Royalty-free music matched to your video's mood and synced to the pacing.",
+    title: "Motion on every shot",
+    desc: "A push, pull or pan is chosen per shot while the shot list is planned, so a slideshow reads as a cut rather than a deck.",
   },
   {
     icon: (
@@ -801,6 +801,25 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
 ];
 
 export const PRICING = [
+  {
+    planId: "free" as const,
+    name: "Free",
+    monthlyPrice: "$0",
+    yearlyPrice: "$0",
+    description: "For trying the whole pipeline on a real video.",
+    features: [
+      "1 video per month",
+      "1080p HD MP4 export",
+      "No watermark, ever",
+      "Auto-directed script, voice, captions",
+      "Community support",
+    ],
+    cta: "Start creating free",
+    href: "/auth/sign-in",
+    highlighted: false,
+    popular: false,
+    icon: "free",
+  },
   {
     planId: "beginner" as const,
     name: "Beginner",

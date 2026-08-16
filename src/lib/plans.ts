@@ -6,6 +6,7 @@ export type PlanConfig = {
   videosPerMonth: number | null;
   apiCallsPerMonth: number | null;
   tokensUnlimited: boolean;
+  tokensPerMonth: number | null;
 };
 
 export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
@@ -15,6 +16,7 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     videosPerMonth: 1,
     apiCallsPerMonth: 1,
     tokensUnlimited: false,
+    tokensPerMonth: 10,
   },
   beginner: {
     id: "beginner",
@@ -22,6 +24,7 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     videosPerMonth: 10,
     apiCallsPerMonth: 25_000,
     tokensUnlimited: false,
+    tokensPerMonth: 120,
   },
   professional: {
     id: "professional",
@@ -29,6 +32,7 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     videosPerMonth: null,
     apiCallsPerMonth: 100_000,
     tokensUnlimited: true,
+    tokensPerMonth: null,
   },
   enterprise: {
     id: "enterprise",
@@ -36,6 +40,7 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     videosPerMonth: null,
     apiCallsPerMonth: null,
     tokensUnlimited: true,
+    tokensPerMonth: null,
   },
 };
 

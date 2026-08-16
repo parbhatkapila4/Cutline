@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { PendingLabel, Skeleton, SkeletonText } from "@/components/ui/skeleton";
 
 const PAID_PLANS = new Set(["beginner", "professional", "enterprise"]);
 const POLL_INTERVAL_MS = 2000;
@@ -92,13 +93,12 @@ function SuccessContent() {
           </p>
         ) : phase === "pending" ? (
           <p className="text-sm text-zinc-400 mt-3 leading-relaxed">
-            Payment received. Your subscription is being activated — this usually takes a few seconds. Refresh this page, or
+            Payment received. Your subscription is being activated - this usually takes a few seconds. Refresh this page, or
             head to your dashboard; access will appear automatically.
           </p>
         ) : (
-          <p className="text-sm text-zinc-400 mt-3 leading-relaxed inline-flex items-center gap-2">
-            <span className="h-4 w-4 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-            Payment received — activating your access…
+          <p className="text-sm text-zinc-400 mt-3 leading-relaxed">
+            <PendingLabel>Payment received - activating your access…</PendingLabel>
           </p>
         )}
 
@@ -125,8 +125,18 @@ export default function CheckoutSuccessPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-black text-white flex items-center justify-center">
-          <div className="mx-auto h-12 w-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+        <div className="min-h-screen bg-black text-white flex items-center justify-center px-6">
+          <div className="w-full max-w-lg text-center">
+            <Skeleton tone="dark" className="mx-auto h-14 w-14 rounded-2xl" />
+            <Skeleton tone="dark" className="mx-auto mt-6 h-8 w-64 rounded-lg" />
+            <div className="mx-auto mt-5 max-w-md">
+              <SkeletonText tone="dark" lines={2} lineClassName="h-3" />
+            </div>
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <Skeleton tone="dark" className="h-11 w-44 rounded-xl" />
+              <Skeleton tone="dark" className="h-11 w-40 rounded-xl" />
+            </div>
+          </div>
         </div>
       }
     >

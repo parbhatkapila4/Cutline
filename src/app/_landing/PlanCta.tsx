@@ -2,16 +2,8 @@
 
 import type { ReactNode } from "react";
 import { CheckoutButton } from "./CheckoutButton";
-import { usePlanState, type PlanId } from "./usePlanState";
+import { usePlanState, PLAN_RANK, type PlanId } from "./usePlanState";
 
-function Spinner() {
-  return (
-    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
-    </svg>
-  );
-}
 function Check() {
   return (
     <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} aria-hidden>
@@ -30,6 +22,8 @@ export function PlanCta({
   errorClassName,
   manageLabel = "Manage plan",
   currentLabel = "Current plan",
+  upgradeLabel = "Upgrade",
+  includedLabel = "Included with every account",
   children,
 }: {
   planId: PlanId;
@@ -41,27 +35,36 @@ export function PlanCta({
   errorClassName?: string;
   manageLabel?: string;
   currentLabel?: string;
+  upgradeLabel?: string;
+  includedLabel?: string;
   children: ReactNode;
 }) {
   const state = usePlanState();
 
-  if (state.status === "loading") {
+  const ready = state.status === "ready" ? state : null;
+  const currentPlan: PlanId = ready?.plan ?? "free";
+  const authenticated = ready?.authenticated ?? false;
+  const currentRank = PLAN_RANK[currentPlan] ?? 0;
+  const targetRank = PLAN_RANK[planId] ?? 0;
+  if (authenticated && currentPlan === planId) {
     return (
-      <button type="button" disabled aria-busy="true" className={primaryClassName}>
-        <Spinner />
-      </button>
-    );
-  }
-
-  if (state.subscribed && state.plan === planId) {
-    return (
-      <div className={currentClassName} role="status" aria-disabled="true">
+      <div className={currentClassName} role="status">
         <Check />
         {currentLabel}
       </div>
     );
   }
 
+  if (planId === "free") {
+    if (authenticated) {
+      return <div className={currentClassName}>{includedLabel}</div>;
+    }
+    return (
+      <a href={contactHref ?? "/auth/sign-in"} className={primaryClassName}>
+        {children}
+      </a>
+    );
+  }
   if (contactHref) {
     return (
       <a href={contactHref} className={primaryClassName}>
@@ -69,19 +72,22 @@ export function PlanCta({
       </a>
     );
   }
-
-  if (!state.subscribed) {
-    if (!productId) return null;
+  if (!productId) return null;
+  if (currentRank > 0 && targetRank < currentRank) {
     return (
-      <CheckoutButton productId={productId} className={primaryClassName} errorClassName={errorClassName}>
-        {children}
-      </CheckoutButton>
+      <a href="/api/customer-portal" className={secondaryClassName}>
+        {manageLabel}
+      </a>
     );
   }
 
   return (
-    <a href="/api/customer-portal" className={secondaryClassName}>
-      {manageLabel}
-    </a>
+    <CheckoutButton
+      productId={productId}
+      className={primaryClassName}
+      errorClassName={errorClassName}
+    >
+      {currentRank > 0 ? upgradeLabel : children}
+    </CheckoutButton>
   );
 }

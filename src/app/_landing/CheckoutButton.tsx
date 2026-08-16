@@ -1,15 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-
-function Spinner() {
-  return (
-    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
-    </svg>
-  );
-}
+import { PendingLabel } from "@/components/ui/skeleton";
 export function CheckoutButton({
   productId,
   className,
@@ -63,14 +55,7 @@ export function CheckoutButton({
         aria-busy={loading}
         className={className}
       >
-        {loading ? (
-          <>
-            <Spinner />
-            <span>{loadingLabel}</span>
-          </>
-        ) : (
-          children
-        )}
+        {loading ? <PendingLabel>{loadingLabel}</PendingLabel> : children}
       </button>
       {error ? (
         <p className={errorClassName} role="alert">

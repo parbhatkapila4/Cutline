@@ -15,6 +15,7 @@ import { isEnterprisePlan, isProPlan, type PlanId } from "@/lib/plans";
 import { ProBadge } from "@/components/ui/pro-badge";
 import { useRouter } from "next/navigation";
 import WarpShaderHero from "@/components/ui/warp-shader";
+import { PendingLabel } from "@/components/ui/skeleton";
 
 function CreateBrandMark({ className }: { className?: string }) {
   return (
@@ -710,7 +711,7 @@ export default function CreatePage() {
                             <p className="text-[12.5px] text-zinc-400 mt-1 leading-relaxed">
                               {status === "pending"
                                 ? (queuePosition != null && queuePosition > 1
-                                  ? `Waiting for the worker — #${queuePosition} in line.`
+                                  ? `Waiting for the worker - #${queuePosition} in line.`
                                   : "Waiting for the worker to pick up your video.")
                                 : activeMeta.description}
                             </p>
@@ -806,11 +807,9 @@ export default function CreatePage() {
 
                                 {active ? (
                                   <span className="shrink-0 inline-flex items-center gap-1.5 text-[10.5px] font-medium text-amber-300">
-                                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                                      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                    </svg>
-                                    {status === "pending" ? "Queued" : "Working"}
+                                    <PendingLabel>
+                                      {status === "pending" ? "Queued" : "Working"}
+                                    </PendingLabel>
                                   </span>
                                 ) : past ? (
                                   <span className="shrink-0 text-[10.5px] font-medium text-emerald-400/75">Done</span>
@@ -833,7 +832,7 @@ export default function CreatePage() {
                             </svg>
                             <span>
                               <span className="font-semibold text-amber-200">Render worker offline.</span>{" "}
-                              Your video is queued and will start automatically once a worker is running. Nothing is wrong with your prompt — the server-side render process just isn&apos;t up right now.
+                              Your video is queued and will start automatically once a worker is running. Nothing is wrong with your prompt - the server-side render process just isn&apos;t up right now.
                             </span>
                           </div>
                         </div>
@@ -1223,13 +1222,7 @@ export default function CreatePage() {
                           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.09)"; }}
                         >
                           {suggesting ? (
-                            <>
-                              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                              </svg>
-                              Suggesting
-                            </>
+                            <PendingLabel>Suggesting</PendingLabel>
                           ) : (
                             <>
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -2106,11 +2099,7 @@ export default function CreatePage() {
                     >
                       {submitting ? (
                         <>
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                          Starting render
+                          <PendingLabel>Starting render</PendingLabel>
                         </>
                       ) : (
                         <>

@@ -25,38 +25,58 @@ function getRedis(): Redis {
   return redis;
 }
 
+function monthStamp(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function monthKey(identifier: string): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  return `${KEY_PREFIX}${identifier}:${y}-${m}`;
+  return `${KEY_PREFIX}${identifier}:${monthStamp()}`;
+}
+const MONTH_KEY_TTL_SECONDS = 70 * 24 * 60 * 60;
+
+async function expireIfNew(key: string, next: number): Promise<void> {
+  if (next === 1) {
+    await getRedis().expire(key, MONTH_KEY_TTL_SECONDS);
+  }
 }
 
 export const FREE_PLAN_VIDEOS_PER_MONTH = parseIntEnv("FREE_PLAN_VIDEOS_PER_MONTH", 1);
 export const FREE_PLAN_API_CALLS_PER_MONTH = parseIntEnv("FREE_PLAN_API_CALLS_PER_MONTH", 1);
 
-export async function getTokens(identifier: string): Promise<number> {
-  const key = `${TOKENS_PREFIX}${identifier}:tokens`;
+
+function tokensKey(identifier: string): string {
+  return `${TOKENS_PREFIX}${identifier}:${monthStamp()}:tokens`;
+}
+
+export async function getTokens(
+  identifier: string,
+  monthlyGrant: number = DEFAULT_TOKENS,
+): Promise<number> {
+  const key = tokensKey(identifier);
   const r = getRedis();
   const raw = await r.get(key);
   if (raw === null) {
-    await r.set(key, String(DEFAULT_TOKENS));
-    return DEFAULT_TOKENS;
+    await r.set(key, String(monthlyGrant), "EX", MONTH_KEY_TTL_SECONDS);
+    return monthlyGrant;
   }
   const n = parseInt(raw, 10);
-  return Number.isNaN(n) ? DEFAULT_TOKENS : Math.max(0, n);
+  return Number.isNaN(n) ? monthlyGrant : Math.max(0, n);
 }
 
-export async function decrementTokens(identifier: string, amount: number): Promise<number> {
-  const key = `${TOKENS_PREFIX}${identifier}:tokens`;
+export async function decrementTokens(
+  identifier: string,
+  amount: number,
+  monthlyGrant: number = DEFAULT_TOKENS,
+): Promise<number> {
+  const key = tokensKey(identifier);
   const r = getRedis();
   const exists = await r.exists(key);
   if (!exists) {
-    await r.set(key, String(DEFAULT_TOKENS));
+    await r.set(key, String(monthlyGrant), "EX", MONTH_KEY_TTL_SECONDS);
   }
   const next = await r.incrby(key, -amount);
   if (next < 0) {
-    await r.set(key, "0");
+    await r.set(key, "0", "KEEPTTL");
     return 0;
   }
   return next;
@@ -73,6 +93,7 @@ export async function getApiCallsThisMonth(identifier: string): Promise<number> 
 export async function incrementApiCallsThisMonth(identifier: string): Promise<number> {
   const key = monthKey(identifier);
   const next = await getRedis().incr(key);
+  await expireIfNew(key, next);
   return next;
 }
 
@@ -87,12 +108,12 @@ export async function getVideosCompletedThisMonth(identifier: string): Promise<n
 export async function incrementVideosCompletedThisMonth(identifier: string): Promise<number> {
   const key = `${monthKey(identifier)}:videos`;
   const next = await getRedis().incr(key);
+  await expireIfNew(key, next);
   return next;
 }
 
 export function getResetDate(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1);
-  d.setDate(1);
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }

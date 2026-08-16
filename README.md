@@ -31,7 +31,7 @@ The naïve AI version - "type what you want, we'll generate a video" - collapses
 
 ### Director layer, not template engine
 
-The pipeline commits to editorial decisions before it touches a frame. From one sentence it infers audience, goal, tone, complexity, and duration; plans a 3–5 beat narrative arc; breaks that into 8–12 shots with per-shot purpose, motion hint, and text density; writes the script aligned to shot boundaries; sources or generates the imagery; composes the MP4. The user does not pick a template, voice, or layout. The system makes those calls. The product is "describe, receive," not "configure, render."
+The pipeline commits to editorial decisions before it touches a frame. From one sentence it infers audience, goal, tone, complexity, and duration; plans a 3-5 beat narrative arc; breaks that into 8-12 shots with per-shot purpose, motion hint, and text density; writes the script aligned to shot boundaries; sources or generates the imagery; composes the MP4. The user does not pick a template, voice, or layout. The system makes those calls. The product is "describe, receive," not "configure, render."
 
 ### One sentence in, no creative knobs
 
@@ -43,7 +43,7 @@ Twelve stages, each a pure function over the previous stage's output. Determinis
 
 ### Worker separate from app
 
-Rendering is CPU-heavy and runs 1–3 minutes per video. Serverless functions time out, and even when they don't, billing-by-execution is the wrong shape for long jobs. The Next.js app handles UI + API + job enqueue; a separate BullMQ worker pipelines and renders. This split is load-bearing for the deploy story: app on Vercel, worker on a long-running host (Railway / Render / Fly), same Redis.
+Rendering is CPU-heavy and runs 1-3 minutes per video. Serverless functions time out, and even when they don't, billing-by-execution is the wrong shape for long jobs. The Next.js app handles UI + API + job enqueue; a separate BullMQ worker pipelines and renders. This split is load-bearing for the deploy story: app on Vercel, worker on a long-running host (Railway / Render / Fly), same Redis.
 
 ---
 
@@ -109,7 +109,7 @@ Why: deterministic stage boundaries beat agent loops for debugging, retries, and
 Tradeoff: less emergent behaviour, more handcrafted prompts per stage. We chose visibility over magic.
 
 **Decision: worker on a long-running host, not serverless.**
-Why: 1–3 minute renders die in serverless timeouts and per-execution billing is the wrong shape for long jobs.
+Why: 1-3 minute renders die in serverless timeouts and per-execution billing is the wrong shape for long jobs.
 Tradeoff: deploy is two services (Vercel app + Railway/Render worker) sharing one Redis. Worth it.
 
 **Decision: in-memory idempotency + Redis cancellation, not a job-state Postgres table.**

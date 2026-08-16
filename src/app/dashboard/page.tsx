@@ -6,6 +6,7 @@ import type { DashboardVideoItem } from "@/app/api/dashboard/videos/route";
 import { authClient } from "@/lib/auth-client";
 import { isEnterprisePlan } from "@/lib/plans";
 import { VideoCardFrame } from "@/components/dashboard/VideoCardFrame";
+import { PendingLabel, Skeleton } from "@/components/ui/skeleton";
 
 type VideoStatus = "completed" | "processing" | "failed";
 
@@ -230,16 +231,15 @@ export default function DashboardPage() {
     return matchStatus && matchSearch;
   });
 
-  const freeVideoCapReached =
+  const videoCapReached =
     !usageLoading &&
     !usageError &&
-    usage.plan === "free" &&
     usage.videosLimit != null &&
     usage.videosUsed >= usage.videosLimit;
 
   return (
     <div className="h-screen overflow-hidden bg-black text-white flex flex-col">
-      {freeVideoCapReached ? (
+      {videoCapReached ? (
         <div className="relative shrink-0 z-20 overflow-hidden border-b border-amber-400/20 bg-linear-to-b from-zinc-950 via-zinc-950 to-black px-4 py-3.5 sm:px-6">
           <div
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_140%_at_100%_-30%,rgba(251,191,36,0.14),transparent_50%)]"
@@ -260,8 +260,12 @@ export default function DashboardPage() {
                 <p className="text-[13px] font-semibold leading-snug tracking-tight text-white sm:text-sm">
                   Monthly limit reached
                 </p>
+         
                 <p className="mt-1 text-[12px] leading-relaxed text-zinc-400 sm:text-[13px]">
-                  Your included Free-plan video for this month is already used. Your library below is unchanged. Upgrade anytime to generate more.
+                  You have used {usage.videosUsed} of {usage.videosLimit}{" "}
+                  {usage.videosLimit === 1 ? "video" : "videos"} on the{" "}
+                  {usage.planLabel} plan this month. Your allowance resets on{" "}
+                  {usage.resetDate}. Your library below is unchanged.
                 </p>
               </div>
             </div>
@@ -726,7 +730,7 @@ export default function DashboardPage() {
                     <p className="text-[13px] text-zinc-500 leading-relaxed max-w-[42ch] mx-auto mb-6">
                       {isFiltered
                         ? "Try clearing the search or switching to a different status."
-                        : "Generate your first video from a single sentence — script, visuals, voice, and edit in about 60 seconds."}
+                        : "Generate your first video from a single sentence - script, visuals, voice, and edit in about 60 seconds."}
                     </p>
 
                     <div className="flex items-center justify-center gap-2">
@@ -800,10 +804,7 @@ export default function DashboardPage() {
                         aria-label={`Delete video ${video.title}`}
                       >
                         {deletingId === video.id ? (
-                          <svg className="w-[18px] h-[18px] animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
+                          <Skeleton tone="dark" className="h-[18px] w-[18px] rounded-[5px]" />
                         ) : (
                           <svg
                             className="w-[18px] h-[18px] transition-transform duration-200 group-hover/del:scale-110 group-hover/del:-rotate-6"
@@ -906,13 +907,7 @@ export default function DashboardPage() {
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-linear-to-b from-red-500 to-red-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-8px_rgba(239,68,68,0.6)] hover:from-red-500 hover:to-red-700 active:from-red-600 active:to-red-700 transition-all disabled:opacity-60 disabled:pointer-events-none"
               >
                 {deletingId !== null ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Deleting…
-                  </>
+                  <PendingLabel>Deleting…</PendingLabel>
                 ) : (
                   <>
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { SkeletonFrame } from "@/components/ui/skeleton";
 
 type VideoStatus = "completed" | "processing" | "failed";
 
@@ -69,19 +70,9 @@ export function VideoCardFrame({ videoUrl, status, compact, className }: VideoCa
           className="absolute inset-0 flex items-center justify-center pointer-events-none bg-zinc-900/20"
           aria-hidden
         >
+
           {status === "processing" ? (
-            <svg
-              className={cn("animate-spin text-zinc-500", compact ? "w-6 h-6" : "w-10 h-10")}
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-              <path
-                className="opacity-80"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
+            <SkeletonFrame compact={compact} />
           ) : (
             <svg
               className={cn("text-zinc-700", compact ? "w-8 h-8" : "w-14 h-14")}

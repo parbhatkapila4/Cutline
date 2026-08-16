@@ -22,9 +22,8 @@ startWorkerHeartbeat();
 
 const expiredHours = process.env.CLEANUP_EXPIRED_HOURS ? Number(process.env.CLEANUP_EXPIRED_HOURS) : 0;
 if (expiredHours > 0) {
-  const tempRoot = process.env.TEMP_DIR || undefined;
   const runExpired = () => {
-    cleanupExpiredTempDirs({ olderThanHours: expiredHours, tempRoot }).then((r) => {
+    cleanupExpiredTempDirs({ olderThanHours: expiredHours }).then((r) => {
       if (r.deleted > 0 || r.errors > 0) {
         console.log("[worker] cleanupExpiredTempDirs deleted=" + r.deleted + " errors=" + r.errors);
       }

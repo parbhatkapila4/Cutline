@@ -35,7 +35,8 @@ export default function PricingPage() {
             <h2 className="text-2xl font-semibold text-white mb-3">How billing works</h2>
             <ul className="space-y-2 text-sm text-zinc-400">
               <li>- Plans are monthly subscriptions billed securely via Dodo Payments. Cancel anytime.</li>
-              <li>- Plan limits are enforced monthly (videos, API calls, token behavior by tier).</li>
+        
+              <li>- Video and token limits are enforced monthly, per tier. Both reset on the 1st.</li>
               <li>- Enterprise is custom (REST API, unlimited calls) - talk to us for volume pricing.</li>
             </ul>
           </section>
@@ -45,7 +46,8 @@ export default function PricingPage() {
             linkClassName="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-black hover:bg-zinc-200 transition-colors shrink-0"
           />
 
-          <section className="grid md:grid-cols-3 gap-5">
+       
+          <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             {PRICING.map((plan) => {
               const productId = PLAN_TO_PRODUCT_ID[plan.planId];
               const highlighted = plan.highlighted;

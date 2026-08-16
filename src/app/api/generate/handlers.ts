@@ -338,7 +338,10 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
           mode: data.mode ?? "slideshow",
           durationSeconds: data.durationSeconds ?? 30,
         });
-        const tokensRemaining = await getTokens(creditsIdentifier);
+        const tokensRemaining = await getTokens(
+          creditsIdentifier,
+          userPlan.tokensPerMonth ?? undefined,
+        );
         if (tokensRemaining < estimatedTokens) {
           return apiError({
             code: ErrorCode.INSUFFICIENT_CREDITS,
@@ -745,11 +748,10 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
       downloaderId = undefined;
     }
     if (apiKeyUser) downloaderId = apiKeyUser.userId;
-    const { getUserPlan } = await import("@/lib/users/planService");
-    if (!downloaderId || !isProPlan((await getUserPlan(downloaderId)).id)) {
+    if (!downloaderId) {
       return apiError({
-        code: ErrorCode.PLAN_REQUIRED,
-        message: "Downloading videos is available on Professional and Enterprise plans.",
+        code: ErrorCode.AUTH_REQUIRED,
+        message: "Sign in to download this video.",
         status: 403,
         headers: corsHeaders,
       });

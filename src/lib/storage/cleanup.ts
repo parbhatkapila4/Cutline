@@ -4,11 +4,7 @@ import { cleanupExpiredBlobs } from "./publish";
 
 const DEFAULT_VIDEO_RETENTION_HOURS = 24;
 export function getTempDirForJob(jobId: string): string {
-  const cwd = process.cwd();
-  const tempRoot = process.env.TEMP_DIR
-    ? path.resolve(cwd, process.env.TEMP_DIR)
-    : path.join(cwd, "public", "temp");
-  return path.join(tempRoot, jobId);
+  return path.join(process.cwd(), "public", "temp", jobId);
 }
 
 export async function cleanupJobArtifacts(jobId: string): Promise<void> {
@@ -24,13 +20,9 @@ export async function cleanupJobArtifacts(jobId: string): Promise<void> {
 
 export async function cleanupExpiredTempDirs(options: {
   olderThanHours: number;
-  tempRoot?: string;
 }): Promise<{ deleted: number; errors: number }> {
-  const { olderThanHours, tempRoot: tempRootOpt } = options;
-  const cwd = process.cwd();
-  const tempRoot = tempRootOpt
-    ? path.resolve(cwd, tempRootOpt)
-    : path.join(cwd, "public", "temp");
+  const { olderThanHours } = options;
+  const tempRoot = path.join(process.cwd(), "public", "temp");
 
   const cutoff = Date.now() - olderThanHours * 60 * 60 * 1000;
   let deleted = 0;
@@ -148,26 +140,42 @@ function cleanRenderedVideos(cwd: string, errors: string[]): number {
   const retentionMs = getVideoRetentionMs();
   const cutoff = Date.now() - retentionMs;
   const counter = { deleted: 0 };
+  cleanRenderedVideosInDir(
+    resolveAllowedDir(cwd, path.join("public", PUBLIC_TEMP_BASENAME)),
+    cutoff,
+    errors,
+    counter
+  );
+  cleanRenderedVideosInDir(
+    resolveAllowedDir(cwd, path.join("public", PUBLIC_OUTPUT_BASENAME)),
+    cutoff,
+    errors,
+    counter
+  );
+  return counter.deleted;
+}
 
-  for (const basename of [PUBLIC_TEMP_BASENAME, PUBLIC_OUTPUT_BASENAME]) {
-    const dir = resolveAllowedDir(cwd, path.join("public", basename));
-    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
+function cleanRenderedVideosInDir(
+  dir: string,
+  cutoff: number,
+  errors: string[],
+  counter: { deleted: number }
+): void {
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return;
 
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const ent of entries) {
-      if (!ent.isFile() || !ent.name.toLowerCase().endsWith(".mp4")) continue;
-      const fullPath = path.join(dir, ent.name);
-      if (!isUnderBase(dir, fullPath)) continue;
-      try {
-        const mtime = fs.statSync(fullPath).mtimeMs;
-        if (mtime < cutoff) safeDeleteFile(fullPath, errors, counter);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        errors.push(`stat failed ${fullPath}: ${msg}`);
-      }
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const ent of entries) {
+    if (!ent.isFile() || !ent.name.toLowerCase().endsWith(".mp4")) continue;
+    const fullPath = path.join(dir, ent.name);
+    if (!isUnderBase(dir, fullPath)) continue;
+    try {
+      const mtime = fs.statSync(fullPath).mtimeMs;
+      if (mtime < cutoff) safeDeleteFile(fullPath, errors, counter);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errors.push(`stat failed ${fullPath}: ${msg}`);
     }
   }
-  return counter.deleted;
 }
 
 function cleanTempImageDirs(cwd: string, errors: string[]): number {
@@ -194,8 +202,7 @@ function cleanTempImageDirs(cwd: string, errors: string[]): number {
 }
 
 function cleanUploads(cwd: string, errors: string[]): number {
-  const uploadDirName = process.env.UPLOAD_DIR ?? DEFAULT_UPLOAD_DIR;
-  const dir = resolveAllowedDir(cwd, uploadDirName);
+  const dir = resolveAllowedDir(cwd, DEFAULT_UPLOAD_DIR);
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return 0;
 
   const retentionMs = getUploadRetentionMs();

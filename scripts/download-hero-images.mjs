@@ -29,6 +29,19 @@ const HERO_IMAGE_URLS = [
   "https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?w=300&auto=format&fit=crop&q=80",
 ];
 
+const BACKDROP_URLS = {
+  "bg-script.jpg":
+    "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=1920&auto=format&fit=crop&q=75",
+  "bg-director.jpg":
+    "https://images.unsplash.com/photo-1493804714600-6edb1cd93080?w=1920&auto=format&fit=crop&q=75",
+  "bg-visuals.jpg":
+    "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1920&auto=format&fit=crop&q=75",
+  "bg-export.jpg":
+    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&auto=format&fit=crop&q=75",
+  "bg-preview.jpg":
+    "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=1280&auto=format&fit=crop&q=75",
+};
+
 async function download(url, filepath) {
   const res = await fetch(url, {
     headers: { "User-Agent": "CutlineHero/1.0" },
@@ -49,6 +62,16 @@ async function main() {
       console.log(`  ${num}/20 ${path.basename(filepath)}`);
     } catch (e) {
       console.error(`  ${num}/20 FAILED:`, e.message);
+    }
+  }
+  console.log("Downloading 4 high-res tab backdrops ...");
+  for (const [name, url] of Object.entries(BACKDROP_URLS)) {
+    const filepath = path.join(OUT_DIR, name);
+    try {
+      await download(url, filepath);
+      console.log(`  ${name}`);
+    } catch (e) {
+      console.error(`  ${name} FAILED:`, e.message);
     }
   }
   console.log(

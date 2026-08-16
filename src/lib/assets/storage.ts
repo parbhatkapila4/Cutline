@@ -5,11 +5,8 @@ import type { AssetMetadata, AssetType } from "./types";
 
 const REGISTRY_FILENAME = "_registry.json";
 const DEFAULT_UPLOAD_DIR = "uploads";
-
 function getUploadDir(): string {
-  const cwd = process.cwd();
-  const dir = process.env.UPLOAD_DIR ?? DEFAULT_UPLOAD_DIR;
-  return path.join(cwd, dir);
+  return path.join(process.cwd(), DEFAULT_UPLOAD_DIR);
 }
 
 function getRegistryPath(): string {
@@ -30,9 +27,10 @@ function readRegistry(): Registry {
 
 function writeRegistry(registry: Registry): void {
   const dir = getUploadDir();
+  const registryPath = getRegistryPath();
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
-    path.join(dir, REGISTRY_FILENAME),
+    registryPath,
     JSON.stringify(registry, null, 0),
     "utf-8"
   );
@@ -64,7 +62,7 @@ export function storeAsset(
   const ext = getExtension(mimeType);
   const filename = `${id}.${ext}`;
   const filePath = path.join(dir, filename);
-  const relativePath = path.join(path.basename(dir), filename);
+  const relativePath = `${DEFAULT_UPLOAD_DIR}/${filename}`;
 
   fs.writeFileSync(filePath, buffer);
 

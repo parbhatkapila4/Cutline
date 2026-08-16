@@ -8,7 +8,13 @@ export const PLAN_RANK: Record<string, number> = { free: 0, beginner: 1, profess
 type Resolved = { plan: PlanId; planLabel: string; authenticated: boolean };
 export type PlanState =
   | { status: "loading" }
-  | { status: "ready"; plan: PlanId; planLabel: string; subscribed: boolean };
+  | {
+    status: "ready";
+    plan: PlanId;
+    planLabel: string;
+    subscribed: boolean;
+    authenticated: boolean;
+  };
 
 let cache: Promise<Resolved> | null = null;
 function fetchPlan(): Promise<Resolved> {
@@ -29,9 +35,15 @@ export function usePlanState(): PlanState {
   const [state, setState] = useState<PlanState>({ status: "loading" });
   useEffect(() => {
     let active = true;
-    fetchPlan().then(({ plan, planLabel }) => {
+    fetchPlan().then(({ plan, planLabel, authenticated }) => {
       if (!active) return;
-      setState({ status: "ready", plan, planLabel, subscribed: (PLAN_RANK[plan] ?? 0) > 0 });
+      setState({
+        status: "ready",
+        plan,
+        planLabel,
+        subscribed: (PLAN_RANK[plan] ?? 0) > 0,
+        authenticated,
+      });
     });
     return () => {
       active = false;

@@ -24,7 +24,7 @@ No fixes were required for wiring; tests were added to lock behavior.
 - [ ] **OPENROUTER_API_KEY** set and valid (LLM for Intent, Narrative, Shots, Script, image query, asset analysis).
 - [ ] **TTS:** Either `ELEVENLABS_API_KEY` (and `TTS_PROVIDER=elevenlabs`) or `PLAYHT_API_KEY` + `PLAYHT_USER_ID` (and `TTS_PROVIDER=playht`) set and valid.
 - [ ] **Image sourcing:** At least one of `UNSPLASH_ACCESS_KEY` or `PEXELS_API_KEY` set and valid. `OPENAI_API_KEY` recommended for DALL·E fallback.
-- [ ] **Storage:** If `STORAGE_TYPE=s3`, all `AWS_*` vars set and bucket writable. If local, worker host disk writable for `UPLOAD_DIR` and `public/temp`.
+- [ ] **Storage:** If `STORAGE_TYPE=s3`, all `AWS_*` vars set and bucket writable. If local, worker host disk writable for `uploads/` and `public/temp` (both fixed to the app working directory; the former `UPLOAD_DIR` override was removed because a dynamic path makes Turbopack over-bundle the server build).
 
 ---
 
@@ -39,7 +39,7 @@ No fixes were required for wiring; tests were added to lock behavior.
 
 ## API keys and quotas
 
-- [ ] **OpenRouter** key has quota and correct model (e.g. `OPENROUTER_MODEL=anthropic/claude-haiku-4.5`). Verify the slug is still listed at https://openrouter.ai/api/v1/models — retired slugs fail every LLM stage with a 404.
+- [ ] **OpenRouter** key has quota and correct model (e.g. `OPENROUTER_MODEL=anthropic/claude-haiku-4.5`). Verify the slug is still listed at https://openrouter.ai/api/v1/models - retired slugs fail every LLM stage with a 404.
 - [ ] **TTS** key valid and voice ID correct; check provider rate limits.
 - [ ] **Unsplash / Pexels** keys valid; check rate limits.
 - [ ] **OpenAI** key valid if using DALL·E fallback.
