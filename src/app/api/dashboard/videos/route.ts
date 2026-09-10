@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
-import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
 import { auth } from "@/lib/auth";
 
 export type DashboardVideoItem = {
@@ -43,7 +42,7 @@ function titleFromInput(input: string | undefined): string {
   return trimmed.slice(0, 50);
 }
 
-type DashboardOwner = { id: string; ownerType: "user" | "anon" };
+type DashboardOwner = { id: string; ownerType: "user" };
 
 async function resolveDashboardOwner(request: Request): Promise<DashboardOwner | null> {
   try {
@@ -54,8 +53,7 @@ async function resolveDashboardOwner(request: Request): Promise<DashboardOwner |
     }
   } catch {
   }
-  const anonId = getAnonSessionIdFromRequest(request);
-  return anonId ? { id: anonId, ownerType: "anon" } : null;
+  return null;
 }
 
 async function loadPersistedItems(owner: DashboardOwner): Promise<DashboardVideoItem[]> {

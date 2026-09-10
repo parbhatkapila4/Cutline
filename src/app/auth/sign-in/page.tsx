@@ -1,37 +1,34 @@
 "use client";
 
-import React from "react";
 import { SignInPage } from "@/components/ui/sign-in";
-import { authClient } from "@/lib/auth-client";
 import { NEW_USER_PARAM } from "@/components/analytics/SignUpTracker";
 
+const RETURN_TO_PARAM = "redirect";
+const DEFAULT_DESTINATION = "/dashboard";
+function safeReturnTo(): string {
+  if (typeof window === "undefined") return DEFAULT_DESTINATION;
+  const raw = new URLSearchParams(window.location.search).get(RETURN_TO_PARAM);
+  if (!raw) return DEFAULT_DESTINATION;
+  if (!raw.startsWith("/")) return DEFAULT_DESTINATION;
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return DEFAULT_DESTINATION;
+  return raw;
+}
+
+function withNewUserFlag(destination: string): string {
+  return destination + (destination.includes("?") ? "&" : "?") + NEW_USER_PARAM + "=1";
+}
+
 export default function AuthSignInPage() {
-  const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    const { error } = await authClient.signIn.email({
-      email,
-      password,
-      callbackURL: "/dashboard",
-    });
-
-    if (error) {
-      alert(error.message ?? "Sign in failed. Please try again.");
-    }
-  };
-
   const handleGoogleSignIn = async () => {
     const base = typeof window !== "undefined" ? window.location.origin : "";
+    const destination = safeReturnTo();
     const res = await fetch(`${base}/api/auth/sign-in/social`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         provider: "google",
-        callbackURL: "/dashboard",
-        newUserCallbackURL: `/dashboard?${NEW_USER_PARAM}=1`,
+        callbackURL: destination,
+        newUserCallbackURL: withNewUserFlag(destination),
       }),
       redirect: "manual",
     });
@@ -63,7 +60,6 @@ export default function AuthSignInPage() {
   return (
     <SignInPage
       heroImageSrc="https://images.unsplash.com/photo-1642615835477-d303d7dc9ee9?w=2160&q=80"
-      onSignIn={handleSignIn}
       onGoogleSignIn={handleGoogleSignIn}
     />
   );

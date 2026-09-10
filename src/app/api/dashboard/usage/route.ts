@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
-import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
 import { getSessionSafe } from "@/lib/auth/getSessionSafe";
 import { getApiCallsThisMonth, getResetDate } from "@/lib/usage";
 import { cinematicSecondsFor } from "@/lib/cost/pricing";
@@ -34,8 +33,6 @@ async function resolveUsageContext(
     const id = userId.trim();
     return { identifier: id, planUserId: id };
   }
-  const anon = getAnonSessionIdFromRequest(request);
-  if (anon) return { identifier: anon, planUserId: undefined };
   return null;
 }
 

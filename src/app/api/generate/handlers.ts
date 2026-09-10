@@ -6,7 +6,7 @@ import {
   getQueueWaitMetrics,
   type VideoJobResult,
 } from "@/lib/queue/videoQueue";
-import { getClientIdentifier, checkRateLimit, getForwardedClientIp } from "@/lib/rate-limit";
+import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { getRequestIdFromRequest } from "@/lib/requestId";
 import { validateGenerateInput, validateJobId } from "@/lib/validation/input";
 import { DEFAULT_PLATFORM } from "@/lib/platform/types";
@@ -18,7 +18,6 @@ import {
   setIdempotencyResult,
   withIdempotencyLock,
 } from "@/lib/api/idempotency";
-import { runGenerationFlow, checkDownloadAllowed } from "@/lib/anon";
 import { requestOwnsResource, resolveOwnerCandidates } from "@/lib/jobs/jobOwnership";
 import { isDatabaseConfigured } from "@/lib/db";
 import { isProPlan } from "@/lib/plans";
@@ -105,6 +104,15 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
   }
   if (fromApiKeyEarly) {
     userIdEarly = fromApiKeyEarly.userId;
+  }
+
+  if (!userIdEarly) {
+    return apiError({
+      code: ErrorCode.AUTH_REQUIRED,
+      message: "Sign in to generate videos.",
+      status: 401,
+      headers,
+    });
   }
 
   const limit = fromApiKeyEarly
@@ -276,20 +284,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     };
   }
 
-  let anonFlow: Awaited<ReturnType<typeof runGenerationFlow>> | null = null;
-  if (!userId && isDatabaseConfigured()) {
-    anonFlow = await runGenerationFlow(request, data.input);
-    if (!anonFlow.result.allowed) {
-      return apiError({
-        code: ErrorCode.ANON_LIMIT_REACHED,
-        message: "Sign in to generate more videos, download, or access your dashboard.",
-        status: 403,
-        details: { reason: anonFlow.result.reason, anon_session_id: anonFlow.result.anon_session_id },
-        headers,
-      });
-    }
-  }
-
   {
     const usesImages = Array.isArray(data.assetIds) && data.assetIds.length > 0;
     const usesProAvatar =
@@ -344,9 +338,9 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     });
   }
 
-  const creditsIdentifier = userId ?? anonFlow?.result.anon_session_id ?? identifier;
+  const creditsIdentifier = userId;
 
-  const spendIdentifier = userId ?? getForwardedClientIp(request) ?? creditsIdentifier;
+  const spendIdentifier = userId;
 
   let effectiveMode: "slideshow" | "talking_object" | null = null;
   let downgradeNotice: string | null = null;
@@ -371,7 +365,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         "[api] DISABLE_CREDITS_CHECK is set but ignored in production; spend limits remain enforced."
       );
     }
-    const skipCreditsForAnon = Boolean(anonFlow?.result.allowed);
     if (!creditsCheckDisabled) {
       const userPlan = await getUserPlan(userId);
 
@@ -486,11 +479,8 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         });
       }
 
-      const videosCompletedThisMonth = skipCreditsForAnon
-        ? 0
-        : await getVideosCompletedThisMonth(creditsIdentifier);
+      const videosCompletedThisMonth = await getVideosCompletedThisMonth(creditsIdentifier);
       if (
-        !skipCreditsForAnon &&
         userPlan.videosPerMonth != null &&
         videosCompletedThisMonth >= userPlan.videosPerMonth
       ) {
@@ -512,7 +502,6 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       clientId: creditsIdentifier,
       requestId,
       ...(userId ? { userId } : {}),
-      ...(anonFlow?.result.allowed ? { videoJobId: anonFlow.result.job_id } : {}),
       ...(data.assetIds?.length ? { assetIds: data.assetIds } : {}),
       ...(data.brandColors ? { brandColors: data.brandColors } : {}),
       mode: effectiveMode ?? (data.regenFromJobId ? "slideshow" : (data.mode ?? "slideshow")),
@@ -553,11 +542,10 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(remixSourceJobId ? { remixFromJobId: remixSourceJobId } : {}),
     };
 
-    const anonJobId = anonFlow?.result.allowed ? anonFlow.result.job_id : undefined;
-    const newJobId = anonJobId ?? randomUUID();
+    const newJobId = randomUUID();
     const queueAddOptions = { jobId: newJobId };
 
-    if (!anonJobId && userId && isDatabaseConfigured()) {
+    if (isDatabaseConfigured()) {
       try {
         const { createVideoJob } = await import("@/lib/jobs/videoJobService");
         await createVideoJob({
@@ -583,7 +571,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         if (again) return again.responseBody as { jobId: string };
         const job = await queue.add("video", jobPayload, queueAddOptions);
         await incrementApiCallsThisMonth(creditsIdentifier);
-        const jobId = anonJobId ?? String(job.id);
+        const jobId = String(job.id);
         const responseBody = { jobId };
         setIdempotencyResult(idempotencyKey, {
           jobId,
@@ -593,20 +581,16 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         return responseBody;
       });
       console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + result.jobId + " idempotencyKey=" + idempotencyKey);
-      const resHeaders: Record<string, string> = { ...headers };
-      if (anonFlow?.setCookieHeader) resHeaders["Set-Cookie"] = anonFlow.setCookieHeader;
-      return NextResponse.json(result, { headers: resHeaders });
+      return NextResponse.json(result, { headers });
     }
 
     const job = await queue.add("video", jobPayload, queueAddOptions);
     await incrementApiCallsThisMonth(creditsIdentifier);
-    const jobId = anonJobId ?? String(job.id);
+    const jobId = String(job.id);
     console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + jobId);
-    const resHeaders: Record<string, string> = { ...headers };
-    if (anonFlow?.setCookieHeader) resHeaders["Set-Cookie"] = anonFlow.setCookieHeader;
     return NextResponse.json(
       { jobId, ...(downgradeNotice ? { notice: downgradeNotice } : {}) },
-      { headers: resHeaders }
+      { headers }
     );
   } catch (e) {
     if (reservedCinematicSeconds > 0 || reservedSpendUsd > 0) {
@@ -913,15 +897,6 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
   const variantIndex = variantParam != null ? Math.max(0, Math.floor(Number(variantParam))) : 0;
 
   if (isDatabaseConfigured()) {
-    const gate = await checkDownloadAllowed(jobId);
-    if (gate.allowed === false && gate.reason === "auth_required") {
-      return apiError({
-        code: ErrorCode.AUTH_REQUIRED,
-        message: "Sign in to download this video.",
-        status: 403,
-        headers: corsHeaders,
-      });
-    }
     const apiKeyUser = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
     let downloaderId: string | undefined;
     try {

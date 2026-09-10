@@ -1,11 +1,5 @@
 export type OwnerType = "anon" | "user";
 export type VideoJobStatus = "queued" | "processing" | "completed" | "failed";
-export type AnonSession = {
-  id: string;
-  created_at: Date;
-  generation_count: number;
-};
-
 export type VideoJob = {
   id: string;
   owner_type: OwnerType;
@@ -27,12 +21,3 @@ export type VideoJobInsert = {
   final_url?: string | null;
   queue_job_id?: string | null;
 };
-
-export type GenerationFlowResult =
-  | { allowed: true; anon_session_id: string; job_id: string }
-  | { allowed: false; reason: "anon_limit_reached"; anon_session_id: string };
-
-export type DownloadGateResult =
-  | { allowed: true; job_id: string }
-  | { allowed: false; reason: "auth_required" }
-  | { allowed: false; reason: "not_found" };

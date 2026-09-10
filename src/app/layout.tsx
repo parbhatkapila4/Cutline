@@ -70,8 +70,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${plexMono.variable} ${instrumentSerif.variable} antialiased`}
       >
         {children}
+        {gaMeasurementId ? <GoogleAnalytics gaId={gaMeasurementId} /> : null}
       </body>
-      {gaMeasurementId ? <GoogleAnalytics gaId={gaMeasurementId} /> : null}
     </html>
   );
 }

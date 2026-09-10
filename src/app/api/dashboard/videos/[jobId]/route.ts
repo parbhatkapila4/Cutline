@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { validateJobId } from "@/lib/validation/input";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
-import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
 import { auth } from "@/lib/auth";
 import { purgeUserVideo } from "@/lib/dashboard/purgeUserVideo";
 
@@ -54,8 +53,6 @@ async function resolveOwnerCandidates(request: Request): Promise<string[]> {
     if (typeof userId === "string" && userId.trim()) candidates.push(userId);
   } catch {
   }
-  const anonId = getAnonSessionIdFromRequest(request);
-  if (anonId) candidates.push(anonId);
   candidates.push(getClientIdentifier(request));
   return candidates;
 }

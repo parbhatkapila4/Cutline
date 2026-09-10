@@ -2,9 +2,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { REQUEST_URL_HEADER, safeRequestPath } from "@/lib/http/requestUrl";
-import { SignUpTracker } from "@/components/analytics/SignUpTracker";
 
-export default async function DashboardLayout({
+export default async function CreateLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -12,13 +11,8 @@ export default async function DashboardLayout({
   const requestHeaders = await headers();
   const session = await auth.api.getSession({ headers: requestHeaders });
   if (session?.user?.id == null) {
-    const returnTo = safeRequestPath(requestHeaders.get(REQUEST_URL_HEADER), "/dashboard");
+    const returnTo = safeRequestPath(requestHeaders.get(REQUEST_URL_HEADER), "/create");
     redirect(`/auth/sign-in?redirect=${encodeURIComponent(returnTo)}`);
   }
-  return (
-    <div className="dashboard-root">
-      <SignUpTracker />
-      {children}
-    </div>
-  );
+  return <>{children}</>;
 }

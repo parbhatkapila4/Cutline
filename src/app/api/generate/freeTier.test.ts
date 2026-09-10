@@ -45,11 +45,6 @@ vi.mock("@/lib/jobs/videoJobService", () => ({
   createVideoJob: vi.fn(async () => ({ id: "row-1" })),
 }));
 
-vi.mock("@/lib/anon", () => ({
-  runGenerationFlow: vi.fn(),
-  checkDownloadAllowed: vi.fn(),
-}));
-
 vi.mock("@/lib/usage", () => ({
   incrementApiCallsThisMonth: vi.fn(async () => { }),
   getVideosCompletedThisMonth: mockGetVideosCompleted,

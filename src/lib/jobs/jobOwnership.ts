@@ -1,5 +1,4 @@
 import { auth } from "@/lib/auth";
-import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
 import { getClientIdentifier } from "@/lib/rate-limit";
 
 const SESSION_LOOKUP_TIMEOUT_MS = 8000;
@@ -29,8 +28,6 @@ export async function resolveOwnerCandidates(request: Request): Promise<string[]
       }
     }
   }
-  const anonId = getAnonSessionIdFromRequest(request);
-  if (anonId) candidates.push(anonId);
   candidates.push(getClientIdentifier(request));
   return candidates;
 }

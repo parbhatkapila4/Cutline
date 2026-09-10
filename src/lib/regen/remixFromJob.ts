@@ -1,6 +1,5 @@
 import { getVideoQueue, type VideoJobData } from "@/lib/queue/videoQueue";
 import { validateJobId } from "@/lib/validation/input";
-import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
 
 export type RemixMergeResult =
   | { ok: true; merged: Record<string, unknown>; remixFromJobId: string }
@@ -34,11 +33,9 @@ export async function mergeRemixFromJob(
   }
 
   const jd = job.data as VideoJobData;
-  const anonId = getAnonSessionIdFromRequest(opts.request);
   const owns =
-    (opts.userId != null &&
-      (jd.userId === opts.userId || jd.clientId === opts.userId)) ||
-    (opts.userId == null && anonId != null && jd.clientId === anonId);
+    opts.userId != null &&
+    (jd.userId === opts.userId || jd.clientId === opts.userId);
 
   if (!owns) {
     return { ok: false, message: "Cannot remix this job (wrong account or session)." };

@@ -3,7 +3,6 @@ import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData } from "@/lib/queue/
 import { validateJobId } from "@/lib/validation/input";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { interpretEdit } from "@/lib/edit/interpreter";
-import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
 import { auth } from "@/lib/auth";
 import { getUserPlan } from "@/lib/users/planService";
 import { isProPlan } from "@/lib/plans";
@@ -19,8 +18,6 @@ async function resolveOwnerCandidates(request: Request): Promise<string[]> {
     if (typeof userId === "string" && userId.trim()) candidates.push(userId);
   } catch {
   }
-  const anonId = getAnonSessionIdFromRequest(request);
-  if (anonId) candidates.push(anonId);
   candidates.push(getClientIdentifier(request));
   return candidates;
 }

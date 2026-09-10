@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { LoadingLink } from "@/components/ui/loading-link";
-import { Eye, EyeOff } from "lucide-react";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 const GoogleIcon = () => (
@@ -26,15 +25,8 @@ interface SignInPageProps {
   description?: React.ReactNode;
   heroImageSrc?: string;
   testimonials?: Testimonial[];
-  onSignIn?: (event: React.FormEvent<HTMLFormElement>) => void;
   onGoogleSignIn?: () => void;
 }
-
-const GlassInputWrapper = ({ children }: { children: React.ReactNode }) => (
-  <div className="rounded-2xl border border-white/8 bg-white/4 backdrop-blur-sm transition-all duration-200 focus-within:border-violet-400/40 focus-within:bg-violet-500/6 hover:border-white/12">
-    {children}
-  </div>
-);
 
 const TestimonialCard = ({
   testimonial,
@@ -80,11 +72,8 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   "Sign in to save your videos, access your dashboard, and create more with one-sentence video generation.",
   heroImageSrc,
   testimonials = [],
-  onSignIn,
   onGoogleSignIn,
 }) => {
-  const [showPassword, setShowPassword] = useState(false);
-
   return (
     <div className="h-dvh flex flex-col md:flex-row w-full bg-black overflow-hidden font-sans">
       <section className="flex-1 flex items-center justify-center p-8 md:p-12 lg:p-16 relative">
@@ -108,97 +97,16 @@ export const SignInPage: React.FC<SignInPageProps> = ({
               {description}
             </p>
 
-            <form className="space-y-5" onSubmit={onSignIn}>
-              <div className="animate-element animate-delay-300">
-                <label className="text-sm font-medium text-zinc-400 mb-2 block">
-                  Email Address
-                </label>
-                <GlassInputWrapper>
-                  <input
-                    name="email"
-                    type="email"
-                    placeholder="Enter your email address"
-                    autoComplete="email"
-                    required
-                    className="w-full bg-transparent text-sm text-white p-4 rounded-2xl focus:outline-none placeholder:text-zinc-600"
-                  />
-                </GlassInputWrapper>
-              </div>
-
-              <div className="animate-element animate-delay-400">
-                <label className="text-sm font-medium text-zinc-400 mb-2 block">
-                  Password
-                </label>
-                <GlassInputWrapper>
-                  <div className="relative">
-                    <input
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      autoComplete="current-password"
-                      required
-                      className="w-full bg-transparent text-sm text-white p-4 pr-12 rounded-2xl focus:outline-none placeholder:text-zinc-600"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-3 flex items-center"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5 text-zinc-500 hover:text-zinc-300 transition-colors" />
-                      ) : (
-                        <Eye className="w-5 h-5 text-zinc-500 hover:text-zinc-300 transition-colors" />
-                      )}
-                    </button>
-                  </div>
-                </GlassInputWrapper>
-              </div>
-
-              <div className="animate-element animate-delay-500 flex items-center justify-between text-sm">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="rememberMe"
-                    className="custom-checkbox"
-                  />
-                  <span className="text-zinc-300/90 text-[13px]">
-                    Keep me signed in
-                  </span>
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                className="animate-element animate-delay-600 group relative w-full rounded-2xl bg-white py-4 font-medium text-zinc-900 hover:bg-zinc-100 transition-all duration-200 overflow-hidden"
-              >
-                <span className="relative z-10">Sign In</span>
-                <div
-                  className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"
-                  style={{
-                    background:
-                      "linear-gradient(90deg, transparent 0%, rgba(139,92,246,0.1) 50%, transparent 100%)",
-                  }}
-                />
-              </button>
-            </form>
-
-            <div className="animate-element animate-delay-700 relative flex items-center justify-center">
-              <span className="w-full border-t border-white/8" />
-              <span className="px-4 text-sm text-zinc-600 bg-black absolute whitespace-nowrap">
-                Or continue with
-              </span>
-            </div>
-
             <button
               type="button"
               onClick={onGoogleSignIn}
-              className="animate-element animate-delay-800 w-full flex items-center justify-center gap-3 border border-white/8 rounded-2xl py-4 text-zinc-300 font-medium hover:bg-white/4 hover:border-white/15 transition-all duration-200"
+              className="animate-element animate-delay-300 w-full flex items-center justify-center gap-3 border border-white/8 rounded-2xl py-4 text-zinc-300 font-medium hover:bg-white/4 hover:border-white/15 transition-all duration-200"
             >
               <GoogleIcon />
               Continue with Google
             </button>
 
-            <p className="animate-element animate-delay-900 text-center text-sm text-zinc-500">
+            <p className="animate-element animate-delay-400 text-center text-sm text-zinc-500">
               New to CUTLINE? Continue with Google - it creates your account on
               first use.
             </p>

@@ -7,12 +7,14 @@ const {
   mockScheduleCleanupJob,
   mockGetUserPlan,
   mockGetVideosCompleted,
+  mockGetSession,
 } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
   mockStartVideoWorker: vi.fn(() => ({})),
   mockScheduleCleanupJob: vi.fn(async () => {}),
   mockGetUserPlan: vi.fn(),
   mockGetVideosCompleted: vi.fn(),
+  mockGetSession: vi.fn(),
 }));
 
 vi.mock("@/lib/queue/videoQueue", () => ({
@@ -32,7 +34,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: { api: { getSession: vi.fn(async () => null) } },
+  auth: { api: { getSession: mockGetSession } },
 }));
 
 vi.mock("@/lib/api-keys/service", () => ({
@@ -115,6 +117,8 @@ describe("POST /api/generate - plan quotas", () => {
     mockAdd.mockResolvedValue({ id: "quota-job-1" });
     mockGetUserPlan.mockClear();
     mockGetVideosCompleted.mockClear();
+    mockGetSession.mockReset();
+    mockGetSession.mockResolvedValue({ user: { id: "quota-test-user" } });
     delete process.env.DISABLE_CREDITS_CHECK;
     mockGetUserPlan.mockResolvedValue(FREE);
     mockGetVideosCompleted.mockResolvedValue(0);

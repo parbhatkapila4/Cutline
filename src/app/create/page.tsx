@@ -16,7 +16,7 @@ import {
 } from "@/components/generate/constants";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId } from "@/lib/types/avatar";
-import { isEnterprisePlan, isProPlan, type PlanId } from "@/lib/plans";
+import { isEnterprisePlan, isProPlan, isPlanId, PLAN_CONFIGS, type PlanId } from "@/lib/plans";
 import { cinematicSecondsFor } from "@/lib/cost/pricing";
 import {
   trackGenerateSubmit,
@@ -321,10 +321,24 @@ export default function CreatePage() {
   const avatarFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch("/api/dashboard/usage")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.plan) setUserPlan(d.plan as PlanId);
+    let cancelled = false;
+    (async () => {
+      let plan: PlanId = "free";
+      try {
+        const r = await fetch("/api/me/plan", { cache: "no-store" });
+        if (r.ok) {
+          const d = await r.json();
+          if (typeof d?.plan === "string" && isPlanId(d.plan)) plan = d.plan;
+        }
+      } catch { }
+      if (cancelled) return;
+      setUserPlan(plan);
+
+      try {
+        const r = await fetch("/api/dashboard/usage");
+        if (!r.ok) return;
+        const d = await r.json();
+        if (cancelled) return;
         if (d?.cinematic) {
           setSecondsBalance({
             included: Number(d.cinematic.includedSeconds) || 0,
@@ -333,13 +347,13 @@ export default function CreatePage() {
             totalRemaining: Number(d.cinematic.totalRemainingSeconds) || 0,
           });
         }
-        const hasVideoCap =
-          typeof d?.videosLimit === "number" && Number.isFinite(d.videosLimit);
+        // Cap comes from the resolved plan, the same field the gate reads
+        // (userPlan.videosPerMonth), not from the usage payload.
+        const limit = PLAN_CONFIGS[plan].videosPerMonth;
         const used =
           typeof d?.videosUsed === "number" && Number.isFinite(d.videosUsed)
             ? d.videosUsed
             : 0;
-        const limit = hasVideoCap ? d.videosLimit : null;
         const exhausted = limit != null && used >= limit;
         setCanGenerateByPlan(!exhausted);
         setPlanLimitMessage(
@@ -347,8 +361,11 @@ export default function CreatePage() {
             ? `You've used ${used} of ${limit} videos this month. Upgrade to continue.`
             : null
         );
-      })
-      .catch(() => { });
+      } catch { }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -594,7 +611,7 @@ export default function CreatePage() {
       if (!r.ok) {
         const code = typeof d?.code === "string" ? d.code : null;
         setErrorCode(code);
-        if (code === "MONTHLY_LIMIT_REACHED" || code === "ANON_LIMIT_REACHED") {
+        if (code === "MONTHLY_LIMIT_REACHED") {
           setError("Your current plan limit has been reached. Please upgrade to continue creating videos.");
           setCanGenerateByPlan(false);
           if (typeof d?.details?.videosUsed === "number" && typeof d?.details?.videosLimit === "number") {

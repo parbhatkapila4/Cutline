@@ -134,7 +134,7 @@ export function getErrorPresentation(
   raw: string | null | undefined,
   code?: string | null,
 ): ErrorPresentation {
-  if (code === "MONTHLY_LIMIT_REACHED" || code === "ANON_LIMIT_REACHED") {
+  if (code === "MONTHLY_LIMIT_REACHED") {
     return {
       title: "Plan limit reached",
       message:

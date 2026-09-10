@@ -91,32 +91,6 @@ export async function listVideoJobsByOwner(
   return (Array.isArray(rows) ? rows : []).map((r) => mapRow(r as VideoJobRow));
 }
 
-export async function findVideoJobsByAnonSession(
-  anonSessionId: string
-): Promise<VideoJob[]> {
-  const sql = getSql();
-  const rows = await sql`
-    SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id
-    FROM video_jobs
-    WHERE owner_type = 'anon' AND owner_id = ${anonSessionId}
-  `;
-  return (Array.isArray(rows) ? rows : []).map((r) => mapRow(r as VideoJobRow));
-}
-
-export async function migrateAnonJobsToUser(
-  anonSessionId: string,
-  userId: string
-): Promise<{ migrated: number }> {
-  const sql = getSql();
-  const rows = await sql`
-    UPDATE video_jobs
-    SET owner_type = 'user'::video_job_owner_type, owner_id = ${userId}
-    WHERE owner_type = 'anon' AND owner_id = ${anonSessionId}
-    RETURNING id
-  `;
-  return { migrated: Array.isArray(rows) ? rows.length : 0 };
-}
-
 export async function deleteVideoJobRelatedDbRows(
   bullJobId: string,
   clientId: string

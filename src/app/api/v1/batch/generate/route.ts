@@ -1,9 +1,28 @@
 import { NextResponse } from "next/server";
 import { handleGeneratePost } from "@/app/api/generate/handlers";
+import { validateApiKeyAndGetUserId } from "@/lib/api-keys/service";
+import { auth } from "@/lib/auth";
 
 const MAX_ITEMS = 12;
 
+async function isAuthenticated(request: Request): Promise<boolean> {
+  if (await validateApiKeyAndGetUserId(request.headers.get("x-api-key"))) return true;
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    return session?.user?.id != null;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
+  if (!(await isAuthenticated(request))) {
+    return NextResponse.json(
+      { error: "Sign in to generate videos.", code: "AUTH_REQUIRED" },
+      { status: 401 }
+    );
+  }
+
   let body: { items?: unknown };
   try {
     body = await request.json();

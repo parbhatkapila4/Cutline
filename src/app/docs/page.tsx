@@ -336,8 +336,7 @@ job_id = res.json()["jobId"]`}</CodeBlock>
                   { name: "VALIDATION_FAILED", type: "400", desc: "Input validation failed. details.errors lists field-level issues." },
                   { name: "INVALID_JSON", type: "400", desc: "Request body isn't valid JSON." },
                   { name: "BAD_REQUEST", type: "400", desc: "Generic bad request." },
-                  { name: "AUTH_REQUIRED", type: "401", desc: "Missing or invalid API key." },
-                  { name: "ANON_LIMIT_REACHED", type: "403", desc: "Anonymous-tier quota exhausted." },
+                  { name: "AUTH_REQUIRED", type: "401", desc: "No signed-in session and no valid API key." },
                   { name: "JOB_NOT_FOUND", type: "404", desc: "No job with that ID." },
                   { name: "VIDEO_NOT_FOUND", type: "404", desc: "Video has been cleaned up after retention window." },
                   { name: "JOB_NOT_READY", type: "404", desc: "Tried to download before job completed." },
@@ -354,7 +353,7 @@ job_id = res.json()["jobId"]`}</CodeBlock>
                 Per-IP and per-key limits, enforced by Redis with sliding windows.
               </p>
               <ul className="text-[14px] text-zinc-400 leading-relaxed space-y-1.5 list-disc pl-5">
-                <li><span className="text-zinc-200 font-mono">5/hour</span> - POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate</code> per IP (anonymous)</li>
+                <li><span className="text-zinc-200 font-mono">5/hour</span> - POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate</code> per IP</li>
                 <li><span className="text-zinc-200 font-mono">60/min</span> - GET <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate/:jobId</code> per IP</li>
                 <li><span className="text-zinc-200 font-mono">20/hour</span> - POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/assets/upload</code> per IP</li>
                 <li>Authenticated quotas are determined by your plan - see <LoadingLink href="/pricing" className="underline text-zinc-200">pricing</LoadingLink>.</li>

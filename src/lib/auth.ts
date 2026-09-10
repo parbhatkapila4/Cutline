@@ -42,7 +42,7 @@ export const auth = betterAuth({
   ],
   database: pool,
   emailAndPassword: {
-    enabled: true,
+    enabled: false,
   },
   socialProviders: {
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET

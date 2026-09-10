@@ -20,6 +20,11 @@ const REQUIRED_VARS = [
   "OPENROUTER_API_KEY",
 ] as const;
 
+const REQUIRED_AUTH_VARS = [
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+] as const;
+
 function getEnv(name: string): string | undefined {
   const v = process.env[name];
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : undefined;
@@ -29,6 +34,18 @@ function parseNumber(value: string | undefined, defaultVal: number): number {
   if (value === undefined || value === "") return defaultVal;
   const n = Number(value);
   return Number.isFinite(n) ? n : defaultVal;
+}
+
+export function validateAuthConfig(): void {
+  const missing = REQUIRED_AUTH_VARS.filter((name) => !getEnv(name));
+  if (missing.length > 0) {
+    throw new Error(
+      "Missing required environment variables: " +
+      missing.join(", ") +
+      ". Google is the only sign-in provider and signing in is required to generate. " +
+      "See README for configuration."
+    );
+  }
 }
 
 export function validateConfig(): ValidatedConfig {
