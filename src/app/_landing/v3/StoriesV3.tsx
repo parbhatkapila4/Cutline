@@ -10,7 +10,7 @@ const CAPABILITIES = [
     label: "Four ways to shoot it",
   },
   {
-    body: "Every render reports what it actually consumed, against a balance you can see. No credits that vanish, no bill you find out about at the end of the month.",
+    body: "Every render reports what it actually consumed, against a seconds balance you can see. No credits that vanish, no bill you find out about at the end of the month.",
     label: "Metered per render",
   },
 ] as const;

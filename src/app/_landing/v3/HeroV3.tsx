@@ -57,7 +57,7 @@ const STAGES = [
 
 const PROOF = [
   { value: "12", label: "stages, one pass" },
-  { value: "1080p", label: "mp4, no watermark" },
+  { value: "4K", label: "mp4, no watermark" },
   { value: "97.9%", label: "render success" },
 ];
 
@@ -188,7 +188,7 @@ function RenderConsole() {
             cutline · render
           </span>
           <span className="font-plex text-[10.5px] tracking-[0.05em] text-[#f4f3f3]/35">
-            1080p
+            4K
           </span>
         </div>
 
@@ -430,7 +430,7 @@ export function HeroV3() {
               className="v3-rise mt-5 font-sans text-[13.5px] font-medium text-[#f4f3f3]/40"
               style={delay(520)}
             >
-              The free plan includes one render a month.
+              The free plan includes three renders a month.
             </p>
           </div>
 

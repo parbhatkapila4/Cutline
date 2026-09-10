@@ -3,13 +3,9 @@ import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { getAnonSessionIdFromRequest } from "@/lib/anon/cookie";
 import { getSessionSafe } from "@/lib/auth/getSessionSafe";
-import {
-  getTokens,
-  getApiCallsThisMonth,
-  getResetDate,
-  DEFAULT_TOKENS,
-} from "@/lib/usage";
-import { calculateTokensFromCost, estimateTokenCost, USD_PER_TOKEN } from "@/lib/cost/pricing";
+import { getApiCallsThisMonth, getResetDate } from "@/lib/usage";
+import { cinematicSecondsFor } from "@/lib/cost/pricing";
+import { getBudgetState } from "@/lib/cost/budget";
 import { getUserPlan } from "@/lib/users/planService";
 
 function titleFromInput(input: string | undefined): string {
@@ -52,7 +48,7 @@ export async function GET(request: Request) {
     durParam != null && durParam !== ""
       ? Math.max(1, Math.min(600, Math.round(Number(durParam) || 30)))
       : 30;
-  const estimatedTokensNextVideo = estimateTokenCost({
+  const estimatedSecondsNextVideo = cinematicSecondsFor({
     mode: estimateMode,
     durationSeconds: estimateDuration,
   });
@@ -81,14 +77,14 @@ export async function GET(request: Request) {
         estimate: {
           mode: estimateMode,
           durationSeconds: estimateDuration,
-          estimatedTokens: estimatedTokensNextVideo,
+          cinematicSeconds: estimatedSecondsNextVideo,
         },
-        tokens: {
-          unlimited: false,
-          initialBalance: DEFAULT_TOKENS,
-          remaining: DEFAULT_TOKENS,
-          used: 0,
-          usdPerToken: USD_PER_TOKEN,
+        cinematic: {
+          includedSeconds: 0,
+          usedSeconds: 0,
+          remainingSeconds: 0,
+          topupSeconds: 0,
+          totalRemainingSeconds: 0,
         },
         recentActivity: [],
         overview: {
@@ -161,49 +157,34 @@ export async function GET(request: Request) {
       const data = job.data as VideoJobData | undefined;
       const result = job.returnvalue as VideoJobResult | undefined;
       const ts = job.finishedOn ?? job.processedOn;
-      const tokensCost = status === "completed" && result?.cost
-        ? calculateTokensFromCost(result.cost)
-        : undefined;
+      const secondsCost = cinematicSecondsFor({
+        mode: data?.mode,
+        durationSeconds: data?.durationSeconds,
+        variationCount: data?.variationCount,
+        talkingObjectStyle: data?.talkingObjectStyle,
+        talkingRealMode: data?.talkingRealMode,
+        avatar: data?.avatar,
+      });
       return {
         id: String(job.id ?? ""),
         title: titleFromInput(data?.input) || "Video",
         status,
         time: relativeTime(ts),
-        tokensUsed: tokensCost,
+        cinematicSeconds: secondsCost || undefined,
         costUsd: result?.cost?.total,
       };
     });
 
-    const totalTokensSpent = completedForClient.reduce((sum, job) => {
-      const result = job.returnvalue as VideoJobResult | undefined;
-      if (result?.cost) return sum + calculateTokensFromCost(result.cost);
-      return sum;
-    }, 0);
-
     const plan = await getUserPlan(planUserId);
 
-    const monthlyGrant = plan.tokensPerMonth ?? DEFAULT_TOKENS;
+    const budget = await getBudgetState(identifier, plan.id);
 
-    let tokensRemaining: number = monthlyGrant;
     let apiCallsUsed = 0;
     try {
-      const [t, a] = await Promise.all([
-        getTokens(identifier, monthlyGrant),
-        getApiCallsThisMonth(identifier),
-      ]);
-      tokensRemaining = t;
-      apiCallsUsed = a;
+      apiCallsUsed = await getApiCallsThisMonth(identifier);
     } catch (redisErr) {
       console.warn("[api/dashboard/usage] usage counters unavailable (redis):", redisErr);
     }
-
-    const tokensUnlimited = plan.tokensUnlimited;
-    const tokenCapDisplay = tokensUnlimited
-      ? null
-      : Math.max(monthlyGrant, tokensRemaining + totalTokensSpent);
-    const usedThisPeriod = tokensUnlimited
-      ? totalTokensSpent
-      : Math.max(0, (tokenCapDisplay ?? monthlyGrant) - tokensRemaining);
 
     const totalCostUsd = completedForClient.reduce((sum, job) => {
       const result = job.returnvalue as VideoJobResult | undefined;
@@ -221,17 +202,16 @@ export async function GET(request: Request) {
       estimate: {
         mode: estimateMode,
         durationSeconds: estimateDuration,
-        estimatedTokens: estimatedTokensNextVideo,
+        cinematicSeconds: estimatedSecondsNextVideo,
       },
-      tokens: {
-        unlimited: tokensUnlimited,
-        initialBalance: tokenCapDisplay,
-        remaining: tokensRemaining,
-        used: usedThisPeriod,
-        usdPerToken: USD_PER_TOKEN,
-        totalCostUsd: Math.round(totalCostUsd * 100) / 100,
-        totalTokensSpent,
+      cinematic: {
+        includedSeconds: budget.cinematicSecondsAllowed,
+        usedSeconds: budget.cinematicSecondsUsed,
+        remainingSeconds: budget.cinematicSecondsRemaining,
+        topupSeconds: budget.topupSecondsRemaining,
+        totalRemainingSeconds: budget.totalSecondsRemaining,
       },
+      totalCostUsd: Math.round(totalCostUsd * 100) / 100,
       recentActivity,
       overview: {
         totalVideos,

@@ -81,7 +81,19 @@ export async function cleanupExpiredBlobs(
       cursor = res.hasMore ? res.cursor : undefined;
     } while (cursor);
 
-    if (toDelete.length > 0) await del(toDelete);
+    if (toDelete.length > 0) {
+      await del(toDelete);
+      try {
+        const { clearFinalUrls } = await import("@/lib/jobs/videoJobService");
+        const cleared = await clearFinalUrls(toDelete);
+        if (cleared > 0) console.log(`[blob] cleared final_url on ${cleared} expired job row(s)`);
+      } catch (e) {
+        console.warn(
+          "[blob] could not clear final_url for purged blobs:",
+          e instanceof Error ? e.message : String(e)
+        );
+      }
+    }
     return { deleted: toDelete.length, errors };
   } catch (e) {
     errors += 1;

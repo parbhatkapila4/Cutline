@@ -1,5 +1,11 @@
 import { Webhooks } from "@dodopayments/nextjs";
-import { grantPlanFromWebhook, revokePlanFromWebhook } from "@/lib/payments/dodo";
+import {
+  grantPlanFromWebhook,
+  revokePlanFromWebhook,
+  creditTopupFromWebhook,
+  reverseTopupFromWebhook,
+} from "@/lib/payments/dodo";
+import { isTopupProductId, topupSecondsForProductId } from "@/lib/products";
 
 export const runtime = "nodejs";
 
@@ -42,13 +48,53 @@ export const POST = Webhooks({
 
   onPaymentSucceeded: async (payload) => {
     const d = payload.data;
+    const productId = d.product_cart?.[0]?.product_id ?? null;
+    const customerId = d.customer?.customer_id ?? null;
+    const userId = userIdOf(d.metadata as Record<string, unknown>);
+
+    if (isTopupProductId(productId)) {
+      await creditTopupFromWebhook({
+        eventKey: `payment.succeeded:${d.payment_id}`,
+        eventType: payload.type,
+        userId,
+        seconds: topupSecondsForProductId(productId),
+        providerRef: d.payment_id,
+        customerId,
+      });
+      return;
+    }
+
     await grantPlanFromWebhook({
       eventKey: `payment.succeeded:${d.payment_id}`,
       eventType: payload.type,
-      userId: userIdOf(d.metadata as Record<string, unknown>),
-      productId: d.product_cart?.[0]?.product_id ?? null,
+      userId,
+      productId,
       providerRef: d.payment_id,
+      customerId,
+    });
+  },
+
+  onRefundSucceeded: async (payload) => {
+    const d = payload.data;
+    await reverseTopupFromWebhook({
+      eventKey: `refund.succeeded:${d.refund_id}`,
+      eventType: payload.type,
+      userId: userIdOf(d.metadata as Record<string, unknown>),
+      paymentId: d.payment_id,
       customerId: d.customer?.customer_id ?? null,
+      isPartial: d.is_partial === true,
+    });
+  },
+
+  onDisputeLost: async (payload) => {
+    const d = payload.data;
+    await reverseTopupFromWebhook({
+      eventKey: `dispute.lost:${d.dispute_id}`,
+      eventType: payload.type,
+      userId: undefined,
+      paymentId: d.payment_id,
+      customerId: null,
+      isPartial: false,
     });
   },
 

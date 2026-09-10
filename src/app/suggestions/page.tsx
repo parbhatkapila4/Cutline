@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 type SuggestionCategory = "all" | "correctness" | "clarity" | "engagement";
@@ -119,13 +120,13 @@ export default function SuggestionsPage() {
     <div className="min-h-screen bg-zinc-950 text-white">
 
       <div className="fixed top-4 left-4 z-50">
-        <Link
+        <LoadingLink
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/50 px-3 py-2 rounded-lg transition-colors"
         >
           <CutlineLogo size="sm" className="max-w-[130px]" />
           <span>Home</span>
-        </Link>
+        </LoadingLink>
       </div>
 
       <main className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">

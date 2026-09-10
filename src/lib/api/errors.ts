@@ -10,7 +10,6 @@ export const ErrorCode = {
   BAD_REQUEST: "BAD_REQUEST",
   INVALID_JSON: "INVALID_JSON",
   PREVIEW_JOB_NOT_FOUND: "PREVIEW_JOB_NOT_FOUND",
-  INSUFFICIENT_CREDITS: "INSUFFICIENT_CREDITS",
   MONTHLY_LIMIT_REACHED: "MONTHLY_LIMIT_REACHED",
   VIDEO_NOT_FOUND: "VIDEO_NOT_FOUND",
   WEBHOOK_INVALID_URL: "WEBHOOK_INVALID_URL",
@@ -35,8 +34,6 @@ export function apiError(options: ApiErrorOptions): NextResponse {
     error: string;
     code: string;
     details?: unknown;
-    tokensRemaining?: number;
-    tokensRequired?: number;
     videosUsed?: number;
     videosLimit?: number;
   } = {
@@ -46,8 +43,6 @@ export function apiError(options: ApiErrorOptions): NextResponse {
   if (options.details != null) {
     body.details = options.details;
     const d = options.details as Record<string, unknown>;
-    if (typeof d.tokensRemaining === "number") body.tokensRemaining = d.tokensRemaining;
-    if (typeof d.tokensRequired === "number") body.tokensRequired = d.tokensRequired;
     if (typeof d.videosUsed === "number") body.videosUsed = d.videosUsed;
     if (typeof d.videosLimit === "number") body.videosLimit = d.videosLimit;
   }

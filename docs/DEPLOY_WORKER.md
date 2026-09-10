@@ -12,7 +12,7 @@ Cutline is **two services that share one Redis**:
 `POST /api/generate` only puts a job into Redis. A separate worker process
 (`npm run worker`) must pick it up and run the 12-stage pipeline. **If no worker
 is running, every job sits at "Analyzing prompt" forever** - there is no
-in-process fallback.
+in-process fallback **in production**; outside production one auto-starts on the first `POST /api/generate`.
 
 > If videos generate while you're developing but hang in production, it's almost
 > always because your **local** `npm run worker` was the only worker, draining
@@ -26,7 +26,7 @@ prompt.
 ## What the worker needs
 
 - **Node 22**, **ffmpeg** on PATH, and **Chrome Headless Shell** + its system
-  libraries (for Remotion). `Dockerfile.worker` installs all of these.
+  libraries (for Remotion). The repo-root `Dockerfile` installs all of these.
 - **The same `REDIS_URL` as the Vercel app.** This is the #1 thing people get
   wrong. App and worker on different Redis instances = jobs never drained.
 - ~2 GB RAM minimum (4 GB comfortable) - Remotion launches headless Chrome.
@@ -34,9 +34,10 @@ prompt.
 ## Deploy on Railway (recommended)
 
 1. **New Project → Deploy from GitHub repo**, pick this repo.
-2. In the service **Settings → Build**, set **Dockerfile Path** = `Dockerfile.worker`.
-   (Railway builds the image; the image's `CMD` already runs `npm run worker` -
-   no custom start command needed.)
+2. Leave **Settings → Build** on the defaults. The worker image is the repo-root
+   `Dockerfile`, which is exactly where Railway's default builder looks, so
+   there is no Dockerfile path to set. (Railway builds the image; the image's
+   `CMD` already runs `npm run worker` - no custom start command needed.)
 3. **Variables**: add every env var from the checklist below. Copy `REDIS_URL`
    **verbatim from your Vercel project** so both point at the same Redis.
 4. **Deploy.** Watch the logs for:
@@ -54,8 +55,8 @@ prompt.
 Same idea, Dockerfile-based:
 
 - **Render** → New **Background Worker** → Docker, Dockerfile path
-  `Dockerfile.worker`, add the env vars.
-- **Fly.io** → `fly launch --dockerfile Dockerfile.worker --no-deploy`, set
+  `Dockerfile`, add the env vars.
+- **Fly.io** → `fly launch --dockerfile Dockerfile --no-deploy`, set
   secrets with `fly secrets set KEY=value …`, then `fly deploy`. Keep at least
   one machine running (don't scale to zero - a sleeping worker = stuck jobs).
 

@@ -43,7 +43,7 @@ Twelve stages, each a pure function over the previous stage's output. Determinis
 
 ### Worker separate from app
 
-Rendering is CPU-heavy and runs 1-3 minutes per video. Serverless functions time out, and even when they don't, billing-by-execution is the wrong shape for long jobs. The Next.js app handles UI + API + job enqueue; a separate BullMQ worker pipelines and renders. This split is load-bearing for the deploy story: app on Vercel, worker on a long-running host (Railway / Render / Fly), same Redis.
+Rendering is CPU-heavy. A single render attempt is allowed up to 600 s (`RENDER_TIMEOUT_MS`) and is retried up to 3 times, so worst-case wall clock is far longer than a typical run. Serverless functions time out, and even when they don't, billing-by-execution is the wrong shape for long jobs. The Next.js app handles UI + API + job enqueue; a separate BullMQ worker pipelines and renders. This split is load-bearing for the deploy story: app on Vercel, worker on a long-running host (Railway / Render / Fly), same Redis.
 
 ---
 
@@ -82,13 +82,13 @@ token unset (single-host/local dev) the worker serves from `public/temp` directl
 
 **The talking-character branch.** When `mode === "talking_object"` the renderer detours through one of three providers depending on `talkingObjectStyle` + `talkingRealMode`: cartoon goes through Google VEO with an LLM-resolved subject (humanoid fallback for abstract topics); studio framing goes through HeyGen + ElevenLabs; cinematic mode produces multi-clip VEO with a documentary-style different-presenter-per-chunk constraint, ffmpeg concat with crossfade, per-chunk silence trim.
 
-**Each stage has its own POST endpoint** (`/api/intent`, `/api/shots`, `/api/script`, `/api/images/source`, `/api/render`, etc.). That enables three things: (a) bisecting which stage produces a bad output by replaying just that stage with a saved input, (b) swapping a provider for one stage without touching the rest, and (c) writing integration tests against the slow stages in isolation. Cancellation is a Redis SET (`cutline:job:cancelled`) read between every stage; on hit the worker throws and the shared cleanup path runs.
+**Cancellation is a Redis SET.** The per-stage POST endpoints (`/api/intent`, `/api/shots`, `/api/script`, `/api/images/source`, `/api/render`, etc.) were removed - they were unauthenticated, unmetered, and their only caller was a debug page that no longer exists. Stage bisection now happens by reading `render_events` rather than by replaying a stage over HTTP. Cancellation is a Redis SET (`cutline:job:cancelled`) read between every stage; on hit the worker throws and the shared cleanup path runs.
 
 ---
 
 ## Why this is hard
 
-- **Three talking-character modes, three different failure semantics.** Cartoon and cinematic both call Google VEO via `@google/genai`; studio framing calls HeyGen. VEO's RAI filter returns a deterministic content-safety block on the generated audio - retrying the identical prompt cannot succeed. The orchestrator throws a distinct `VeoContentFilteredError`, the retry classifier marks it non-retryable, and the chunk loop runs an LLM reword pass that varies the *narration* (what RAI blocks) while keeping the *visual* prompt intact. The reworded chunk text is threaded through to caption burn so audio and captions stay synced. After two failed rewords the job fails with an actionable message and stops burning quota.
+- **Three talking-character modes, three different failure semantics.** Cartoon and cinematic both call Google VEO via `@google/genai`; studio framing calls HeyGen. VEO's RAI filter blocks the generated audio for a spoken line, detected structurally via the SDK's `raiMediaFilteredCount` rather than by string-matching an error message. The block is *not* deterministic - the same prompt can clear on a second attempt - so the chunk loop spends three separate budgets in order: one identical-prompt reroll (`VEO_FILTER_REROLLS = 1`), then up to two LLM reword passes (`VEO_SAFETY_REWORDS = 2`) that vary the *narration* while keeping the *visual* prompt intact. The orchestrator throws a distinct `VeoContentFilteredError` and the retry classifier marks it non-retryable so the generic wrapper doesn't re-fire it. The reworded chunk text is threaded through to caption burn (`finalChunkTexts`) so audio and captions stay synced. When a chunk exhausts all three budgets it is **dropped, not fatal**: the run continues, the finished video is shorter, and the user is told so. The job only fails if *every* chunk is blocked.
 
 - **HeyGen Photo Avatar quota under at-least-once submissions.** Lower-tier HeyGen accounts cap stored Photo Avatars at 3. The upload path keys a SHA-256 cache (`heygenPhotoCache.ts`) on image bytes so identical inputs short-circuit. On `code:401028` (quota full), the orchestrator lists the account, partitions avatars into *orphans* (HeyGen has them, our cache doesn't) vs *cached*, and bulk-deletes orphans oldest-first in parallel batches (concurrency 10, cap 10,000) with LRU eviction over cached as backup. A standalone CLI (`scripts/cleanup-heygen-avatars.ts`) covers one-shot recovery on heavily cluttered accounts.
 
@@ -98,7 +98,9 @@ token unset (single-host/local dev) the worker serves from `public/temp` directl
 
 - **Plan entitlement enforced at three layers.** Free / Beginner / Professional / Enterprise with caps `1 / 10 / unlimited / unlimited` videos per month (from `src/lib/plans.ts`). Pro-only features (cinematic mode, custom avatars, image uploads, downloads, edits, sharing) are gated by UI (badges + lock states), the API handler (`isProPlan(getUserPlan(userId))` before BullMQ enqueue), and the DB (`user_plan_overrides`, written only by the verified Dodo webhook). A tampered request body can't bypass the handler check; entitlement is set server-side from the signed webhook, never the client.
 
-- **Image sourcing has to never fail.** A pipeline that finishes 11 stages and aborts on shot 7 is a wasted job. Per-shot fallback chain `Unsplash → DALL·E 3 → Pexels → placeholder`, query derived per shot from intent + script via OpenRouter, `shouldRetryForImage` classifier retries 429/5xx and gives up on other 4xx. The placeholder is deliberate: a render with one stock-filler shot beats a failed render every time.
+- **Image sourcing has to never fail *per shot* - but a render of blank plates is not a success.** A pipeline that finishes 11 stages and aborts on shot 7 is a wasted job. Per-shot fallback chain `Unsplash → Pexels → DALL·E 3 → simplified-query retry (same three) → placeholder`, query derived per shot from intent + script via OpenRouter, `shouldRetryForImage` classifier retries 429/5xx and gives up on other 4xx. Every link is wrapped so a link that *throws* at runtime (a sustained 5xx that exhausts `retry()`, an abort, a provider returning junk) is logged and advances to the next link instead of escaping the stage, and the query-derivation call has the same treatment with a locally-derived fallback query. So `sourceImageForShot` is total: it always returns *an* image.
+
+  Two deliberate exceptions keep that from becoming a lie. **Absent config fails fast**: a missing `OPENROUTER_API_KEY` throws `ConfigurationError`, which the link wrapper rethrows rather than absorbs - a deploy fault is not a degraded render, and it would reproduce on every shot. Optional image keys are *not* in this class; `PEXELS_API_KEY` / `OPENAI_API_KEY` / `UNSPLASH_ACCESS_KEY` absent means that provider returns null and the chain moves on, by design. **And a placeholder floor**: after the chain runs for all shots, `sourceImages` counts how many ended on the placeholder and fails the stage when that fraction exceeds `IMAGE_PLACEHOLDER_MAX_RATIO` (default `0.5`). One filler frame in a ten-shot video still beats a failed render; six of ten does not. The count lands in stage telemetry either way, so a single fallback is visible to an operator without failing anything.
 
 ---
 
@@ -128,13 +130,13 @@ Tradeoff: `getUserPlan(userId)` reads two tables. Trivial query cost in exchange
 
 ## Failure modes
 
-- **VEO content-safety block on chunk N.** Detected as `VeoContentFilteredError`. The orchestrator runs an LLM reword on that chunk's narration (meaning preserved, wording varied), regenerates the chunk, threads the reworded text into caption burn. After two failed rewords it stops, returns an actionable message ("change this part of your topic"), and burns no further VEO quota.
+- **VEO content-safety block on chunk N.** Detected as `VeoContentFilteredError`. The orchestrator first rerolls the identical prompt once, then runs up to two LLM rewords on that chunk's narration (meaning preserved, wording varied), regenerating the chunk each time and threading the reworded text into caption burn. If the chunk still won't clear, it is **skipped and the run continues** - caption timing and the crossfade total are recomputed from the chunks that actually rendered, and the response carries "N segment(s) couldn't clear the content-safety filter and were skipped, so your video is a little shorter than Xs." Only if *no* chunk survives does the job fail, with: "Every segment was blocked by the content-safety filter, so no video could be assembled. Try changing your topic or wording, switch to Cartoon style, or use Slideshow mode."
 
 - **HeyGen `401028` Photo Avatar quota full.** Bulk auto-cleanup partitions orphans vs cached, deletes oldest orphans in parallel batches, then retries the upload once. If retry still hits 401028, the *user-facing* error is generic ("talking-character videos are temporarily unavailable; try Slideshow mode"); the *operator* log carries the technical detail and points at the CLI cleanup script. End users never see internal URLs or script paths.
 
-- **Image provider 5xx / 429.** `shouldRetryForImage` retries transient failures with exponential backoff, then falls through Unsplash → DALL·E → Pexels → placeholder. Render completes.
+- **Image provider 5xx / 429.** `shouldRetryForImage` retries transient failures on a fixed backoff table (`[1000, 2000]`, clamped to the last entry - not a computed exponential). If the provider is still failing when the budget runs out, `retry()` throws; the link wrapper catches it, logs `advancing to next link`, and the chain continues Unsplash → Pexels → DALL·E → simplified retry → placeholder. One provider down: render completes, `placeholderCount` stays at 0. *Every* provider down: each shot lands on the placeholder, the floor trips, and the job fails with `ImageFallbackFloorError` naming the count and the limit - classified non-retryable, so the stage is not re-run and re-billed for a failure that would reproduce exactly.
 
-- **Worker process killed mid-render.** Per-job temp dir is deleted on success, failure, and cancel via one shared cleanup path. An orphan-sweep job (`CLEANUP_EXPIRED_HOURS`) runs every 60 minutes as a backstop for dirs from crashed processes. Final MP4 retention is separate (`VIDEO_RETENTION_HOURS`, default 24h).
+- **Worker process killed mid-render.** Per-job temp dir is deleted on success, failure, and cancel via one shared cleanup path. An orphan-sweep job (`CLEANUP_EXPIRED_HOURS`) can run every 60 minutes as a backstop for dirs from crashed processes, but it is **off by default** - it only schedules when `CLEANUP_EXPIRED_HOURS` is set to a positive number. Final MP4 retention is separate (`VIDEO_RETENTION_HOURS`, default 24h).
 
 - **Dodo webhook replay or retries.** Dodo delivers at-least-once; the webhook claims each event in `processed_webhook_events` atomically (`INSERT … ON CONFLICT DO NOTHING RETURNING`) before granting, so duplicates no-op. Double-grant is structurally impossible.
 
@@ -154,7 +156,7 @@ Tradeoff: `getUserPlan(userId)` reads two tables. Trivial query cost in exchange
 
 - **Prompt-injection rejection.** `validateGenerateInput` rejects topics matching the injection-pattern set with a field-level `VALIDATION_FAILED`.
 
-- **Rate limiting.** Redis-backed sliding window per client (`rate-limiter-flexible`), per-route caps via env: generate (5/h default), upload (20/h), status (60/min).
+- **Rate limiting.** Redis-backed **fixed window** keyed on client IP (`rate-limiter-flexible`), per-route caps via env. Seven limit types, not three: generate (5/h), generateDaily (50/day), apiKeyGenerate (120/h), upload (20/h), status (60/min), contact (5/h), general (100/min). On a Redis store fault the limiter **fails open** and logs, rather than 429-ing every route.
 
 - **CORS.** Per-route allowlist via `CORS_ORIGIN` / `CORS_ORIGINS`. Admin and telemetry routes are excluded from CORS by design.
 
@@ -201,9 +203,13 @@ npx next dev       # terminal 1, port 3000
 npm run worker     # terminal 2, same .env.local
 ```
 
-Without the worker, jobs sit in `pending` forever. That's deliberate - there is no in-process fallback.
+Without the worker, jobs sit in `pending` forever **in production**. Outside production (or with `CUTLINE_AUTOSTART_WORKER=true`) `POST /api/generate` starts an in-process BullMQ worker, which is why `next dev` alone can still render.
 
-Full env reference, API spec, error codes, and troubleshooting live in [`docs/REFERENCE.md`](docs/REFERENCE.md).
+Further reading, by topic: [`docs/DEPLOY_WORKER.md`](docs/DEPLOY_WORKER.md) (worker deploy + the env checklist),
+[`docs/IMAGE_API_KEYS.md`](docs/IMAGE_API_KEYS.md) (image provider keys),
+[`docs/BETTER_AUTH_SETUP.md`](docs/BETTER_AUTH_SETUP.md) and [`docs/AUTH_AND_BILLING.md`](docs/AUTH_AND_BILLING.md) (auth + billing),
+[`docs/PRODUCTION_CHECKLIST.md`](docs/PRODUCTION_CHECKLIST.md), and [`ARCHITECTURE.md`](ARCHITECTURE.md).
+The HTTP API spec and error codes are served by the app itself at `/docs`.
 
 ---
 

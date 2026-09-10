@@ -1,8 +1,7 @@
 import Redis from "ioredis";
-import { createManagedRedis } from "@/lib/redis/managedRedis";
+import { createManagedRedis, FAIL_FAST_REDIS_OPTIONS } from "@/lib/redis/managedRedis";
 
 const KEY_PREFIX = "cutline:usage:";
-const TOKENS_PREFIX = "cutline:user:";
 
 function parseIntEnv(key: string, fallback: number): number {
   const raw = process.env[key];
@@ -12,15 +11,12 @@ function parseIntEnv(key: string, fallback: number): number {
   return n;
 }
 
-export const DEFAULT_TOKENS = parseIntEnv("DEFAULT_TOKENS", 10);
-export const TOKENS_PER_VIDEO = parseIntEnv("TOKENS_PER_VIDEO", 10);
-
 let redis: Redis | null = null;
 
 function getRedis(): Redis {
   if (!redis) {
     const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-    redis = createManagedRedis(url, { maxRetriesPerRequest: null });
+    redis = createManagedRedis(url, FAIL_FAST_REDIS_OPTIONS);
   }
   return redis;
 }
@@ -40,47 +36,9 @@ async function expireIfNew(key: string, next: number): Promise<void> {
   }
 }
 
-export const FREE_PLAN_VIDEOS_PER_MONTH = parseIntEnv("FREE_PLAN_VIDEOS_PER_MONTH", 1);
-export const FREE_PLAN_API_CALLS_PER_MONTH = parseIntEnv("FREE_PLAN_API_CALLS_PER_MONTH", 1);
+export const FREE_PLAN_VIDEOS_PER_MONTH = parseIntEnv("FREE_PLAN_VIDEOS_PER_MONTH", 3);
+export const FREE_PLAN_API_CALLS_PER_MONTH = parseIntEnv("FREE_PLAN_API_CALLS_PER_MONTH", 3);
 
-
-function tokensKey(identifier: string): string {
-  return `${TOKENS_PREFIX}${identifier}:${monthStamp()}:tokens`;
-}
-
-export async function getTokens(
-  identifier: string,
-  monthlyGrant: number = DEFAULT_TOKENS,
-): Promise<number> {
-  const key = tokensKey(identifier);
-  const r = getRedis();
-  const raw = await r.get(key);
-  if (raw === null) {
-    await r.set(key, String(monthlyGrant), "EX", MONTH_KEY_TTL_SECONDS);
-    return monthlyGrant;
-  }
-  const n = parseInt(raw, 10);
-  return Number.isNaN(n) ? monthlyGrant : Math.max(0, n);
-}
-
-export async function decrementTokens(
-  identifier: string,
-  amount: number,
-  monthlyGrant: number = DEFAULT_TOKENS,
-): Promise<number> {
-  const key = tokensKey(identifier);
-  const r = getRedis();
-  const exists = await r.exists(key);
-  if (!exists) {
-    await r.set(key, String(monthlyGrant), "EX", MONTH_KEY_TTL_SECONDS);
-  }
-  const next = await r.incrby(key, -amount);
-  if (next < 0) {
-    await r.set(key, "0", "KEEPTTL");
-    return 0;
-  }
-  return next;
-}
 
 export async function getApiCallsThisMonth(identifier: string): Promise<number> {
   const key = monthKey(identifier);

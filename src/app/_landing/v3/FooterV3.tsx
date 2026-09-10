@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import { Container } from "./primitives";
 
 type FooterLink = { label: string; href: string; external?: boolean };
@@ -32,7 +32,6 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
     links: [
       { label: "Changelog", href: "/changelog" },
       { label: "Status", href: "/status" },
-      { label: "Evals", href: "/evals" },
     ],
   },
   {
@@ -81,9 +80,9 @@ function Column({ heading, links }: { heading: string; links: FooterLink[] }) {
                 {link.label}
               </a>
             ) : (
-              <Link href={link.href} className={LINK_CLS}>
+              <LoadingLink href={link.href} className={LINK_CLS}>
                 {link.label}
-              </Link>
+              </LoadingLink>
             )}
           </li>
         ))}
@@ -143,7 +142,7 @@ export function FooterV3() {
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 font-plex text-[11px] text-[#f4f3f3]/50">
             <span>© 2026 Cutline, Inc. All rights reserved.</span>
             <span className="hidden md:inline">
-              sentence → mp4 · 12 stages · 1080p · single pass
+              sentence → mp4 · 12 stages · 4K · single pass
             </span>
             <nav aria-label="Social" className="flex items-center gap-5">
               {SOCIAL.map((link) => (

@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { createManagedRedis } from "@/lib/redis/managedRedis";
+import { createManagedRedis, FAIL_FAST_REDIS_OPTIONS } from "@/lib/redis/managedRedis";
 import fs from "fs";
 import path from "path";
 import type { Intent } from "@/lib/types/intent";
@@ -15,7 +15,7 @@ let redisClient: Redis | null = null;
 function getRedis(): Redis {
   if (!redisClient) {
     const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-    redisClient = createManagedRedis(url, { maxRetriesPerRequest: null });
+    redisClient = createManagedRedis(url, FAIL_FAST_REDIS_OPTIONS);
   }
   return redisClient;
 }

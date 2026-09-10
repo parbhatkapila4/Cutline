@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import Image from "next/image";
 import { authClient, useCachedSession } from "@/lib/auth-client";
 import { Container, ArrowNE, useHydrated } from "./primitives";
@@ -46,7 +46,7 @@ export function NavV3() {
   return (
     <header className="absolute inset-x-0 top-0 z-50 font-sans">
       <div className="px-3 pt-3 sm:px-5">
-        <Link
+        <LoadingLink
           href="/how"
           className="relative flex items-center justify-center overflow-hidden rounded-[10px] bg-[#2a2827] px-6 py-2.5 transition-colors hover:bg-[#333130]"
         >
@@ -67,12 +67,12 @@ export function NavV3() {
               Read more.
             </span>
           </span>
-        </Link>
+        </LoadingLink>
       </div>
 
       <nav>
         <Container className="flex h-[74px] items-center justify-between gap-4">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5">
+          <LoadingLink href="/" className="flex shrink-0 items-center gap-2.5">
             <span className="relative inline-flex h-7 w-7 overflow-hidden rounded-[7px] bg-[#0b0b0b]">
               <Image
                 src="/cutline-logo.png"
@@ -87,13 +87,13 @@ export function NavV3() {
             <span className="font-sans text-[19px] font-medium tracking-[-0.02em] text-[#f4f3f3]">
               Cutline
             </span>
-          </Link>
+          </LoadingLink>
 
           <div className="hidden items-center lg:flex">
             {NAV_LINKS.map((link) => (
-              <Link key={link.href} href={link.href} className={LINK_CLS}>
+              <LoadingLink key={link.href} href={link.href} className={LINK_CLS}>
                 {link.label}
-              </Link>
+              </LoadingLink>
             ))}
           </div>
 
@@ -105,13 +105,13 @@ export function NavV3() {
               />
             ) : isLoggedIn && sessionUser ? (
               <>
-                <Link
+                <LoadingLink
                   href="/dashboard"
                   className={`${btnClasses("darkSolid", "sm")} hidden sm:inline-flex`}
                 >
                   Dashboard
                   <ArrowNE />
-                </Link>
+                </LoadingLink>
                 <div id="v3-account-menu" className="relative">
                   <button
                     type="button"
@@ -180,18 +180,18 @@ export function NavV3() {
               </>
             ) : (
               <>
-                <Link
+                <LoadingLink
                   href="/auth/sign-in"
                   className={btnClasses("darkSolid", "sm")}
                 >
                   Start free
-                </Link>
-                <Link
+                </LoadingLink>
+                <LoadingLink
                   href="/contact"
                   className={`${btnClasses("dark", "sm")} hidden sm:inline-flex`}
                 >
                   Talk to us
-                </Link>
+                </LoadingLink>
               </>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { PRICING } from "@/constants/landing";
+import { PRICING, isExcludedFeature } from "@/constants/landing";
 import { PLAN_TO_PRODUCT_ID } from "@/lib/products";
 import { PlanCta } from "./PlanCta";
 import { ManageBillingBanner } from "./ManageBillingBanner";
@@ -70,9 +70,11 @@ export function Pricing() {
                   <span className={`text-[2.75rem] font-bold tracking-[-0.04em] tabular-nums ${isPopular ? "text-white" : "text-[#0a0a0a]"}`}>
                     {plan.monthlyPrice}
                   </span>
-                  <span className={`text-[13px] font-medium ${isPopular ? "text-white/50" : "text-[#71717a]"}`}>
-                    /mo
-                  </span>
+                  {plan.monthlyPrice.startsWith("$") ? (
+                    <span className={`text-[13px] font-medium ${isPopular ? "text-white/50" : "text-[#71717a]"}`}>
+                      /mo
+                    </span>
+                  ) : null}
                 </div>
 
                 <PlanCta
@@ -95,20 +97,27 @@ export function Pricing() {
                     What you get
                   </p>
                   <ul className="space-y-3">
-                    {plan.features.map((feature, fi) => (
-                      <li key={fi} className={`flex items-start gap-2.5 text-[13px] leading-snug ${isPopular ? "text-white/85" : "text-[#3f3f46]"}`}>
-                        <svg
-                          className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isPopular ? "text-emerald-400" : "text-emerald-600"}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          strokeWidth={2.5}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
-                        <span>{feature}</span>
-                      </li>
-                    ))}
+                    {plan.features.map((feature, fi) => {
+                      const excluded = isExcludedFeature(feature);
+                      return (
+                        <li key={fi} className={`flex items-start gap-2.5 text-[13px] leading-snug ${excluded ? (isPopular ? "text-white/45" : "text-[#a1a1aa]") : (isPopular ? "text-white/85" : "text-[#3f3f46]")}`}>
+                          {excluded ? (
+                            <span className="w-3.5 h-3.5 shrink-0 mt-0.5 text-center leading-[14px]" aria-hidden>&minus;</span>
+                          ) : (
+                            <svg
+                              className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isPopular ? "text-emerald-400" : "text-emerald-600"}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              strokeWidth={2.5}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                          )}
+                          <span>{feature}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>
@@ -120,7 +129,7 @@ export function Pricing() {
           {[
             "Cancel anytime",
             "No watermarks on any plan",
-            "Same 1080p HD output across all tiers",
+            "4K MP4 export",
           ].map((label) => (
             <span key={label} className="inline-flex items-center gap-1.5 leading-none">
               <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>

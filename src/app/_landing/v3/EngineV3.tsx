@@ -123,7 +123,7 @@ export function EngineV3() {
             name="The Compositor"
             kind="Render engine"
             lead="Most tools stop at a storyboard."
-            body="This one composites the voice, the footage, the captions and the score into a single timeline and encodes it - one pass, 1080p, roughly a minute from prompt to download."
+            body="This one composites the voice, the footage, the captions and the score into a single timeline and encodes it - one pass, 4K, roughly a minute from prompt to download."
             href="/features"
             slab={
               <StageSlab

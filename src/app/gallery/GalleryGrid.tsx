@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useMemo } from "react";
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import type { GalleryItem, Persona } from "./page";
 
 const PERSONAS: readonly Persona[] = [
@@ -172,7 +172,7 @@ export function GalleryGrid({ items }: { items: GalleryItem[] }) {
           </div>
         </div>
 
-        <Link
+        <LoadingLink
           href="/auth/sign-in"
           className="group block rounded-2xl border border-white/10 bg-white/[0.04] p-5 hover:border-white/25 hover:bg-white/[0.07] transition-colors"
         >
@@ -197,9 +197,9 @@ export function GalleryGrid({ items }: { items: GalleryItem[] }) {
             </svg>
           </div>
           <p className="mt-2 text-[11.5px] text-zinc-500 leading-relaxed">
-            First video free. No card.
+            3 free videos a month. No card.
           </p>
-        </Link>
+        </LoadingLink>
       </aside>
 
       <div className="min-w-0">
@@ -265,10 +265,10 @@ export function GalleryGrid({ items }: { items: GalleryItem[] }) {
                 Make one of these for your brief.
               </h2>
               <p className="text-zinc-400 text-sm leading-relaxed max-w-[52ch]">
-                Type a sentence. The 12-stage director writes, narrates, and renders. First video is free - no card.
+                Type a sentence. The 12-stage director writes, narrates, and renders. 3 free videos a month - no card.
               </p>
             </div>
-            <Link
+            <LoadingLink
               href="/auth/sign-in"
               className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white text-black text-[12px] font-bold tracking-[0.12em] uppercase hover:bg-zinc-200 transition-colors shadow-[0_4px_24px_-6px_rgba(255,255,255,0.3)]"
             >
@@ -287,7 +287,7 @@ export function GalleryGrid({ items }: { items: GalleryItem[] }) {
                   d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
                 />
               </svg>
-            </Link>
+            </LoadingLink>
           </div>
         </div>
 
@@ -438,7 +438,7 @@ function VideoCard({ item }: { item: GalleryItem }) {
             render <span className="text-zinc-300 tabular-nums">{item.renderSec}s</span>
           </span>
           <span className="text-zinc-700" aria-hidden>·</span>
-          <span>1080p</span>
+          <span>4K</span>
           <span className="text-zinc-700" aria-hidden>·</span>
           <span>MP4</span>
         </div>

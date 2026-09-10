@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 import { GalleryGrid } from "./GalleryGrid";
 
@@ -117,14 +117,14 @@ export default function GalleryPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3 bg-black/60 backdrop-blur-sm border-b border-white/5">
-        <Link
+        <LoadingLink
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
         >
           <CutlineLogo size="sm" className="max-w-[140px]" />
           <span>Home</span>
-        </Link>
-        <Link
+        </LoadingLink>
+        <LoadingLink
           href="/auth/sign-in"
           className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-black text-[12px] font-bold tracking-[0.1em] uppercase hover:bg-zinc-200 transition-colors"
         >
@@ -132,7 +132,7 @@ export default function GalleryPage() {
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
           </svg>
-        </Link>
+        </LoadingLink>
       </div>
 
       <main className="pt-24 pb-24 px-4 sm:px-6 lg:px-8">

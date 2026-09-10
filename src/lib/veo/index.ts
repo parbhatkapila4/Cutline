@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, PersonGeneration } from "@google/genai";
 import fs from "fs";
 import path from "path";
 
@@ -7,6 +7,7 @@ import { isValidAspectRatio, type AspectRatio } from "@/lib/validation/aspectRat
 
 const VEO_MODEL = process.env.VEO_MODEL || "veo-3.1-generate-preview";
 const POLL_INTERVAL_MS = 10_000;
+const MAX_POLL_DURATION_MS = 600_000;
 
 const QUOTA_LIMIT_PATTERNS = [
   "quota",
@@ -120,9 +121,11 @@ export async function generateTalkingVideoWithVeo(
   const config: {
     aspectRatio?: string;
     durationSeconds?: number;
+    personGeneration?: PersonGeneration;
   } = {
     aspectRatio: veoConfigAspectRatio(options?.aspectRatio),
     durationSeconds: 8,
+    personGeneration: PersonGeneration.ALLOW_ADULT,
   };
 
   let operation: Awaited<ReturnType<typeof ai.models.generateVideos>>;
@@ -137,7 +140,13 @@ export async function generateTalkingVideoWithVeo(
     throwFromVeoRaw(msg);
   }
 
+  const pollStartedAt = Date.now();
   while (!operation.done) {
+    if (Date.now() - pollStartedAt >= MAX_POLL_DURATION_MS) {
+      throw new Error(
+        `Video generation timed out after ${Math.round(MAX_POLL_DURATION_MS / 60_000)} minutes. Please try again.`
+      );
+    }
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     operation = await ai.operations.getVideosOperation({ operation });
   }

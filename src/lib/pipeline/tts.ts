@@ -5,6 +5,7 @@ import { createSilenceWav, pcmToWav, SAMPLE_RATE } from "@/lib/tts/wav";
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
 const DEFAULT_ELEVENLABS_MODEL = "eleven_multilingual_v2";
+const TTS_REQUEST_TIMEOUT_MS = 60_000;
 
 type TTSProvider = "elevenlabs" | "playht";
 function getElevenLabsVoiceSettings() {
@@ -50,19 +51,29 @@ async function synthesizeElevenLabsPcm(
   voiceId: string
 ): Promise<Buffer> {
   const url = `${ELEVENLABS_BASE}/text-to-speech/${voiceId}?output_format=pcm_44100`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-      Accept: "audio/pcm",
-    },
-    body: JSON.stringify({
-      text,
-      model_id: getElevenLabsModel(),
-      voice_settings: getElevenLabsVoiceSettings(),
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TTS_REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "xi-api-key": apiKey,
+        Accept: "audio/pcm",
+      },
+      body: JSON.stringify({
+        text,
+        model_id: getElevenLabsModel(),
+        voice_settings: getElevenLabsVoiceSettings(),
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const body = await response.text();
@@ -82,19 +93,29 @@ async function synthesizeElevenLabsMp3(
   voiceId: string
 ): Promise<Buffer> {
   const url = `${ELEVENLABS_BASE}/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-      Accept: "audio/mpeg",
-    },
-    body: JSON.stringify({
-      text,
-      model_id: getElevenLabsModel(),
-      voice_settings: getElevenLabsVoiceSettings(),
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TTS_REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "xi-api-key": apiKey,
+        Accept: "audio/mpeg",
+      },
+      body: JSON.stringify({
+        text,
+        model_id: getElevenLabsModel(),
+        voice_settings: getElevenLabsVoiceSettings(),
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const body = await response.text();
@@ -113,22 +134,32 @@ async function synthesizePlayHT(
   voiceId: string,
   userId: string
 ): Promise<Buffer> {
-  const response = await fetch("https://api.play.ht/api/v2/tts/stream", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "X-User-ID": userId,
-      Accept: "audio/mpeg",
-    },
-    body: JSON.stringify({
-      text,
-      voice: voiceId,
-      voice_engine: "PlayHT2.0-turbo",
-      output_format: "mp3",
-      sample_rate: 44100,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TTS_REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch("https://api.play.ht/api/v2/tts/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "X-User-ID": userId,
+        Accept: "audio/mpeg",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        text,
+        voice: voiceId,
+        voice_engine: "PlayHT2.0-turbo",
+        output_format: "mp3",
+        sample_rate: 44100,
+      }),
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const body = await response.text();

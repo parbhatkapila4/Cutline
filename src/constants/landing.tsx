@@ -152,7 +152,7 @@ export const FEATURES = [
   },
   {
     icon: null,
-    title: "1080p HD Export",
+    title: "4K UHD Export",
     desc: "Download your finished video in full HD quality, ready for any platform.",
   },
   {
@@ -192,13 +192,13 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Mountain Scene",
         detail: "Matched to your narrative, sourced in HD quality.",
-        badge: "HD 1080p",
+        badge: "4K UHD",
       },
     },
     card3: {
       title: "Video Studio",
       desc: "Full control from resolution to captions - preview, export, and download your HD video instantly.",
-      dd1: "1080p Resolution",
+      dd1: "4K Resolution",
       dd2: "MP4 Format",
       infoTitle: "Render Time",
       infoDesc:
@@ -262,7 +262,7 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Concept Map",
         detail: "Visual breakdown of complex topics for better retention.",
-        badge: "HD 1080p",
+        badge: "4K UHD",
       },
     },
     card3: {
@@ -332,7 +332,7 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Reel Cover",
         detail: "Thumb-stopping cover frames optimized for the feed.",
-        badge: "HD 1080p",
+        badge: "4K UHD",
       },
     },
     card3: {
@@ -452,14 +452,14 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       scene: {
         name: "Sunset Skyline · 4K",
         detail: "Sourced from your reference deck.",
-        badge: "HD 1080p",
+        badge: "4K UHD",
       },
       summary: { label: "Style match", value: "94%" },
     },
     card3: {
       status: { label: "rendering", tone: "rose" },
       presets: [
-        { label: "1080p", active: true },
+        { label: "4K", active: true },
         { label: "4K" },
         { label: "Square" },
         { label: "9:16" },
@@ -587,7 +587,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       status: { label: "captioning", tone: "rose" },
       presets: [
         { label: "720p", active: true },
-        { label: "1080p" },
+        { label: "4K" },
         { label: "LMS" },
         { label: "16:9" },
       ],
@@ -800,19 +800,24 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
   },
 ];
 
+export function isExcludedFeature(feature: string): boolean {
+  return /not included\.?$/i.test(feature.trim());
+}
+
 export const PRICING = [
   {
     planId: "free" as const,
     name: "Free",
     monthlyPrice: "$0",
-    yearlyPrice: "$0",
-    description: "For trying the whole pipeline on a real video.",
+    description: "For trying a real render before you pay.",
     features: [
-      "1 video per month",
-      "1080p HD MP4 export",
-      "No watermark, ever",
-      "Auto-directed script, voice, captions",
+      "3 videos per month",
+      "Up to 20 seconds",
+      "Stock-image slideshows only",
+      "4K MP4 export, no watermark",
       "Community support",
+      "AI-generated imagery not included",
+      "Talking-character videos not included",
     ],
     cta: "Start creating free",
     href: "/auth/sign-in",
@@ -824,16 +829,16 @@ export const PRICING = [
     planId: "beginner" as const,
     name: "Beginner",
     monthlyPrice: "$29",
-    yearlyPrice: "$19",
     description:
       "For solo creators shipping a few videos a month.",
     features: [
       "10 videos per month",
-      "1080p HD MP4 export",
+      "Up to 60 seconds",
+      "AI-generated imagery when stock falls short",
       "Auto-directed script, voice, captions, b-roll",
-      "Brand colors and logo upload",
       "Reels, Shorts, LinkedIn, YouTube formats",
       "Email support",
+      "Talking-character videos not included",
     ],
     cta: "Get started",
     href: DODO_PAYMENT_URL,
@@ -845,15 +850,17 @@ export const PRICING = [
     planId: "professional" as const,
     name: "Professional",
     monthlyPrice: "$59",
-    yearlyPrice: "$39",
     description:
       "For creators and small teams running content at volume.",
     features: [
+      "90 seconds of talking-character video per month, top-ups available",
+      "Talking-character videos - cartoon, cinematic and avatar",
+      "Custom and preset avatars",
+      "Your own images in a render",
+      "Logo upload",
       "Unlimited videos per month",
       "Everything in Beginner",
-      "Premium voice options",
       "Asset analysis from reference media",
-      "Advanced motion and pacing controls",
       "Priority email support",
     ],
     cta: "Try Professional",
@@ -865,11 +872,11 @@ export const PRICING = [
   {
     planId: "enterprise" as const,
     name: "Enterprise",
-    monthlyPrice: "$89",
-    yearlyPrice: "$59",
+    monthlyPrice: "$299",
     description:
       "For agencies and product teams shipping at scale or via API.",
     features: [
+      "400 seconds of talking-character video per month",
       "Everything in Professional",
       "REST API + webhook callbacks",
       "Unlimited API calls",
@@ -877,7 +884,7 @@ export const PRICING = [
       "Direct support channel",
       "Onboarding session",
     ],
-    cta: "Talk to us",
+    cta: "Get Enterprise",
     href: "mailto:parbhat@parbhat.work?subject=Cutline%20Enterprise%20inquiry",
     highlighted: false,
     popular: false,

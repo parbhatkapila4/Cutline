@@ -14,7 +14,7 @@ const TICKER_ITEMS = [
   },
   {
     emoji: "⚡",
-    text: "From one sentence to a 1080p MP4 in about 60 seconds",
+    text: "From one sentence to a 4K MP4 in about 60 seconds",
     href: "/how",
   },
   {
@@ -24,7 +24,7 @@ const TICKER_ITEMS = [
   },
   {
     emoji: "🆓",
-    text: "Your first video is free - no card required",
+    text: "3 free videos a month - no card required",
     href: "/auth/sign-in",
   },
 ] as const;

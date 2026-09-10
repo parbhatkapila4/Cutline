@@ -108,10 +108,10 @@ const CAPABILITIES: Capability[] = [
   {
     id: "render",
     title: "Render the cut",
-    body: "Voice, footage, captions and motion composited into one timeline and encoded in a single pass. What lands in your downloads is a 1080p MP4, not a project file.",
-    prompt: "Burn it down to a 1080p MP4",
+    body: "Voice, footage, captions and motion composited into one timeline and encoded in a single pass. What lands in your downloads is a 4K MP4, not a project file.",
+    prompt: "Burn it down to a 4K MP4",
     run: "RUN 4825",
-    chip: "Render · 1080p H.264",
+    chip: "Render · 4K H.264",
     ruleLabel: "Output",
     ruleMeta: "1 pass · 0:44",
     unit: "Step",
@@ -528,7 +528,7 @@ function AppPanel({
         <div className="mt-3 flex items-center gap-2.5">
           <StatusChip>{item.chip}</StatusChip>
           <span className="truncate font-plex text-[10px] text-[#1d1c1b]/40">
-            1080p · MP4 · no watermark
+            4K · MP4 · no watermark
           </span>
         </div>
 

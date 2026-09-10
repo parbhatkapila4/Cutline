@@ -8,10 +8,21 @@ import { CircleUserRound, Clapperboard, Info } from "lucide-react";
 import { getUserFriendlyErrorMessage, getErrorPresentation } from "@/lib/utils/error";
 import { STAGES } from "@/constants/landing";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
-import { SUBMIT_TIMEOUT_MS } from "@/components/generate/constants";
+import {
+  SUBMIT_TIMEOUT_MS,
+  POLL_INITIAL_DELAY_MS,
+  POLL_BACKOFF_FACTOR,
+  POLL_MAX_DELAY_MS,
+} from "@/components/generate/constants";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId } from "@/lib/types/avatar";
 import { isEnterprisePlan, isProPlan, type PlanId } from "@/lib/plans";
+import { cinematicSecondsFor } from "@/lib/cost/pricing";
+import {
+  trackGenerateSubmit,
+  trackGenerateComplete,
+  trackGenerateFailed,
+} from "@/lib/analytics/ga";
 import { ProBadge } from "@/components/ui/pro-badge";
 import { useRouter } from "next/navigation";
 import WarpShaderHero from "@/components/ui/warp-shader";
@@ -80,6 +91,8 @@ function canUseProAvatar(plan: PlanId): boolean {
 function canUseCinematicScenes(plan: PlanId): boolean {
   return isProPlan(plan);
 }
+
+const FREE_MAX_DURATION_SECONDS = 20;
 
 const POLL_MS = 2500;
 
@@ -270,13 +283,40 @@ export default function CreatePage() {
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [canGenerateByPlan, setCanGenerateByPlan] = useState(true);
   const [planLimitMessage, setPlanLimitMessage] = useState<string | null>(null);
+  const [secondsBalance, setSecondsBalance] = useState<{
+    included: number;
+    remaining: number;
+    topup: number;
+    totalRemaining: number;
+  } | null>(null);
   const canUseCinematicMode = canUseCinematicScenes(userPlan);
   const isPro = isProPlan(userPlan);
+  const isFreePlan = userPlan === "free";
+  const maxDur = isFreePlan ? FREE_MAX_DURATION_SECONDS : DURATION_MAX;
   const isSlideshow = mode === "slideshow";
+  const secondsThisVideo = cinematicSecondsFor({
+    mode,
+    durationSeconds: Math.min(maxDur, Math.max(DURATION_MIN, dur)),
+    talkingObjectStyle: objStyle,
+    talkingRealMode,
+    avatar:
+      avatarMode === "preset"
+        ? { mode: "preset", presetId: avatarPresetId }
+        : avatarMode === "upload"
+          ? { mode: "upload", uploadAssetId: avatarFile ? "pending" : undefined }
+          : { mode: "default" },
+  });
+  const shortOnSeconds =
+    secondsThisVideo > 0 &&
+    secondsBalance != null &&
+    secondsThisVideo > secondsBalance.totalRemaining;
   const router = useRouter();
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const transientRef = useRef(0);
+  const backoffUntilRef = useRef(0);
+  const gaJobRef = useRef<{ mode: Mode; plan: PlanId; settled: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const avatarFileRef = useRef<HTMLInputElement>(null);
 
@@ -285,6 +325,14 @@ export default function CreatePage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.plan) setUserPlan(d.plan as PlanId);
+        if (d?.cinematic) {
+          setSecondsBalance({
+            included: Number(d.cinematic.includedSeconds) || 0,
+            remaining: Number(d.cinematic.remainingSeconds) || 0,
+            topup: Number(d.cinematic.topupSeconds) || 0,
+            totalRemaining: Number(d.cinematic.totalRemainingSeconds) || 0,
+          });
+        }
         const hasVideoCap =
           typeof d?.videosLimit === "number" && Number.isFinite(d.videosLimit);
         const used =
@@ -314,6 +362,14 @@ export default function CreatePage() {
       setTalkingRealMode("studio");
     }
   }, [canUseCinematicMode, talkingRealMode]);
+  useEffect(() => {
+    setDur((prev) => (prev > maxDur ? maxDur : prev));
+  }, [maxDur]);
+  useEffect(() => {
+    if (!canUseCinematicMode && mode === "talking_object") {
+      setMode("slideshow");
+    }
+  }, [canUseCinematicMode, mode]);
 
   useEffect(() => {
     if (isPro) return;
@@ -358,12 +414,38 @@ export default function CreatePage() {
     if (stageRef.current) clearInterval(stageRef.current);
     pollRef.current = stageRef.current = null;
   }, []);
+  const settleGa = useCallback((outcome: "completed" | "failed", errorCode?: string) => {
+    const ctx = gaJobRef.current;
+    if (!ctx || ctx.settled) return;
+    ctx.settled = true;
+    if (outcome === "completed") trackGenerateComplete(ctx.mode, ctx.plan);
+    else trackGenerateFailed(ctx.mode, ctx.plan, errorCode ?? "UNKNOWN");
+  }, []);
 
   const poll = useCallback(async (id: string) => {
+    if (Date.now() < backoffUntilRef.current) return;
     try {
       const r = await fetch(`/api/generate/${encodeURIComponent(id)}`);
       const d = await r.json();
-      if (!r.ok) { setError(getUserFriendlyErrorMessage(d.error || "Error")); setStatus("failed"); stop(); return; }
+      if (!r.ok) {
+        if (r.status === 429 || r.status >= 500) {
+          transientRef.current += 1;
+          const computed = Math.min(
+            POLL_INITIAL_DELAY_MS * POLL_BACKOFF_FACTOR ** (transientRef.current - 1),
+            POLL_MAX_DELAY_MS
+          );
+          const retryAfterMs = Number(d?.details?.retryAfter) * 1000;
+          const wait = Math.max(computed, Number.isFinite(retryAfterMs) ? retryAfterMs : 0);
+          backoffUntilRef.current = Date.now() + wait;
+          return;
+        }
+        setError(getUserFriendlyErrorMessage(d.error || "Error"));
+        setStatus("failed");
+        settleGa("failed", typeof d?.code === "string" ? d.code : "STATUS_UNAVAILABLE");
+        stop();
+        return;
+      }
+      transientRef.current = 0;
       setStatus(d.status);
       setPipelineStage(typeof d.stage === "string" && d.stage.trim() ? d.stage.trim() : null);
       setStageDetail(typeof d.stageDetail === "string" && d.stageDetail.trim() ? d.stageDetail.trim() : null);
@@ -372,11 +454,22 @@ export default function CreatePage() {
       if (d.status === "completed" && d.videoUrl) {
         setVideoUrl(d.videoUrl);
         setCompletionMessage(typeof d.message === "string" && d.message.trim() ? d.message.trim() : null);
+        settleGa("completed");
         stop();
       }
-      if (d.status === "failed") { setError(getUserFriendlyErrorMessage(d.error || "Failed")); stop(); }
-    } catch { setError("Connection lost"); setStatus("failed"); stop(); }
-  }, [stop]);
+      if (d.status === "failed") {
+        setError(getUserFriendlyErrorMessage(d.error || "Failed"));
+        settleGa("failed", typeof d.failureCode === "string" ? d.failureCode : "UNKNOWN");
+        stop();
+      }
+    } catch {
+      transientRef.current += 1;
+      backoffUntilRef.current = Date.now() + Math.min(
+        POLL_INITIAL_DELAY_MS * POLL_BACKOFF_FACTOR ** (transientRef.current - 1),
+        POLL_MAX_DELAY_MS
+      );
+    }
+  }, [stop, settleGa]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -409,13 +502,16 @@ export default function CreatePage() {
       setErrorCode("MONTHLY_LIMIT_REACHED");
       return;
     }
-    if (
-      mode === "talking_object" &&
-      objStyle === "real" &&
-      talkingRealMode === "scenario" &&
-      !canUseCinematicMode
-    ) {
-      setError("Cinematic scenes are available on Pro and Enterprise plans. Upgrade to use this mode.");
+    if (mode === "talking_object" && !canUseCinematicMode) {
+      setError("Talking-character videos are available on Pro and Enterprise plans. Upgrade to use this mode.");
+      return;
+    }
+    if (shortOnSeconds && secondsBalance) {
+      setError(
+        `This video needs ${secondsThisVideo}s of talking-character time and you have ` +
+        `${secondsBalance.totalRemaining}s left. Shorten it, or add more seconds.`
+      );
+      setErrorCode("CINEMATIC_SECONDS_EXHAUSTED");
       return;
     }
     if (
@@ -462,6 +558,8 @@ export default function CreatePage() {
         }
         avatarUploadAssetId = String(uploadData.assetIds[0]);
       }
+      gaJobRef.current = { mode, plan: userPlan, settled: false };
+      trackGenerateSubmit(mode, userPlan);
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(), SUBMIT_TIMEOUT_MS);
       let r: Response;
@@ -470,7 +568,7 @@ export default function CreatePage() {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             input: prompt.trim(), mode, platform, aspectRatio,
-            durationSeconds: Math.min(DURATION_MAX, Math.max(DURATION_MIN, dur)),
+            durationSeconds: Math.min(maxDur, Math.max(DURATION_MIN, dur)),
             captions: cc ? "on" : "off",
             ...(assetIds.length ? { assetIds } : {}),
             ...(mode === "talking_object" ? { talkingObjectStyle: objStyle } : {}),
@@ -507,11 +605,13 @@ export default function CreatePage() {
         } else {
           setError(getUserFriendlyErrorMessage(d.error || "Failed"));
         }
+        settleGa("failed", code ?? "GENERATE_REJECTED");
         return;
       }
       setJobId(d.jobId); setStatus("pending");
     } catch (e) {
       setError(e instanceof Error && e.name === "AbortError" ? "Timed out. Try again." : "Connection failed.");
+      settleGa("failed", e instanceof Error && e.name === "AbortError" ? "SUBMIT_TIMEOUT" : "NETWORK_ERROR");
     } finally { setSubmitting(false); }
   };
 
@@ -901,7 +1001,7 @@ export default function CreatePage() {
                 <span className="text-white/15">/</span>
                 <span className="text-zinc-400">MP4</span>
                 <span className="text-white/15">·</span>
-                <span className="text-zinc-400">1080P</span>
+                <span className="text-zinc-400">4K</span>
                 {videoDurationSec != null && (
                   <>
                     <span className="text-white/15">·</span>
@@ -1017,7 +1117,7 @@ export default function CreatePage() {
                   </svg>
                   <span className="relative">Download MP4</span>
                   <span className="relative inline-flex items-center font-mono text-[10px] font-bold tracking-[0.16em] uppercase opacity-65">
-                    1080p
+                    4K
                   </span>
                   <svg className="relative w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -1033,8 +1133,8 @@ export default function CreatePage() {
                     setTimeout(() => setCopied(false), 2000);
                   }}
                   className={`group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border text-[13px] font-medium transition-colors ${copied
-                      ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                      : "border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22]"
+                    ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                    : "border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22]"
                     }`}
                   aria-live="polite"
                 >
@@ -1449,7 +1549,12 @@ export default function CreatePage() {
                     <div className="flex flex-col gap-2.5">
                       <div>
                         <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Video length</h2>
-                        <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">{DURATION_MIN}-{DURATION_MAX} seconds. Talking videos over 8s use multiple clips.</p>
+                        <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">
+                          {DURATION_MIN}-{maxDur} seconds.{" "}
+                          {isFreePlan
+                            ? "Free videos are capped at 20 seconds - upgrade for up to 60."
+                            : "Talking videos over 8s use multiple clips."}
+                        </p>
                       </div>
                       <div
                         className="rounded-[10px] px-[18px] py-4 flex items-center gap-[18px]"
@@ -1468,7 +1573,7 @@ export default function CreatePage() {
                           <input
                             type="range"
                             min={DURATION_MIN}
-                            max={DURATION_MAX}
+                            max={maxDur}
                             value={dur}
                             onChange={(e) => setDur(Number(e.target.value))}
                             className="absolute inset-0 w-full h-1 opacity-0 cursor-pointer z-10"
@@ -1478,14 +1583,14 @@ export default function CreatePage() {
                             <div
                               className="absolute left-0 top-0 h-full rounded-full"
                               style={{
-                                width: `${((dur - DURATION_MIN) / (DURATION_MAX - DURATION_MIN)) * 100}%`,
+                                width: `${((dur - DURATION_MIN) / (maxDur - DURATION_MIN)) * 100}%`,
                                 background: "linear-gradient(90deg, rgba(255,255,255,0.85), #ededed)",
                               }}
                             />
                             <div
                               className="absolute top-1/2 w-[14px] h-[14px] rounded-full bg-white"
                               style={{
-                                left: `${((dur - DURATION_MIN) / (DURATION_MAX - DURATION_MIN)) * 100}%`,
+                                left: `${((dur - DURATION_MIN) / (maxDur - DURATION_MIN)) * 100}%`,
                                 transform: "translate(-50%, -50%)",
                                 border: "1px solid rgba(0,0,0,0.3)",
                                 boxShadow: "0 2px 4px rgba(0,0,0,0.4)",
@@ -2072,7 +2177,35 @@ export default function CreatePage() {
                         <strong className="font-mono font-medium text-[#ededed] text-[11px] tabular-nums">~{Math.max(60, Math.round(dur * 1.5))}s</strong> render
                       </span>
                       <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
-                      <span className="inline-flex items-center gap-1.5"><strong className="font-mono font-medium text-[#ededed] text-[11px] tabular-nums">4K</strong> UHD</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <strong className="font-mono font-medium text-[#ededed] text-[11px] tabular-nums">4K</strong>
+                        {isFreePlan ? " UHD, stock imagery" : " UHD"}
+                      </span>
+                      {secondsThisVideo > 0 && secondsBalance ? (
+                        <>
+                          <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
+                          <span className="inline-flex items-center gap-1.5">
+                            <strong
+                              className="font-mono font-medium text-[11px] tabular-nums"
+                              style={{ color: shortOnSeconds ? "#f87171" : "#ededed" }}
+                            >
+                              {secondsThisVideo}
+                            </strong>
+                            {` of your ${secondsBalance.totalRemaining} seconds`}
+                            {secondsBalance.topup > 0
+                              ? ` (${secondsBalance.remaining} included + ${secondsBalance.topup} purchased)`
+                              : ""}
+                          </span>
+                          {shortOnSeconds ? (
+                            <Link
+                              href="/pricing#topup"
+                              className="inline-flex items-center gap-1 font-medium text-red-300 underline underline-offset-2 hover:text-red-200"
+                            >
+                              Add seconds
+                            </Link>
+                          ) : null}
+                        </>
+                      ) : null}
                       <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
                       <span
                         className="px-[9px] py-[2px] rounded-full font-medium tracking-[0.04em] uppercase"

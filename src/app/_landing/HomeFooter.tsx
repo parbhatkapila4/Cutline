@@ -136,14 +136,14 @@ export function HomeFooter() {
                   <span className="absolute inline-flex h-full w-full rounded-sm bg-emerald-400 opacity-70 animate-ping" />
                   <span className="relative inline-flex h-2 w-2 rounded-sm bg-emerald-400" />
                 </span>
-                <span>First video free. No card.</span>
+                <span>3 free videos a month. No card.</span>
               </div>
               <div className="flex items-center gap-2.5 text-zinc-400">
                 <span
                   className="inline-block h-2 w-2 rounded-sm bg-emerald-400/60 shrink-0"
                   aria-hidden
                 />
-                <span>30-60s · 1080p MP4 · single-pass.</span>
+                <span>30-60s · 4K MP4 · single-pass.</span>
               </div>
               <div className="flex items-center gap-2.5 text-zinc-500">
                 <span
@@ -356,7 +356,7 @@ export function HomeFooter() {
             <span className="text-zinc-400">4</span> phases
           </span>
           <span className="text-zinc-800" aria-hidden>·</span>
-          <span>1080p</span>
+          <span>4K</span>
           <span className="text-zinc-800" aria-hidden>·</span>
           <span>single-pass</span>
         </div>

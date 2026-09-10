@@ -2,8 +2,9 @@ import type { GenerationFlowResult } from "@/lib/db/types";
 import { ensureAnonSession } from "./middleware";
 import { getAnonSessionById, incrementAnonGenerationCount } from "./anonSessionService";
 import { createVideoJob } from "@/lib/jobs/videoJobService";
+import { randomUUID } from "crypto";
 
-const ANON_FREE_GENERATIONS = 1;
+const ANON_FREE_GENERATIONS = 3;
 
 export type GenerationFlowOutput = {
   result: GenerationFlowResult;
@@ -30,14 +31,17 @@ export async function runGenerationFlow(
     };
   }
 
-  const { id: jobId } = await createVideoJob({
+  const queueJobId = randomUUID();
+  await createVideoJob({
     owner_type: "anon",
     owner_id: anonSessionId,
     prompt,
     status: "queued",
     preview_url: null,
     final_url: null,
+    queue_job_id: queueJobId,
   });
+  const jobId = queueJobId;
 
   await incrementAnonGenerationCount(anonSessionId);
 

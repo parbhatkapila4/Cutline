@@ -32,6 +32,10 @@ import { cleanupJobArtifacts } from "@/lib/storage/cleanup";
 import { isJobCancelled } from "@/lib/queue/cancelCheck";
 import { generateTalkingVideoWithVeo, VeoQuotaOrLimitError, VeoContentFilteredError } from "@/lib/veo";
 import { rewriteNarrationForSafety } from "@/lib/pipeline/safetyReword";
+import {
+  precheckChunksForSafety,
+  isSafetyPrecheckEnabled,
+} from "@/lib/pipeline/safetyPrecheck";
 import { resolveCartoonSubject } from "@/lib/pipeline/cartoonSubject";
 import {
   concatenateMp4s,
@@ -58,9 +62,11 @@ import {
   setActiveJob,
   clearActiveJob,
 } from "@/lib/telemetry/store";
+import { recordRenderEvent } from "@/lib/telemetry/renderEvents";
+import { mapFailedReasonToFailureCode } from "@/lib/utils/error";
 import { savePreviewArtifacts, loadPreviewArtifacts } from "@/lib/preview/artifacts";
 import { getCaptionsRenderOption } from "@/lib/pipeline/captionsRenderOption";
-import { createCostTracker } from "@/lib/cost/costEstimator";
+import { createCostTracker, countPaidImageCalls } from "@/lib/cost/costEstimator";
 import type { CostBreakdown } from "@/lib/cost/types";
 import type { Job } from "bullmq";
 import { runQualityGate } from "@/lib/pipeline/qualityGate";
@@ -102,23 +108,35 @@ function withStageTelemetry<T>(
     recordStageStart(jobId, stageName);
   } catch {
   }
+  recordRenderEvent({ jobId, eventType: "stage_started", stageName });
+  const startedAt = Date.now();
   return fn()
     .then((r) => {
       try {
         recordStageEnd(jobId, stageName);
       } catch {
       }
+      recordRenderEvent({
+        jobId,
+        eventType: "stage_completed",
+        stageName,
+        durationMs: Date.now() - startedAt,
+      });
       return r;
     })
     .catch((e) => {
+      const message = e instanceof Error ? e.message : String(e);
       try {
-        recordStageEnd(
-          jobId,
-          stageName,
-          e instanceof Error ? e.message : String(e)
-        );
+        recordStageEnd(jobId, stageName, message);
       } catch {
       }
+      recordRenderEvent({
+        jobId,
+        eventType: "stage_failed",
+        stageName,
+        errorCode: mapFailedReasonToFailureCode(message),
+        durationMs: Date.now() - startedAt,
+      });
       throw e;
     });
 }
@@ -154,6 +172,7 @@ export type PipelineOptions = {
   regenSnapshot?: RegenSnapshotV1;
   regenFromJobId?: string;
   regenerateShotIds?: string[];
+  stockImagesOnly?: boolean;
 };
 
 
@@ -465,10 +484,26 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
       } catch {
       }
     }
+    const totalCost = results.reduce(
+      (acc, r) => {
+        const c = r.cost;
+        if (!c) return acc;
+        return {
+          llm: acc.llm + (c.llm ?? 0),
+          tts: acc.tts + (c.tts ?? 0),
+          video: acc.video + (c.video ?? 0),
+          images: acc.images + (c.images ?? 0),
+          total: acc.total + (c.total ?? 0),
+        };
+      },
+      { llm: 0, tts: 0, video: 0, images: 0, total: 0 }
+    );
+
     return {
       videoPath: results[0]!.videoUrl,
       variations: results,
       qualityReport,
+      cost: totalCost,
     };
   } catch (e) {
     if (jobId) {
@@ -918,8 +953,12 @@ async function runPipelineOnce(
 
         await withStageTelemetry(jobId, "heygen", () =>
           withRetry(
-            () =>
-              createTalkingVideo(
+            () => {
+              try {
+                recordStageProgress(jobId, "heygen", "generating");
+              } catch {
+              }
+              return createTalkingVideo(
                 resolvedAvatarPath,
                 ttsResult.audioBuffer,
                 ttsResult.audioFormat,
@@ -934,7 +973,8 @@ async function runPipelineOnce(
                   backgroundColor: "#0f1115",
                   scale: heygenScale,
                 }
-              ),
+              );
+            },
             { maxAttempts: 2, baseDelayMs: 1500, maxDelayMs: 8000 }
           )
         );
@@ -986,7 +1026,7 @@ async function runPipelineOnce(
         }
 
         const durationSec = getDuration(outputPath);
-        if (durationSec > 0) costTracker.recordVideoSeconds(durationSec);
+        if (durationSec > 0) costTracker.recordHeygenSeconds(durationSec);
         checkOutputSizeIfConfigured(outputPath);
         logEvent({
           jobId,
@@ -1127,7 +1167,7 @@ async function runPipelineOnce(
           }
         }
         const durationSec = getDuration(outputPath);
-        if (durationSec > 0) costTracker.recordVideoSeconds(durationSec);
+        if (durationSec > 0) costTracker.recordVeoChunks(1);
         checkOutputSizeIfConfigured(outputPath);
         logEvent({
           jobId,
@@ -1197,6 +1237,50 @@ async function runPipelineOnce(
       }
 
       const textChunks = splitScriptIntoChunks(combinedScript, wordsPerChunk).slice(0, targetChunks);
+      if (isSafetyPrecheckEnabled() && textChunks.length > 0) {
+        const flagged = await precheckChunksForSafety(
+          textChunks,
+          textModel ? { model: textModel } : undefined
+        );
+        const flaggedCount = flagged.filter(Boolean).length;
+        if (flaggedCount > 0) {
+          console.warn(
+            "[pipeline] jobId=" + jobId + " safety pre-check flagged " + flaggedCount +
+            "/" + textChunks.length + " chunk(s); rewording before generation"
+          );
+          let rewordedCount = 0;
+          for (let i = 0; i < textChunks.length; i++) {
+            if (!flagged[i]) continue;
+            try {
+              const reworded = await rewriteNarrationForSafety(
+                textChunks[i]!,
+                textModel ? { model: textModel } : undefined
+              );
+              if (reworded?.trim() && reworded.trim() !== textChunks[i]!.trim()) {
+                textChunks[i] = reworded.trim();
+                rewordedCount++;
+              }
+            } catch (e) {
+              console.warn(
+                "[pipeline] jobId=" + jobId + " pre-check reword failed for chunk " + (i + 1) +
+                "; sending original: " + (e instanceof Error ? e.message : String(e))
+              );
+            }
+          }
+          if (rewordedCount > 0) {
+            const line = rewordedCount === 1 ? "line" : "lines";
+            const wasWere = rewordedCount === 1 ? "was" : "were";
+            message =
+              (message ? message + " " : "") +
+              `${rewordedCount} ${line} ${wasWere} reworded to pass content filters.`;
+            console.log(
+              "[pipeline] jobId=" + jobId + " pre-check reworded " + rewordedCount + "/" +
+              textChunks.length + " chunk(s) before generation."
+            );
+          }
+        }
+      }
+
       const finalChunkTexts: string[] = [];
       await checkCancelledAndThrow();
       logEvent({ jobId, event: "stage_start", stage: "veo" });
@@ -1295,11 +1379,13 @@ async function runPipelineOnce(
                 console.log("[pipeline] jobId=" + jobId + " mode=talking_object stage=veo chunk " + (i + 1) + "/" + N);
               }
               await withRetry(
-                () =>
-                  generateTalkingVideoWithVeo(prompt, jobId + "-chunk-" + i, chunkPath, {
+                () => {
+                  costTracker.recordVeoChunks(1);
+                  return generateTalkingVideoWithVeo(prompt, jobId + "-chunk-" + i, chunkPath, {
                     talkingObjectStyle,
                     aspectRatio,
-                  }),
+                  });
+                },
                 { maxAttempts: 4, baseDelayMs: 2000, maxDelayMs: 20000 }
               );
               const validation = validateVideoChunk(chunkPath, VEO_CHUNK_SECONDS);
@@ -1457,8 +1543,7 @@ async function runPipelineOnce(
           throw new Error(`Caption burn failed (captions were requested): ${msg}`);
         }
       }
-      const videoDurationSec = getDuration(outputPath);
-      if (videoDurationSec > 0) costTracker.recordVideoSeconds(videoDurationSec);
+
       checkOutputSizeIfConfigured(outputPath);
       logEvent({
         jobId,
@@ -1590,8 +1675,9 @@ async function runPipelineOnce(
           analyzedAssets,
           assetPaths,
           jobId,
-          isPreview,
-          aspectRatio
+          isPreview || Boolean(options.stockImagesOnly),
+          aspectRatio,
+          options.stockImagesOnly ? 1 : undefined
         ),
       {
         maxRetries: retryConfig.image.maxRetries,
@@ -1606,7 +1692,7 @@ async function runPipelineOnce(
     throw new Error(message);
   });
   costTracker.recordLlmTokens(shotList.shots.length * TOKENS_ESTIMATE.imageQueryPerShot);
-  costTracker.recordImageCalls(imageSpec.entries.length);
+  costTracker.recordImageCalls(countPaidImageCalls(imageSpec.entries));
 
   const normalizedImageSpec = normalizeImageSpecForRender(imageSpec, jobId, cwd);
 

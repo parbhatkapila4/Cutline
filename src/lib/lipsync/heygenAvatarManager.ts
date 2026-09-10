@@ -168,7 +168,7 @@ export async function freeUpHeyGenSlot(
     return { freedCount: 0, orphansRemaining: 0, source: "none" };
   }
 
-  const cachedById = getAllCachedTalkingPhotoIds();
+  const cachedById = await getAllCachedTalkingPhotoIds();
   const orphans = accountAvatars.filter((p) => !cachedById.has(p.id));
   const cached = accountAvatars.filter((p) => cachedById.has(p.id));
 
@@ -223,7 +223,7 @@ export async function freeUpHeyGenSlot(
   if (!ok) {
     return { freedCount: 0, orphansRemaining: 0, source: "none" };
   }
-  removeCachedByTalkingPhotoId(victim.id);
+  await removeCachedByTalkingPhotoId(victim.id);
   console.log(`[heygen] jobId=${jobId} freeUpSlot: freed cached ${victim.id}`);
   return { freedCount: 1, orphansRemaining: 0, source: "lru" };
 }

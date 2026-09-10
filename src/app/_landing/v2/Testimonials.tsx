@@ -5,7 +5,7 @@ export function TestimonialOne() {
     <Section rule>
       <Container>
         <TestimonialFigure
-          quote="From idea to 1080p download in one flow. We needed something that felt professional without a full production team. Cutline does exactly that."
+          quote="From idea to 4K download in one flow. We needed something that felt professional without a full production team. Cutline does exactly that."
           name="Omar Raza"
           role="Founder"
         />

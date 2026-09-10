@@ -43,14 +43,40 @@ function titleFromInput(input: string | undefined): string {
   return trimmed.slice(0, 50);
 }
 
-async function resolveDashboardIdentifier(request: Request): Promise<string | null> {
+type DashboardOwner = { id: string; ownerType: "user" | "anon" };
+
+async function resolveDashboardOwner(request: Request): Promise<DashboardOwner | null> {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
     const userId = session?.user?.id;
-    if (typeof userId === "string" && userId.trim()) return userId;
+    if (typeof userId === "string" && userId.trim()) {
+      return { id: userId, ownerType: "user" };
+    }
   } catch {
   }
-  return getAnonSessionIdFromRequest(request);
+  const anonId = getAnonSessionIdFromRequest(request);
+  return anonId ? { id: anonId, ownerType: "anon" } : null;
+}
+
+async function loadPersistedItems(owner: DashboardOwner): Promise<DashboardVideoItem[]> {
+  const { listVideoJobsByOwner } = await import("@/lib/jobs/videoJobService");
+  const rows = await listVideoJobsByOwner(owner.ownerType, owner.id, 100);
+  return rows.map((row) => {
+    const ts = row.created_at instanceof Date ? row.created_at.getTime() : 0;
+    const status: DashboardVideoItem["status"] =
+      row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "processing";
+    const videoUrl = row.final_url ?? row.preview_url ?? undefined;
+    return {
+      id: row.queue_job_id ?? row.id,
+      title: titleFromInput(row.prompt),
+      prompt: row.prompt ?? "",
+      date: formatDate(ts),
+      duration: "-",
+      status,
+      ...(status === "completed" && videoUrl ? { videoUrl } : {}),
+      timestamp: ts,
+    };
+  });
 }
 
 export async function GET(request: Request) {
@@ -65,8 +91,19 @@ export async function GET(request: Request) {
   }
 
   try {
-    const identifier = await resolveDashboardIdentifier(request);
-    if (!identifier) return NextResponse.json([]);
+    const owner = await resolveDashboardOwner(request);
+    if (!owner) return NextResponse.json([]);
+    const identifier = owner.id;
+
+    let persisted: DashboardVideoItem[] = [];
+    const { isDatabaseConfigured } = await import("@/lib/db/client");
+    if (isDatabaseConfigured()) {
+      try {
+        persisted = await loadPersistedItems(owner);
+      } catch (e) {
+        console.error("[api] GET /api/dashboard/videos persisted read failed", e);
+      }
+    }
 
     const queue = getVideoQueue();
     const [completed, failed, waiting, active] = await Promise.all([
@@ -123,9 +160,23 @@ export async function GET(request: Request) {
       items.push(toItem(job, "processing", ""));
     }
 
-    items.sort((a, b) => b.timestamp - a.timestamp);
+    const byId = new Map<string, DashboardVideoItem>();
+    for (const item of items) {
+      if (item.id) byId.set(item.id, item);
+    }
+    for (const item of persisted) {
+      const live = byId.get(item.id);
+      if (live && item.status !== "completed" && item.status !== "failed") {
+        byId.set(item.id, { ...item, status: live.status, videoUrl: live.videoUrl });
+        continue;
+      }
+      byId.set(item.id, live ? { ...live, ...item } : item);
+    }
 
-    return NextResponse.json(items);
+    const merged = [...byId.values()];
+    merged.sort((a, b) => b.timestamp - a.timestamp);
+
+    return NextResponse.json(merged);
   } catch (e) {
     console.error("[api] GET /api/dashboard/videos", e);
     return NextResponse.json({ error: "Failed to load videos." }, { status: 500 });

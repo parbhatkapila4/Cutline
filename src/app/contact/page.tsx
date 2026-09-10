@@ -1,41 +1,33 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import Image from "next/image";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
+import { BUDGET_OPTIONS, INQUIRY_OPTIONS } from "@/lib/contact/options";
 
-const BUDGET_OPTIONS = [
-  "Less than $3K",
-  "$3K-$5K",
-  "$5K-$10K",
-  "$10K-$20K",
-  "More than $20K",
-];
-
-const INQUIRY_OPTIONS = [
-  "General inquiry",
-  "Video project",
-  "Partnership",
-  "Support",
-  "Other",
-];
+const CONTACT_EMAIL = "parbhat@parbhat.work";
 
 export default function ContactPage() {
   const [budget, setBudget] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
   const [budgetError, setBudgetError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(false), 4000);
+    const t = setTimeout(() => setToast(false), 6000);
     return () => clearTimeout(t);
   }, [toast]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBudgetError(false);
+    setSubmitError(null);
+    setToast(false);
+
     const form = formRef.current;
     if (!form) return;
     if (!form.reportValidity()) return;
@@ -43,19 +35,56 @@ export default function ContactPage() {
       setBudgetError(true);
       return;
     }
-    setToast(true);
+    if (submitting) return;
+
+    const data = new FormData(form);
+    const payload = {
+      name: String(data.get("name") ?? ""),
+      email: String(data.get("email") ?? ""),
+      phone: String(data.get("phone") ?? ""),
+      company: String(data.get("company") ?? ""),
+      inquiry: String(data.get("inquiry") ?? ""),
+      details: String(data.get("details") ?? ""),
+      website: String(data.get("website") ?? ""),
+      budget,
+    };
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+
+      if (!res.ok) {
+        setSubmitError(body.error ?? "We could not send your message. Please try again.");
+        return;
+      }
+
+      form.reset();
+      setBudget(null);
+      setToast(true);
+    } catch {
+      setSubmitError(
+        "We could not reach the server. Check your connection and try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="h-screen bg-black overflow-hidden flex flex-col">
       <div className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex justify-start">
-        <Link
+        <LoadingLink
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/30 hover:bg-white/10 px-3 py-2 rounded-lg transition-colors"
         >
           <CutlineLogo size="sm" className="max-w-[140px]" />
           <span>Home</span>
-        </Link>
+        </LoadingLink>
       </div>
 
       <main className="pt-20 pb-16 px-4 sm:px-6 flex-1 min-h-0 overflow-hidden flex items-center justify-center">
@@ -96,124 +125,156 @@ export default function ContactPage() {
               <div className="p-8 sm:p-10 lg:p-12 bg-zinc-50/80 border-l border-zinc-200/80">
                 <form
                   ref={formRef}
-                  className="space-y-6"
                   onSubmit={handleSubmit}
                 >
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-zinc-700 mb-1">
-                      Full name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="name"
-                      type="text"
-                      required
-                      className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
-                      placeholder="Your name"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1">
-                        Email <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="email"
-                        type="email"
-                        required
-                        className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
-                        placeholder="you@example.com"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="phone" className="block text-sm font-medium text-zinc-700 mb-1">
-                        Phone number
-                      </label>
-                      <input
-                        id="phone"
-                        type="tel"
-                        className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
-                        placeholder="+1 234 567 8900"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label htmlFor="company" className="block text-sm font-medium text-zinc-700 mb-1">
-                        Company name
-                      </label>
-                      <input
-                        id="company"
-                        type="text"
-                        className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
-                        placeholder="Your company"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="inquiry" className="block text-sm font-medium text-zinc-700 mb-1">
-                        Inquiry reason <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="inquiry"
-                        required
-                        className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors appearance-none cursor-pointer"
-                        style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23717171'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 0 center", backgroundSize: "1.25rem" }}
-                      >
-                        <option value="">Select reason</option>
-                        {INQUIRY_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="block text-sm font-medium text-zinc-700 mb-3">
-                      Project budget <span className="text-red-500">*</span>
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {BUDGET_OPTIONS.map((opt) => (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() => { setBudget(opt); setBudgetError(false); }}
-                          className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${budget === opt
-                            ? "border-emerald-500 bg-emerald-500 text-white"
-                            : "border-zinc-300 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-100"
-                            }`}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                    {budgetError && (
-                      <p className="mt-2 text-sm text-red-500">Please select a project budget.</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="details" className="block text-sm font-medium text-zinc-700 mb-1">
-                      Project details <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      id="details"
-                      required
-                      rows={4}
-                      className="w-full h-28 min-h-28 max-h-28 bg-transparent border border-zinc-300 rounded-lg px-4 py-3 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors resize-none"
-                      placeholder="Tell us about your project..."
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-4 rounded-xl transition-colors"
+                  <fieldset
+                    disabled={submitting}
+                    className="space-y-6 border-0 m-0 p-0 min-w-0 disabled:opacity-70 transition-opacity"
                   >
-                    Let&apos;s connect
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M17 7H7M17 7v10" />
-                    </svg>
-                  </button>
+                    <div>
+                      <label htmlFor="name" className="block text-sm font-medium text-zinc-700 mb-1">
+                        Full name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="name"
+                        name="name"
+                        type="text"
+                        required
+                        className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
+                        placeholder="Your name"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div>
+                        <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Email <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="email"
+                          name="email"
+                          type="email"
+                          required
+                          className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
+                          placeholder="you@example.com"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="phone" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Phone number
+                        </label>
+                        <input
+                          id="phone"
+                          name="phone"
+                          type="tel"
+                          className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
+                          placeholder="+1 234 567 8900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div>
+                        <label htmlFor="company" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Company name
+                        </label>
+                        <input
+                          id="company"
+                          name="company"
+                          type="text"
+                          className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
+                          placeholder="Your company"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="inquiry" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Inquiry reason <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="inquiry"
+                          name="inquiry"
+                          required
+                          className="w-full bg-transparent border-0 border-b-2 border-zinc-300 px-0 py-2 text-zinc-900 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors appearance-none cursor-pointer"
+                          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23717171'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 0 center", backgroundSize: "1.25rem" }}
+                        >
+                          <option value="">Select reason</option>
+                          {INQUIRY_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span id="budget-label" className="block text-sm font-medium text-zinc-700 mb-3">
+                        Project budget <span className="text-red-500">*</span>
+                      </span>
+                      <div
+                        role="group"
+                        aria-labelledby="budget-label"
+                        aria-describedby={budgetError ? "budget-error" : undefined}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {BUDGET_OPTIONS.map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            aria-pressed={budget === opt}
+                            onClick={() => { setBudget(opt); setBudgetError(false); }}
+                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${budget === opt
+                              ? "border-emerald-500 bg-emerald-500 text-white"
+                              : "border-zinc-300 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-100"
+                              }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                      {budgetError && (
+                        <p id="budget-error" role="alert" className="mt-2 text-sm text-red-500">
+                          Please select a project budget.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="details" className="block text-sm font-medium text-zinc-700 mb-1">
+                        Project details <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        id="details"
+                        name="details"
+                        required
+                        rows={4}
+                        className="w-full h-28 min-h-28 max-h-28 bg-transparent border border-zinc-300 rounded-lg px-4 py-3 text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors resize-none"
+                        placeholder="Tell us about your project..."
+                      />
+                    </div>
+
+                    <div className="hidden" aria-hidden>
+                      <label htmlFor="website">Leave this field empty</label>
+                      <input
+                        id="website"
+                        name="website"
+                        type="text"
+                        tabIndex={-1}
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/60 disabled:cursor-not-allowed text-white font-semibold px-8 py-4 rounded-xl transition-colors"
+                    >
+                      {submitting ? "Sending..." : "Let's connect"}
+                      {!submitting && (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M17 7H7M17 7v10" />
+                        </svg>
+                      )}
+                    </button>
+                  </fieldset>
                 </form>
               </div>
             </div>
@@ -221,8 +282,8 @@ export default function ContactPage() {
             <div className="px-8 sm:px-10 lg:px-12 py-6 border-t border-zinc-200 bg-white flex flex-col sm:flex-row flex-wrap items-center justify-center gap-8 sm:gap-12 text-sm">
               <div className="text-center sm:text-left">
                 <p className="text-zinc-500 mb-0.5">Work with us</p>
-                <a href="mailto:parbhat@parbhat.work" className="font-medium text-zinc-900 hover:text-emerald-600 transition-colors">
-                  parbhat@parbhat.work
+                <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-zinc-900 hover:text-emerald-600 transition-colors">
+                  {CONTACT_EMAIL}
                 </a>
               </div>
             </div>
@@ -237,6 +298,24 @@ export default function ContactPage() {
           aria-live="polite"
         >
           Message sent successfully! We&apos;ll get back to you soon.
+        </div>
+      )}
+      {submitError && (
+        <div
+          role="alert"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[min(92vw,32rem)] px-6 py-4 rounded-xl bg-red-600 text-white shadow-lg animate-in"
+        >
+          <p className="font-medium">{submitError}</p>
+          <p className="mt-1 text-sm text-red-100">
+            You can also email us directly at{" "}
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="underline font-semibold hover:text-white"
+            >
+              {CONTACT_EMAIL}
+            </a>
+            .
+          </p>
         </div>
       )}
     </div>

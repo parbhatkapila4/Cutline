@@ -86,7 +86,7 @@ export function FinalCtaV3() {
                 Ready to make the video you keep putting off?
               </h2>
               <p className="mt-5 max-w-[440px] font-sans text-[14.5px] font-medium leading-[1.5] text-[#f4f3f3]/80 sm:text-[15.5px]">
-                Your first render is free. No card, no watermark, no editor.
+                Three free renders a month. No card, no watermark, no editor.
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <Btn href={startHref} variant="darkSolid">

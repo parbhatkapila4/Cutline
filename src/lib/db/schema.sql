@@ -15,7 +15,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS video_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_type video_job_owner_type NOT NULL,
-  owner_id UUID NOT NULL,
+  owner_id TEXT NOT NULL,
   prompt TEXT NOT NULL,
   status video_job_status NOT NULL DEFAULT 'queued',
   preview_url TEXT,
@@ -106,3 +106,40 @@ CREATE TABLE IF NOT EXISTS billing_customers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_billing_customers_dodo ON billing_customers (dodo_customer_id);
+CREATE TABLE IF NOT EXISTS contact_submissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  company TEXT,
+  inquiry TEXT NOT NULL,
+  budget TEXT NOT NULL,
+  details TEXT NOT NULL,
+  email_status TEXT NOT NULL DEFAULT 'pending' CHECK (
+    email_status IN ('pending', 'sent', 'failed')
+  ),
+  email_error TEXT,
+  provider_message_id TEXT,
+  client_identifier TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submissions (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_contact_submissions_email_status ON contact_submissions (email_status);
+CREATE INDEX IF NOT EXISTS idx_video_jobs_queue_job_id ON video_jobs (queue_job_id);
+CREATE TABLE IF NOT EXISTS render_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id TEXT NOT NULL,
+  user_id TEXT,
+  event_type TEXT NOT NULL,
+  stage_name TEXT,
+  error_code TEXT,
+  duration_ms INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_render_events_job_id ON render_events (job_id);
+CREATE INDEX IF NOT EXISTS idx_render_events_user_id ON render_events (user_id);
+CREATE INDEX IF NOT EXISTS idx_render_events_type_created ON render_events (event_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_render_events_stage ON render_events (stage_name);
+ALTER TABLE processed_webhook_events
+ADD COLUMN IF NOT EXISTS topup_seconds INTEGER;
+CREATE INDEX IF NOT EXISTS idx_processed_webhook_events_ref ON processed_webhook_events (provider_ref);

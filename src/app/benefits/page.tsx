@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 const WHAT_YOU_GET = [
@@ -7,7 +7,7 @@ const WHAT_YOU_GET = [
   { title: "Images per shot", desc: "Every shot gets an image: sourced from stock (Unsplash, Pexels) or generated (DALL·E), or from your uploads. The pipeline picks; you don't hunt for B-roll." },
   { title: "Motion and pacing", desc: "Pan, zoom, and shot length are decided by the pipeline from the narrative. The edit feels intentional, not random or template-flat." },
   { title: "Synced subtitles", desc: "Captions are aligned to the voice using word-level timings from TTS. Viewers can watch with or without sound and still follow along." },
-  { title: "No watermarks, no account", desc: "The video is yours. No \"upgrade to remove watermark\" or sign-up wall. Rate limits apply per session, but you can try the full flow without creating an account." },
+  { title: "No watermarks, no account", desc: "The video is yours. No \"upgrade to remove watermark\" or sign-up wall. Rate limits apply per session, and the free render is a stock-image slideshow up to 20 seconds - talking-character videos and AI-generated imagery are on the paid plans." },
 ];
 
 const WHY_BETTER = [
@@ -28,13 +28,13 @@ const HOW_USEFUL = [
 export default function BenefitsPage() {
   return (
     <div className="min-h-screen bg-black text-white">
-      <Link
+      <LoadingLink
         href="/"
         className="fixed top-4 left-4 z-10 inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors border border-white/20 rounded-lg px-3 py-2 hover:bg-white/5 bg-black/40 backdrop-blur-sm"
       >
         <CutlineLogo size="sm" className="max-w-[120px]" />
         <span>Home</span>
-      </Link>
+      </LoadingLink>
       <main>
 
         <section className="relative py-24 px-6 overflow-hidden">

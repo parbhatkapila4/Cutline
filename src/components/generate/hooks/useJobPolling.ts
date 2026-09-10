@@ -22,6 +22,7 @@ export function useJobPolling(jobId: string | null) {
   const [variations, setVariations] = useState<JobVariation[] | null>(null);
   const [isPreview, setIsPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -47,6 +48,7 @@ export function useJobPolling(jobId: string | null) {
         setStatus(data.status);
         if (data.status === "completed" && data.videoUrl) {
           setVideoUrl(data.videoUrl);
+          setNotice(typeof data.message === "string" && data.message.trim() ? data.message.trim() : null);
           setIsPreview(data.isPreview === true);
           setVariations(data.variations ?? null);
           stopPolling();
@@ -104,6 +106,8 @@ export function useJobPolling(jobId: string | null) {
     setIsPreview,
     error,
     setError,
+    notice,
+    setNotice,
     stopPolling,
   };
 }

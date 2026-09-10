@@ -41,7 +41,7 @@ export function SecureV3() {
 
           <div className="border-l border-[#1d1c1b]/16 py-2 pl-6 sm:pl-10">
             <h2 className="font-sans text-[36px] font-normal leading-[1.06] tracking-[-0.03em] text-[#1d1c1b] sm:text-[46px]">
-              Yours, end to end
+              Yours to keep
             </h2>
             <p className="mt-6 max-w-[460px] font-sans text-[15.5px] font-medium leading-[1.5] text-[#1d1c1b]/75">
               No watermark on any plan, at any tier. Your uploads stay yours and

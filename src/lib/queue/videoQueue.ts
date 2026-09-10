@@ -28,6 +28,8 @@ export function createRedisConnection(): Redis {
   return getRedisConnection();
 }
 
+import { recordRenderEvent } from "@/lib/telemetry/renderEvents";
+import { mapFailedReasonToFailureCode } from "@/lib/utils/error";
 import type { BrandColors } from "@/lib/assets/types";
 import type { Platform } from "@/lib/platform/types";
 import type { CostBreakdown } from "@/lib/cost/types";
@@ -47,6 +49,11 @@ export type VideoJobData = {
   brandColors?: BrandColors;
   mode?: "slideshow" | "talking_object";
   durationSeconds?: number;
+  reservedSpendUsd?: number;
+  reservedCinematicSeconds?: number;
+  reservedCinematicSplit?: { fromMonthly?: number; fromTopup?: number };
+  spendIdentifier?: string;
+  stockImagesOnly?: boolean;
   textModel?: string;
   captions?: "on" | "off";
   talkingObjectStyle?: "cartoon" | "real";
@@ -86,6 +93,16 @@ export type VideoJobResult = {
   qualityReport?: QualityReport;
 };
 
+export function purchasedGenerativeWork(progress: unknown): boolean {
+  if (!progress || typeof progress !== "object" || Array.isArray(progress)) return false;
+  const p = progress as { stage?: unknown; detail?: unknown };
+  const stage = typeof p.stage === "string" ? p.stage : "";
+  const detail = typeof p.detail === "string" ? p.detail : "";
+  if (stage === "veo") return detail.startsWith("chunk ");
+  if (stage === "heygen") return detail === "generating";
+  return false;
+}
+
 export const CLEANUP_JOB_NAME = "cleanup";
 
 export async function cancelJob(jobId: string): Promise<{ ok: boolean; reason?: "not_found" | "already_finished" }> {
@@ -111,18 +128,23 @@ export async function cancelJob(jobId: string): Promise<{ ok: boolean; reason?: 
   }
 }
 
+let videoQueueInstance: Queue<VideoJobData, VideoJobResult> | null = null;
+
 export function getVideoQueue(): Queue<VideoJobData, VideoJobResult> {
+  if (videoQueueInstance) return videoQueueInstance;
   const connection = createRedisConnection();
-  return new Queue<VideoJobData, VideoJobResult>(QUEUE_NAME, {
+  videoQueueInstance = new Queue<VideoJobData, VideoJobResult>(QUEUE_NAME, {
     connection,
     defaultJobOptions: {
       removeOnComplete: { count: 100 },
       removeOnFail: { count: 500 },
     },
   });
+  return videoQueueInstance;
 }
 
 const DEFAULT_AVG_JOB_SECONDS = 120;
+const QUEUE_POSITION_WINDOW = 50;
 
 export async function getQueueWaitMetrics(jobId: string): Promise<{
   queuePosition: number | null;
@@ -142,21 +164,22 @@ export async function getQueueWaitMetrics(jobId: string): Promise<{
       return { queuePosition: null, queueEtaSeconds: 0 };
     }
     if (state === "waiting") {
-      const waiting = await queue.getWaiting(0, -1);
-      const idx = waiting.findIndex((j) => String(j.id) === String(jobId));
-      if (idx < 0) return { queuePosition: null, queueEtaSeconds: null };
-      const position = idx + 1;
+      const [waitingCount, head] = await Promise.all([
+        queue.getWaitingCount(),
+        queue.getWaiting(0, QUEUE_POSITION_WINDOW - 1),
+      ]);
+      const idx = head.findIndex((j) => String(j.id) === String(jobId));
+      const position = idx >= 0 ? idx + 1 : Math.max(QUEUE_POSITION_WINDOW + 1, waitingCount);
       return {
         queuePosition: position,
         queueEtaSeconds: Math.max(0, Math.round((position - 1) * avgSec)),
       };
     }
     if (state === "delayed") {
-      const [waitingList, delayed] = await Promise.all([
-        queue.getWaiting(0, -1),
-        queue.getDelayed(0, -1),
+      const [waitingCount, delayed] = await Promise.all([
+        queue.getWaitingCount(),
+        queue.getDelayed(0, QUEUE_POSITION_WINDOW - 1),
       ]);
-      const waitingCount = waitingList.length;
       const idx = delayed.findIndex((j) => String(j.id) === String(jobId));
       if (idx < 0) {
         return {
@@ -207,7 +230,10 @@ const LIST_JOBS_DEFAULT_LIMIT = 20;
 const LIST_JOBS_MAX_LIMIT = 50;
 const LIST_JOBS_FETCH_WINDOW = 250;
 
-export async function listRecentJobs(options: { limit?: number }): Promise<JobSummary[]> {
+export async function listRecentJobs(options: {
+  limit?: number;
+  ownerIds?: string[];
+}): Promise<JobSummary[]> {
   const limit = Math.min(
     LIST_JOBS_MAX_LIMIT,
     Math.max(1, options.limit ?? LIST_JOBS_DEFAULT_LIMIT)
@@ -216,7 +242,16 @@ export async function listRecentJobs(options: { limit?: number }): Promise<JobSu
     const queue = getVideoQueue();
     const types: JobState[] = ["waiting", "active", "completed", "failed"];
     const jobs = await queue.getJobs(types, 0, LIST_JOBS_FETCH_WINDOW - 1);
-    const filtered = jobs.filter((j) => j.name !== CLEANUP_JOB_NAME && j.id != null);
+    const owners = options.ownerIds;
+    const filtered = jobs
+      .filter((j) => j.name !== CLEANUP_JOB_NAME && j.id != null)
+      .filter((j) => {
+        if (!owners) return true;
+        const clientId = (j.data as VideoJobData | undefined)?.clientId;
+        return typeof clientId === "string" && owners.includes(clientId);
+      })
+      .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0))
+      .slice(0, limit);
     const withState = await Promise.all(
       filtered.map(async (job) => {
         const state = await job.getState();
@@ -236,7 +271,7 @@ export async function listRecentJobs(options: { limit?: number }): Promise<JobSu
       })
     );
     withState.sort((a, b) => b.createdAt - a.createdAt);
-    return withState.slice(0, limit);
+    return withState;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[queue] listRecentJobs error: " + msg.replace(/\s+/g, " "));
@@ -328,6 +363,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         qualityGateMode,
         regenFromJobId,
         regenerateShotIds,
+        stockImagesOnly,
       } = job.data;
       const jobId = job.id;
       if (!jobId) {
@@ -338,6 +374,11 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         throw new Error("Job cancelled");
       }
       logPipelineEvent({ jobId: jobIdStr, event: "job_started", ...(requestId ? { requestId } : {}) });
+      recordRenderEvent({
+        jobId: jobIdStr,
+        userId: typeof job.data?.userId === "string" ? job.data.userId : null,
+        eventType: "job_started",
+      });
       try {
         const result = await runPipeline({
           input,
@@ -365,6 +406,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
           ...(ttsVoiceId ? { ttsVoiceId } : {}),
           ...(characterLockId ? { characterLockId } : {}),
           ...(qualityGateMode ? { qualityGateMode } : {}),
+          ...(stockImagesOnly ? { stockImagesOnly } : {}),
           ...(regenFromJobId ? { regenFromJobId } : {}),
           ...(regenerateShotIds?.length ? { regenerateShotIds } : {}),
         });
@@ -435,6 +477,12 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
     const processedOn = typeof job?.processedOn === "number" ? job.processedOn : 0;
     const finishedOn = typeof job?.finishedOn === "number" ? job.finishedOn : Date.now();
     const durationMs = processedOn > 0 ? Math.round(finishedOn - processedOn) : undefined;
+    recordRenderEvent({
+      jobId: String(job?.id ?? ""),
+      userId: typeof data?.userId === "string" ? data.userId : null,
+      eventType: "job_completed",
+      durationMs: durationMs ?? null,
+    });
     logPipelineEvent({
       jobId: String(job?.id ?? ""),
       event: "job_completed",
@@ -443,24 +491,45 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
       ...(data?.requestId ? { requestId: data.requestId } : {}),
     });
     const clientId = data?.clientId;
-    let tokensCharged = 0;
     if (clientId && typeof clientId === "string") {
       try {
-        const { calculateTokensFromCost } = await import("@/lib/cost/pricing");
-        const { decrementTokens } = await import("@/lib/usage");
-        const { getUserPlan } = await import("@/lib/users/planService");
-        tokensCharged = result?.cost
-          ? calculateTokensFromCost(result.cost)
-          : 1;
-    
-        const plan = await getUserPlan(
-          typeof data?.userId === "string" ? data.userId : undefined,
-        );
-        if (!plan.tokensUnlimited) {
-          await decrementTokens(clientId, tokensCharged, plan.tokensPerMonth ?? undefined);
+        const { adjustSpendUsd } = await import("@/lib/cost/budget");
+        const unmetered = (c: { total?: number; video?: number } | undefined): number => {
+          if (!c || typeof c.total !== "number") return 0;
+          return Math.max(0, c.total - (typeof c.video === "number" ? c.video : 0));
+        };
+        let actualUsd = unmetered(result?.cost);
+        if (actualUsd === 0 && Array.isArray(result?.variations)) {
+          actualUsd = result.variations.reduce(
+            (sum: number, v: { cost?: { total?: number; video?: number } }) =>
+              sum + unmetered(v?.cost),
+            0
+          );
+        }
+        const reserved = typeof data?.reservedSpendUsd === "number" ? data.reservedSpendUsd : 0;
+        const delta = actualUsd - reserved;
+        if (delta !== 0) {
+          const spendKeyId =
+            typeof data?.spendIdentifier === "string" && data.spendIdentifier
+              ? data.spendIdentifier
+              : clientId;
+          await adjustSpendUsd(spendKeyId, delta);
+        }
+        if (actualUsd === 0 && reserved === 0) {
+          console.warn(
+            "[worker] jobId=" + job?.id + " completed with no cost data; margin ledger unchanged"
+          );
         }
       } catch (e) {
-        console.error("[worker] jobId=" + job?.id + " decrementTokens error=" + (e instanceof Error ? e.message : String(e)));
+        console.error("[worker] jobId=" + job?.id + " budget/credits error=" + (e instanceof Error ? e.message : String(e)));
+      }
+      try {
+        const { updateVideoJobStatusByQueueId } = await import("@/lib/jobs/videoJobService");
+        await updateVideoJobStatusByQueueId(String(job?.id ?? ""), "completed", {
+          final_url: vid || null,
+        });
+      } catch (e) {
+        console.error("[worker] jobId=" + job?.id + " video_jobs update error=" + (e instanceof Error ? e.message : String(e)));
       }
       try {
         const { incrementVideosCompletedThisMonth } = await import("@/lib/usage");
@@ -474,8 +543,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
       console.log(
         "[worker] jobId=" + job?.id +
         " cost llm=$" + c.llm + " tts=$" + c.tts + " video=$" + c.video +
-        " images=$" + c.images + " total=$" + c.total +
-        " tokensCharged=" + tokensCharged
+        " images=$" + c.images + " total=$" + c.total
       );
     }
   });
@@ -490,6 +558,65 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
     const callbackUrl = data?.callbackUrl;
     const msg = (err instanceof Error ? err.message : String(err)).replace(/\s+/g, " ");
     const isCancelled = msg.includes("cancelled");
+    {
+      const processedOn = typeof job?.processedOn === "number" ? job.processedOn : 0;
+      const finishedOn = typeof job?.finishedOn === "number" ? job.finishedOn : Date.now();
+      recordRenderEvent({
+        jobId: String(jid),
+        userId: typeof data?.userId === "string" ? data.userId : null,
+        eventType: "job_failed",
+        errorCode: mapFailedReasonToFailureCode(msg),
+        durationMs: processedOn > 0 ? Math.round(finishedOn - processedOn) : null,
+      });
+    }
+    if (typeof data?.reservedSpendUsd === "number" && data.reservedSpendUsd > 0) {
+      console.warn(
+        "[worker] jobId=" + jid + " failed; keeping $" + data.reservedSpendUsd.toFixed(3) +
+        " budget reservation (spend already incurred is unknown)"
+      );
+    }
+    void (async () => {
+      const reserved = typeof data?.reservedCinematicSeconds === "number" ? data.reservedCinematicSeconds : 0;
+      if (reserved <= 0) return;
+      const spendKeyId =
+        typeof data?.spendIdentifier === "string" && data.spendIdentifier
+          ? data.spendIdentifier
+          : typeof data?.clientId === "string"
+            ? data.clientId
+            : null;
+      if (!spendKeyId) return;
+      if (purchasedGenerativeWork(job?.progress)) {
+        console.warn(
+          "[worker] jobId=" + jid + " failed after generation started; keeping " +
+          reserved + "s (provider was already paid)"
+        );
+        return;
+      }
+      try {
+        const { releaseCinematicSecondsOnce } = await import("@/lib/cost/budget");
+        const split = data?.reservedCinematicSplit ?? { fromMonthly: reserved, fromTopup: 0 };
+        const released = await releaseCinematicSecondsOnce(spendKeyId, reserved, split, String(jid));
+        if (released) {
+          console.log(
+            "[worker] jobId=" + jid + " failed before any generation; released " + reserved +
+            "s (monthly " + (split.fromMonthly ?? 0) + ", purchased " + (split.fromTopup ?? 0) + ")"
+          );
+        }
+      } catch (e) {
+        console.error(
+          "[worker] jobId=" + jid + " cinematic release failed error=" +
+          (e instanceof Error ? e.message : String(e))
+        );
+      }
+    })();
+    void (async () => {
+      try {
+        const { updateVideoJobStatusByQueueId } = await import("@/lib/jobs/videoJobService");
+        await updateVideoJobStatusByQueueId(String(jid), "failed");
+      } catch (e) {
+        console.error("[worker] jobId=" + jid + " video_jobs fail-update error=" + (e instanceof Error ? e.message : String(e)));
+      }
+    })();
     if (callbackUrl && typeof callbackUrl === "string") {
       setImmediate(() => {
         void notifyWebhook({

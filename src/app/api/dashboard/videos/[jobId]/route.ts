@@ -16,6 +16,7 @@ export type DashboardVideoDetail = {
   videoUrl: string;
   mode?: "slideshow" | "talking_object";
   durationSeconds?: number;
+  message?: string;
 };
 
 function formatDate(ms: number | undefined): string {
@@ -142,6 +143,9 @@ export async function GET(
       videoUrl: videoPath,
       mode: data?.mode,
       durationSeconds: data?.durationSeconds,
+      ...(typeof result?.message === "string" && result.message.trim()
+        ? { message: result.message.trim() }
+        : {}),
     };
 
     return NextResponse.json(body);

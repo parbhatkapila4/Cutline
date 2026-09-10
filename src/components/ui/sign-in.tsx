@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import { Eye, EyeOff } from "lucide-react";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
@@ -28,8 +28,6 @@ interface SignInPageProps {
   testimonials?: Testimonial[];
   onSignIn?: (event: React.FormEvent<HTMLFormElement>) => void;
   onGoogleSignIn?: () => void;
-  onResetPassword?: () => void;
-  onCreateAccount?: () => void;
 }
 
 const GlassInputWrapper = ({ children }: { children: React.ReactNode }) => (
@@ -84,8 +82,6 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   testimonials = [],
   onSignIn,
   onGoogleSignIn,
-  onResetPassword,
-  onCreateAccount,
 }) => {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -102,9 +98,9 @@ export const SignInPage: React.FC<SignInPageProps> = ({
 
         <div className="w-full max-w-md relative z-10">
           <div className="flex flex-col gap-6">
-            <Link href="/" className="animate-element inline-block w-fit">
+            <LoadingLink href="/" className="animate-element inline-block w-fit">
               <CutlineLogo size="md" className="max-w-[220px]" />
-            </Link>
+            </LoadingLink>
             <h1 className="animate-element animate-delay-100 text-4xl md:text-5xl font-semibold leading-tight">
               {title}
             </h1>
@@ -169,13 +165,6 @@ export const SignInPage: React.FC<SignInPageProps> = ({
                     Keep me signed in
                   </span>
                 </label>
-                <button
-                  type="button"
-                  onClick={onResetPassword}
-                  className="text-violet-400 hover:text-violet-300 hover:underline transition-colors text-[13px]"
-                >
-                  Reset password
-                </button>
               </div>
 
               <button
@@ -210,14 +199,8 @@ export const SignInPage: React.FC<SignInPageProps> = ({
             </button>
 
             <p className="animate-element animate-delay-900 text-center text-sm text-zinc-500">
-              New to CUTLINE?{" "}
-              <button
-                type="button"
-                onClick={onCreateAccount}
-                className="text-violet-400 hover:text-violet-300 hover:underline transition-colors font-medium"
-              >
-                Create account
-              </button>
+              New to CUTLINE? Continue with Google - it creates your account on
+              first use.
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -130,12 +130,12 @@ export default async function StatusPage() {
           <p className="mt-2 text-sm text-gray-500">
             Could not retrieve service status. Please try again in a moment.
           </p>
-          <Link
+          <LoadingLink
             href="/"
             className="mt-6 inline-flex items-center px-4 py-2 rounded-full bg-[#0a0a0a] hover:bg-black text-white text-[12px] font-bold tracking-[0.06em] uppercase transition-colors"
           >
             Back home
-          </Link>
+          </LoadingLink>
         </div>
       </div>
     );
@@ -147,7 +147,7 @@ export default async function StatusPage() {
     <div className="min-h-screen bg-[#FAFAFA]">
       <header className="bg-white border-b border-gray-200/70">
         <div className="max-w-[1100px] mx-auto flex items-center px-5 sm:px-8 h-[60px]">
-          <Link href="/" className="flex items-center gap-2 group">
+          <LoadingLink href="/" className="flex items-center gap-2 group">
             <span className="inline-flex items-center justify-center w-7 h-7 rounded-[7px] bg-[#0a0a0a]">
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-white" fill="currentColor">
                 <path d="M8 5.14v13.72a1 1 0 0 0 1.5.866l11.5-6.86a1 1 0 0 0 0-1.732l-11.5-6.86A1 1 0 0 0 8 5.14z" />
@@ -156,7 +156,7 @@ export default async function StatusPage() {
             <span className="text-[15.5px] font-semibold tracking-[-0.02em] text-[#0a0a0a]">Cutline</span>
             <span className="text-gray-300 mx-1">/</span>
             <span className="text-[14px] font-medium text-gray-600">Status</span>
-          </Link>
+          </LoadingLink>
         </div>
       </header>
 

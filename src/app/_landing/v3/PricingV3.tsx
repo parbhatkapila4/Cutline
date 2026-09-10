@@ -1,4 +1,4 @@
-import { PRICING } from "@/constants/landing";
+import { PRICING, isExcludedFeature } from "@/constants/landing";
 import { PLAN_TO_PRODUCT_ID } from "@/lib/products";
 import { PlanCta } from "../PlanCta";
 import { ManageBillingBanner } from "../ManageBillingBanner";
@@ -8,7 +8,7 @@ import { btnClasses } from "./styles";
 const TRUST_ITEMS = [
   "Cancel anytime",
   "No watermarks on any plan",
-  "Same 1080p output across every tier",
+  "4K MP4 export",
 ];
 
 function CheckIcon({ className = "" }: { className?: string }) {
@@ -36,7 +36,7 @@ export function PricingV3() {
       <Container>
         <RuleHeader
           title={<>Pay for what you ship.</>}
-          lede="The same 60-second pipeline on every plan. No watermarks, no usage cliffs, no annual lock-in."
+          lede="No watermarks, no annual lock-in. Free covers stock-image slideshows; talking-character videos start on Professional."
         />
 
         <ManageBillingBanner
@@ -82,11 +82,13 @@ export function PricingV3() {
                   <span className="font-sans text-[46px] font-normal leading-none tracking-[-0.04em] xl:text-[52px]">
                     {plan.monthlyPrice}
                   </span>
-                  <span
-                    className={`font-plex text-[12px] ${dark ? "text-[#f4f3f3]/50" : "text-[#1d1c1b]/50"}`}
-                  >
-                    /mo
-                  </span>
+                  {plan.monthlyPrice.startsWith("$") ? (
+                    <span
+                      className={`font-plex text-[12px] ${dark ? "text-[#f4f3f3]/50" : "text-[#1d1c1b]/50"}`}
+                    >
+                      /mo
+                    </span>
+                  ) : null}
                 </div>
 
                 <p
@@ -110,19 +112,33 @@ export function PricingV3() {
                     What you get
                   </p>
                   <ul className="mt-5 space-y-3">
-                    {plan.features.map((feature) => (
+                    {plan.features.map((feature) => {
+                      const excluded = isExcludedFeature(feature);
+                      return (
                       <li
                         key={feature}
                         className={`flex items-start gap-2.5 font-sans text-[14.5px] font-medium leading-snug ${
-                          dark ? "text-[#f4f3f3]/85" : "text-[#1d1c1b]/80"
+                          excluded
+                            ? dark ? "text-[#f4f3f3]/45" : "text-[#1d1c1b]/45"
+                            : dark ? "text-[#f4f3f3]/85" : "text-[#1d1c1b]/80"
                         }`}
                       >
-                        <CheckIcon
-                          className={dark ? "text-[#c7e6a0]" : "text-[#1d1c1b]"}
-                        />
+                        {excluded ? (
+                          <span
+                            className="mt-[3px] h-3.5 w-3.5 shrink-0 text-center leading-[14px]"
+                            aria-hidden
+                          >
+                            &minus;
+                          </span>
+                        ) : (
+                          <CheckIcon
+                            className={dark ? "text-[#c7e6a0]" : "text-[#1d1c1b]"}
+                          />
+                        )}
                         <span>{feature}</span>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 </div>
 
@@ -135,6 +151,11 @@ export function PricingV3() {
                     secondaryClassName={secondaryClassName}
                     currentClassName={currentClassName}
                     errorClassName="mt-2 font-plex text-[12px] text-[#c2410c]"
+                    secondaryContactHref={
+                      plan.planId === "enterprise" ? plan.href : undefined
+                    }
+                    secondaryContactClassName={`mt-3 block text-center font-sans text-[13px] underline underline-offset-2 ${dark ? "text-[#f4f3f3]/60 hover:text-[#f4f3f3]" : "text-[#1d1c1b]/60 hover:text-[#1d1c1b]"
+                      }`}
                   >
                     {plan.cta}
                   </PlanCta>

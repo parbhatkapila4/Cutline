@@ -19,6 +19,7 @@ vi.mock("@/lib/queue/videoQueue", () => ({
 vi.mock("@/lib/rate-limit", () => ({
   getClientIdentifier: () => "test-client",
   checkRateLimit: () => Promise.resolve({ allowed: true }),
+  getForwardedClientIp: () => null,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -28,7 +29,7 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/auth", () => ({
   auth: {
     api: {
-      getSession: vi.fn(async () => null),
+      getSession: vi.fn(async () => ({ user: { id: "route-test-user" } })),
     },
   },
 }));
@@ -39,14 +40,33 @@ vi.mock("@/lib/api-keys/service", () => ({
 
 vi.mock("@/lib/usage", () => ({
   incrementApiCallsThisMonth: vi.fn(async () => { }),
-  getTokens: vi.fn(async () => 10_000),
   getVideosCompletedThisMonth: vi.fn(async () => 0),
+}));
+
+vi.mock("@/lib/cost/budget", () => ({
+  getBudgetState: vi.fn(async () => ({
+    plan: "free",
+    budgetUsd: 1000,
+    spentUsd: 0,
+    remainingUsd: 1000,
+    fractionUsed: 0,
+    cinematicSecondsAllowed: 1000,
+    cinematicSecondsUsed: 0,
+    cinematicSecondsRemaining: 1000,
+  })),
+  decideSpend: vi.fn(() => ({ outcome: "allow", state: {} })),
+  recordCinematicSeconds: vi.fn(async () => 0),
+  reserveCinematicSeconds: vi.fn(async () => ({ ok: true, usedSeconds: 0 })),
+  reserveSpendUsd: vi.fn(async () => ({ ok: true, spentUsd: 0 })),
+  adjustSpendUsd: vi.fn(async () => 0),
+  releaseCinematicSeconds: vi.fn(async () => { }),
+  recordSpendUsd: vi.fn(async () => 0),
+  resetsAt: vi.fn(() => "Oct 1, 2026"),
 }));
 
 vi.mock("@/lib/users/planService", () => ({
   getUserPlan: vi.fn(async () => ({
-    id: "free",
-    tokensUnlimited: true,
+    id: "professional",
     videosPerMonth: null,
   })),
 }));

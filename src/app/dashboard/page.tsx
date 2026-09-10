@@ -18,21 +18,20 @@ type UsageData = {
   videosUsed: number;
   apiCallsUsed: number;
   resetDate: string;
-  tokens: {
-    unlimited?: boolean;
-    initialBalance: number | null;
-    remaining: number;
-    used: number;
-    usdPerToken?: number;
-    totalCostUsd?: number;
-    totalTokensSpent?: number;
+  cinematic: {
+    includedSeconds: number;
+    usedSeconds: number;
+    remainingSeconds: number;
+    topupSeconds: number;
+    totalRemainingSeconds: number;
   };
+  totalCostUsd?: number;
   recentActivity: {
     id: string;
     title: string;
     status: string;
     time: string;
-    tokensUsed?: number;
+    cinematicSeconds?: number;
     costUsd?: number;
   }[];
   overview?: {
@@ -65,7 +64,7 @@ const DEFAULT_USAGE: UsageData = {
   videosUsed: 0,
   apiCallsUsed: 0,
   resetDate: "",
-  tokens: { unlimited: false, initialBalance: 10, remaining: 10, used: 0, usdPerToken: 0.10 },
+  cinematic: { includedSeconds: 0, usedSeconds: 0, remainingSeconds: 0, topupSeconds: 0, totalRemainingSeconds: 0 },
   recentActivity: [],
   overview: {
     totalVideos: 0,
@@ -260,7 +259,7 @@ export default function DashboardPage() {
                 <p className="text-[13px] font-semibold leading-snug tracking-tight text-white sm:text-sm">
                   Monthly limit reached
                 </p>
-         
+
                 <p className="mt-1 text-[12px] leading-relaxed text-zinc-400 sm:text-[13px]">
                   You have used {usage.videosUsed} of {usage.videosLimit}{" "}
                   {usage.videosLimit === 1 ? "video" : "videos"} on the{" "}
@@ -401,8 +400,8 @@ export default function DashboardPage() {
                         <p className="text-xs font-medium text-white truncate">{a.title}</p>
                         <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
                           <span>{a.time} · {a.status}</span>
-                          {a.tokensUsed != null && a.tokensUsed > 0 ? (
-                            <span className="text-violet-400/80">· {a.tokensUsed} tokens</span>
+                          {a.cinematicSeconds != null && a.cinematicSeconds > 0 ? (
+                            <span className="text-violet-400/80">· {a.cinematicSeconds}s</span>
                           ) : null}
                         </div>
                       </div>
@@ -412,87 +411,71 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="rounded-xl border border-white/10 bg-zinc-950/90 p-4 transition-colors hover:border-white/15">
-              <h2 className="text-sm font-semibold text-white mb-3">Tokens</h2>
+              <h2 className="text-sm font-semibold text-white mb-3">Talking-character seconds</h2>
               {usageLoading ? (
                 <div className="space-y-3 animate-pulse">
                   <div className="flex items-baseline justify-between gap-2">
-                    <div className="h-8 w-12 bg-zinc-800 rounded" />
+                    <div className="h-8 w-16 bg-zinc-800 rounded" />
                     <div className="h-3 w-24 bg-zinc-800 rounded" />
                   </div>
                   <div className="h-2 rounded-full bg-zinc-800" />
                   <div className="h-3 w-full bg-zinc-800 rounded" />
-                  <div className="h-3 w-32 bg-zinc-800 rounded" />
-                  <div className="h-9 w-full bg-zinc-800 rounded mt-3" />
                 </div>
               ) : usageError ? (
                 <div>
                   <p className="text-xs text-red-400">{usageError}</p>
                   <button type="button" onClick={() => fetchUsage()} className="mt-2 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">Try again</button>
                 </div>
+              ) : usage.cinematic.includedSeconds === 0 && usage.cinematic.topupSeconds === 0 ? (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-zinc-500 leading-snug">
+                    Talking-character video is on Professional. Slideshows on your plan are metered by video count instead.
+                  </p>
+                  <Link href="/pricing" className="block w-full text-center mt-1 py-2 rounded-lg bg-white text-black text-sm font-medium hover:bg-zinc-200 transition-colors">
+                    See Professional
+                  </Link>
+                </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                    <span className="text-2xl font-bold text-white">
-                      {(usage.tokens.totalTokensSpent ?? usage.tokens.used ?? 0).toLocaleString()}
+                    <span className="text-2xl font-bold text-white tabular-nums">
+                      {usage.cinematic.totalRemainingSeconds.toLocaleString()}s
                     </span>
-                    <span className="text-xs text-zinc-500">credits used</span>
+                    <span className="text-xs text-zinc-500">remaining</span>
                   </div>
-                  <p className="text-[11px] text-zinc-500 leading-snug">
-                    Total charged on <span className="text-zinc-400">your</span> account from completed videos (same as token deductions we record per finished job). Failed or cancelled jobs don’t count.
-                  </p>
-                  {usage.tokens.unlimited ? (
-                    <p className="text-[11px] text-emerald-400/80 font-medium">Unlimited plan · no fixed token cap</p>
-                  ) : null}
-                  {!usage.tokens.unlimited && usage.tokens.usdPerToken ? (
-                    <p className="text-[11px] text-emerald-400/80 font-medium">
-                      ~${(usage.tokens.remaining * usage.tokens.usdPerToken).toFixed(2)} wallet balance (estimate)
-                    </p>
-                  ) : null}
-                  {!usage.tokens.unlimited ? (
-                    <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-linear-to-r from-amber-400 to-orange-500"
-                        style={{
-                          width: `${usage.tokens.initialBalance
-                            ? Math.min(100, (usage.tokens.remaining / usage.tokens.initialBalance) * 100)
-                            : 0}%`,
-                        }}
-                      />
-                    </div>
-                  ) : null}
-                  {!usage.tokens.unlimited ? (
+                  <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-linear-to-r from-amber-400 to-orange-500"
+                      style={{
+                        width: `${usage.cinematic.includedSeconds
+                          ? Math.min(100, (usage.cinematic.remainingSeconds / usage.cinematic.includedSeconds) * 100)
+                          : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-zinc-500 gap-2">
+                    <span>Included this month</span>
+                    <span className="text-zinc-400 font-medium tabular-nums text-right">
+                      {usage.cinematic.remainingSeconds.toLocaleString()} / {usage.cinematic.includedSeconds.toLocaleString()}s left
+                    </span>
+                  </div>
+                  {usage.cinematic.topupSeconds > 0 ? (
                     <div className="flex justify-between text-[11px] text-zinc-500 gap-2">
-                      <span>Wallet balance</span>
-                      <span className="text-zinc-400 font-medium tabular-nums text-right">
-                        {usage.tokens.initialBalance != null
-                          ? `${usage.tokens.remaining.toLocaleString()} / ${usage.tokens.initialBalance.toLocaleString()} credits left`
-                          : `${usage.tokens.remaining.toLocaleString()} credits left`}
+                      <span>Purchased (never expires)</span>
+                      <span className="text-emerald-400/90 font-medium tabular-nums text-right">
+                        +{usage.cinematic.topupSeconds.toLocaleString()}s
                       </span>
                     </div>
                   ) : null}
                   <p className="text-[11px] text-zinc-500 leading-relaxed">
-                    Cost varies by video length &amp; mode. AI video (Veo) costs more than slideshow.
+                    A 60-second talking video uses 64s. Included seconds reset on {usage.resetDate}; purchased seconds never expire.
                   </p>
-                  <div className="pt-1 space-y-1">
-                    {usage.tokens.totalCostUsd != null && usage.tokens.totalCostUsd > 0 ? (
-                      <div className="flex justify-between text-[11px] text-zinc-500">
-                        <span>Total generation cost (completed)</span>
-                        <span className="text-zinc-400 font-medium">${usage.tokens.totalCostUsd.toFixed(2)}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                  {!usage.tokens.unlimited ? (
-                    <button
-                      type="button"
-                      className="w-full mt-3 py-2 rounded-lg bg-white text-black text-sm font-medium hover:bg-zinc-200 transition-colors shadow-[0_0_0_1px_rgba(255,255,255,0.12)]"
-                    >
-                      Add tokens
-                    </button>
-                  ) : (
-                    <p className="mt-3 text-[11px] text-zinc-500 text-center">
-                      Generation is covered by your plan - no wallet top-ups.
-                    </p>
-                  )}
+                  {usage.totalCostUsd != null && usage.totalCostUsd > 0 ? (
+                    <div className="flex justify-between text-[11px] text-zinc-500">
+                      <span>Total generation cost (completed)</span>
+                      <span className="text-zinc-400 font-medium">${usage.totalCostUsd.toFixed(2)}</span>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

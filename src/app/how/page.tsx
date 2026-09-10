@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 const SECTIONS = [
@@ -16,13 +16,13 @@ export default function HowPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 py-4 flex justify-start bg-black/60 backdrop-blur-sm border-b border-white/5">
-        <Link
+        <LoadingLink
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
         >
           <CutlineLogo size="sm" className="max-w-[140px]" />
           <span>Home</span>
-        </Link>
+        </LoadingLink>
       </div>
 
       <main className="pt-24 pb-24 px-4 sm:px-6 lg:px-8">
@@ -148,7 +148,7 @@ export default function HowPage() {
                 {
                   num: "11. Image sourcing",
                   title: "Getting an image for every shot",
-                  body: "Every shot needs an image. For each shot, the AI (OpenRouter) suggests a search query or image prompt. The system then tries, in order: Unsplash (stock photos), DALL·E 3 (AI-generated), Pexels (another stock source), and if needed a simplified query. If everything fails, a placeholder image is used so the video still renders. If you uploaded product photos, some shots may be assigned those instead.",
+                  body: "Every shot needs an image. For each shot, the AI (OpenRouter) suggests a search query or image prompt. The system then tries, in order: Unsplash (stock photos), Pexels (another stock source), DALL·E 3 (AI-generated), and then the same three again with a simplified query. A provider that errors out is logged and skipped rather than failing the job. If everything fails, a plain placeholder frame is used so the video still renders. If you uploaded product photos, some shots may be assigned those instead.",
                 },
                 {
                   num: "12. Remotion render",

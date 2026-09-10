@@ -163,6 +163,25 @@ export function recordStageProgress(
   }
 }
 
+export function recordStageMetrics(
+  jobId: string,
+  stageName: string,
+  metrics: Record<string, number>
+): void {
+  if (!jobId || !stageName || !metrics) return;
+  try {
+    ensureLoaded();
+    const job = store.get(jobId);
+    if (!job) return;
+    const stage = job.stages.find((s) => s.name === stageName && !s.completedAt);
+    if (!stage) return;
+    stage.metrics = { ...(stage.metrics ?? {}), ...metrics };
+    flushToFile();
+  } catch (e) {
+    safeLog("recordStageMetrics failed", e);
+  }
+}
+
 export function recordStageEnd(
   jobId: string,
   stageName: string,

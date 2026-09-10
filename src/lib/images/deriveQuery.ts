@@ -2,6 +2,7 @@ import type { Intent } from "@/lib/types";
 import type { Shot } from "@/lib/types";
 import type { Script } from "@/lib/types";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
+import { ConfigurationError } from "@/lib/utils/error";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
@@ -28,7 +29,9 @@ export async function deriveImageQuery(
   const model = process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
 
   if (!apiKey?.trim()) {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+    throw new ConfigurationError(
+      "OPENROUTER_API_KEY is not set. Add your key to .env.local"
+    );
   }
 
   const scriptText = getScriptTextForShot(script, shot.id);

@@ -219,7 +219,7 @@ async function uploadTalkingPhoto(
     contentType = ext === ".png" ? "image/png" : "image/jpeg";
   }
 
-  const cached = getCachedTalkingPhotoId(imageBuffer);
+  const cached = await getCachedTalkingPhotoId(imageBuffer);
   if (cached) {
     console.log(
       `[heygen] jobId=${jobId} stage=upload-photo cache=hit talking_photo_id=${cached}`
@@ -312,7 +312,7 @@ async function uploadTalkingPhoto(
   const sourceHint = imagePathOrUrl.startsWith("http")
     ? imagePathOrUrl
     : path.basename(imagePathOrUrl);
-  cacheTalkingPhotoId(imageBuffer, data.data.talking_photo_id, sourceHint);
+  await cacheTalkingPhotoId(imageBuffer, data.data.talking_photo_id, sourceHint);
 
   return data.data.talking_photo_id;
 }

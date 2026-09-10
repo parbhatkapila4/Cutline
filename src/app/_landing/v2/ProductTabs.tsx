@@ -472,7 +472,7 @@ function ExportMain() {
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
-          {["1080p", "720p", "Square", "9:16"].map((preset, i) => (
+          {["4K", "720p", "Square", "9:16"].map((preset, i) => (
             <span
               key={preset}
               className={`rounded-full px-2.5 py-[3px] font-mono text-[10px] ${

@@ -57,8 +57,8 @@ export function Navbar() {
             <span className="font-semibold uppercase tracking-[0.16em]">Live</span>
           </span>
           <span className="text-white/30" aria-hidden>·</span>
-          <span className="text-white/85 hidden sm:inline">Generate your first video free at cutline.cloud</span>
-          <span className="text-white/85 sm:hidden">Your first video is free</span>
+          <span className="text-white/85 hidden sm:inline">3 free videos a month at cutline.cloud</span>
+          <span className="text-white/85 sm:hidden">3 free videos a month</span>
           <Link href={isLoggedIn ? "/create" : "/auth/sign-in"} className="ml-1 inline-flex items-center gap-1 text-white hover:text-emerald-300 transition-colors">
             <span className="font-semibold">Try it</span>
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>

@@ -188,7 +188,7 @@ const GROUPS: FeatureGroup[] = [
       },
       {
         id: "hd-no-watermark",
-        title: "1080p HD, no watermarks",
+        title: "4K UHD, no watermarks",
         body: "Full-resolution MP4 on every plan. Your video, your file, no branding but yours.",
         linkHref: "/features",
         linkLabel: "Learn more",
@@ -197,7 +197,7 @@ const GROUPS: FeatureGroup[] = [
           heading: "render.output",
           rows: [
             { label: "container", value: "mp4" },
-            { label: "resolution", value: "1080p" },
+            { label: "resolution", value: "4K" },
             { label: "watermark", value: "none" },
             { label: "plans", value: "all" },
           ],
@@ -238,9 +238,9 @@ const GROUPS: FeatureGroup[] = [
           kind: "rows",
           heading: "batch.run",
           rows: [
-            { label: "9:16 · 1080p", value: "done" },
-            { label: "1:1 · 1080p", value: "done" },
-            { label: "16:9 · 1080p", value: "rendering", accent: true },
+            { label: "9:16 · 4K", value: "done" },
+            { label: "1:1 · 4K", value: "done" },
+            { label: "16:9 · 4K", value: "rendering", accent: true },
             { label: "9:16 · 720p", value: "queued" },
           ],
         },

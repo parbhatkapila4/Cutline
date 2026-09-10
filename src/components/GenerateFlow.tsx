@@ -109,16 +109,12 @@ export function GenerateFlow({ embedded = false }: Props) {
           jobId?: string;
           error?: string;
           errors?: Array<{ field: string; message: string }>;
-          tokensRemaining?: number;
-          tokensRequired?: number;
           videosUsed?: number;
           videosLimit?: number;
         };
         if (!res.ok) {
           let msg = data.error || getSubmitErrorMessage(res.status);
-          if (res.status === 402 && data.tokensRemaining != null && data.tokensRequired != null) {
-            msg += ` You have ${data.tokensRemaining} credits, need ${data.tokensRequired} per video.`;
-          } else if (res.status === 402 && data.videosUsed != null && data.videosLimit != null) {
+          if (res.status === 402 && data.videosUsed != null && data.videosLimit != null) {
             msg += ` You've used ${data.videosUsed} of ${data.videosLimit} videos this month.`;
           }
           setSubmitError(msg);
@@ -282,7 +278,7 @@ export function GenerateFlow({ embedded = false }: Props) {
                 {isPreview ? "Preview ready" : hasMultipleVariations ? "Your videos are ready!" : "Your video is ready!"}
               </p>
               <p className="text-sm text-zinc-500">
-                {isPreview ? "720p preview • Stock images • No voiceover" : hasMultipleVariations ? `${variations!.length} variants • 1080p HD` : "1080p HD • MP4 format"}
+                {isPreview ? "720p preview • Stock images • No voiceover" : hasMultipleVariations ? `${variations!.length} variants • 4K UHD` : "4K UHD • MP4 format"}
               </p>
             </div>
           </div>
@@ -756,7 +752,7 @@ export function GenerateFlow({ embedded = false }: Props) {
             ~60 seconds
           </span>
           <span className="mx-2">•</span>
-          <span>1080p HD</span>
+          <span>4K UHD</span>
           <span className="mx-2">•</span>
           <span className="text-blue-400">Free</span>
         </div>

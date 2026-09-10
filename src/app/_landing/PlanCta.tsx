@@ -1,7 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { CheckoutButton } from "./CheckoutButton";
+import { LoadingLink } from "@/components/ui/loading-link";
+import { LoadingDots, LoadingLabel } from "@/components/ui/loading-dots";
+import { cn } from "@/lib/utils";
 import { usePlanState, PLAN_RANK, type PlanId } from "./usePlanState";
 
 function Check() {
@@ -9,6 +12,82 @@ function Check() {
     <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
     </svg>
+  );
+}
+
+function PlanLink({
+  href,
+  className,
+  children,
+}: {
+  href: string;
+  className: string;
+  children: ReactNode;
+}) {
+  if (href.startsWith("http")) {
+    return (
+      <ExternalLink href={href} className={className} newTab>
+        {children}
+      </ExternalLink>
+    );
+  }
+  if (href.startsWith("mailto:")) {
+    return (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <LoadingLink href={href} className={className}>
+      {children}
+    </LoadingLink>
+  );
+}
+
+function ExternalLink({
+  href,
+  className,
+  newTab,
+  children,
+}: {
+  href: string;
+  className: string;
+  newTab?: boolean;
+  children: ReactNode;
+}) {
+  const [leaving, setLeaving] = useState(false);
+  return (
+    <a
+      href={href}
+      className={cn("relative", className)}
+      aria-busy={leaving || undefined}
+      {...(newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      onClick={(event) => {
+        if (leaving) {
+          event.preventDefault();
+          return;
+        }
+        setLeaving(true);
+      }}
+    >
+      <LoadingLabel hidden={leaving}>{children}</LoadingLabel>
+      <LoadingDots pending={leaving} />
+    </a>
+  );
+}
+
+export function PortalLink({
+  className,
+  children,
+}: {
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <ExternalLink href="/api/customer-portal" className={className}>
+      {children}
+    </ExternalLink>
   );
 }
 
@@ -24,6 +103,9 @@ export function PlanCta({
   currentLabel = "Current plan",
   upgradeLabel = "Upgrade",
   includedLabel = "Included with every account",
+  secondaryContactHref,
+  secondaryContactLabel,
+  secondaryContactClassName,
   children,
 }: {
   planId: PlanId;
@@ -37,6 +119,9 @@ export function PlanCta({
   currentLabel?: string;
   upgradeLabel?: string;
   includedLabel?: string;
+  secondaryContactHref?: string;
+  secondaryContactLabel?: string;
+  secondaryContactClassName?: string;
   children: ReactNode;
 }) {
   const state = usePlanState();
@@ -60,34 +145,38 @@ export function PlanCta({
       return <div className={currentClassName}>{includedLabel}</div>;
     }
     return (
-      <a href={contactHref ?? "/auth/sign-in"} className={primaryClassName}>
+      <PlanLink href={contactHref ?? "/auth/sign-in"} className={primaryClassName}>
         {children}
-      </a>
+      </PlanLink>
     );
   }
   if (contactHref) {
     return (
-      <a href={contactHref} className={primaryClassName}>
+      <PlanLink href={contactHref} className={primaryClassName}>
         {children}
-      </a>
+      </PlanLink>
     );
   }
   if (!productId) return null;
   if (currentRank > 0 && targetRank < currentRank) {
-    return (
-      <a href="/api/customer-portal" className={secondaryClassName}>
-        {manageLabel}
-      </a>
-    );
+    return <PortalLink className={secondaryClassName}>{manageLabel}</PortalLink>;
   }
 
   return (
-    <CheckoutButton
-      productId={productId}
-      className={primaryClassName}
-      errorClassName={errorClassName}
-    >
-      {currentRank > 0 ? upgradeLabel : children}
-    </CheckoutButton>
+    <>
+      <CheckoutButton
+        productId={productId}
+        plan={planId}
+        className={primaryClassName}
+        errorClassName={errorClassName}
+      >
+        {currentRank > 0 ? upgradeLabel : children}
+      </CheckoutButton>
+      {secondaryContactHref ? (
+        <a href={secondaryContactHref} className={secondaryContactClassName}>
+          {secondaryContactLabel ?? "Talk to us first"}
+        </a>
+      ) : null}
+    </>
   );
 }

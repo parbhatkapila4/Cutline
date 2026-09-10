@@ -1,6 +1,6 @@
 import Redis from "ioredis";
 import { RateLimiterRedis } from "rate-limiter-flexible";
-import { createManagedRedis } from "@/lib/redis/managedRedis";
+import { createManagedRedis, FAIL_FAST_REDIS_OPTIONS } from "@/lib/redis/managedRedis";
 
 export type RateLimitType =
   | "generate"
@@ -8,7 +8,8 @@ export type RateLimitType =
   | "upload"
   | "status"
   | "general"
-  | "apiKeyGenerate";
+  | "apiKeyGenerate"
+  | "contact";
 
 export type RateLimitResult = {
   allowed: boolean;
@@ -21,6 +22,7 @@ const DEFAULT_UPLOAD_PER_HOUR = 20;
 const DEFAULT_STATUS_PER_MINUTE = 60;
 const DEFAULT_GENERAL_PER_MINUTE = 100;
 const DEFAULT_API_KEY_GENERATE_PER_HOUR = 120;
+const DEFAULT_CONTACT_PER_HOUR = 5;
 const KEY_PREFIX = "cutline:rl:";
 
 let redisClient: Redis | null = null;
@@ -29,7 +31,7 @@ const limiters: Partial<Record<RateLimitType, RateLimiterRedis>> = {};
 function getRedis(): Redis {
   if (!redisClient) {
     const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-    redisClient = createManagedRedis(url, { maxRetriesPerRequest: null });
+    redisClient = createManagedRedis(url, FAIL_FAST_REDIS_OPTIONS);
   }
   return redisClient;
 }
@@ -85,6 +87,10 @@ function getConfig(type: RateLimitType): { points: number; durationSeconds: numb
       const window = Number(process.env.RATE_LIMIT_API_KEY_WINDOW_SECONDS) || 3600;
       return { points: max, durationSeconds: window };
     }
+    case "contact": {
+      const n = Number(process.env.RATE_LIMIT_CONTACT) || DEFAULT_CONTACT_PER_HOUR;
+      return { points: n, durationSeconds: 3600 };
+    }
     default:
       return { points: DEFAULT_GENERAL_PER_MINUTE, durationSeconds: 60 };
   }
@@ -108,6 +114,18 @@ export function getClientIdentifier(request: Request): string {
   }
   return "anonymous";
 }
+export function getForwardedClientIp(request: Request): string | null {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (!forwarded) return null;
+  const parts = forwarded
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+  const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1);
+  const idx = Math.max(0, parts.length - hops);
+  return parts[idx] ?? null;
+}
 
 export async function checkRateLimit(
   identifier: string,
@@ -122,6 +140,12 @@ export async function checkRateLimit(
     await limiter.consume(key);
     return { allowed: true };
   } catch (rejected: unknown) {
+    if (rejected instanceof Error) {
+      console.error(
+        `[rate-limit] store unavailable for type=${type}; allowing request. error=${rejected.message}`
+      );
+      return { allowed: true };
+    }
     const res = rejected as { msBeforeNext?: number };
     const ms = typeof res?.msBeforeNext === "number" ? res.msBeforeNext : 60_000;
     return {

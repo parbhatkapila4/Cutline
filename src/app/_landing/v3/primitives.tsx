@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import {
   useEffect,
   useRef,
@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { btnClasses, type BtnSize, type BtnVariant } from "./styles";
-const noopSubscribe = () => () => {};
+const noopSubscribe = () => () => { };
 export function useHydrated() {
   return useSyncExternalStore(
     noopSubscribe,
@@ -114,9 +114,9 @@ export function Btn({
     );
   }
   return (
-    <Link href={href} className={cls}>
+    <LoadingLink href={href} className={cls}>
       {inner}
-    </Link>
+    </LoadingLink>
   );
 }
 
@@ -237,15 +237,14 @@ export function NumberedList({
               type="button"
               onClick={() => onOpen(item.id)}
               aria-expanded={open}
-              className={`flex w-full items-baseline gap-3 rounded-[14px] px-5 py-4 text-left transition-colors ${
-                open
+              className={`flex w-full items-baseline gap-3 rounded-[14px] px-5 py-4 text-left transition-colors ${open
                   ? dark
                     ? "bg-[#f4f3f3]/[0.07] text-[#f4f3f3]"
                     : "bg-[#1d1c1b]/[0.05] text-[#1d1c1b]"
                   : dark
                     ? "text-[#f4f3f3]/70 hover:text-[#f4f3f3]"
                     : "text-[#1d1c1b]/60 hover:text-[#1d1c1b]"
-              }`}
+                }`}
             >
               {numbered ? (
                 <span className="font-sans text-[17px] font-normal tabular-nums">
@@ -258,16 +257,14 @@ export function NumberedList({
             </button>
 
             <div
-              className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-                open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-              }`}
+              className={`grid transition-[grid-template-rows] duration-300 ease-out ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
             >
               <div className="overflow-hidden">
                 <div className="px-5 pb-5 pt-3">
                   <p
-                    className={`${bodyWidth} font-sans text-[14.5px] font-medium leading-[1.5] ${
-                      dark ? "text-[#f4f3f3]/70" : "text-[#1d1c1b]/70"
-                    }`}
+                    className={`${bodyWidth} font-sans text-[14.5px] font-medium leading-[1.5] ${dark ? "text-[#f4f3f3]/70" : "text-[#1d1c1b]/70"
+                      }`}
                   >
                     {item.body}
                   </p>

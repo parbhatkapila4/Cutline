@@ -39,7 +39,7 @@ const STAGES: NumberedItem[] = [
   {
     id: "render",
     title: "Render + export",
-    body: "Composited and encoded in a single pass. 1080p MP4, no watermark, sized for Reels, Shorts, LinkedIn or YouTube.",
+    body: "Composited and encoded in a single pass. 4K MP4, no watermark, sized for Reels, Shorts, LinkedIn or YouTube.",
     href: "/features",
     linkLabel: "Learn more",
   },
@@ -54,7 +54,7 @@ export function PipelineV3() {
       <Container>
         <RuleHeader
           tone="dark"
-          title={<>A finished film in 60 seconds.</>}
+          title={<>A finished film in about a minute of render time.</>}
           lede="The whole production pipeline as one call - script, voice, visuals and captions, rendered end to end."
           action={
             <Btn href="/docs" variant="dark">
@@ -86,7 +86,7 @@ export function PipelineV3() {
                 label="Speed"
                 caption={
                   <>
-                    ~60s prompt to MP4;
+                    ~60s of render time;
                     <br />a 12-stage pass per render
                   </>
                 }
@@ -109,7 +109,7 @@ export function PipelineV3() {
             <div className="absolute bottom-[6%] right-[5%] z-10">
               <LeaderLabel
                 label="Output"
-                caption="1080p H.264 MP4, burned captions, no watermark"
+                caption="4K H.264 MP4, burned captions, no watermark"
                 stem="up"
                 stemLength="h-10 sm:h-[64px]"
                 captionClassName="hidden sm:block"

@@ -1,11 +1,14 @@
 import Redis from "ioredis";
-import { createManagedRedis } from "@/lib/redis/managedRedis";
+import { createManagedRedis, FAIL_FAST_REDIS_OPTIONS } from "@/lib/redis/managedRedis";
 
 export const CANCELLED_JOBS_KEY = "cutline:job:cancelled";
+let cancelRedis: Redis | null = null;
 
 function getRedisConnection(): Redis {
+  if (cancelRedis) return cancelRedis;
   const url = process.env.REDIS_URL ?? "redis://localhost:6379";
-  return createManagedRedis(url, { maxRetriesPerRequest: null });
+  cancelRedis = createManagedRedis(url, FAIL_FAST_REDIS_OPTIONS);
+  return cancelRedis;
 }
 
 export async function isJobCancelled(jobId: string): Promise<boolean> {
@@ -13,7 +16,6 @@ export async function isJobCancelled(jobId: string): Promise<boolean> {
   try {
     const redis = getRedisConnection();
     const exists = await redis.sismember(CANCELLED_JOBS_KEY, jobId);
-    await redis.quit();
     return exists === 1;
   } catch {
     return false;

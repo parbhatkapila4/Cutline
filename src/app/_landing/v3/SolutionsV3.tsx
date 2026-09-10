@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import {
   useRef,
   useState,
@@ -310,14 +310,14 @@ export function SolutionsV3() {
                       </p>
 
                       {active ? (
-                        <Link
+                        <LoadingLink
                           href={item.href}
                           className={LEARN_MORE}
                           draggable={false}
                         >
                           Learn more
                           <BoxedArrow />
-                        </Link>
+                        </LoadingLink>
                       ) : (
                         <span
                           className={LEARN_MORE}
@@ -366,7 +366,7 @@ function AppPanel({ item }: { item: Solution }) {
             {item.status}
           </span>
           <span className="truncate font-plex text-[10px] text-[#f4f3f3]/45">
-            1080p · MP4 · no watermark
+            4K · MP4 · no watermark
           </span>
         </div>
 

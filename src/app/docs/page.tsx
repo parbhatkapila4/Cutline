@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 
 const SECTIONS = [
   { id: "overview", label: "Overview" },
@@ -82,7 +82,7 @@ export default function DocsPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center bg-black/60 backdrop-blur-sm border-b border-white/5">
-        <Link
+        <LoadingLink
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
         >
@@ -94,7 +94,7 @@ export default function DocsPage() {
           <span>Cutline</span>
           <span className="text-zinc-600">/</span>
           <span className="text-zinc-400">Docs</span>
-        </Link>
+        </LoadingLink>
         <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.04] text-[10.5px] font-mono text-zinc-400">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           v1
@@ -301,15 +301,19 @@ job_id = res.json()["jobId"]`}</CodeBlock>
   "jobId": "job_01HK8Z9X2YBN5T7QM3R4S5T6",
   "status": "completed",
   "videoUrl": "/temp/job_01HK8Z9X2YBN5T7QM3R4S5T6.mp4",
+  "variations": [
+    { "videoUrl": "/temp/job_01HK8Z9X2YBN5T7QM3R4S5T6.mp4" }
+  ],
   "completedAt": "2026-05-10T14:23:11.842Z",
   "qualityReport": {
-    "scriptStage": "ok",
-    "ttsStage": "ok",
-    "imageStage": "fallback_used",
-    "renderStage": "ok",
-    "retries": 1
+    "passed": true,
+    "score": 92,
+    "issues": []
   }
 }`}</CodeBlock>
+              <p className="text-[14px] text-zinc-400 leading-relaxed mt-3">
+                <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">variations</code> is present only for multi-variation jobs, and <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">qualityReport</code> only when the quality gate ran. There are no per-stage fields and no retry count in the payload.
+              </p>
               <p className="text-[14px] text-zinc-400 leading-relaxed mt-3">
                 Delivery is fire-and-forget. We do not retry. 5-second timeout. Localhost URLs are rejected in production unless <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">ALLOW_LOCALHOST_WEBHOOK=true</code>.
               </p>
@@ -318,7 +322,7 @@ job_id = res.json()["jobId"]`}</CodeBlock>
             <section id="idempotency" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Idempotency</h2>
               <p className="text-[14px] text-zinc-400 leading-relaxed">
-                Pass <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">X-Idempotency-Key</code> (max 128 chars) on POST to safely retry network failures. The same key within a 24h window returns the same <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">jobId</code> - duplicate work is never enqueued. We recommend a UUID per logical user-action.
+                Pass <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">X-Idempotency-Key</code> (max 128 chars) on POST to safely retry network failures. The same key within a 24h window returns the same <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">jobId</code>. We recommend a UUID per logical user-action. <strong className="text-zinc-200">Best-effort, not a guarantee:</strong> the key store is an in-process map, so it is per app instance and resets on restart or redeploy. A duplicate POST that lands on a different instance, or arrives after a restart, will enqueue a second job. Treat it as protection against a client-side network retry, not as a distributed exactly-once lock.
               </p>
             </section>
 
@@ -353,7 +357,7 @@ job_id = res.json()["jobId"]`}</CodeBlock>
                 <li><span className="text-zinc-200 font-mono">5/hour</span> - POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate</code> per IP (anonymous)</li>
                 <li><span className="text-zinc-200 font-mono">60/min</span> - GET <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/v1/generate/:jobId</code> per IP</li>
                 <li><span className="text-zinc-200 font-mono">20/hour</span> - POST <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">/api/assets/upload</code> per IP</li>
-                <li>Authenticated quotas are determined by your plan - see <Link href="/pricing" className="underline text-zinc-200">pricing</Link>.</li>
+                <li>Authenticated quotas are determined by your plan - see <LoadingLink href="/pricing" className="underline text-zinc-200">pricing</LoadingLink>.</li>
               </ul>
               <p className="text-[14px] text-zinc-400 leading-relaxed mt-4">
                 <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">429</code> responses include a <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">Retry-After</code> header (seconds).

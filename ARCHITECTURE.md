@@ -6,7 +6,7 @@ A 5-minute overview for engineers. One sentence in → video out.
 
 ## Pipeline flow
 
-The video pipeline runs in order. Each stage consumes the previous output; any failure throws and the job is marked failed (with retries for transient failures).
+The video pipeline runs in order. Each stage consumes the previous output; any failure throws and the job is marked failed. Retries are **in-stage only** (per-provider, via `src/lib/utils/retry.ts`) - there is no job-level retry: no `attempts` is set on the queue, and `maxStalledCount: 0` means even a worker crash does not re-run a job. That is deliberate: a rerun would re-pay for every stage that already succeeded, including Veo.
 
 ```
 Input (one sentence)
@@ -31,7 +31,7 @@ Input (one sentence)
     ↓
 10. Visuals      - In-process: visual spec (colors, layout) from intent + assets
     ↓
-11. Image sourcing - Per shot: LLM query → Unsplash → DALL·E → Pexels → simplified query
+11. Image sourcing - Per shot: LLM query → Unsplash → Pexels → DALL·E → simplified-query retry → placeholder
     ↓
 12. Remotion render - Compose script, shots, subtitles, motion, images, audio → MP4
     ↓
@@ -64,7 +64,7 @@ Output: public/temp/[jobId].mp4
 | Subtitles              | `src/lib/pipeline/subtitles.ts`                               | Chunk script, estimate timing                                   |
 | TTS                    | `src/lib/pipeline/tts.ts`                                     | ElevenLabs/PlayHT → audio                                       |
 | Motion / Visuals       | `src/lib/pipeline/motion.ts`, `visuals.ts`                    | In-process specs                                                |
-| Image sourcing         | `src/lib/images/source.ts`                                    | Per-shot: derive query → Unsplash/DALL·E/Pexels                 |
+| Image sourcing         | `src/lib/images/source.ts`                                    | Per-shot: derive query → Unsplash/Pexels/DALL·E                 |
 | Render                 | `src/lib/pipeline/renderVideo.ts`                             | Remotion CLI → MP4                                              |
 | Queue                  | `src/lib/queue/videoQueue.ts`                                 | BullMQ queue + worker definition                                |
 | Validation             | `src/lib/validation/input.ts`, `src/lib/assets/validation.ts` | Input and asset validation                                      |
@@ -93,7 +93,7 @@ Output: public/temp/[jobId].mp4
 
 ## Deployment note
 
-- **Next.js** (API + UI) can run on Vercel. API routes only enqueue jobs and poll; they do not run the pipeline.
+- **Next.js** (API + UI) can run on Vercel. In production API routes only enqueue jobs and poll. Outside production, or with `CUTLINE_AUTOSTART_WORKER=true`, `POST /api/generate` auto-starts an in-process worker that does run the pipeline.
 - **Worker + Redis** must run elsewhere (Railway, Render, Fly.io, etc.). Same env vars; worker runs `npm run worker` and connects to the same Redis as the app.
 
 ---

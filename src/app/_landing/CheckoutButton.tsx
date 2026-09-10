@@ -2,14 +2,17 @@
 
 import { useState, type ReactNode } from "react";
 import { PendingLabel } from "@/components/ui/skeleton";
+import { trackCheckoutStart, type PlanParam } from "@/lib/analytics/ga";
 export function CheckoutButton({
   productId,
+  plan,
   className,
   children,
   loadingLabel = "Redirecting…",
   errorClassName = "mt-2 text-[12px] text-red-500",
 }: {
   productId: string;
+  plan: PlanParam;
   className: string;
   children: ReactNode;
   loadingLabel?: string;
@@ -22,6 +25,7 @@ export function CheckoutButton({
     if (loading) return;
     setError(null);
     setLoading(true);
+    trackCheckoutStart(plan);
     try {
       const res = await fetch(`/api/checkout?productId=${encodeURIComponent(productId)}`);
       if (res.status === 401) {

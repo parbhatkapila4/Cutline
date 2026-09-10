@@ -30,7 +30,7 @@ const testimonials: Testimonial[] = [
     role: "Marketing Manager",
   },
   {
-    text: "From idea to 1080p download in one flow. We needed something that felt professional without a full production team. Cutline does exactly that.",
+    text: "From idea to 4K download in one flow. We needed something that felt professional without a full production team. Cutline does exactly that.",
     image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150&h=150",
     name: "Omar Raza",
     role: "Founder",

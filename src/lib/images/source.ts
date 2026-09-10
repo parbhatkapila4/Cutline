@@ -14,6 +14,7 @@ import {
   shouldRetryForLLM,
   shouldRetryForImage,
 } from "@/lib/utils/retry";
+import { ConfigurationError } from "@/lib/utils/error";
 
 export type AssetPaths = {
   logo?: string;
@@ -121,6 +122,67 @@ function pickUnusedUrl(urls: string[], usedNormalizedUrls: Set<string>): string 
   return null;
 }
 
+async function attemptLink<T>(
+  label: string,
+  fn: () => Promise<T>
+): Promise<T | null> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof ConfigurationError) throw err;
+    console.warn(
+      `[images] ${label} failed, advancing to next link: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return null;
+  }
+}
+export class ImageFallbackFloorError extends Error {
+  readonly placeholderCount: number;
+  readonly shotCount: number;
+
+  constructor(message: string, placeholderCount: number, shotCount: number) {
+    super(message);
+    this.name = "ImageFallbackFloorError";
+    this.placeholderCount = placeholderCount;
+    this.shotCount = shotCount;
+  }
+}
+const PLACEHOLDER_MAX_RATIO_DEFAULT = 0.5;
+
+function placeholderMaxRatio(): number {
+  const raw = process.env.IMAGE_PLACEHOLDER_MAX_RATIO;
+  if (raw == null || raw.trim() === "") return PLACEHOLDER_MAX_RATIO_DEFAULT;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    console.warn(
+      `[images] IMAGE_PLACEHOLDER_MAX_RATIO="${raw}" is not a number >= 0; using default ${PLACEHOLDER_MAX_RATIO_DEFAULT}`
+    );
+    return PLACEHOLDER_MAX_RATIO_DEFAULT;
+  }
+  return parsed;
+}
+
+const IMAGE_STAGE_NAME = "image_sourcing";
+
+async function recordImageStageMetrics(
+  jobId: string,
+  metrics: Record<string, number>
+): Promise<void> {
+  try {
+    const { recordStageMetrics } = await import("@/lib/telemetry/store");
+    recordStageMetrics(jobId, IMAGE_STAGE_NAME, metrics);
+  } catch {
+  }
+}
+
+
+function localQueryFromIntent(shot: Shot, intent: Intent): string {
+  const subject =
+    (intent.mainSubject ?? "").trim() || (intent.rawInput ?? "").trim();
+  const words = subject.split(/\s+/).filter(Boolean).slice(0, 6).join(" ");
+  return words || `${shot.purpose} abstract visual`;
+}
+
 export async function sourceImageForShot(
   shot: Shot,
   script: Script,
@@ -141,15 +203,21 @@ export async function sourceImageForShot(
   const unsplashOrient = toUnsplashOrientation(orientation);
   const pexelsOrient = toPexelsOrientation(orientation);
 
-  const { searchQuery, imagePrompt } = await retry(
-    () => deriveImageQuery(shot, script, intent, alreadyUsedForOtherShots),
-    {
-      maxRetries: retryConfig.llm.maxRetries,
-      backoffMs: retryConfig.llm.backoffMs,
-      shouldRetry: shouldRetryForLLM,
-      label: "LLM (Image query)",
-    }
+  const derived = await attemptLink("LLM (Image query)", () =>
+    retry(
+      () => deriveImageQuery(shot, script, intent, alreadyUsedForOtherShots),
+      {
+        maxRetries: retryConfig.llm.maxRetries,
+        backoffMs: retryConfig.llm.backoffMs,
+        shouldRetry: shouldRetryForLLM,
+        label: "LLM (Image query)",
+      }
+    )
   );
+
+  const localQuery = localQueryFromIntent(shot, intent);
+  const searchQuery = derived?.searchQuery?.trim() || localQuery;
+  const imagePrompt = derived?.imagePrompt?.trim() || localQuery;
 
   const outputDir = jobId ? path.join(process.cwd(), "public", "temp", jobId, "images") : undefined;
   const filename = outputDir ? `shot-${shot.id}.png` : undefined;
@@ -162,19 +230,23 @@ export async function sourceImageForShot(
 
   let url: string | null = null;
 
-  const unsplashMultiple = await retry(
-    () => searchUnsplashMultiple(searchQuery, 15, unsplashOrient),
-    { ...imageRetryOpts, label: "Unsplash (multiple)" }
+  const unsplashMultiple = await attemptLink("Unsplash (multiple)", () =>
+    retry(
+      () => searchUnsplashMultiple(searchQuery, 15, unsplashOrient),
+      { ...imageRetryOpts, label: "Unsplash (multiple)" }
+    )
   );
-  url = pickUnusedUrl(unsplashMultiple, used);
+  url = pickUnusedUrl(unsplashMultiple ?? [], used);
   if (url) {
     addUsed(url);
     return { url, source: "stock", fallbackUsed: false, searchQuery, imagePrompt };
   }
 
-  const unsplashResult = await retry(
-    () => searchUnsplash(searchQuery, unsplashOrient),
-    { ...imageRetryOpts, label: "Unsplash" }
+  const unsplashResult = await attemptLink("Unsplash", () =>
+    retry(
+      () => searchUnsplash(searchQuery, unsplashOrient),
+      { ...imageRetryOpts, label: "Unsplash" }
+    )
   );
   url = unsplashResult?.url ?? null;
   if (url && !used.has(normalizeImageUrl(url))) {
@@ -182,19 +254,23 @@ export async function sourceImageForShot(
     return { url, source: "stock", fallbackUsed: false, searchQuery, imagePrompt };
   }
 
-  const pexelsMultiple = await retry(
-    () => searchPexelsMultiple(searchQuery, 15, pexelsOrient),
-    { ...imageRetryOpts, label: "Pexels (multiple)" }
+  const pexelsMultiple = await attemptLink("Pexels (multiple)", () =>
+    retry(
+      () => searchPexelsMultiple(searchQuery, 15, pexelsOrient),
+      { ...imageRetryOpts, label: "Pexels (multiple)" }
+    )
   );
-  url = pickUnusedUrl(pexelsMultiple, used);
+  url = pickUnusedUrl(pexelsMultiple ?? [], used);
   if (url) {
     addUsed(url);
     return { url, source: "stock", fallbackUsed: true, searchQuery, imagePrompt };
   }
 
-  const pexelsResult = await retry(
-    () => searchPexels(searchQuery, pexelsOrient),
-    { ...imageRetryOpts, label: "Pexels" }
+  const pexelsResult = await attemptLink("Pexels", () =>
+    retry(
+      () => searchPexels(searchQuery, pexelsOrient),
+      { ...imageRetryOpts, label: "Pexels" }
+    )
   );
   url = pexelsResult?.url ?? null;
   if (url && !used.has(normalizeImageUrl(url))) {
@@ -204,9 +280,11 @@ export async function sourceImageForShot(
 
   if (!stockOnly) {
     const dalleOpts = outputDir && filename ? { outputDir, filename } : undefined;
-    const dalleResult = await retry(
-      () => generateImageWithDalle(imagePrompt, dalleOpts),
-      { ...imageRetryOpts, label: "DALL·E" }
+    const dalleResult = await attemptLink("DALL·E", () =>
+      retry(
+        () => generateImageWithDalle(imagePrompt, dalleOpts),
+        { ...imageRetryOpts, label: "DALL·E" }
+      )
     );
     if (dalleResult?.url) {
       url = outputDir && filename && !dalleResult.url.startsWith("http")
@@ -221,9 +299,11 @@ export async function sourceImageForShot(
 
   const simplifiedQuery = searchQuery.split(/\s+/).slice(0, 3).join(" ") || "abstract visual";
 
-  const unsplashSimplified = await retry(
-    () => searchUnsplash(simplifiedQuery, unsplashOrient),
-    { ...imageRetryOpts, label: "Unsplash (simplified)" }
+  const unsplashSimplified = await attemptLink("Unsplash (simplified)", () =>
+    retry(
+      () => searchUnsplash(simplifiedQuery, unsplashOrient),
+      { ...imageRetryOpts, label: "Unsplash (simplified)" }
+    )
   );
   url = unsplashSimplified?.url ?? null;
   if (url && !used.has(normalizeImageUrl(url))) {
@@ -231,9 +311,11 @@ export async function sourceImageForShot(
     return { url, source: "stock", fallbackUsed: true, searchQuery, imagePrompt };
   }
 
-  const pexelsSimplified = await retry(
-    () => searchPexels(simplifiedQuery, pexelsOrient),
-    { ...imageRetryOpts, label: "Pexels (simplified)" }
+  const pexelsSimplified = await attemptLink("Pexels (simplified)", () =>
+    retry(
+      () => searchPexels(simplifiedQuery, pexelsOrient),
+      { ...imageRetryOpts, label: "Pexels (simplified)" }
+    )
   );
   url = pexelsSimplified?.url ?? null;
   if (url && !used.has(normalizeImageUrl(url))) {
@@ -243,9 +325,11 @@ export async function sourceImageForShot(
 
   if (!stockOnly) {
     const dalleOpts = outputDir && filename ? { outputDir, filename } : undefined;
-    const dalleSimplified = await retry(
-      () => generateImageWithDalle(`Simple scene: ${simplifiedQuery}`, dalleOpts),
-      { ...imageRetryOpts, label: "DALL·E (simplified)" }
+    const dalleSimplified = await attemptLink("DALL·E (simplified)", () =>
+      retry(
+        () => generateImageWithDalle(`Simple scene: ${simplifiedQuery}`, dalleOpts),
+        { ...imageRetryOpts, label: "DALL·E (simplified)" }
+      )
     );
     if (dalleSimplified?.url) {
       url = outputDir && filename && !dalleSimplified.url.startsWith("http")
@@ -272,7 +356,8 @@ export async function sourceImages(
   assetPaths?: AssetPaths,
   jobId?: string,
   stockOnly?: boolean,
-  aspectRatio?: string
+  aspectRatio?: string,
+  maxPlaceholderRatio?: number
 ): Promise<ImageSpec> {
   const shots = [...(shotList.shots ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const productPhotoPaths = assetPaths?.productPhotos ?? [];
@@ -332,6 +417,36 @@ export async function sourceImages(
     } else {
       committedNormalized.add(norm);
     }
+  }
+
+  const placeholderCount = entries.filter(
+    (e) => e.imageUrl === FALLBACK_IMAGE_PATH
+  ).length;
+  const shotCount = entries.length;
+  const ratio = shotCount > 0 ? placeholderCount / shotCount : 0;
+
+  if (jobId) {
+    await recordImageStageMetrics(jobId, { placeholderCount, shotCount });
+  }
+
+  if (placeholderCount > 0) {
+    console.warn(
+      `[images] jobId=${jobId ?? "-"} ${placeholderCount}/${shotCount} shot(s) ended on the placeholder (ratio ${ratio.toFixed(2)}).`
+    );
+  }
+
+  const maxRatio =
+    typeof maxPlaceholderRatio === "number" && Number.isFinite(maxPlaceholderRatio)
+      ? maxPlaceholderRatio
+      : placeholderMaxRatio();
+  if (shotCount > 0 && ratio > maxRatio) {
+    throw new ImageFallbackFloorError(
+      `Image sourcing fell back to the placeholder for ${placeholderCount} of ${shotCount} shots ` +
+      `(ratio ${ratio.toFixed(2)}, limit ${maxRatio.toFixed(2)}). Refusing to ship a render of blank plates. ` +
+      `Check UNSPLASH_ACCESS_KEY / PEXELS_API_KEY / OPENAI_API_KEY, or raise IMAGE_PLACEHOLDER_MAX_RATIO.`,
+      placeholderCount,
+      shotCount
+    );
   }
 
   return { entries };

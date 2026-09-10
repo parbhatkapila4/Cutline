@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   const all = await listTalkingPhotos(apiKey);
   console.log(`[cleanup] account has ${all.length} avatar(s) total`);
 
-  const cached = getAllCachedTalkingPhotoIds();
+  const cached = await getAllCachedTalkingPhotoIds();
   const orphans = all.filter((p) => !cached.has(p.id));
   const cachedHere = all.filter((p) => cached.has(p.id));
   console.log(

@@ -25,6 +25,7 @@ export type VideoJobInsert = {
   status?: VideoJobStatus;
   preview_url?: string | null;
   final_url?: string | null;
+  queue_job_id?: string | null;
 };
 
 export type GenerationFlowResult =

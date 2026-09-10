@@ -11,6 +11,7 @@ export interface StageTelemetry {
   durationMs?: number;
   error?: string;
   progress?: string;
+  metrics?: Record<string, number>;
 }
 
 export interface JobTelemetry {

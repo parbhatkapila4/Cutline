@@ -128,7 +128,7 @@ export function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
               <span className="text-white/70 font-semibold">Cutline</span>
             </span>
             <span className="text-white/15">/</span>
-            <span>1080p</span>
+            <span>4K</span>
             <span className="text-white/15">·</span>
             <span>16:9</span>
             <span className="text-white/15">·</span>
@@ -399,20 +399,20 @@ function PhaseTimeline() {
             >
               <span
                 className={`tabular-nums transition-colors duration-500 ${active
-                    ? "text-emerald-400"
-                    : done
-                      ? "text-emerald-400/60"
-                      : "text-emerald-400/20"
+                  ? "text-emerald-400"
+                  : done
+                    ? "text-emerald-400/60"
+                    : "text-emerald-400/20"
                   }`}
               >
                 {ph.num}
               </span>
               <span
                 className={`transition-colors duration-500 ${active
-                    ? "text-white/95"
-                    : done
-                      ? "text-white/55"
-                      : "text-white/30"
+                  ? "text-white/95"
+                  : done
+                    ? "text-white/55"
+                    : "text-white/30"
                   }`}
               >
                 {ph.name}
@@ -458,10 +458,10 @@ function PhaseTimeline() {
                 key={`tick-${idx}`}
                 aria-hidden
                 className={`absolute top-1/2 w-[1.5px] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${passed
-                    ? "bg-emerald-400/80"
-                    : isPhaseStart
-                      ? "bg-white/25"
-                      : "bg-white/12"
+                  ? "bg-emerald-400/80"
+                  : isPhaseStart
+                    ? "bg-white/25"
+                    : "bg-white/12"
                   }`}
                 style={{
                   left: `${pos * 100}%`,

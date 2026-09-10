@@ -29,7 +29,7 @@ export function TrustBar() {
         </div>
 
         <p className="mt-8 text-center font-mono text-[11px] tracking-[0.08em] text-[#111]/45">
-          30-60s renders · 1080p MP4 · No watermarks · Single pass
+          30-60s renders · 4K MP4 · No watermarks · Single pass
         </p>
       </Container>
     </Section>

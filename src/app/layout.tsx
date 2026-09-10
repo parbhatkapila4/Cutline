@@ -6,10 +6,11 @@ import {
   Instrument_Serif,
   JetBrains_Mono,
 } from "next/font/google";
-import { Suspense } from "react";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import { TopProgress } from "@/components/ui/top-progress";
+import { GoogleAnalytics } from "@next/third-parties/google";
+
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
 
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
 
@@ -68,11 +69,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${plexMono.variable} ${instrumentSerif.variable} antialiased`}
       >
-        <Suspense fallback={null}>
-          <TopProgress />
-        </Suspense>
         {children}
       </body>
+      {gaMeasurementId ? <GoogleAnalytics gaId={gaMeasurementId} /> : null}
     </html>
   );
 }

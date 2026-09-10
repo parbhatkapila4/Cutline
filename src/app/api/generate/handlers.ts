@@ -6,7 +6,7 @@ import {
   getQueueWaitMetrics,
   type VideoJobResult,
 } from "@/lib/queue/videoQueue";
-import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
+import { getClientIdentifier, checkRateLimit, getForwardedClientIp } from "@/lib/rate-limit";
 import { getRequestIdFromRequest } from "@/lib/requestId";
 import { validateGenerateInput, validateJobId } from "@/lib/validation/input";
 import { DEFAULT_PLATFORM } from "@/lib/platform/types";
@@ -19,7 +19,7 @@ import {
   withIdempotencyLock,
 } from "@/lib/api/idempotency";
 import { runGenerationFlow, checkDownloadAllowed } from "@/lib/anon";
-import { requestOwnsResource } from "@/lib/jobs/jobOwnership";
+import { requestOwnsResource, resolveOwnerCandidates } from "@/lib/jobs/jobOwnership";
 import { isDatabaseConfigured } from "@/lib/db";
 import { isProPlan } from "@/lib/plans";
 import { auth } from "@/lib/auth";
@@ -31,6 +31,8 @@ import type { BrandColors } from "@/lib/assets/types";
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+
+const FREE_MAX_DURATION_SECONDS = 20;
 
 type JobStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
 
@@ -288,20 +290,26 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
-  if (isDatabaseConfigured()) {
+  {
     const usesImages = Array.isArray(data.assetIds) && data.assetIds.length > 0;
     const usesProAvatar =
       data.avatar?.mode === "preset" || data.avatar?.mode === "upload";
-    const usesCinematic =
-      data.mode === "talking_object" &&
-      data.talkingObjectStyle === "real" &&
-      data.talkingRealMode === "scenario";
+    const usesCinematic = data.mode === "talking_object";
     if (usesImages || usesProAvatar || usesCinematic) {
       const { getUserPlan } = await import("@/lib/users/planService");
       const callerIsPro = userId ? isProPlan((await getUserPlan(userId)).id) : false;
-      if (!callerIsPro) {
+      let holdsPurchasedSeconds = false;
+      if (!callerIsPro && usesCinematic && !usesImages && !usesProAvatar && userId) {
+        try {
+          const { getTopupSecondsRemaining } = await import("@/lib/cost/budget");
+          holdsPurchasedSeconds = (await getTopupSecondsRemaining(userId)) > 0;
+        } catch {
+          holdsPurchasedSeconds = false;
+        }
+      }
+      if (!callerIsPro && !holdsPurchasedSeconds) {
         const feature = usesCinematic
-          ? "Cinematic scenes"
+          ? "Talking-character videos"
           : usesProAvatar
             ? "Custom avatars"
             : "Image uploads";
@@ -319,42 +327,170 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
   }
 
+  const { getUserPlan: getPlanForLimits } = await import("@/lib/users/planService");
+  const isFreePlan = (await getPlanForLimits(userId)).id === "free";
+
+  if (isFreePlan && (data.durationSeconds ?? 0) > FREE_MAX_DURATION_SECONDS) {
+    return apiError({
+      code: ErrorCode.PLAN_REQUIRED,
+      message: `Free videos are up to ${FREE_MAX_DURATION_SECONDS} seconds. Upgrade for longer videos.`,
+      status: 403,
+      details: {
+        feature: "duration",
+        maxDurationSeconds: FREE_MAX_DURATION_SECONDS,
+        requiredPlan: "beginner",
+      },
+      headers,
+    });
+  }
+
   const creditsIdentifier = userId ?? anonFlow?.result.anon_session_id ?? identifier;
+
+  const spendIdentifier = userId ?? getForwardedClientIp(request) ?? creditsIdentifier;
+
+  let effectiveMode: "slideshow" | "talking_object" | null = null;
+  let downgradeNotice: string | null = null;
+  let reservedCinematicSeconds = 0;
+  let reservedCinematicSplit: { fromMonthly: number; fromTopup: number } = {
+    fromMonthly: 0,
+    fromTopup: 0,
+  };
+  let reservedSpendUsd = 0;
 
   try {
     await ensureInProcessWorkerStarted();
     const queue = getVideoQueue();
-    const { incrementApiCallsThisMonth, getTokens, getVideosCompletedThisMonth } = await import("@/lib/usage");
-    const { estimateTokenCost } = await import("@/lib/cost/pricing");
+    const { incrementApiCallsThisMonth, getVideosCompletedThisMonth } = await import("@/lib/usage");
     const { getUserPlan } = await import("@/lib/users/planService");
-    const creditsCheckDisabled =
+    const creditsCheckRequested =
       process.env.DISABLE_CREDITS_CHECK === "true" || process.env.DISABLE_CREDITS_CHECK === "1";
+    const creditsCheckDisabled =
+      creditsCheckRequested && process.env.NODE_ENV !== "production";
+    if (creditsCheckRequested && !creditsCheckDisabled) {
+      console.warn(
+        "[api] DISABLE_CREDITS_CHECK is set but ignored in production; spend limits remain enforced."
+      );
+    }
     const skipCreditsForAnon = Boolean(anonFlow?.result.allowed);
-    if (!creditsCheckDisabled && !skipCreditsForAnon) {
+    if (!creditsCheckDisabled) {
       const userPlan = await getUserPlan(userId);
 
-      if (!userPlan.tokensUnlimited) {
-        const estimatedTokens = estimateTokenCost({
-          mode: data.mode ?? "slideshow",
-          durationSeconds: data.durationSeconds ?? 30,
+      const { estimateUnmeteredCostUsd, cinematicSecondsFor } = await import("@/lib/cost/pricing");
+      const {
+        getBudgetState,
+        decideSpend,
+        reserveCinematicSeconds,
+        reserveSpendUsd,
+        releaseCinematicSeconds: releaseCine,
+        resetsAt,
+      } = await import("@/lib/cost/budget");
+      const requestedMode = data.regenFromJobId ? "slideshow" : (data.mode ?? "slideshow");
+      const requestedDuration = data.durationSeconds ?? 30;
+      const requestedVariations = data.variationCount ?? 1;
+      const providerArgs = {
+        talkingObjectStyle: data.talkingObjectStyle,
+        talkingRealMode: data.talkingRealMode,
+        avatar: data.avatar,
+      };
+      const costArgs = {
+        mode: requestedMode,
+        durationSeconds: requestedDuration,
+        variationCount: requestedVariations,
+        ...providerArgs,
+        stockImagesOnly: isFreePlan,
+      } as const;
+      const budgetState = await getBudgetState(spendIdentifier, userPlan.id);
+      const decision = decideSpend({
+        state: budgetState,
+        estimateUsd: estimateUnmeteredCostUsd(costArgs),
+        cinematicSeconds: cinematicSecondsFor(costArgs),
+        fallbackEstimateUsd: estimateUnmeteredCostUsd({
+          mode: "slideshow",
+          durationSeconds: requestedDuration,
+          variationCount: requestedVariations,
+          stockImagesOnly: isFreePlan,
+        }),
+      });
+
+      if (decision.outcome === "deny") {
+        return apiError({
+          code: ErrorCode.MONTHLY_LIMIT_REACHED,
+          message: decision.reason,
+          status: 402,
+          details: {
+            plan: userPlan.id,
+            allowanceUsedPercent: Math.round(decision.state.fractionUsed * 100),
+            resetsAt: resetsAt(),
+          },
+          headers,
         });
-        const tokensRemaining = await getTokens(
-          creditsIdentifier,
-          userPlan.tokensPerMonth ?? undefined,
+      }
+      if (decision.outcome === "downgrade") {
+        effectiveMode = decision.toMode;
+        downgradeNotice = decision.reason;
+      }
+
+      const admittedMode = effectiveMode ?? requestedMode;
+      const admittedArgs = {
+        mode: admittedMode,
+        durationSeconds: requestedDuration,
+        variationCount: requestedVariations,
+        ...providerArgs,
+        stockImagesOnly: isFreePlan,
+      } as const;
+
+      const seconds = cinematicSecondsFor(admittedArgs);
+      if (seconds > 0) {
+        const cine = await reserveCinematicSeconds(
+          spendIdentifier,
+          budgetState.cinematicSecondsAllowed,
+          seconds
         );
-        if (tokensRemaining < estimatedTokens) {
+        if (!cine.ok) {
           return apiError({
-            code: ErrorCode.INSUFFICIENT_CREDITS,
-            message: `Not enough tokens. You have ${tokensRemaining} tokens, this video needs approximately ${estimatedTokens} tokens.`,
+            code: ErrorCode.MONTHLY_LIMIT_REACHED,
+            message:
+              "Cinematic seconds for this month are used up. Standard renders are still available, and this resets next month.",
             status: 402,
-            details: { tokensRemaining, tokensRequired: estimatedTokens },
+            details: { plan: userPlan.id, resetsAt: resetsAt() },
             headers,
           });
         }
+        reservedCinematicSeconds = seconds;
+        reservedCinematicSplit = {
+          fromMonthly: cine.fromMonthly ?? seconds,
+          fromTopup: cine.fromTopup ?? 0,
+        };
       }
 
-      const videosCompletedThisMonth = await getVideosCompletedThisMonth(creditsIdentifier);
+      reservedSpendUsd = estimateUnmeteredCostUsd(admittedArgs);
+      const claim = await reserveSpendUsd(
+        spendIdentifier,
+        budgetState.budgetUsd,
+        reservedSpendUsd
+      );
+      if (!claim.ok) {
+        if (reservedCinematicSeconds > 0) {
+          await releaseCine(spendIdentifier, reservedCinematicSeconds, reservedCinematicSplit);
+          reservedCinematicSeconds = 0;
+          reservedCinematicSplit = { fromMonthly: 0, fromTopup: 0 };
+        }
+        reservedSpendUsd = 0;
+        return apiError({
+          code: ErrorCode.MONTHLY_LIMIT_REACHED,
+          message:
+            "You have used this month's generation allowance. It resets at the start of next month.",
+          status: 402,
+          details: { plan: userPlan.id, resetsAt: resetsAt() },
+          headers,
+        });
+      }
+
+      const videosCompletedThisMonth = skipCreditsForAnon
+        ? 0
+        : await getVideosCompletedThisMonth(creditsIdentifier);
       if (
+        !skipCreditsForAnon &&
         userPlan.videosPerMonth != null &&
         videosCompletedThisMonth >= userPlan.videosPerMonth
       ) {
@@ -379,8 +515,17 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(anonFlow?.result.allowed ? { videoJobId: anonFlow.result.job_id } : {}),
       ...(data.assetIds?.length ? { assetIds: data.assetIds } : {}),
       ...(data.brandColors ? { brandColors: data.brandColors } : {}),
-      mode: data.regenFromJobId ? "slideshow" : (data.mode ?? "slideshow"),
+      mode: effectiveMode ?? (data.regenFromJobId ? "slideshow" : (data.mode ?? "slideshow")),
       durationSeconds: data.durationSeconds,
+      ...(reservedSpendUsd > 0 ? { reservedSpendUsd } : {}),
+      ...(reservedCinematicSeconds > 0
+        ? {
+          reservedCinematicSeconds,
+          reservedCinematicSplit,
+        }
+        : {}),
+      ...(spendIdentifier !== creditsIdentifier ? { spendIdentifier } : {}),
+      ...(isFreePlan ? { stockImagesOnly: true } : {}),
       ...(data.textModel ? { textModel: data.textModel } : {}),
       captions: data.captions,
       ...(data.talkingObjectStyle ? { talkingObjectStyle: data.talkingObjectStyle } : {}),
@@ -412,6 +557,26 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     const newJobId = anonJobId ?? randomUUID();
     const queueAddOptions = { jobId: newJobId };
 
+    if (!anonJobId && userId && isDatabaseConfigured()) {
+      try {
+        const { createVideoJob } = await import("@/lib/jobs/videoJobService");
+        await createVideoJob({
+          owner_type: "user",
+          owner_id: userId,
+          prompt: typeof data.input === "string" ? data.input : String(data.input ?? ""),
+          status: "queued",
+          queue_job_id: newJobId,
+        });
+      } catch (e) {
+        console.error(
+          "[api] POST /api/generate could not persist video_jobs row jobId=" +
+          newJobId +
+          " error=" +
+          (e instanceof Error ? e.message : String(e))
+        );
+      }
+    }
+
     if (idempotencyKey) {
       const result = await withIdempotencyLock(idempotencyKey, async () => {
         const again = getIdempotencyResult(idempotencyKey);
@@ -439,8 +604,26 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + jobId);
     const resHeaders: Record<string, string> = { ...headers };
     if (anonFlow?.setCookieHeader) resHeaders["Set-Cookie"] = anonFlow.setCookieHeader;
-    return NextResponse.json({ jobId }, { headers: resHeaders });
+    return NextResponse.json(
+      { jobId, ...(downgradeNotice ? { notice: downgradeNotice } : {}) },
+      { headers: resHeaders }
+    );
   } catch (e) {
+    if (reservedCinematicSeconds > 0 || reservedSpendUsd > 0) {
+      try {
+        const { releaseCinematicSeconds, adjustSpendUsd } = await import("@/lib/cost/budget");
+        if (reservedCinematicSeconds > 0) {
+          await releaseCinematicSeconds(
+            spendIdentifier,
+            reservedCinematicSeconds,
+            reservedCinematicSplit,
+          );
+        }
+        if (reservedSpendUsd > 0) {
+          await adjustSpendUsd(spendIdentifier, -reservedSpendUsd);
+        }
+      } catch { }
+    }
     const { logServerError } = await import("@/lib/utils/error");
     logServerError("POST /api/generate", e);
     const errMsg = e instanceof Error ? e.message : String(e);
@@ -871,6 +1054,40 @@ export function handleJobsOptions(request: Request): NextResponse {
 export async function handleJobsGet(request: Request): Promise<NextResponse> {
   const origin = request.headers.get("Origin");
   const corsHeaders = getCorsHeaders(origin);
+
+  const limitIdentifier = getClientIdentifier(request);
+  const listLimit = await checkRateLimit(limitIdentifier, "status");
+  if (!listLimit.allowed) {
+    const retryAfter = listLimit.retryAfter ?? 60;
+    return apiError({
+      code: ErrorCode.RATE_LIMITED,
+      message: "Too Many Requests",
+      status: 429,
+      details: { retryAfter },
+      headers: { ...corsHeaders, "Retry-After": String(retryAfter) },
+    });
+  }
+
+  const fromApiKey = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
+  let sessionUserId: string | undefined;
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    sessionUserId = session?.user?.id != null ? String(session.user.id) : undefined;
+  } catch {
+    sessionUserId = undefined;
+  }
+  if (!fromApiKey && !sessionUserId) {
+    return apiError({
+      code: ErrorCode.AUTH_REQUIRED,
+      message: "Authentication required.",
+      status: 401,
+      headers: corsHeaders,
+    });
+  }
+
+  const ownerIds = new Set(await resolveOwnerCandidates(request));
+  if (fromApiKey) ownerIds.add(fromApiKey.userId);
+
   const { searchParams } = new URL(request.url);
   const limitParam = searchParams.get("limit");
   let limit = LIST_JOBS_DEFAULT_LIMIT;
@@ -887,7 +1104,7 @@ export async function handleJobsGet(request: Request): Promise<NextResponse> {
     limit = parsed;
   }
   try {
-    const jobs = await listRecentJobs({ limit });
+    const jobs = await listRecentJobs({ limit, ownerIds: [...ownerIds] });
     const body = {
       jobs: jobs.map((j) => ({
         jobId: j.jobId,

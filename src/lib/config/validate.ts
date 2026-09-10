@@ -64,6 +64,17 @@ export function validateConfig(): ValidatedConfig {
   if (adminSecret !== undefined && adminSecret.length === 0) {
     console.warn("[config] ADMIN_SECRET is empty; admin routes will return 401.");
   }
+  const contactEmailMissing = [
+    getEnv("RESEND_API_KEY") ? null : "RESEND_API_KEY",
+    getEnv("CONTACT_FROM_EMAIL") ? null : "CONTACT_FROM_EMAIL",
+  ].filter((v): v is string => v !== null);
+  if (contactEmailMissing.length > 0) {
+    console.warn(
+      "[config] Contact form email is not configured (missing: " +
+      contactEmailMissing.join(", ") +
+      "). /api/contact will return 502 and submissions will not be delivered."
+    );
+  }
 
   const rateLimitMax = parseNumber(
     process.env.RATE_LIMIT_MAX ?? process.env.RATE_LIMIT_GENERATE,

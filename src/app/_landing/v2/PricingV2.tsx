@@ -1,4 +1,4 @@
-import { PRICING } from "@/constants/landing";
+import { PRICING, isExcludedFeature } from "@/constants/landing";
 import { PLAN_TO_PRODUCT_ID } from "@/lib/products";
 import { PlanCta } from "../PlanCta";
 import { ManageBillingBanner } from "../ManageBillingBanner";
@@ -8,7 +8,7 @@ import { pillClasses, PILL_BASE, PILL_SIZE } from "./pill-styles";
 const TRUST_ITEMS = [
   "Cancel anytime",
   "No watermarks on any plan",
-  "Same 1080p HD output across all tiers",
+  "4K MP4 export",
 ];
 
 function CheckIcon({ className = "" }: { className?: string }) {
@@ -80,11 +80,13 @@ export function PricingV2() {
                   <span className="font-display font-normal text-[56px] leading-none tracking-[-0.02em]">
                     {plan.monthlyPrice}
                   </span>
-                  <span
-                    className={`font-mono text-[12px] ${dark ? "text-[#f4f3ec]/50" : "text-[#111]/50"}`}
-                  >
-                    /mo
-                  </span>
+                  {plan.monthlyPrice.startsWith("$") ? (
+                    <span
+                      className={`font-mono text-[12px] ${dark ? "text-[#f4f3ec]/50" : "text-[#111]/50"}`}
+                    >
+                      /mo
+                    </span>
+                  ) : null}
                 </div>
 
                 <p
@@ -108,19 +110,28 @@ export function PricingV2() {
                     What you get
                   </p>
                   <ul className="mt-4 space-y-3">
-                    {plan.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className={`flex items-start gap-2.5 font-sans text-[14.5px] leading-snug ${
-                          dark ? "text-[#f4f3ec]/85" : "text-[#111]/80"
-                        }`}
-                      >
-                        <CheckIcon
-                          className={dark ? "text-[#f4f3ec]" : "text-[#111]"}
-                        />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
+                    {plan.features.map((feature) => {
+                      const excluded = isExcludedFeature(feature);
+                      return (
+                        <li
+                          key={feature}
+                          className={`flex items-start gap-2.5 font-sans text-[14.5px] leading-snug ${
+                            excluded
+                              ? dark ? "text-[#f4f3ec]/45" : "text-[#111]/45"
+                              : dark ? "text-[#f4f3ec]/85" : "text-[#111]/80"
+                          }`}
+                        >
+                          {excluded ? (
+                            <span className="w-3.5 h-3.5 shrink-0 mt-[3px] text-center leading-[14px]" aria-hidden>&minus;</span>
+                          ) : (
+                            <CheckIcon
+                              className={dark ? "text-[#f4f3ec]" : "text-[#111]"}
+                            />
+                          )}
+                          <span>{feature}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
 

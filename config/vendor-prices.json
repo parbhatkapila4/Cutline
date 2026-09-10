@@ -1,0 +1,266 @@
+{
+  "$schema": "./vendor-prices.schema.json",
+  "_README": [
+    "Price-per-unit for every vendor/unit a single Cutline job can consume.",
+    "",
+    "TWO DIFFERENT FIELDS, AND THE DIFFERENCE MATTERS:",
+    "  verifiedPriceUsd    - a real vendor rate card price that a human has checked.",
+    "                        null everywhere in this file. NOTHING here has been verified",
+    "                        against a vendor invoice or rate card.",
+    "  codeAssumedPriceUsd - the number THIS REPO currently bills against, with the",
+    "                        file:line it lives at. This is what the product already",
+    "                        believes. It is NOT evidence of the real price.",
+    "",
+    "Do not collapse these two fields. A codeAssumedPriceUsd that turns out to be wrong",
+    "is exactly how a margin model silently lies.",
+    "",
+    "scripts/cost-model.ts reads verifiedPriceUsd by default and refuses to present a",
+    "total as complete while any of them is null. Pass --use-code-assumptions to get a",
+    "provisional figure from codeAssumedPriceUsd instead; it is labelled PROVISIONAL."
+  ],
+  "meta": {
+    "createdOn": "2026-09-07",
+    "repoRevision": "working tree with uncommitted changes; see docs/cost-audit.md",
+    "pricesVerified": false,
+    "howToVerify": "Open each vendor's pricing page or a recent invoice, fill verifiedPriceUsd, set pricesVerified true."
+  },
+
+  "vendors": {
+    "openrouter": {
+      "displayName": "OpenRouter (LLM gateway)",
+      "units": {
+        "llm_per_1k_tokens": {
+          "unit": "1,000 tokens",
+          "verifiedPriceUsd": null,
+          "TODO": "Get the per-1M input AND output price for anthropic/claude-haiku-4.5 from the OpenRouter model page, plus OpenRouter's routing fee. Split into two entries if input/output differ.",
+          "codeAssumedPriceUsd": 0.00025,
+          "codeAssumptionSource": "src/lib/cost/pricing.ts:11 (LLM_PER_1K_TOKENS: 0.00025)",
+          "envOverride": "COST_PER_1K_TOKENS (src/lib/cost/costEstimator.ts:25)",
+          "model": "anthropic/claude-haiku-4.5",
+          "modelSource": "src/lib/pipeline/modelFallback.ts:1 (DEFAULT_MODEL)",
+          "notes": "The tracker does NOT separate input from output tokens - recordLlmTokens takes one number (src/lib/cost/costEstimator.ts:17). Real billing separates them and output is normally the dearer side, so a single blended rate here will be wrong in both directions depending on the stage."
+        }
+      }
+    },
+
+    "openai": {
+      "displayName": "OpenAI (DALL-E 3 image generation)",
+      "units": {
+        "image_generation": {
+          "unit": "1 generated image",
+          "verifiedPriceUsd": null,
+          "TODO": "Get the DALL-E 3 price for size 1792x1024 at quality 'hd' specifically. The code pins the top tier, so the standard 1024x1024 rate is the WRONG number to put here.",
+          "codeAssumedPriceUsd": 0.12,
+          "codeAssumptionSource": "src/lib/cost/pricing.ts:9 (DALLE_PER_IMAGE: 0.12)",
+          "envOverride": "COST_PER_IMAGE_CALL (src/lib/cost/costEstimator.ts:28)",
+          "requestShape": {
+            "model": "dall-e-3",
+            "size": "1792x1024",
+            "quality": "hd",
+            "source": "src/lib/images/generate.ts:18-22"
+          },
+          "notes": "This constant was changed from 0.04 to 0.12 earlier the same day as part of uncommitted work; 0.04 is the standard-tier rate and understated real image spend threefold. Still unverified against the rate card."
+        }
+      }
+    },
+
+    "elevenlabs": {
+      "displayName": "ElevenLabs (text to speech)",
+      "units": {
+        "tts_per_character": {
+          "unit": "1 character of input text",
+          "verifiedPriceUsd": null,
+          "TODO": "ElevenLabs bills per CHARACTER on a subscription character quota. Get the effective $/character for the plan in use (plan quota / plan price), for model eleven_multilingual_v2.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE - the repo has no per-character rate anywhere.",
+          "model": "eleven_multilingual_v2",
+          "modelSource": "src/lib/pipeline/tts.ts:7 (DEFAULT_ELEVENLABS_MODEL)",
+          "notes": "THIS IS THE UNIT THE VENDOR ACTUALLY BILLS, and the repo does not model it at all. See tts_per_second below."
+        },
+        "tts_per_second": {
+          "unit": "1 second of produced audio",
+          "verifiedPriceUsd": null,
+          "TODO": "Do not fill this in as if it were a vendor price - it is not a unit ElevenLabs sells. Either derive it (chars-per-second x $/char) or migrate the tracker to characters.",
+          "codeAssumedPriceUsd": 0.004,
+          "codeAssumptionSource": "src/lib/cost/pricing.ts:4 (TTS_PER_SECOND: 0.004)",
+          "envOverride": "COST_PER_TTS_SECOND (src/lib/cost/costEstimator.ts:26)",
+          "notes": "UNIT MISMATCH. The tracker records seconds of OUTPUT audio (recordTtsSeconds, src/lib/cost/costEstimator.ts:19, fed from r.durationMs/1000 at src/lib/pipeline/orchestrator.ts:885 and :1530). ElevenLabs charges for INPUT characters. These diverge with speaking rate, and the divergence is systematic rather than noise."
+        }
+      }
+    },
+
+    "google_veo": {
+      "displayName": "Google Veo (generative video)",
+      "units": {
+        "video_per_second": {
+          "unit": "1 second of generated video",
+          "verifiedPriceUsd": null,
+          "TODO": "Get the per-second price for veo-3.1-generate-preview from Google's Vertex/Gemini API pricing. Confirm whether audio-on generation is priced differently.",
+          "codeAssumedPriceUsd": 0.4,
+          "codeAssumptionSource": "src/lib/cost/pricing.ts:3 (VEO_PER_SECOND: 0.40)",
+          "envOverride": "COST_PER_VIDEO_SECOND (src/lib/cost/costEstimator.ts:27)",
+          "model": "veo-3.1-generate-preview",
+          "modelSource": "src/lib/veo/index.ts:8 (VEO_MODEL)",
+          "billingGranularity": {
+            "secondsPerCall": 8,
+            "source": "src/lib/veo/index.ts:125 (durationSeconds: 8)",
+            "notes": "Every Veo call buys a fixed 8 seconds. A 9-second requirement costs 16 seconds. The estimator models this via VEO_CHUNK_SECONDS = 8 (src/lib/cost/pricing.ts:16)."
+          },
+          "notes": "By far the largest single line item. At the code-assumed rate, 8 seconds costs $3.20."
+        }
+      }
+    },
+
+    "heygen": {
+      "displayName": "HeyGen (photo avatar lip-sync)",
+      "units": {
+        "avatar_video_generation": {
+          "unit": "UNKNOWN - the code does not reveal HeyGen's billing unit (per video? per second? per credit?)",
+          "verifiedPriceUsd": null,
+          "TODO": "Check the HeyGen plan in use. Determine (a) the billing unit, (b) whether stored Photo Avatars cost anything at rest, (c) whether a failed or discarded generation is still billed.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE. Superseded by avatar_video_per_second below, which is the unit the tracker now meters (CostTracker.recordHeygenSeconds).",
+          "notes": "CONSEQUENCE: every HeyGen avatar render books $0 against the margin ceiling. The only HeyGen limit the code knows about is a stored-avatar cap inferred from error code 401028 (the number 3 is NOT in the code; an earlier revision of this file asserted it) (src/lib/lipsync/heygen.ts:266)."
+        },
+
+        "avatar_video_per_second": {
+          "unit": "1 second of produced avatar video",
+          "verifiedPriceUsd": null,
+          "TODO": "THIS IS THE BLOCKING UNKNOWN for talking-character margin. HeyGen may not even sell per-second - check whether the plan bills per video, per credit, or per minute, and convert to $/second of output. Until this is a number, HeyGen renders are invisible to the gross-margin ceiling.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "src/lib/cost/pricing.ts HEYGEN_PER_SECOND = null. DELIBERATELY null, not a guess.",
+          "envOverride": "COST_PER_HEYGEN_SECOND (src/lib/cost/pricing.ts heygenRatePerSecond)",
+          "notes": "The metering unit the code now uses. heygenRatePerSecond() returns 0 and logs an error once per process while this is unknown, and CostTracker.recordHeygenSeconds books against it. Before this entry existed HeyGen output was fed through recordVideoSeconds and priced at Google Veo rate ($0.40/s) - a confident number for the wrong vendor. $0.00 with a loud log is the honest placeholder; do NOT fill this in with Veo rate."
+        },
+        "stored_photo_avatar": {
+          "unit": "1 stored Photo Avatar (account-wide, cap of 3 on lower tiers)",
+          "verifiedPriceUsd": null,
+          "TODO": "Confirm the stored-avatar cap and whether higher tiers raise it; the cap is inferred from an error code, not read from an API.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "src/lib/lipsync/heygen.ts:266 (401028 quota-full handling)",
+          "notes": "Content-addressed SHA-256 cache avoids re-uploading identical images (src/lib/lipsync/heygenPhotoCache.ts:34), so this is one of the few genuinely cached vendor calls in the codebase."
+        }
+      }
+    },
+
+    "unsplash": {
+      "displayName": "Unsplash (stock image search)",
+      "units": {
+        "image_search_request": {
+          "unit": "1 API request",
+          "verifiedPriceUsd": null,
+          "TODO": "Confirm the tier. Unsplash's free Demo tier is rate-limited per hour; production access is a separate application. Determine the request/hour ceiling and whether overage is refused or billed.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE - treated as free. Not in SERVICE_COSTS and never passed to recordImageCalls.",
+          "notes": "First link in the image fallback chain (src/lib/images/source.ts). Because only DALL-E calls reach recordImageCalls, a job served entirely from Unsplash books $0 of image cost - which is right if the tier is free and wrong if it is not."
+        }
+      }
+    },
+
+    "pexels": {
+      "displayName": "Pexels (stock image search)",
+      "units": {
+        "image_search_request": {
+          "unit": "1 API request",
+          "verifiedPriceUsd": null,
+          "TODO": "Confirm the request/hour and request/month ceilings for the API key in use, and the behaviour on overage.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE - treated as free.",
+          "notes": "Second link in the fallback chain, tried after Unsplash fails."
+        }
+      }
+    },
+
+    "vercel_blob": {
+      "displayName": "Vercel Blob (finished MP4 storage)",
+      "units": {
+        "storage_gb_month": {
+          "unit": "1 GB stored for 1 month",
+          "verifiedPriceUsd": null,
+          "TODO": "Get Vercel Blob storage $/GB-month from the Vercel pricing page and the plan's included allowance.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE - storage is not modelled anywhere in the cost tracker.",
+          "notes": "Effective residency is ~24h, not a month: the hourly cleanup deletes every blob under videos/ older than VIDEO_RETENTION_HOURS, default 24 (src/lib/storage/cleanup.ts:5, src/lib/storage/publish.ts:75-84). A GB-month rate therefore overstates cost badly unless prorated."
+        },
+        "bandwidth_gb": {
+          "unit": "1 GB served",
+          "verifiedPriceUsd": null,
+          "TODO": "Get Vercel Blob egress $/GB. This scales with VIEWS, not with renders, so it is the one unit that grows with a video's popularity.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE",
+          "notes": "UNKNOWN mean file size - see docs/cost-audit.md. MAX_VIDEO_OUTPUT_MB is unset by default (src/lib/config/limits.ts:13-19), so nothing in the repo bounds it."
+        }
+      }
+    },
+
+    "worker_host": {
+      "displayName": "Render worker host (Railway/Render/Fly container)",
+      "units": {
+        "cpu_second": {
+          "unit": "1 second of container wall-clock",
+          "verifiedPriceUsd": null,
+          "TODO": "Get the host's $/hour or $/GB-hour for the instance size actually running the worker, then divide to a per-second rate.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE - render compute is not modelled in the cost tracker at all.",
+          "notes": "This is a real per-job cost that the margin ceiling completely ignores. The container is billed continuously whether or not it is rendering, so a per-second rate only makes sense divided across actual throughput. See docs/cost-audit.md Part 1 for the render-time UNKNOWN."
+        }
+      }
+    },
+
+    "upstash_redis": {
+      "displayName": "Upstash Redis (queue + counters)",
+      "units": {
+        "command": {
+          "unit": "1 Redis command",
+          "verifiedPriceUsd": null,
+          "TODO": "Get $/100k commands for the Upstash plan in use, plus the connection cap.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE",
+          "notes": "Not per-job in any clean sense: status polling dominates command volume, and it scales with viewers x queue depth rather than with renders."
+        }
+      }
+    },
+
+    "neon_postgres": {
+      "displayName": "Neon Postgres",
+      "units": {
+        "compute_hour": {
+          "unit": "1 compute-hour",
+          "verifiedPriceUsd": null,
+          "TODO": "Get Neon's compute-hour and storage pricing for the branch in use.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE",
+          "notes": "A handful of queries per job; expected to be a rounding error next to Veo, but unmodelled."
+        }
+      }
+    },
+
+    "dodo_payments": {
+      "displayName": "Dodo Payments (billing)",
+      "units": {
+        "transaction": {
+          "unit": "1 subscription charge",
+          "verifiedPriceUsd": null,
+          "TODO": "Get Dodo's percentage + fixed fee per transaction. This reduces NET revenue per seat and therefore the true margin, which the ceiling in src/lib/cost/budget.ts does not account for.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE",
+          "notes": "Not a per-job cost, but it belongs in a margin model: the budget ceiling is derived from LIST price (src/lib/cost/budget.ts PLAN_PRICE_USD), not from what actually lands in the bank."
+        }
+      }
+    },
+
+    "resend": {
+      "displayName": "Resend (transactional email)",
+      "units": {
+        "email": {
+          "unit": "1 email sent",
+          "verifiedPriceUsd": null,
+          "TODO": "Get Resend's per-email price above the free tier.",
+          "codeAssumedPriceUsd": null,
+          "codeAssumptionSource": "NONE",
+          "notes": "Not part of a render job. Used only by the contact form (src/lib/contact/email.ts), which is uncommitted work. Listed for completeness of the vendor surface."
+        }
+      }
+    }
+  }
+}

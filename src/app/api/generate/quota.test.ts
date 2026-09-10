@@ -6,14 +6,12 @@ const {
   mockStartVideoWorker,
   mockScheduleCleanupJob,
   mockGetUserPlan,
-  mockGetTokens,
   mockGetVideosCompleted,
 } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
   mockStartVideoWorker: vi.fn(() => ({})),
   mockScheduleCleanupJob: vi.fn(async () => {}),
   mockGetUserPlan: vi.fn(),
-  mockGetTokens: vi.fn(),
   mockGetVideosCompleted: vi.fn(),
 }));
 
@@ -26,6 +24,7 @@ vi.mock("@/lib/queue/videoQueue", () => ({
 vi.mock("@/lib/rate-limit", () => ({
   getClientIdentifier: () => "quota-test-client",
   checkRateLimit: () => Promise.resolve({ allowed: true }),
+  getForwardedClientIp: () => null,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -42,8 +41,28 @@ vi.mock("@/lib/api-keys/service", () => ({
 
 vi.mock("@/lib/usage", () => ({
   incrementApiCallsThisMonth: vi.fn(async () => {}),
-  getTokens: mockGetTokens,
   getVideosCompletedThisMonth: mockGetVideosCompleted,
+}));
+
+vi.mock("@/lib/cost/budget", () => ({
+  getBudgetState: vi.fn(async () => ({
+    plan: "free",
+    budgetUsd: 1000,
+    spentUsd: 0,
+    remainingUsd: 1000,
+    fractionUsed: 0,
+    cinematicSecondsAllowed: 1000,
+    cinematicSecondsUsed: 0,
+    cinematicSecondsRemaining: 1000,
+  })),
+  decideSpend: vi.fn(() => ({ outcome: "allow", state: {} })),
+  recordCinematicSeconds: vi.fn(async () => 0),
+  reserveCinematicSeconds: vi.fn(async () => ({ ok: true, usedSeconds: 0 })),
+  reserveSpendUsd: vi.fn(async () => ({ ok: true, spentUsd: 0 })),
+  adjustSpendUsd: vi.fn(async () => 0),
+  releaseCinematicSeconds: vi.fn(async () => {}),
+  recordSpendUsd: vi.fn(async () => 0),
+  resetsAt: vi.fn(() => "Oct 1, 2026"),
 }));
 
 vi.mock("@/lib/users/planService", () => ({
@@ -63,23 +82,18 @@ const FREE = {
   label: "Free",
   videosPerMonth: 1,
   apiCallsPerMonth: 1,
-  tokensUnlimited: false,
-  tokensPerMonth: 10,
 };
 const BEGINNER = {
   ...FREE,
   id: "beginner",
   label: "Beginner",
   videosPerMonth: 10,
-  tokensPerMonth: 120,
 };
 const PRO = {
   id: "professional",
   label: "Professional",
   videosPerMonth: null,
   apiCallsPerMonth: 100_000,
-  tokensUnlimited: true,
-  tokensPerMonth: null,
 };
 
 const generate = (body: Record<string, unknown> = {}) =>
@@ -89,7 +103,7 @@ const generate = (body: Record<string, unknown> = {}) =>
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         input: "A short explainer about cold brew coffee in one sentence.",
-        durationSeconds: 30,
+        durationSeconds: 20,
         ...body,
       }),
     }),
@@ -100,11 +114,9 @@ describe("POST /api/generate - plan quotas", () => {
     mockAdd.mockReset();
     mockAdd.mockResolvedValue({ id: "quota-job-1" });
     mockGetUserPlan.mockClear();
-    mockGetTokens.mockClear();
     mockGetVideosCompleted.mockClear();
     delete process.env.DISABLE_CREDITS_CHECK;
     mockGetUserPlan.mockResolvedValue(FREE);
-    mockGetTokens.mockResolvedValue(10_000);
     mockGetVideosCompleted.mockResolvedValue(0);
   });
 
@@ -146,26 +158,6 @@ describe("POST /api/generate - plan quotas", () => {
     expect((await generate()).status).toBe(200);
   });
 
-  it("blocks a render the remaining token balance cannot cover", async () => {
-    mockGetTokens.mockResolvedValue(1);
-    const res = await generate();
-    expect(res.status).toBe(402);
-    const body = await res.json();
-    expect(body.code).toBe("INSUFFICIENT_CREDITS");
-    expect(body.details.tokensRemaining).toBe(1);
-    expect(body.details.tokensRequired).toBeGreaterThan(1);
-    expect(mockAdd).not.toHaveBeenCalled();
-  });
 
-  it("reads the token balance with the PLAN's monthly grant, not the global default", async () => {
-    mockGetUserPlan.mockResolvedValue(BEGINNER);
-    await generate();
-    expect(mockGetTokens).toHaveBeenCalledWith(expect.any(String), 120);
-  });
 
-  it("does not consult the token balance at all on an unlimited plan", async () => {
-    mockGetUserPlan.mockResolvedValue(PRO);
-    await generate();
-    expect(mockGetTokens).not.toHaveBeenCalled();
-  });
 });

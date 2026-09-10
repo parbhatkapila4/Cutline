@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LoadingLink } from "@/components/ui/loading-link";
 import { CutlineLogo } from "@/components/brand/CutlineLogo";
 
 type Tag = "shipped" | "improved" | "fixed" | "infra" | "api";
@@ -113,9 +113,9 @@ const ENTRIES: Entry[] = [
     version: "0.11",
     title: "Quality report on every webhook",
     summary:
-      "The job-completion webhook now includes a quality_report block for downstream consumers.",
+      "The job-completion webhook now includes a qualityReport block for downstream consumers.",
     changes: [
-      { tag: "api", text: "Webhook payload extended with quality_report (per-stage success, retries, fallback hits)" },
+      { tag: "api", text: "Webhook payload extended with qualityReport ({ passed, score, issues })" },
       { tag: "shipped", text: "Variation strategies for content generation" },
       { tag: "improved", text: "Removed legacy aspect-ratio docs in favor of code-derived constants" },
     ],
@@ -152,13 +152,13 @@ export default function ChangelogPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 py-4 flex justify-start bg-black/60 backdrop-blur-sm border-b border-white/5">
-        <Link
+        <LoadingLink
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white border border-white/20 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
         >
           <CutlineLogo size="sm" className="max-w-[140px]" />
           <span>Home</span>
-        </Link>
+        </LoadingLink>
       </div>
 
       <main className="pt-24 pb-24 px-4 sm:px-6 lg:px-8">

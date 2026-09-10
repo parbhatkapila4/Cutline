@@ -196,7 +196,7 @@ export function FooterV2() {
           <div className="flex flex-wrap items-center justify-between gap-3 font-mono text-[11px] text-[#111]/45">
             <span>© 2026 Cutline - One sentence in. One video out.</span>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <span>sentence → mp4 · 12 stages · 1080p · single-pass</span>
+              <span>sentence → mp4 · 12 stages · 4K · single-pass</span>
               <Link
                 href="/status"
                 className="hover:text-[#ff5600] transition-colors"

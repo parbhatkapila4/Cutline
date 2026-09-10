@@ -1,6 +1,7 @@
 "use client";
 
 import { usePlanState } from "./usePlanState";
+import { PortalLink } from "./PlanCta";
 export function ManageBillingBanner({
   className,
   linkClassName,
@@ -18,9 +19,7 @@ export function ManageBillingBanner({
         You’re on the <span className="font-semibold capitalize">{state.planLabel}</span> plan. Upgrades, downgrades,
         and cancellation are handled in the billing portal.
       </span>
-      <a href="/api/customer-portal" className={linkClassName}>
-        {label}
-      </a>
+      <PortalLink className={linkClassName}>{label}</PortalLink>
     </div>
   );
 }

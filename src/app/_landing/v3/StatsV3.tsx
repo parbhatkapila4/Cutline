@@ -20,7 +20,7 @@ const STATS: {
     head: "60",
     tint: "s",
     ramp: [LILAC, AMBER, PEACH, GREEN],
-    caption: "Prompt to finished 1080p MP4, in a single pass",
+    caption: "Prompt to finished 4K MP4, in a single pass",
   },
   {
     head: "1",
@@ -29,11 +29,11 @@ const STATS: {
     caption: "Stages of AI direction behind every render",
   },
   {
-    head: "108",
-    tint: "0",
-    tail: "p",
+    head: "4",
+    tint: "K",
+    tail: "",
     ramp: [PEACH, GREEN, LILAC, AMBER],
-    caption: "HD on every plan. No watermark, ever",
+    caption: "UHD on every plan. No watermark, ever",
   },
 ];
 

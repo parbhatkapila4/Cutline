@@ -5,7 +5,7 @@ import { createRedisConnection, getVideoQueueName } from "./videoQueue";
 export function workerHeartbeatKey(queueName: string): string {
   return "cutline:worker:heartbeat:" + queueName;
 }
-const HEARTBEAT_TTL_SEC = 180;
+const HEARTBEAT_TTL_SEC = 900;
 const DEFAULT_INTERVAL_MS = 20_000;
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;

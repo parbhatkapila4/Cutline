@@ -4,6 +4,8 @@ export function isRetryableError(err: unknown): boolean {
   const lower = msg.toLowerCase();
 
   if (name === "AbortError" && lower.includes("cancel")) return false;
+  if (name === "ConfigurationError") return false;
+  if (name === "ImageFallbackFloorError") return false;
   if (name === "VeoContentFilteredError") return false;
   if (name === "VeoInternalServerError") return true;
 
@@ -61,6 +63,7 @@ export function isRetryableNetworkOrTimeout(err: unknown): boolean {
 export function shouldRetryForLLM(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   const lower = msg.toLowerCase();
+  if (err instanceof Error && err.name === "ConfigurationError") return false;
   const status = parseHttpStatus(err);
   if (status != null) {
     if (status === 429 || status === 408 || status === 504) return true;
@@ -81,6 +84,10 @@ export function shouldRetryForTTS(err: unknown): boolean {
 }
 
 export function shouldRetryForImage(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : "";
+  if (name === "ConfigurationError" || name === "ImageFallbackFloorError") {
+    return false;
+  }
   const status = parseHttpStatus(err);
   if (status != null) {
     if (status === 429 || (status >= 500 && status < 600)) return true;

@@ -1,4 +1,10 @@
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";
+export class ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigurationError";
+  }
+}
 
 export type JobFailureCode =
   | "QUOTA"
@@ -53,6 +59,21 @@ function isHeyGenAvatarQuotaError(s: string): boolean {
   );
 }
 
+const MAX_USER_MESSAGE_LENGTH = 400;
+const OPERATOR_DETAIL_PATTERNS: RegExp[] = [
+  /https?:\/\//i,
+  /\b(?:scripts|src|node_modules|dist|public)\//i,
+  /\.(?:ts|tsx|js|mjs|cjs|json|sql|env)\b/i,
+  /[A-Za-z]:\\/,
+  /\bat\s+[\w.$]+\s*\(/,
+  /\b(?:ENOENT|ECONNREFUSED|ETIMEDOUT|EACCES)\b/,
+  /\bprocess\.env\b/i,
+];
+
+export function containsOperatorDetail(message: string): boolean {
+  return OPERATOR_DETAIL_PATTERNS.some((re) => re.test(message));
+}
+
 const HEYGEN_AVATAR_QUOTA_MESSAGE =
   "Talking-character videos are temporarily unavailable. Please try Slideshow mode, or try again in a few minutes.";
 
@@ -86,7 +107,8 @@ export function getUserFriendlyErrorMessage(raw: string | null | undefined): str
     return "That took longer than expected. Please try again.";
   }
   if (!cleaned) return GENERIC_MESSAGE;
-  if (cleaned.length > 140) return GENERIC_MESSAGE;
+  if (containsOperatorDetail(cleaned)) return GENERIC_MESSAGE;
+  if (cleaned.length > MAX_USER_MESSAGE_LENGTH) return GENERIC_MESSAGE;
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
