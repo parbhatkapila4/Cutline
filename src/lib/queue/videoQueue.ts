@@ -93,16 +93,6 @@ export type VideoJobResult = {
   qualityReport?: QualityReport;
 };
 
-export function purchasedGenerativeWork(progress: unknown): boolean {
-  if (!progress || typeof progress !== "object" || Array.isArray(progress)) return false;
-  const p = progress as { stage?: unknown; detail?: unknown };
-  const stage = typeof p.stage === "string" ? p.stage : "";
-  const detail = typeof p.detail === "string" ? p.detail : "";
-  if (stage === "veo") return detail.startsWith("chunk ");
-  if (stage === "heygen") return detail === "generating";
-  return false;
-}
-
 export const CLEANUP_JOB_NAME = "cleanup";
 
 export async function cancelJob(jobId: string): Promise<{ ok: boolean; reason?: "not_found" | "already_finished" }> {
@@ -567,6 +557,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         eventType: "job_failed",
         errorCode: mapFailedReasonToFailureCode(msg),
         durationMs: processedOn > 0 ? Math.round(finishedOn - processedOn) : null,
+        providerError: msg,
       });
     }
     if (typeof data?.reservedSpendUsd === "number" && data.reservedSpendUsd > 0) {
@@ -585,21 +576,19 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
             ? data.clientId
             : null;
       if (!spendKeyId) return;
-      if (purchasedGenerativeWork(job?.progress)) {
-        console.warn(
-          "[worker] jobId=" + jid + " failed after generation started; keeping " +
-          reserved + "s (provider was already paid)"
-        );
-        return;
-      }
       try {
         const { releaseCinematicSecondsOnce } = await import("@/lib/cost/budget");
         const split = data?.reservedCinematicSplit ?? { fromMonthly: reserved, fromTopup: 0 };
         const released = await releaseCinematicSecondsOnce(spendKeyId, reserved, split, String(jid));
         if (released) {
           console.log(
-            "[worker] jobId=" + jid + " failed before any generation; released " + reserved +
-            "s (monthly " + (split.fromMonthly ?? 0) + ", purchased " + (split.fromTopup ?? 0) + ")"
+            "[worker] jobId=" + jid + " failed; released the full " + reserved +
+            "s reservation (monthly " + (split.fromMonthly ?? 0) + ", purchased " + (split.fromTopup ?? 0) + ")"
+          );
+        } else {
+          console.log(
+            "[worker] jobId=" + jid + " cinematic release skipped; " + reserved +
+            "s was already released for this job"
           );
         }
       } catch (e) {

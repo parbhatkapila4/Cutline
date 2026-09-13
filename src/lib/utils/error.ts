@@ -16,9 +16,16 @@ export type JobFailureCode =
   | "PROVIDER_ERROR"
   | "UNKNOWN";
 
+const CLASSIFIER_MAX_CHARS = 500;
+
+export function classifierInput(raw: string): string {
+  const firstLine = raw.split(/[\r\n]/, 1)[0] ?? "";
+  return firstLine.slice(0, CLASSIFIER_MAX_CHARS).toLowerCase();
+}
+
 export function mapFailedReasonToFailureCode(raw: string | null | undefined): JobFailureCode {
   if (!raw || typeof raw !== "string") return "UNKNOWN";
-  const s = raw.toLowerCase();
+  const s = classifierInput(raw);
   if (s.includes("cancelled")) return "CANCELLED";
   if (s.includes("quality") && (s.includes("gate") || s.includes("failed"))) return "QUALITY_GATE";
   if (s.includes("timeout") || s.includes("timed out") || s.includes("etimedout")) return "TIMEOUT";

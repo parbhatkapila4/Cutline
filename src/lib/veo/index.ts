@@ -1,8 +1,10 @@
-import { GoogleGenAI, PersonGeneration } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 import path from "path";
 
 import { getDuration } from "@/lib/pipeline/concatMp4";
+import { recordRenderEvent } from "@/lib/telemetry/renderEvents";
+import { parseHttpStatus } from "@/lib/utils/retry";
 import { isValidAspectRatio, type AspectRatio } from "@/lib/validation/aspectRatio";
 
 const VEO_MODEL = process.env.VEO_MODEL || "veo-3.1-generate-preview";
@@ -64,7 +66,15 @@ export class VeoInternalServerError extends Error {
   }
 }
 
-function throwFromVeoRaw(raw: string): never {
+function throwFromVeoRaw(raw: string, jobId: string): never {
+  const status = parseHttpStatus(raw);
+  recordRenderEvent({
+    jobId,
+    eventType: "provider_error",
+    stageName: "veo",
+    errorCode: status != null ? `veo_http_${status}` : "veo_unknown",
+    providerError: raw,
+  });
   if (isQuotaOrLimitError(raw)) {
     throw new VeoQuotaOrLimitError(
       "We couldn’t create the talking-character video right now. The service may be busy or temporarily full. Please try again in a few minutes."
@@ -102,7 +112,7 @@ function veoConfigAspectRatio(user?: string): "16:9" | "9:16" {
 
 export async function generateTalkingVideoWithVeo(
   prompt: string,
-  _jobId: string,
+  jobId: string,
   outputPath: string,
   options?: GenerateTalkingVideoOptions
 ): Promise<void> {
@@ -121,11 +131,9 @@ export async function generateTalkingVideoWithVeo(
   const config: {
     aspectRatio?: string;
     durationSeconds?: number;
-    personGeneration?: PersonGeneration;
   } = {
     aspectRatio: veoConfigAspectRatio(options?.aspectRatio),
     durationSeconds: 8,
-    personGeneration: PersonGeneration.ALLOW_ADULT,
   };
 
   let operation: Awaited<ReturnType<typeof ai.models.generateVideos>>;
@@ -137,7 +145,7 @@ export async function generateTalkingVideoWithVeo(
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    throwFromVeoRaw(msg);
+    throwFromVeoRaw(msg, jobId);
   }
 
   const pollStartedAt = Date.now();
@@ -156,7 +164,7 @@ export async function generateTalkingVideoWithVeo(
       typeof operation.error === "object" && operation.error !== null && "message" in operation.error
         ? String((operation.error as { message?: unknown }).message)
         : String(operation.error);
-    throwFromVeoRaw(msg);
+    throwFromVeoRaw(msg, jobId);
   }
 
   const resp = operation.response;
@@ -168,7 +176,15 @@ export async function generateTalkingVideoWithVeo(
       style === "real"
         ? `That description wasn’t accepted for a real-person look (often for safety or policy reasons). Try “Cartoon” style or change what you asked for.`
         : `That description wasn’t accepted (often for safety or policy reasons). Try changing your topic or wording.`;
-    console.error("[veo] RAI/filtered response:", { raiMediaFilteredCount: raiCount, raiMediaFilteredReasons: raiReasons });
+    const raiDetail = { raiMediaFilteredCount: raiCount, raiMediaFilteredReasons: raiReasons };
+    console.error("[veo] RAI/filtered response:", raiDetail);
+    recordRenderEvent({
+      jobId,
+      eventType: "provider_error",
+      stageName: "veo",
+      errorCode: "veo_content_filtered",
+      providerError: JSON.stringify(raiDetail),
+    });
     throw new VeoContentFilteredError(userMessage);
   }
 
@@ -186,6 +202,13 @@ export async function generateTalkingVideoWithVeo(
       "[veo] No video in response. Diagnostic:",
       JSON.stringify(safeResp, null, 2)
     );
+    recordRenderEvent({
+      jobId,
+      eventType: "provider_error",
+      stageName: "veo",
+      errorCode: "veo_empty_response",
+      providerError: JSON.stringify(safeResp),
+    });
     throw new Error(
       "We couldn’t retrieve your talking-character video from the service. Please try again, or use slideshow mode."
     );

@@ -12,6 +12,7 @@ import {
   retry,
   withRetry,
   getRetryConfig,
+  isRetryableError,
   shouldRetryForLLM,
   shouldRetryForTTS,
   shouldRetryForImage,
@@ -136,6 +137,7 @@ function withStageTelemetry<T>(
         stageName,
         errorCode: mapFailedReasonToFailureCode(message),
         durationMs: Date.now() - startedAt,
+        providerError: message,
       });
       throw e;
     });
@@ -181,6 +183,12 @@ const VEO_CHUNK_SECONDS = 8;
 const VEO_CHUNK_VALIDATE_RETRIES = 2;
 const VEO_SAFETY_REWORDS = 2;
 const VEO_FILTER_REROLLS = 1;
+class ChunkValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChunkValidationError";
+  }
+}
 
 function maxVeoChunksForTargetDuration(targetSec: number): number {
   const L = VEO_CHUNK_SECONDS;
@@ -1381,7 +1389,7 @@ async function runPipelineOnce(
               await withRetry(
                 () => {
                   costTracker.recordVeoChunks(1);
-                  return generateTalkingVideoWithVeo(prompt, jobId + "-chunk-" + i, chunkPath, {
+                  return generateTalkingVideoWithVeo(prompt, jobId, chunkPath, {
                     talkingObjectStyle,
                     aspectRatio,
                   });
@@ -1390,7 +1398,7 @@ async function runPipelineOnce(
               );
               const validation = validateVideoChunk(chunkPath, VEO_CHUNK_SECONDS);
               if (!validation.valid) {
-                throw new Error(validation.reason ?? "Chunk validation failed");
+                throw new ChunkValidationError(validation.reason ?? "Chunk validation failed");
               }
               trimChunkSilence(chunkPath, {
                 trimLeading: i === 0,
@@ -1446,6 +1454,22 @@ async function runPipelineOnce(
                 }
                 await new Promise((r) => setTimeout(r, 2000));
                 continue;
+              }
+
+              if (
+                !(lastChunkError instanceof ChunkValidationError) &&
+                !isRetryableError(lastChunkError)
+              ) {
+                console.error(
+                  "[pipeline] jobId=" + jobId + " chunk " + (i + 1) + "/" + N +
+                  " rejected by the provider with a permanent error; not retrying: " +
+                  lastChunkError.message
+                );
+                throw new Error(
+                  `Chunk ${i + 1}/${N} was rejected by the video provider and will not be retried. ` +
+                  `The request is permanently invalid, not a transient failure. ` +
+                  `Provider error: ${lastChunkError.message}`
+                );
               }
 
               genAttempt++;
