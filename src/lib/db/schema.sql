@@ -145,8 +145,3 @@ ADD COLUMN IF NOT EXISTS topup_seconds INTEGER;
 CREATE INDEX IF NOT EXISTS idx_processed_webhook_events_ref ON processed_webhook_events (provider_ref);
 ALTER TABLE render_events
 ADD COLUMN IF NOT EXISTS provider_error TEXT;
-ALTER TABLE render_events
-ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMPTZ;
-UPDATE render_events SET occurred_at = created_at WHERE occurred_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_render_events_occurred_at ON render_events (occurred_at DESC);
-CREATE INDEX IF NOT EXISTS idx_render_events_job_occurred ON render_events (job_id, occurred_at);
