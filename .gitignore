@@ -30,6 +30,16 @@
 .DS_Store
 *.pem
 
+# throwaway vertex veo probe output (scripts/vertex-veo-probe.ts)
+/probe-out/
+
+# gcp service-account keys - never commit these
+*-service-account.json
+service-account*.json
+gcp-*.json
+*-key.json
+cutline-veo.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*

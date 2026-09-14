@@ -105,7 +105,7 @@ export default function FeaturesPage() {
                 <div className="rounded-xl border border-white/10 bg-white/2 p-6">
                   <h3 className="font-semibold text-white mb-2">Talking object</h3>
                   <p className="text-zinc-400 text-sm leading-relaxed">
-                    Instead of TTS + images + Remotion, the script is sent to Google Veo to generate a talking character that speaks your script. No image sourcing or slideshow; just AI-generated video of a character talking. Requires GEMINI_API_KEY. Veo produces clips of roughly 8 seconds; for longer videos the system splits the script into chunks, generates one clip per chunk, and concatenates them with ffmpeg. Best for character-driven explainers or talking-avatar style clips.
+                    Instead of TTS + images + Remotion, the script is sent to Google Veo to generate a talking character that speaks your script. No image sourcing or slideshow; just AI-generated video of a character talking. Runs on Google Vertex AI; requires GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION and Vertex credentials. Veo produces clips of roughly 8 seconds; for longer videos the system splits the script into chunks, generates one clip per chunk, and concatenates them with ffmpeg. Best for character-driven explainers or talking-avatar style clips.
                   </p>
                 </div>
               </div>

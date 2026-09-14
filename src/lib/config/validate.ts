@@ -5,6 +5,8 @@ export type ValidatedConfig = {
   elevenLabsApiKey: string;
   playhtApiKey?: string;
   playhtUserId?: string;
+  googleCloudProject: string;
+  googleCloudLocation: string;
   adminSecret?: string;
   rateLimitMax?: number;
   rateLimitWindowSeconds?: number;
@@ -70,6 +72,21 @@ export function validateConfig(): ValidatedConfig {
       ". See README for configuration."
     );
   }
+  const vertexMissing: string[] = [];
+  if (!getEnv("GOOGLE_CLOUD_PROJECT")) vertexMissing.push("GOOGLE_CLOUD_PROJECT");
+  if (!getEnv("GOOGLE_CLOUD_LOCATION")) vertexMissing.push("GOOGLE_CLOUD_LOCATION");
+  if (vertexMissing.length > 0) {
+    throw new Error(
+      "Missing required Vertex AI environment variables: " +
+      vertexMissing.join(", ") +
+      ". Veo (talking-character mode) runs on Vertex AI, which is addressed by GCP project and region. " +
+      "Set GOOGLE_CLOUD_PROJECT to the project id and GOOGLE_CLOUD_LOCATION to a region with Veo quota (e.g. us-central1). " +
+      "Credentials come from GOOGLE_SERVICE_ACCOUNT_JSON_B64, or ambient ADC for local dev. See docs/DEPLOY_WORKER.md."
+    );
+  }
+
+  const googleCloudProject = getEnv("GOOGLE_CLOUD_PROJECT")!;
+  const googleCloudLocation = getEnv("GOOGLE_CLOUD_LOCATION")!;
 
   const redisUrl = getEnv("REDIS_URL") ?? "redis://localhost:6379";
   const openRouterApiKey = getEnv("OPENROUTER_API_KEY")!;
@@ -124,6 +141,8 @@ export function validateConfig(): ValidatedConfig {
     openRouterApiKey,
     ttsProvider: ttsProvider === "playht" ? "playht" : "elevenlabs",
     elevenLabsApiKey,
+    googleCloudProject,
+    googleCloudLocation,
     ...(playhtApiKey ? { playhtApiKey } : {}),
     ...(playhtUserId ? { playhtUserId } : {}),
     ...(adminSecret ? { adminSecret } : {}),

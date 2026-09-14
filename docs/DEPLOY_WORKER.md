@@ -68,6 +68,8 @@ Same idea, Dockerfile-based:
 |---|---|
 | `REDIS_URL` | **Must match the Vercel app exactly.** |
 | `OPENROUTER_API_KEY` | LLM stages (intent, script, …). |
+| `GOOGLE_CLOUD_PROJECT` | GCP project for Vertex AI (Veo). Spend bills here. |
+| `GOOGLE_CLOUD_LOCATION` | Vertex region with Veo quota, e.g. `us-central1`. Unset falls back to `global`, which does not serve Veo. |
 | `ELEVENLABS_API_KEY` | Required when `TTS_PROVIDER=elevenlabs` (default). |
 | `PLAYHT_API_KEY`, `PLAYHT_USER_ID` | Required instead, if `TTS_PROVIDER=playht`. |
 
@@ -77,7 +79,7 @@ Same idea, Dockerfile-based:
 |---|---|
 | `DATABASE_URL` | Token deduction + usage/billing recorded on job completion. |
 | `BLOB_READ_WRITE_TOKEN` | Upload finished MP4s to Vercel Blob so the app can serve them. Same token as the Vercel app. See `docs/PRODUCTION_CHECKLIST.md`. |
-| `GEMINI_API_KEY` | VEO / talking-cartoon paths. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | Base64 of the Vertex service-account JSON key (`base64 -w0 key.json`). Decoded to a 0600 file under the temp dir at boot. Omit only if the host provides ambient ADC (e.g. Workload Identity); Railway does not. The service account needs `roles/aiplatform.user` and `aiplatform.googleapis.com` must be enabled on the project. |
 | `HEYGEN_API_KEY` | Talking-real (studio avatar) path. |
 | `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, `OPENAI_API_KEY` | Image sourcing chain. Without them, slideshows fall back to placeholder visuals. |
 

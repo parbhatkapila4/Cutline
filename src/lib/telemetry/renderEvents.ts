@@ -31,6 +31,7 @@ const TRUNCATION_MARKER = "\n…[truncated]…\n";
 const SECRET_ENV_KEYS = [
   "GEMINI_API_KEY",
   "GOOGLE_API_KEY",
+  "GOOGLE_SERVICE_ACCOUNT_JSON_B64",
   "ELEVENLABS_API_KEY",
   "HEYGEN_API_KEY",
   "OPENROUTER_API_KEY",
@@ -46,6 +47,8 @@ const SECRET_PATTERNS: [RegExp, string][] = [
   [/([?&](?:key|api_?key|access_token|token)=)[^&\s"']+/gi, "$1***REDACTED***"],
   [/(bearer\s+)[A-Za-z0-9._-]{16,}/gi, "$1***REDACTED***"],
   [/\/\/[^:/\s@]+:[^@/\s]+@/g, "//***REDACTED***@"],
+  [/\bya29\.[A-Za-z0-9._-]{10,}/g, "***REDACTED***"],
+  [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "***REDACTED***"],
 ];
 export function redactSecrets(raw: string): string {
   let out = String(raw);

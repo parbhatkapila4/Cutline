@@ -4,9 +4,11 @@ import path from "path";
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 import { validateConfig } from "@/lib/config/validate";
+import { ensureVertexCredentials } from "@/lib/veo/credentials";
 
 try {
   validateConfig();
+  ensureVertexCredentials();
 } catch (e) {
   const msg = e instanceof Error ? e.message : String(e);
   console.error("[config] Startup validation failed:", msg);

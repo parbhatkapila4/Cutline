@@ -6,8 +6,9 @@ import { getDuration } from "@/lib/pipeline/concatMp4";
 import { recordRenderEvent } from "@/lib/telemetry/renderEvents";
 import { parseHttpStatus } from "@/lib/utils/retry";
 import { isValidAspectRatio, type AspectRatio } from "@/lib/validation/aspectRatio";
+import { ensureVertexCredentials } from "@/lib/veo/credentials";
 
-const VEO_MODEL = process.env.VEO_MODEL || "veo-3.1-generate-preview";
+const VEO_MODEL = process.env.VEO_MODEL || "veo-3.1-fast-generate-001";
 const POLL_INTERVAL_MS = 10_000;
 const MAX_POLL_DURATION_MS = 600_000;
 
@@ -44,6 +45,63 @@ function isTransientInternalError(message: string): boolean {
   const lower = message.toLowerCase();
   return TRANSIENT_INTERNAL_PATTERNS.some((p) => lower.includes(p));
 }
+const VERTEX_CONFIG_PATTERNS = [
+  "permission_denied",
+  "permission denied",
+  "does not have permission",
+  "caller does not have permission",
+  "service_disabled",
+  "serviceusage",
+  "has not been used in project",
+  "api is not enabled",
+  "is disabled",
+  "billing",
+  "failed_precondition",
+  "consumer_invalid",
+  "unauthenticated",
+  "could not load the default credentials",
+  "could not refresh access token",
+  "unable to detect a project id",
+];
+
+function isVertexConfigError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return VERTEX_CONFIG_PATTERNS.some((p) => lower.includes(p));
+}
+
+const AI_STUDIO_CREDENTIAL_MARKERS = ["api key", "apikey", "express mode"];
+
+function isAiStudioFallback(message: string): boolean {
+  const lower = message.toLowerCase();
+  if (!lower.includes("gemini api")) return false;
+  return AI_STUDIO_CREDENTIAL_MARKERS.some((marker) => lower.includes(marker));
+}
+
+interface VertexErrorStatus {
+  code: number | null;
+  status: string | null;
+  message: string | null;
+  details: unknown;
+}
+
+function parseVertexErrorStatus(raw: string): VertexErrorStatus | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object" || !("error" in parsed)) return null;
+  const inner = (parsed as { error?: unknown }).error;
+  if (inner === null || typeof inner !== "object") return null;
+  const e = inner as Record<string, unknown>;
+  return {
+    code: typeof e.code === "number" ? e.code : null,
+    status: typeof e.status === "string" ? e.status : null,
+    message: typeof e.message === "string" ? e.message : null,
+    details: e.details ?? null,
+  };
+}
 
 export class VeoQuotaOrLimitError extends Error {
   constructor(message: string) {
@@ -66,30 +124,166 @@ export class VeoInternalServerError extends Error {
   }
 }
 
+export class VeoConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VeoConfigurationError";
+  }
+}
+
+export type VeoErrorKind =
+  | "ai_studio_fallback"
+  | "quota"
+  | "model_not_found"
+  | "configuration"
+  | "transient"
+  | "generic";
+
+export interface VeoErrorClassification {
+  kind: VeoErrorKind;
+  errorCode: string;
+  httpStatus: number | null;
+  rpcStatus: string | null;
+}
+
+export function classifyVeoError(raw: string): VeoErrorClassification {
+  const parsed = parseVertexErrorStatus(raw);
+  const httpStatus = parsed?.code ?? parseHttpStatus(raw);
+  const rpcStatus = parsed?.status ?? null;
+  const base = { httpStatus, rpcStatus };
+
+  if (isAiStudioFallback(raw)) {
+    return { ...base, kind: "ai_studio_fallback", errorCode: "veo_ai_studio_fallback" };
+  }
+
+  if (httpStatus === 429 || rpcStatus === "RESOURCE_EXHAUSTED") {
+    return {
+      ...base,
+      kind: "quota",
+      errorCode: httpStatus != null ? `veo_quota_${httpStatus}` : "veo_quota",
+    };
+  }
+  if (httpStatus === 404 || rpcStatus === "NOT_FOUND") {
+    return { ...base, kind: "model_not_found", errorCode: "veo_model_not_found" };
+  }
+
+  if (
+    rpcStatus === "PERMISSION_DENIED" ||
+    rpcStatus === "UNAUTHENTICATED" ||
+    rpcStatus === "FAILED_PRECONDITION" ||
+    isVertexConfigError(raw)
+  ) {
+    return {
+      ...base,
+      kind: "configuration",
+      errorCode: httpStatus != null ? `veo_config_${httpStatus}` : "veo_config_error",
+    };
+  }
+
+
+  if (isQuotaOrLimitError(raw)) {
+    return {
+      ...base,
+      kind: "quota",
+      errorCode: httpStatus != null ? `veo_quota_${httpStatus}` : "veo_quota",
+    };
+  }
+
+  if (isTransientInternalError(raw)) {
+    return {
+      ...base,
+      kind: "transient",
+      errorCode: httpStatus != null ? `veo_http_${httpStatus}` : "veo_transient",
+    };
+  }
+
+  return {
+    ...base,
+    kind: "generic",
+    errorCode: httpStatus != null ? `veo_http_${httpStatus}` : "veo_unknown",
+  };
+}
+
+const CONFIG_USER_MESSAGE =
+  "Talking-character video isn’t available on this setup right now (server configuration problem). Use slideshow mode instead.";
+
 function throwFromVeoRaw(raw: string, jobId: string): never {
-  const status = parseHttpStatus(raw);
+  const { kind, errorCode, httpStatus, rpcStatus } = classifyVeoError(raw);
+
   recordRenderEvent({
     jobId,
     eventType: "provider_error",
     stageName: "veo",
-    errorCode: status != null ? `veo_http_${status}` : "veo_unknown",
+    errorCode,
     providerError: raw,
   });
-  if (isQuotaOrLimitError(raw)) {
-    throw new VeoQuotaOrLimitError(
-      "We couldn’t create the talking-character video right now. The service may be busy or temporarily full. Please try again in a few minutes."
+
+  switch (kind) {
+    case "ai_studio_fallback":
+      console.error(
+        "[veo] MISCONFIGURATION: the client fell back to the AI Studio (Gemini) API instead of Vertex AI. " +
+        "Veo must run on Vertex so spend lands on the GCP project. Check that GOOGLE_CLOUD_PROJECT and " +
+        "GOOGLE_CLOUD_LOCATION are set and that no apiKey is being passed to GoogleGenAI. Raw: " + raw
+      );
+      throw new VeoConfigurationError(CONFIG_USER_MESSAGE);
+
+    case "quota":
+      console.error("[veo] quota/rate limit (raw):", raw);
+      throw new VeoQuotaOrLimitError(
+        "We couldn’t create the talking-character video right now. The service may be busy or temporarily full. Please try again in a few minutes."
+      );
+
+    case "model_not_found":
+      console.error(
+        "[veo] MISCONFIGURATION: Vertex AI has no such publisher model. The two things to check are the " +
+        `model id and the region: VEO_MODEL=${VEO_MODEL}, GOOGLE_CLOUD_LOCATION=${process.env.GOOGLE_CLOUD_LOCATION ?? "(unset)"}. ` +
+        "Either the model id is wrong or retired (preview ids get withdrawn), or it is not served in that region. Raw: " + raw
+      );
+      throw new VeoConfigurationError(CONFIG_USER_MESSAGE);
+
+    case "configuration":
+      console.error(
+        "[veo] MISCONFIGURATION: Vertex AI rejected the call for a deployment reason " +
+        `(status=${String(httpStatus)}, rpcStatus=${String(rpcStatus)}). ` +
+        "Check: aiplatform.googleapis.com enabled on the project, the service account has roles/aiplatform.user, " +
+        "billing is active, and GOOGLE_SERVICE_ACCOUNT_JSON_B64 / ADC resolve. Raw: " + raw
+      );
+      throw new VeoConfigurationError(CONFIG_USER_MESSAGE);
+
+    case "transient":
+      console.error("[veo] transient internal error (raw):", raw);
+      throw new VeoInternalServerError(
+        "The video service had a temporary internal error. Please try again in a few minutes."
+      );
+
+    case "generic":
+      console.error("[veo] generation error (raw):", raw);
+      throw new Error(
+        "We couldn’t create the talking-character video. Try a slightly different description, switch to cartoon style if you used a real person, or use slideshow mode instead."
+      );
+  }
+}
+
+function createVertexClient(): GoogleGenAI {
+  ensureVertexCredentials();
+
+  const project = process.env.GOOGLE_CLOUD_PROJECT?.trim();
+  const location = process.env.GOOGLE_CLOUD_LOCATION?.trim();
+
+  if (!project || !location) {
+    const missing = [
+      project ? null : "GOOGLE_CLOUD_PROJECT",
+      location ? null : "GOOGLE_CLOUD_LOCATION",
+    ].filter((v): v is string => v !== null);
+    console.error(
+      `[veo] Missing ${missing.join(" and ")}. Veo runs on Vertex AI and cannot start without them.`
+    );
+    throw new VeoConfigurationError(
+      "Talking-character video isn’t available on this setup right now (server configuration problem). Use slideshow mode instead."
     );
   }
-  if (isTransientInternalError(raw)) {
-    console.error("[veo] transient internal error (raw):", raw);
-    throw new VeoInternalServerError(
-      "The video service had a temporary internal error. Please try again in a few minutes."
-    );
-  }
-  console.error("[veo] generation error (raw):", raw);
-  throw new Error(
-    "We couldn’t create the talking-character video. Try a slightly different description, switch to cartoon style if you used a real person, or use slideshow mode instead."
-  );
+
+  return new GoogleGenAI({ vertexai: true, project, location });
 }
 
 const MIN_VIDEO_BYTES = 500_000;
@@ -116,17 +310,9 @@ export async function generateTalkingVideoWithVeo(
   outputPath: string,
   options?: GenerateTalkingVideoOptions
 ): Promise<void> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim() === "") {
-    console.error("[veo] Missing GEMINI_API_KEY. Talking-character video is disabled until it is configured.");
-    throw new Error(
-      "Talking-character video isn’t available on this setup right now. Use slideshow mode instead, or try again later."
-    );
-  }
-
   const style = options?.talkingObjectStyle ?? "cartoon";
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = createVertexClient();
 
   const config: {
     aspectRatio?: string;
@@ -156,7 +342,12 @@ export async function generateTalkingVideoWithVeo(
       );
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-    operation = await ai.operations.getVideosOperation({ operation });
+    try {
+      operation = await ai.operations.getVideosOperation({ operation });
+    } catch (pollErr) {
+      const msg = pollErr instanceof Error ? pollErr.message : String(pollErr);
+      throwFromVeoRaw(msg, jobId);
+    }
   }
 
   if (operation.error) {
@@ -216,20 +407,36 @@ export async function generateTalkingVideoWithVeo(
 
   const videoFile = generatedVideos[0].video;
   const destPath = path.resolve(outputPath);
+  const videoBytes = videoFile.videoBytes;
+  if (typeof videoBytes !== "string" || videoBytes.length === 0) {
+    const shape = {
+      videoKeys: Object.keys(videoFile),
+      generatedVideoKeys: Object.keys(generatedVideos[0]),
+      mimeType: videoFile.mimeType ?? null,
+      uri: videoFile.uri ?? null,
+      videoBytesType: typeof videoBytes,
+    };
+    console.error("[veo] no videoBytes on the returned video object. Shape:", JSON.stringify(shape));
+    recordRenderEvent({
+      jobId,
+      eventType: "provider_error",
+      stageName: "veo",
+      errorCode: "veo_no_video_bytes",
+      providerError: JSON.stringify(shape),
+    });
+    throw new Error(
+      "Vertex returned a video object with no inline bytes " +
+      `(video keys: [${shape.videoKeys.join(", ")}], generatedVideos[0] keys: [${shape.generatedVideoKeys.join(", ")}], ` +
+      `mimeType: ${String(shape.mimeType)}, uri: ${String(shape.uri)}). ` +
+      "If uri is a gs:// path then outputGcsUri was set somewhere and the bytes must be fetched from GCS instead."
+    );
+  }
 
   try {
-    await ai.files.download({
-      file: videoFile,
-      downloadPath: destPath,
-    });
-  } catch (downloadErr) {
-    const msg = downloadErr instanceof Error ? downloadErr.message : String(downloadErr);
-    console.error("[veo] download failed:", outputPath, msg);
-    if (isQuotaOrLimitError(msg)) {
-      throw new VeoQuotaOrLimitError(
-        "We couldn’t finish downloading your talking-character video. The service may be busy. Try again in a few minutes."
-      );
-    }
+    fs.writeFileSync(destPath, Buffer.from(videoBytes, "base64"));
+  } catch (writeErr) {
+    const msg = writeErr instanceof Error ? writeErr.message : String(writeErr);
+    console.error("[veo] failed writing video to disk:", outputPath, msg);
     throw new Error(
       "We couldn’t save your talking-character video after it was generated. Try again, or use slideshow mode."
     );

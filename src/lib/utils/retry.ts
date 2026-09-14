@@ -7,6 +7,7 @@ export function isRetryableError(err: unknown): boolean {
   if (name === "ConfigurationError") return false;
   if (name === "ImageFallbackFloorError") return false;
   if (name === "VeoContentFilteredError") return false;
+  if (name === "VeoConfigurationError") return false;
   if (name === "VeoInternalServerError") return true;
 
   const status = parseHttpStatus(err);

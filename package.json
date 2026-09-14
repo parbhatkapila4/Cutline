@@ -18,7 +18,9 @@
     "lint": "eslint",
     "remotion:studio": "remotion studio src/remotion/index.tsx",
     "remotion:render": "remotion render src/remotion/index.tsx CUTLINEComposition output/video.mp4",
-    "worker": "tsx src/worker.ts"
+    "worker": "tsx src/worker.ts",
+    "probe": "tsx scripts/vertex-veo-probe.ts",
+    "classify": "tsx scripts/classify-fixtures.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "1.5.5",
