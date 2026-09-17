@@ -13,6 +13,43 @@ import type { ImageSpec } from "@/lib/images/types";
 
 const REMOTION_ENTRY = "src/remotion/index.tsx";
 const COMPOSITION_ID = "CUTLINEComposition";
+const RENDER_TIMEOUT_MS = 600_000;
+const TIMEOUT_TOLERANCE_MS = 5_000;
+const OOM_SIGNATURE_RE = /\bSIGKILL\b|\bENOMEM\b|out of memory|cannot allocate memory/i;
+const MAX_RENDER_STDERR_CHARS = 2000;
+
+export class RenderTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RenderTimeoutError";
+  }
+}
+export class RenderOutOfMemoryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RenderOutOfMemoryError";
+  }
+}
+
+export class RenderKilledError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RenderKilledError";
+  }
+}
+
+function renderFailureDetail(result: {
+  stderr?: string | null;
+  stdout?: string | null;
+}): string {
+  const raw = (result.stderr || result.stdout || "").trim();
+  if (!raw) return "";
+  const body =
+    raw.length > MAX_RENDER_STDERR_CHARS
+      ? raw.slice(0, MAX_RENDER_STDERR_CHARS) + "…[truncated]"
+      : raw;
+  return "\n" + body;
+}
 
 export type RenderInput = {
   script: Script;
@@ -121,7 +158,7 @@ export function runRemotionRender(
     );
   }
 
-  const RENDER_TIMEOUT_MS = 600_000;
+  const startedAt = Date.now();
   const result = spawnSync(
     process.execPath,
     [
@@ -162,18 +199,41 @@ export function runRemotionRender(
   } catch {
   }
 
+  const elapsedMs = Date.now() - startedAt;
+  const elapsedSec = Math.round(elapsedMs / 1000);
+  const budgetSec = Math.round(RENDER_TIMEOUT_MS / 1000);
+  const detail = renderFailureDetail(result);
+
+  if (result.signal === "SIGKILL") {
+    throw new RenderOutOfMemoryError(
+      `Remotion render was killed by SIGKILL after ${elapsedSec}s of a ${budgetSec}s budget — the renderer ran out of memory. Try a shorter video, or give the worker more RAM.${detail}`
+    );
+  }
+
   if (result.signal === "SIGTERM") {
-    throw new Error(
-      `Remotion render timed out after ${RENDER_TIMEOUT_MS / 60_000} minutes. Try a shorter video or increase timeout.`
+    if (elapsedMs >= RENDER_TIMEOUT_MS - TIMEOUT_TOLERANCE_MS) {
+      throw new RenderTimeoutError(
+        `Remotion render timed out after ${elapsedSec}s (budget ${budgetSec}s). Try a shorter video or raise RENDER_TIMEOUT_MS.${detail}`
+      );
+    }
+    throw new RenderKilledError(
+      `Remotion render was terminated by SIGTERM after ${elapsedSec}s, far short of its ${budgetSec}s budget — an external signal stopped the process (container shutdown, redeploy, or eviction). The render itself was not slow.${detail}`
     );
   }
 
   if (result.error) {
-    throw new Error(`Render failed: ${result.error.message}`);
+    throw new Error(`Render failed after ${elapsedSec}s: ${result.error.message}`);
   }
 
   if (result.status !== 0) {
-    const msg = result.stderr || result.stdout || "";
-    throw new Error(`Remotion render failed (exit ${result.status}). ${msg}`);
+    const raw = (result.stderr || result.stdout || "").trim();
+    if (OOM_SIGNATURE_RE.test(raw)) {
+      throw new RenderOutOfMemoryError(
+        `Remotion render ran out of memory after ${elapsedSec}s (exit ${result.status}); a child process was killed by the OS.${detail}`
+      );
+    }
+    throw new Error(
+      `Remotion render failed (exit ${result.status}) after ${elapsedSec}s.${detail}`
+    );
   }
 }

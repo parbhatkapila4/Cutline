@@ -6,6 +6,11 @@ import {
   shouldRetryForImage,
   shouldRetryForRender,
 } from "./retry";
+import {
+  RenderKilledError,
+  RenderOutOfMemoryError,
+  RenderTimeoutError,
+} from "@/lib/pipeline/renderVideo";
 
 describe("parseHttpStatus", () => {
   it("returns 429 for message 'API returned 429'", () => {
@@ -97,5 +102,42 @@ describe("shouldRetryForRender", () => {
 
   it("returns false for 'invalid composition'", () => {
     expect(shouldRetryForRender(new Error("invalid composition"))).toBe(false);
+  });
+});
+
+describe("shouldRetryForRender: budget failures are not retried", () => {
+  it("does not retry our own render timeout", () => {
+    expect(
+      shouldRetryForRender(
+        new RenderTimeoutError("Remotion render timed out after 601s (budget 600s).")
+      )
+    ).toBe(false);
+  });
+
+  it("does not retry an out-of-memory kill, typed or bare", () => {
+    expect(
+      shouldRetryForRender(
+        new RenderOutOfMemoryError("Remotion render ran out of memory after 143s (exit 1).")
+      )
+    ).toBe(false);
+    expect(
+      shouldRetryForRender(
+        new Error("Remotion render failed (exit null).\nFFmpeg quit with code null (SIGKILL)")
+      )
+    ).toBe(false);
+  });
+
+  it("still retries an external kill, which is not caused by the inputs", () => {
+    expect(
+      shouldRetryForRender(
+        new RenderKilledError(
+          "Remotion render was terminated by SIGTERM after 118s, far short of its 600s budget."
+        )
+      )
+    ).toBe(true);
+  });
+
+  it("still retries a timeout raised by anything other than our render budget", () => {
+    expect(shouldRetryForRender(new Error("delayRender() timed out after 30000ms"))).toBe(true);
   });
 });

@@ -98,8 +98,14 @@ export function shouldRetryForImage(err: unknown): boolean {
 }
 
 export function shouldRetryForRender(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : "";
+
+  if (name === "RenderTimeoutError" || name === "RenderOutOfMemoryError") return false;
+
   const msg = err instanceof Error ? err.message : String(err);
   const lower = msg.toLowerCase();
+
+  if (lower.includes("sigkill") || lower.includes("out of memory")) return false;
   if (lower.includes("timed out") || lower.includes("sigterm") || lower.includes("timeout")) return true;
   if (lower.includes("render failed") || lower.includes("exit")) return true;
   if (lower.includes("invalid") || lower.includes("missing props") || lower.includes("not found")) return false;

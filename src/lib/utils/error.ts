@@ -9,6 +9,8 @@ export class ConfigurationError extends Error {
 export type JobFailureCode =
   | "QUOTA"
   | "TIMEOUT"
+  | "MEMORY"
+  | "EXTERNAL_KILL"
   | "AUTH"
   | "CANCELLED"
   | "QUALITY_GATE"
@@ -27,6 +29,8 @@ export function mapFailedReasonToFailureCode(raw: string | null | undefined): Jo
   if (!raw || typeof raw !== "string") return "UNKNOWN";
   const s = classifierInput(raw);
   if (s.includes("cancelled")) return "CANCELLED";
+  if (s.includes("sigkill") || s.includes("out of memory")) return "MEMORY";
+  if (s.includes("sigterm")) return "EXTERNAL_KILL";
   if (s.includes("quality") && (s.includes("gate") || s.includes("failed"))) return "QUALITY_GATE";
   if (s.includes("timeout") || s.includes("timed out") || s.includes("etimedout")) return "TIMEOUT";
   if (s.includes("401") || s.includes("403") || s.includes("api key") || s.includes("unauthorized")) {
