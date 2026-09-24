@@ -158,6 +158,10 @@ export async function POST(
       ...(data?.brandColors ? { brandColors: data.brandColors } : {}),
       ...(typeof data?.textModel === "string" && data.textModel.trim() !== "" ? { textModel: data.textModel.trim() } : {}),
       ...(data?.captions === "on" || data?.captions === "off" ? { captions: data.captions } : {}),
+      ...(typeof data?.aspectRatio === "string" && data.aspectRatio.trim() !== ""
+        ? { aspectRatio: data.aspectRatio }
+        : {}),
+      ...(data?.platform ? { platform: data.platform } : {}),
     };
 
     const newJob = await queue.add("video", jobData);

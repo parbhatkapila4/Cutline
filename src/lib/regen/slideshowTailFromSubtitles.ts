@@ -266,7 +266,7 @@ export async function runSlideshowTailFromSubtitles(
       () =>
         new Promise<void>((resolve, reject) => {
           try {
-            runRemotionRender(renderInput, outputPath);
+            runRemotionRender(renderInput, outputPath, jobId);
             resolve();
           } catch (e) {
             reject(e);

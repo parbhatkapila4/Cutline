@@ -1825,7 +1825,7 @@ async function runPipelineOnce(
     () =>
       new Promise<void>((resolve, reject) => {
         try {
-          runRemotionRender(renderInput, effectiveOutputPath);
+          runRemotionRender(renderInput, effectiveOutputPath, jobId);
           resolve();
         } catch (e) {
           reject(e);
@@ -1870,9 +1870,9 @@ async function runPipelineOnce(
     sourceJobId: jobId,
     intent,
     narrative: plan,
-    shotList,
+    shotList: finalShotList,
     script,
-    motionSpec,
+    motionSpec: finalMotionSpec,
     visualSpec,
     imageSpec: normalizedImageSpec,
     captions: captions ?? "on",

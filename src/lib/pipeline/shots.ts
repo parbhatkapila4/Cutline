@@ -15,6 +15,13 @@ import type {
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
+const SHOTS_PER_BEAT_MIN = 1;
+const SHOTS_PER_BEAT_MAX = 3;
+
+export function getShotCountRange(beatCount: number): { min: number; max: number } {
+  const beats = Math.max(1, Math.floor(beatCount));
+  return { min: beats * SHOTS_PER_BEAT_MIN, max: beats * SHOTS_PER_BEAT_MAX };
+}
 
 const SHOT_PURPOSES: ShotPurpose[] = [
   "establish",
@@ -42,9 +49,12 @@ const EMOTIONAL_INTENTS: EmotionalIntent[] = [
   "neutral",
 ];
 
-const SYSTEM_PROMPT = `You are a shot-level reasoner for a short video. Given an Intent and a NarrativePlan (with beats), output a single JSON object with exactly these keys (no other keys, no markdown, no explanation):
+export function buildSystemPrompt(beatCount: number): string {
+  const beats = Math.max(1, Math.floor(beatCount));
+  const { min, max } = getShotCountRange(beats);
+  return `You are a shot-level reasoner for a short video. Given an Intent and a NarrativePlan (with beats), output a single JSON object with exactly these keys (no other keys, no markdown, no explanation):
 
-- shots: array of 4-12 shot objects. Map 1-3 shots per narrative beat (use fewer for short videos). Each shot has:
+- shots: array of ${min}-${max} shot objects. This NarrativePlan has ${beats} beats. Give EVERY beat at least ${SHOTS_PER_BEAT_MIN} shot and at most ${SHOTS_PER_BEAT_MAX}; leave no beat without a shot. That is where the ${min}-${max} range comes from, so staying inside the per-beat rule keeps you inside the range. Each shot has:
   - id: string (e.g. "shot-1", "shot-2")
   - beatId: string (must be one of the beat ids from the NarrativePlan)
   - durationSeconds: number (positive integer)
@@ -57,6 +67,47 @@ const SYSTEM_PROMPT = `You are a shot-level reasoner for a short video. Given an
 - totalDurationSeconds: number, must equal NarrativePlan.totalDurationSeconds
 
 Output only valid JSON.`;
+}
+
+function trimShotsToMax(shots: Shot[], max: number): Shot[] {
+  const out = [...shots];
+  while (out.length > max) {
+    const counts = new Map<string, number>();
+    for (const s of out) counts.set(s.beatId, (counts.get(s.beatId) ?? 0) + 1);
+
+    let victimIndex = -1;
+    let victimDuration = Infinity;
+    for (let i = 0; i < out.length; i++) {
+      const shot = out[i]!;
+      if ((counts.get(shot.beatId) ?? 0) > 1 && shot.durationSeconds < victimDuration) {
+        victimDuration = shot.durationSeconds;
+        victimIndex = i;
+      }
+    }
+
+    if (victimIndex === -1) break;
+
+    const victim = out[victimIndex]!;
+    let siblingIndex = -1;
+    for (let j = victimIndex + 1; j < out.length; j++) {
+      if (out[j]!.beatId === victim.beatId) { siblingIndex = j; break; }
+    }
+    if (siblingIndex === -1) {
+      for (let j = victimIndex - 1; j >= 0; j--) {
+        if (out[j]!.beatId === victim.beatId) { siblingIndex = j; break; }
+      }
+    }
+    if (siblingIndex === -1) break;
+
+    const sibling = out[siblingIndex]!;
+    out[siblingIndex] = {
+      ...sibling,
+      durationSeconds: sibling.durationSeconds + victim.durationSeconds,
+    };
+    out.splice(victimIndex, 1);
+  }
+  return out;
+}
 
 function isShotPurpose(s: string): s is ShotPurpose {
   return (SHOT_PURPOSES as readonly string[]).includes(s);
@@ -88,10 +139,10 @@ function parseAndValidateShotList(
   const obj = parsed as Record<string, unknown>;
 
   const shotsRaw = obj.shots;
-  const minShots = 4;
-  const maxShots = 12;
-  if (!Array.isArray(shotsRaw) || shotsRaw.length < minShots || shotsRaw.length > maxShots) {
-    throw new Error(`Shot reasoning failed: shots must be an array of ${minShots}-${maxShots} items (got ${Array.isArray(shotsRaw) ? shotsRaw.length : "non-array"})`);
+  const beatCount = plan.beats.length;
+  const { min: minShots, max: maxShots } = getShotCountRange(beatCount);
+  if (!Array.isArray(shotsRaw) || shotsRaw.length < minShots) {
+    throw new Error(`Shot reasoning failed: shots must be an array of ${minShots}-${maxShots} items for a ${beatCount}-beat plan (got ${Array.isArray(shotsRaw) ? shotsRaw.length : "non-array"})`);
   }
 
   const beatIds = new Set(plan.beats.map((b) => b.id));
@@ -108,7 +159,7 @@ function parseAndValidateShotList(
     const order = s.order;
 
     if (typeof id !== "string" || id.trim() === "") {
-      throw new Error(`Shot reasoning failed: shot ${i} missing or invalid id`);
+      throw new Error(`Shot reasoning failed: shot ${i} of ${shotsRaw.length} missing or invalid id`);
     }
     if (typeof beatId !== "string" || !beatIds.has(beatId)) {
       throw new Error(
@@ -163,13 +214,23 @@ function parseAndValidateShotList(
     };
   });
 
-  const sum = shots.reduce((s, sh) => s + sh.durationSeconds, 0);
+  let repaired = shots;
+  if (shots.length > maxShots) {
+    repaired = trimShotsToMax(shots, maxShots);
+    const beatsBefore = new Set(shots.map((sh) => sh.beatId)).size;
+    const beatsAfter = new Set(repaired.map((sh) => sh.beatId)).size;
+    console.warn(
+      `[shots] model returned ${shots.length} shots for a ${beatCount}-beat plan (allowed ${minShots}-${maxShots}); merged surplus shots down to ${repaired.length}, beats covered ${beatsBefore} -> ${beatsAfter}.`
+    );
+  }
+
+  const sum = repaired.reduce((s, sh) => s + sh.durationSeconds, 0);
   if (sum <= 0) {
     throw new Error("Shot reasoning failed: shot durations must sum to a positive number");
   }
 
   const scale = targetDuration / sum;
-  const normalized = shots.map((sh) => ({
+  const normalized = repaired.map((sh) => ({
     ...sh,
     durationSeconds: Math.max(1, Math.round(sh.durationSeconds * scale)),
   }));
@@ -277,7 +338,7 @@ export async function planShots(
     options?.platform && options.platform !== "general"
       ? getPlatformPromptSnippet(options.platform, "shots")
       : "";
-  const systemContent = SYSTEM_PROMPT + platformSnippet;
+  const systemContent = buildSystemPrompt(plan.beats.length) + platformSnippet;
   const modelCandidates = getModelCandidates(primaryModel);
 
   let lastError: unknown;

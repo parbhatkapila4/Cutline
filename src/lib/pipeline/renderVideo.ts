@@ -17,6 +17,12 @@ const RENDER_TIMEOUT_MS = 600_000;
 const TIMEOUT_TOLERANCE_MS = 5_000;
 const OOM_SIGNATURE_RE = /\bSIGKILL\b|\bENOMEM\b|out of memory|cannot allocate memory/i;
 const MAX_RENDER_STDERR_CHARS = 2000;
+const PROPS_RETENTION_MS = 24 * 60 * 60 * 1000;
+const MAX_KEPT_PROPS_FILES = 20;
+const RENDER_FPS = 30;
+const DEFAULT_WIDTH = 1920;
+const DEFAULT_HEIGHT = 1080;
+const DEFAULT_DURATION_SECONDS = 30;
 
 export class RenderTimeoutError extends Error {
   constructor(message: string) {
@@ -120,9 +126,43 @@ export function buildRemotionProps(input: RenderInput): Record<string, unknown> 
   return base;
 }
 
+function sanitizeForFilename(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 64);
+}
+
+function prunePropsFiles(tempDir: string, now: number): void {
+  try {
+    const entries = fs
+      .readdirSync(tempDir)
+      .filter((name) => name.startsWith("props-") && name.endsWith(".json"))
+      .map((name) => {
+        const full = path.join(tempDir, name);
+        try {
+          return { full, mtimeMs: fs.statSync(full).mtimeMs };
+        } catch {
+          return null;
+        }
+      })
+      .filter((e): e is { full: string; mtimeMs: number } => e !== null)
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+    entries.forEach((entry, index) => {
+      if (index < MAX_KEPT_PROPS_FILES && now - entry.mtimeMs <= PROPS_RETENTION_MS) {
+        return;
+      }
+      try {
+        fs.unlinkSync(entry.full);
+      } catch {
+      }
+    });
+  } catch {
+  }
+}
+
 export function runRemotionRender(
   input: RenderInput,
-  outputPath: string
+  outputPath: string,
+  jobId?: string
 ): void {
   const cwd = process.cwd();
   const tempDir = path.join(cwd, ".remotion-temp");
@@ -134,8 +174,12 @@ export function runRemotionRender(
     throw new Error("Failed to create temp or output directory.");
   }
 
+  prunePropsFiles(tempDir, Date.now());
+
+  const traceId =
+    sanitizeForFilename(jobId ?? path.basename(outputPath, ".mp4")) || "unknown";
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  const propsPath = path.join(tempDir, `props-${id}.json`);
+  const propsPath = path.join(tempDir, `props-${traceId}-${id}.json`);
   const props = buildRemotionProps(input);
 
   try {
@@ -143,6 +187,27 @@ export function runRemotionRender(
   } catch (e) {
     throw new Error("Failed to write props file.");
   }
+
+  const rawWidth = props.width;
+  const rawHeight = props.height;
+  const rawDuration = props.durationSeconds;
+  const hasDimensions = typeof rawWidth === "number" && typeof rawHeight === "number";
+  const width = typeof rawWidth === "number" ? rawWidth : DEFAULT_WIDTH;
+  const height = typeof rawHeight === "number" ? rawHeight : DEFAULT_HEIGHT;
+  const durationSeconds =
+    typeof rawDuration === "number" && rawDuration > 0
+      ? rawDuration
+      : input.shotList?.totalDurationSeconds ?? DEFAULT_DURATION_SECONDS;
+  const frames = Math.ceil(durationSeconds * RENDER_FPS);
+  const dimensionSource = hasDimensions
+    ? "from props"
+    : "Root.tsx default - no width/height in props";
+
+  console.log(
+    `[render] jobId=${traceId} ${width}x${height} (${dimensionSource}) ` +
+    `${frames} frames @ ${RENDER_FPS}fps (${durationSeconds.toFixed(1)}s) ` +
+    `props=${propsPath}`
+  );
 
   const remotionCli = path.join(
     cwd,
@@ -194,46 +259,48 @@ export function runRemotionRender(
     }
   );
 
-  try {
-    fs.unlinkSync(propsPath);
-  } catch {
-  }
-
   const elapsedMs = Date.now() - startedAt;
   const elapsedSec = Math.round(elapsedMs / 1000);
   const budgetSec = Math.round(RENDER_TIMEOUT_MS / 1000);
   const detail = renderFailureDetail(result);
+  const kept = `\nRemotion props kept for reproduction: ${propsPath}`;
 
   if (result.signal === "SIGKILL") {
     throw new RenderOutOfMemoryError(
-      `Remotion render was killed by SIGKILL after ${elapsedSec}s of a ${budgetSec}s budget — the renderer ran out of memory. Try a shorter video, or give the worker more RAM.${detail}`
+      `Remotion render was killed by SIGKILL after ${elapsedSec}s of a ${budgetSec}s budget — the renderer ran out of memory. Try a shorter video, or give the worker more RAM.${kept}${detail}`
     );
   }
 
   if (result.signal === "SIGTERM") {
     if (elapsedMs >= RENDER_TIMEOUT_MS - TIMEOUT_TOLERANCE_MS) {
       throw new RenderTimeoutError(
-        `Remotion render timed out after ${elapsedSec}s (budget ${budgetSec}s). Try a shorter video or raise RENDER_TIMEOUT_MS.${detail}`
+        `Remotion render timed out after ${elapsedSec}s (budget ${budgetSec}s). Try a shorter video or raise RENDER_TIMEOUT_MS.${kept}${detail}`
       );
     }
     throw new RenderKilledError(
-      `Remotion render was terminated by SIGTERM after ${elapsedSec}s, far short of its ${budgetSec}s budget — an external signal stopped the process (container shutdown, redeploy, or eviction). The render itself was not slow.${detail}`
+      `Remotion render was terminated by SIGTERM after ${elapsedSec}s, far short of its ${budgetSec}s budget — an external signal stopped the process (container shutdown, redeploy, or eviction). The render itself was not slow.${kept}${detail}`
     );
   }
 
   if (result.error) {
-    throw new Error(`Render failed after ${elapsedSec}s: ${result.error.message}`);
+    throw new Error(
+      `Render failed after ${elapsedSec}s: ${result.error.message}${kept}`
+    );
   }
 
   if (result.status !== 0) {
     const raw = (result.stderr || result.stdout || "").trim();
     if (OOM_SIGNATURE_RE.test(raw)) {
       throw new RenderOutOfMemoryError(
-        `Remotion render ran out of memory after ${elapsedSec}s (exit ${result.status}); a child process was killed by the OS.${detail}`
+        `Remotion render ran out of memory after ${elapsedSec}s (exit ${result.status}); a child process was killed by the OS.${kept}${detail}`
       );
     }
     throw new Error(
-      `Remotion render failed (exit ${result.status}) after ${elapsedSec}s.${detail}`
+      `Remotion render failed (exit ${result.status}) after ${elapsedSec}s.${kept}${detail}`
     );
+  }
+  try {
+    fs.unlinkSync(propsPath);
+  } catch {
   }
 }
