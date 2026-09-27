@@ -88,6 +88,10 @@ Same idea, Dockerfile-based:
 `UPLOAD_RETENTION_HOURS`, `CLEANUP_INTERVAL_HOURS`, `JOB_RETENTION_DAYS`,
 `CLEANUP_EXPIRED_HOURS`, `RETRY_*`, `FFMPEG_PATH` (unset = use the image's ffmpeg).
 
+Leave `VIDEO_RETENTION_HOURS` unset in production. Rendered-video retention is
+per plan by default (24h Free, 90 days paid); setting the variable replaces both
+with one flat window for every tier. `0` disables rendered-video cleanup.
+
 ## Important: pair this with Blob storage
 
 Deploying the worker fixes **generation**. For finished videos to actually be

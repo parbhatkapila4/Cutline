@@ -152,7 +152,7 @@ export const FEATURES = [
   },
   {
     icon: null,
-    title: "4K UHD Export",
+    title: "1080p Export",
     desc: "Download your finished video in full HD quality, ready for any platform.",
   },
   {
@@ -192,13 +192,13 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Mountain Scene",
         detail: "Matched to your narrative, sourced in HD quality.",
-        badge: "4K UHD",
+        badge: "1080p",
       },
     },
     card3: {
       title: "Video Studio",
       desc: "Full control from resolution to captions - preview, export, and download your HD video instantly.",
-      dd1: "4K Resolution",
+      dd1: "1080p Resolution",
       dd2: "MP4 Format",
       infoTitle: "Render Time",
       infoDesc:
@@ -227,13 +227,13 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Product Shot",
         detail: "On-brand hero image, color-matched to your palette.",
-        badge: "4K Ready",
+        badge: "1080p Ready",
       },
     },
     card3: {
       title: "Multi-Format",
       desc: "Export for every channel - Instagram, YouTube, LinkedIn, TikTok - in one click.",
-      dd1: "4K Resolution",
+      dd1: "1080p Resolution",
       dd2: "All Platforms",
       infoTitle: "Campaign ROI",
       infoDesc:
@@ -262,7 +262,7 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Concept Map",
         detail: "Visual breakdown of complex topics for better retention.",
-        badge: "4K UHD",
+        badge: "1080p",
       },
     },
     card3: {
@@ -297,7 +297,7 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Hero Banner",
         detail: "High-converting product imagery for storefronts and ads.",
-        badge: "4K Ready",
+        badge: "1080p Ready",
       },
     },
     card3: {
@@ -332,7 +332,7 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Reel Cover",
         detail: "Thumb-stopping cover frames optimized for the feed.",
-        badge: "4K UHD",
+        badge: "1080p",
       },
     },
     card3: {
@@ -367,13 +367,13 @@ export const FEATURE_TAB_DATA = [
       product: {
         name: "Brand Intro",
         detail: "White-label intro sequences ready for any client.",
-        badge: "4K Master",
+        badge: "1080p Master",
       },
     },
     card3: {
       title: "Batch Export",
       desc: "Deliver multiple formats and resolutions in a single run - built for agency-scale output.",
-      dd1: "4K Master",
+      dd1: "1080p Master",
       dd2: "Multi-Format",
       infoTitle: "Delivery Time",
       infoDesc: "Cut average project delivery from 5 days to under 2 hours.",
@@ -450,17 +450,17 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       ],
       sourceTag: "primary",
       scene: {
-        name: "Sunset Skyline · 4K",
+        name: "Sunset Skyline · 1080p",
         detail: "Sourced from your reference deck.",
-        badge: "4K UHD",
+        badge: "1080p",
       },
       summary: { label: "Style match", value: "94%" },
     },
     card3: {
       status: { label: "rendering", tone: "rose" },
       presets: [
-        { label: "4K", active: true },
-        { label: "4K" },
+        { label: "1080p", active: true },
+        { label: "1080p" },
         { label: "Square" },
         { label: "9:16" },
       ],
@@ -515,7 +515,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       scene: {
         name: "Hero · Product Reveal",
         detail: "Color-matched to brand palette #4F46E5.",
-        badge: "4K Ready",
+        badge: "1080p Ready",
       },
       summary: { label: "Brand palette", value: "4 colors locked" },
       palette: ["#4F46E5", "#0F172A", "#F97316", "#F1F5F9"],
@@ -587,7 +587,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       status: { label: "captioning", tone: "rose" },
       presets: [
         { label: "720p", active: true },
-        { label: "4K" },
+        { label: "1080p" },
         { label: "LMS" },
         { label: "16:9" },
       ],
@@ -642,7 +642,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       scene: {
         name: "Lifestyle · Hero #04",
         detail: "Sized for Shopify hero banners.",
-        badge: "4K Ready",
+        badge: "1080p Ready",
       },
       summary: { label: "Catalog", value: "84 SKUs · $24 - $280" },
     },
@@ -766,9 +766,9 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
       ],
       sourceTag: "client",
       scene: {
-        name: "Acme · Brand Intro 4K",
+        name: "Acme · Brand Intro 1080p",
         detail: "White-label master ready for any client.",
-        badge: "4K Master",
+        badge: "1080p Master",
       },
       summary: { label: "Acme · client locker", value: "24 assets · 6 variants" },
     },
@@ -781,7 +781,7 @@ export const FEATURE_TAB_PREVIEWS: FeatureTabPreview[] = [
         { label: "Broadcast" },
       ],
       settings: [
-        { icon: "resolution", label: "Resolution", value: "3840 × 2160" },
+        { icon: "resolution", label: "Resolution", value: "1920 × 1080" },
         { icon: "format", label: "Format", value: "ProRes 422" },
         { icon: "captions", label: "Captions", value: "Multi-language" },
         { icon: "fps", label: "Frame rate", value: "24 fps" },
@@ -814,7 +814,7 @@ export const PRICING = [
       "3 videos per month",
       "Up to 20 seconds",
       "Stock-image slideshows only",
-      "4K MP4 export, no watermark",
+      "1080p MP4 export, no watermark",
       "Community support",
       "AI-generated imagery not included",
       "Talking-character videos not included",

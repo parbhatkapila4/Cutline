@@ -165,7 +165,7 @@ export default function FeaturesPage() {
                 Video generation can take a minute or more, so it runs in the background. When you submit, the API adds a job to a BullMQ queue (Redis) and returns a jobId immediately. A separate worker process (npm run worker) picks up jobs and runs the full pipeline. The UI polls GET /api/generate/[jobId] every few seconds until the status is completed or failed, then shows the video or the error. You never wait on the server for the full render: submit, get an ID, poll until done.
               </p>
               <p className="text-zinc-400 leading-relaxed">
-                Rendered videos and temp assets are cleaned up automatically based on VIDEO_RETENTION_HOURS and related settings, so you don’t have to manually delete old files.
+                Rendered videos are kept for 24 hours on the Free plan and 90 days on paid plans, then deleted automatically. Uploads and per-job temp assets are cleaned up on their own shorter schedules, so you don’t have to manually delete old files.
               </p>
             </section>
 

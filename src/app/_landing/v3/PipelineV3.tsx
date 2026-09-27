@@ -39,7 +39,7 @@ const STAGES: NumberedItem[] = [
   {
     id: "render",
     title: "Render + export",
-    body: "Composited and encoded in a single pass. 4K MP4, no watermark, sized for Reels, Shorts, LinkedIn or YouTube.",
+    body: "Composited and encoded in a single pass. 1080p MP4, no watermark, sized for Reels, Shorts, LinkedIn or YouTube.",
     href: "/features",
     linkLabel: "Learn more",
   },
@@ -109,7 +109,7 @@ export function PipelineV3() {
             <div className="absolute bottom-[6%] right-[5%] z-10">
               <LeaderLabel
                 label="Output"
-                caption="4K H.264 MP4, burned captions, no watermark"
+                caption="1080p H.264 MP4, burned captions, no watermark"
                 stem="up"
                 stemLength="h-10 sm:h-[64px]"
                 captionClassName="hidden sm:block"

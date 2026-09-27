@@ -68,7 +68,7 @@ export default function PrivacyPage() {
               <ul className="space-y-2 text-zinc-400 text-sm leading-relaxed list-disc pl-5">
                 <li>We collect the minimum needed to run the service: account info, the prompts and assets you submit, the videos we generate for you, and basic technical/operational logs.</li>
                 <li>We send your prompts and scripts to third-party AI providers (OpenRouter, ElevenLabs or PlayHT, OpenAI, optionally Google Veo) so they can run the pipeline. Your prompts leave our servers when this happens.</li>
-                <li>Generated videos and uploaded assets are deleted automatically after roughly 24 hours.</li>
+                <li>Free renders are deleted after roughly 24 hours. Paid renders are kept for 90 days, then deleted. Uploaded assets are deleted after roughly 24 hours on every plan.</li>
                 <li>We do not run third-party analytics, ad-tracking, or behavioural profiling on this site.</li>
                 <li>Payments are processed by Dodo Payments. We never see or store your card number.</li>
                 <li>You can request access, export, or deletion of your data at any time by writing to {CONTACT_EMAIL}.</li>
@@ -158,7 +158,7 @@ export default function PrivacyPage() {
             <section id="retention" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Data retention</h2>
               <ul className="space-y-2 text-zinc-400 text-sm leading-relaxed list-disc pl-5">
-                <li><span className="text-zinc-300 font-medium">Generated MP4 videos:</span> deleted automatically approximately 24 hours after they are produced. Download yours within the window.</li>
+                <li><span className="text-zinc-300 font-medium">Generated MP4 videos:</span> on the Free plan, deleted approximately 24 hours after they are produced. On paid plans, kept for 90 days, then deleted. Download yours within the window.</li>
                 <li><span className="text-zinc-300 font-medium">Uploaded assets (logos, product photos):</span> deleted approximately 24 hours after upload.</li>
                 <li><span className="text-zinc-300 font-medium">Per-job temp files:</span> deleted as soon as the job finishes, regardless of success or failure.</li>
                 <li><span className="text-zinc-300 font-medium">Job records (status, timing, error metadata):</span> kept while your account is active so you can see history; deleted with your account.</li>

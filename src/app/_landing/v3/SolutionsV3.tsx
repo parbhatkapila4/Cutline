@@ -366,7 +366,7 @@ function AppPanel({ item }: { item: Solution }) {
             {item.status}
           </span>
           <span className="truncate font-plex text-[10px] text-[#f4f3f3]/45">
-            4K · MP4 · no watermark
+            1080p · MP4 · no watermark
           </span>
         </div>
 

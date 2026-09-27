@@ -131,7 +131,7 @@ export default function BenefitsPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white mb-3">Your video, no lock-in</h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">Output is a standard MP4. No watermarks, no “export with branding.” You own the file. Cleanup can delete old temp files after a retention window; until then, you can download and keep what you need.</p>
+                <p className="text-sm text-zinc-400 leading-relaxed">Output is a standard MP4. No watermarks, no “export with branding.” You own the file. Renders stay downloadable for 24 hours on the Free plan and 90 days on paid plans, then they are deleted - once you download it, the file is yours to keep.</p>
               </div>
             </div>
           </div>

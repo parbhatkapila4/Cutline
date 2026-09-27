@@ -50,6 +50,7 @@ No fixes were required for wiring; tests were added to lock behavior.
 
 - [ ] **Rate limiting** enabled (`RATE_LIMIT_ENABLED=true`). Tune `RATE_LIMIT_GENERATE`, `RATE_LIMIT_UPLOAD`, `RATE_LIMIT_STATUS` as needed.
 - [ ] **Cleanup** enabled (`CLEANUP_ENABLED=true`) so temp videos and uploads are deleted after retention. Or external cron calling `POST /api/cleanup` with `X-Cleanup-Secret` if using `CLEANUP_SECRET`.
+- [ ] **`VIDEO_RETENTION_HOURS` left unset** so per-plan retention applies (24h Free, 90 days paid). Setting it forces one flat window on every tier. The 90-day window also requires Blob storage to be configured; without it renders live on the worker's local disk under the 24h window.
 - [ ] **CLEANUP_SECRET** set in production if you want to restrict manual cleanup to authorized callers.
 - [ ] **Retry** config acceptable (`RETRY_ENABLED=true`, max retries for LLM/TTS/image/render as in `.env.example`).
 

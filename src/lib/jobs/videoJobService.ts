@@ -127,6 +127,27 @@ export async function deleteVideoJobRelatedDbRows(
   }
 }
 
+export async function getPlanIdsByFinalUrl(
+  urls: string[]
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!isDatabaseConfigured() || urls.length === 0) return out;
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT vj.final_url AS final_url, upo.plan AS plan
+    FROM video_jobs vj
+    LEFT JOIN user_plan_overrides upo ON upo.user_id = vj.owner_id
+    WHERE vj.final_url = ANY(${urls})
+      AND vj.owner_type = 'user'::video_job_owner_type
+  `) as Array<{ final_url: string | null; plan: string | null }>;
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (typeof row?.final_url === "string" && typeof row?.plan === "string") {
+      out.set(row.final_url, row.plan);
+    }
+  }
+  return out;
+}
+
 export async function clearFinalUrls(urls: string[]): Promise<number> {
   if (!isDatabaseConfigured() || urls.length === 0) return 0;
   const sql = getSql();

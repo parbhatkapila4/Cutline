@@ -1,4 +1,4 @@
-import { spawnSync } from "child_process";
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from "child_process";
 import fs from "fs";
 import path from "path";
 
@@ -20,6 +20,9 @@ const MAX_RENDER_STDERR_CHARS = 2000;
 const PROPS_RETENTION_MS = 24 * 60 * 60 * 1000;
 const MAX_KEPT_PROPS_FILES = 20;
 const RENDER_FPS = 30;
+const RENDER_KILL_GRACE_MS = 2_000;
+const RENDER_TAG_ENV = "CUTLINE_RENDER_TAG";
+const IS_WINDOWS = process.platform === "win32";
 const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
 const DEFAULT_DURATION_SECONDS = 30;
@@ -44,6 +47,98 @@ export class RenderKilledError extends Error {
   }
 }
 
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function signalRenderGroup(pid: number | undefined, signal: NodeJS.Signals): boolean {
+  if (IS_WINDOWS) return false;
+  if (!Number.isInteger(pid) || pid == null || pid <= 1 || pid === process.pid) return false;
+  try {
+    process.kill(-pid, signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function signalTaggedRenderProcesses(tag: string, signal: NodeJS.Signals): number[] {
+  if (IS_WINDOWS) return [];
+  const needle = `${RENDER_TAG_ENV}=${tag}`;
+  const signalled: number[] = [];
+  let entries: string[];
+  try {
+    entries = fs.readdirSync("/proc");
+  } catch {
+    return signalled;
+  }
+  for (const entry of entries) {
+    if (!/^[0-9]+$/.test(entry)) continue;
+    const pid = Number(entry);
+    if (pid === process.pid) continue;
+    try {
+      if (!fs.readFileSync(`/proc/${entry}/environ`, "utf-8").includes(needle)) continue;
+      process.kill(pid, signal);
+      signalled.push(pid);
+    } catch {
+    }
+  }
+  return signalled;
+}
+
+function reapRenderProcessTree(
+  pid: number | undefined,
+  tag: string,
+  traceId: string,
+  escalate: boolean
+): void {
+  try {
+    if (IS_WINDOWS) {
+      if (pid != null && isAlive(pid)) {
+        spawnSync("taskkill", ["/T", "/F", "/PID", String(pid)], { encoding: "utf-8" });
+      }
+      return;
+    }
+
+    if (!escalate) {
+      const swept = signalTaggedRenderProcesses(tag, "SIGKILL");
+      if (swept.length > 0) {
+        console.warn(
+          `[render] jobId=${traceId} render exited cleanly but left ${swept.length} ` +
+          `tagged process(es) behind; killed ${swept.join(",")}`
+        );
+      }
+      return;
+    }
+
+    const groupTerm = signalRenderGroup(pid, "SIGTERM");
+    const taggedTerm = signalTaggedRenderProcesses(tag, "SIGTERM");
+    if (!groupTerm && taggedTerm.length === 0) return;
+
+    sleepSync(RENDER_KILL_GRACE_MS);
+
+    const groupKill = signalRenderGroup(pid, "SIGKILL");
+    const taggedKill = signalTaggedRenderProcesses(tag, "SIGKILL");
+    console.warn(
+      `[render] jobId=${traceId} reaped render process tree pgid=${pid ?? "?"} ` +
+      `group(SIGTERM=${groupTerm} SIGKILL=${groupKill}) ` +
+      `tagged(SIGTERM=${taggedTerm.length} survived=${taggedKill.length})`
+    );
+  } catch (e) {
+    console.warn(
+      `[render] jobId=${traceId} process-tree reap failed: ` +
+      (e instanceof Error ? e.message : String(e))
+    );
+  }
+}
+
 function renderFailureDetail(result: {
   stderr?: string | null;
   stdout?: string | null;
@@ -55,6 +150,65 @@ function renderFailureDetail(result: {
       ? raw.slice(0, MAX_RENDER_STDERR_CHARS) + "…[truncated]"
       : raw;
   return "\n" + body;
+}
+
+export type RenderSpawnOutcome = {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  errorCode?: string | undefined;
+  errorMessage?: string | undefined;
+  stdout?: string | null;
+  stderr?: string | null;
+  elapsedMs: number;
+  propsPath: string;
+};
+
+export function classifyRenderResult(outcome: RenderSpawnOutcome): Error | null {
+  const { status, signal, errorCode, errorMessage, elapsedMs, propsPath } = outcome;
+  const elapsedSec = Math.round(elapsedMs / 1000);
+  const budgetSec = Math.round(RENDER_TIMEOUT_MS / 1000);
+  const detail = renderFailureDetail(outcome);
+  const kept = `\nRemotion props kept for reproduction: ${propsPath}`;
+
+  const weTimedOut =
+    errorCode === "ETIMEDOUT" ||
+    (signal === "SIGTERM" && elapsedMs >= RENDER_TIMEOUT_MS - TIMEOUT_TOLERANCE_MS);
+
+  if (weTimedOut) {
+    return new RenderTimeoutError(
+      `Remotion render timed out after ${elapsedSec}s (budget ${budgetSec}s). Try a shorter video or raise RENDER_TIMEOUT_MS.${kept}${detail}`
+    );
+  }
+
+  if (signal === "SIGKILL") {
+    return new RenderOutOfMemoryError(
+      `Remotion render was killed by SIGKILL after ${elapsedSec}s of a ${budgetSec}s budget — the renderer ran out of memory. Try a shorter video, or give the worker more RAM.${kept}${detail}`
+    );
+  }
+
+  if (signal === "SIGTERM") {
+    return new RenderKilledError(
+      `Remotion render was terminated by SIGTERM after ${elapsedSec}s, far short of its ${budgetSec}s budget — an external signal stopped the process (container shutdown, redeploy, or eviction). The render itself was not slow.${kept}${detail}`
+    );
+  }
+
+  if (errorMessage != null) {
+    return new Error(`Render failed after ${elapsedSec}s: ${errorMessage}${kept}`);
+  }
+
+  if (status !== 0) {
+    const raw = (outcome.stderr || outcome.stdout || "").trim();
+    if (OOM_SIGNATURE_RE.test(raw)) {
+      return new RenderOutOfMemoryError(
+        `Remotion render ran out of memory after ${elapsedSec}s (exit ${status}); a child process was killed by the OS.${kept}${detail}`
+      );
+    }
+    return new Error(
+      `Remotion render failed (exit ${status}) after ${elapsedSec}s.${kept}${detail}`
+    );
+  }
+
+  return null;
 }
 
 export type RenderInput = {
@@ -223,6 +377,17 @@ export function runRemotionRender(
     );
   }
 
+  const renderTag = `${traceId}-${id}`;
+  const spawnOptions: SpawnSyncOptionsWithStringEncoding = {
+    cwd,
+    encoding: "utf-8",
+    timeout: RENDER_TIMEOUT_MS,
+    env: { ...process.env, [RENDER_TAG_ENV]: renderTag },
+  };
+  if (!IS_WINDOWS) {
+    (spawnOptions as SpawnSyncOptionsWithStringEncoding & { detached?: boolean }).detached = true;
+  }
+
   const startedAt = Date.now();
   const result = spawnSync(
     process.execPath,
@@ -252,53 +417,26 @@ export function runRemotionRender(
       "--concurrency",
       "1",
     ],
-    {
-      cwd,
-      encoding: "utf-8",
-      timeout: RENDER_TIMEOUT_MS,
-    }
+    spawnOptions
   );
 
   const elapsedMs = Date.now() - startedAt;
-  const elapsedSec = Math.round(elapsedMs / 1000);
-  const budgetSec = Math.round(RENDER_TIMEOUT_MS / 1000);
-  const detail = renderFailureDetail(result);
-  const kept = `\nRemotion props kept for reproduction: ${propsPath}`;
+  const failure = classifyRenderResult({
+    status: result.status,
+    signal: result.signal,
+    errorCode: (result.error as NodeJS.ErrnoException | undefined)?.code,
+    errorMessage: result.error?.message,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    elapsedMs,
+    propsPath,
+  });
+  reapRenderProcessTree(result.pid, renderTag, traceId, failure != null);
 
-  if (result.signal === "SIGKILL") {
-    throw new RenderOutOfMemoryError(
-      `Remotion render was killed by SIGKILL after ${elapsedSec}s of a ${budgetSec}s budget — the renderer ran out of memory. Try a shorter video, or give the worker more RAM.${kept}${detail}`
-    );
+  if (failure) {
+    throw failure;
   }
 
-  if (result.signal === "SIGTERM") {
-    if (elapsedMs >= RENDER_TIMEOUT_MS - TIMEOUT_TOLERANCE_MS) {
-      throw new RenderTimeoutError(
-        `Remotion render timed out after ${elapsedSec}s (budget ${budgetSec}s). Try a shorter video or raise RENDER_TIMEOUT_MS.${kept}${detail}`
-      );
-    }
-    throw new RenderKilledError(
-      `Remotion render was terminated by SIGTERM after ${elapsedSec}s, far short of its ${budgetSec}s budget — an external signal stopped the process (container shutdown, redeploy, or eviction). The render itself was not slow.${kept}${detail}`
-    );
-  }
-
-  if (result.error) {
-    throw new Error(
-      `Render failed after ${elapsedSec}s: ${result.error.message}${kept}`
-    );
-  }
-
-  if (result.status !== 0) {
-    const raw = (result.stderr || result.stdout || "").trim();
-    if (OOM_SIGNATURE_RE.test(raw)) {
-      throw new RenderOutOfMemoryError(
-        `Remotion render ran out of memory after ${elapsedSec}s (exit ${result.status}); a child process was killed by the OS.${kept}${detail}`
-      );
-    }
-    throw new Error(
-      `Remotion render failed (exit ${result.status}) after ${elapsedSec}s.${kept}${detail}`
-    );
-  }
   try {
     fs.unlinkSync(propsPath);
   } catch {

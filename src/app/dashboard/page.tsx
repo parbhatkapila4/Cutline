@@ -8,7 +8,7 @@ import { isEnterprisePlan } from "@/lib/plans";
 import { VideoCardFrame } from "@/components/dashboard/VideoCardFrame";
 import { PendingLabel, Skeleton } from "@/components/ui/skeleton";
 
-type VideoStatus = "completed" | "processing" | "failed";
+type VideoStatus = "completed" | "processing" | "failed" | "expired";
 
 type UsageData = {
   plan: string;
@@ -49,6 +49,7 @@ const statusStyles: Record<VideoStatus, string> = {
   completed: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   processing: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   failed: "bg-red-500/15 text-red-400 border-red-500/30",
+  expired: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
 };
 
 function toDownloadHref(url: string): string {

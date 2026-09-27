@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { cleanupExpiredBlobs } from "./publish";
-
-const DEFAULT_VIDEO_RETENTION_HOURS = 24;
+import { FREE_VIDEO_RETENTION_HOURS } from "@/lib/plans";
+const DEFAULT_VIDEO_RETENTION_HOURS = FREE_VIDEO_RETENTION_HOURS;
 export function getTempDirForJob(jobId: string): string {
   return path.join(process.cwd(), "public", "temp", jobId);
 }
@@ -86,14 +86,38 @@ function isUnderBase(base: string, target: string): boolean {
   return relative !== ".." && !relative.startsWith(".." + path.sep);
 }
 
-function getVideoRetentionMs(): number {
-  const hours = Number(process.env.VIDEO_RETENTION_HOURS) || DEFAULT_VIDEO_RETENTION_HOURS;
-  return hours * 60 * 60 * 1000;
+function parseRetentionHours(
+  raw: string | undefined,
+  fallback: number,
+  name: string
+): number {
+  if (raw == null || raw.trim() === "") return fallback;
+  const hours = Number(raw);
+  if (!Number.isFinite(hours) || hours < 0) {
+    console.warn(
+      `[cleanup] ignoring invalid ${name}=${JSON.stringify(raw)}; using ${fallback}h`
+    );
+    return fallback;
+  }
+  return hours;
 }
 
-function getUploadRetentionMs(): number {
-  const hours = Number(process.env.UPLOAD_RETENTION_HOURS) || DEFAULT_UPLOAD_RETENTION_HOURS;
-  return hours * 60 * 60 * 1000;
+export function getVideoRetentionOverrideHours(): number | null {
+  const raw = process.env.VIDEO_RETENTION_HOURS;
+  if (raw == null || raw.trim() === "") return null;
+  return parseRetentionHours(raw, DEFAULT_VIDEO_RETENTION_HOURS, "VIDEO_RETENTION_HOURS");
+}
+
+function getLocalVideoRetentionHours(): number {
+  return getVideoRetentionOverrideHours() ?? DEFAULT_VIDEO_RETENTION_HOURS;
+}
+
+function getUploadRetentionHours(): number {
+  return parseRetentionHours(
+    process.env.UPLOAD_RETENTION_HOURS,
+    DEFAULT_UPLOAD_RETENTION_HOURS,
+    "UPLOAD_RETENTION_HOURS"
+  );
 }
 
 function getTempImagesRetentionMs(): number {
@@ -136,30 +160,35 @@ function safeDeleteDir(
   }
 }
 
-function cleanRenderedVideos(cwd: string, errors: string[]): number {
-  const retentionMs = getVideoRetentionMs();
-  const cutoff = Date.now() - retentionMs;
+function cleanRenderedVideos(
+  cwd: string,
+  errors: string[]
+): { deleted: number; publicUrls: string[] } {
+  const hours = getLocalVideoRetentionHours();
+  if (hours === 0) return { deleted: 0, publicUrls: [] };
+  const cutoff = Date.now() - hours * 60 * 60 * 1000;
   const counter = { deleted: 0 };
-  cleanRenderedVideosInDir(
-    resolveAllowedDir(cwd, path.join("public", PUBLIC_TEMP_BASENAME)),
-    cutoff,
-    errors,
-    counter
-  );
-  cleanRenderedVideosInDir(
-    resolveAllowedDir(cwd, path.join("public", PUBLIC_OUTPUT_BASENAME)),
-    cutoff,
-    errors,
-    counter
-  );
-  return counter.deleted;
+  const publicUrls: string[] = [];
+  for (const basename of [PUBLIC_TEMP_BASENAME, PUBLIC_OUTPUT_BASENAME]) {
+    cleanRenderedVideosInDir(
+      resolveAllowedDir(cwd, path.join("public", basename)),
+      basename,
+      cutoff,
+      errors,
+      counter,
+      publicUrls
+    );
+  }
+  return { deleted: counter.deleted, publicUrls };
 }
 
 function cleanRenderedVideosInDir(
   dir: string,
+  publicBasename: string,
   cutoff: number,
   errors: string[],
-  counter: { deleted: number }
+  counter: { deleted: number },
+  publicUrls: string[]
 ): void {
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return;
 
@@ -170,7 +199,12 @@ function cleanRenderedVideosInDir(
     if (!isUnderBase(dir, fullPath)) continue;
     try {
       const mtime = fs.statSync(fullPath).mtimeMs;
-      if (mtime < cutoff) safeDeleteFile(fullPath, errors, counter);
+      if (mtime >= cutoff) continue;
+      const before = counter.deleted;
+      safeDeleteFile(fullPath, errors, counter);
+      if (counter.deleted > before) {
+        publicUrls.push(`/${publicBasename}/${ent.name}`);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`stat failed ${fullPath}: ${msg}`);
@@ -205,8 +239,9 @@ function cleanUploads(cwd: string, errors: string[]): number {
   const dir = resolveAllowedDir(cwd, DEFAULT_UPLOAD_DIR);
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return 0;
 
-  const retentionMs = getUploadRetentionMs();
-  const cutoff = Date.now() - retentionMs;
+  const uploadHours = getUploadRetentionHours();
+  if (uploadHours === 0) return 0;
+  const cutoff = Date.now() - uploadHours * 60 * 60 * 1000;
   const counter = { deleted: 0 };
 
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -246,17 +281,32 @@ export async function runCleanup(): Promise<CleanupResult> {
 
   const cwd = process.cwd();
 
+  let localVideoUrls: string[] = [];
   try {
-    result.videosDeleted = cleanRenderedVideos(cwd, result.errors);
+    const videos = cleanRenderedVideos(cwd, result.errors);
+    result.videosDeleted = videos.deleted;
+    localVideoUrls = videos.publicUrls;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     result.errors.push(`rendered videos cleanup: ${msg}`);
   }
+  if (localVideoUrls.length > 0) {
+    try {
+      const { clearFinalUrls } = await import("@/lib/jobs/videoJobService");
+      const cleared = await clearFinalUrls(localVideoUrls);
+      if (cleared > 0) {
+        console.log(`[cleanup] cleared final_url on ${cleared} local render row(s)`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      result.errors.push(`local final_url clear: ${msg}`);
+    }
+  }
 
   try {
-    const retentionHours =
-      Number(process.env.VIDEO_RETENTION_HOURS) || DEFAULT_VIDEO_RETENTION_HOURS;
-    const blobRes = await cleanupExpiredBlobs(retentionHours);
+    const blobRes = await cleanupExpiredBlobs({
+      overrideHours: getVideoRetentionOverrideHours(),
+    });
     result.videosDeleted += blobRes.deleted;
     if (blobRes.errors > 0) result.errors.push(`blob video cleanup: ${blobRes.errors} error(s)`);
   } catch (e) {

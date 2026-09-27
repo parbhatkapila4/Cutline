@@ -48,7 +48,7 @@ Output: public/temp/[jobId].mp4
 - **Create job:** `POST /api/generate` → validates input → `queue.add("video", { input, assetIds?, brandColors? })` → returns `jobId`.
 - **Worker:** Separate Node process (`npm run worker`). Runs `runPipeline(job.data)` for each job. On success: job completed, `returnvalue = { videoPath }`. On failure: job failed, `failedReason` = error message.
 - **Poll:** `GET /api/generate/[jobId]` → returns `{ status, videoUrl?, error? }`. Status: `pending` | `processing` | `completed` | `failed`.
-- **Cleanup:** BullMQ repeatable job (when worker is up) deletes old temp videos, uploads, per-job images. Config: `CLEANUP_ENABLED`, `VIDEO_RETENTION_HOURS`, etc.
+- **Cleanup:** BullMQ repeatable job (when worker is up) deletes old temp videos, uploads, per-job images. Rendered-video retention is per plan (24h Free / 90 days paid, `src/lib/plans.ts`); per-job image caches use a fixed 1h window. Config: `CLEANUP_ENABLED`, `VIDEO_RETENTION_HOURS` (flat override for all tiers), `UPLOAD_RETENTION_HOURS`, etc.
 
 ---
 

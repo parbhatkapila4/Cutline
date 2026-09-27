@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { SkeletonFrame } from "@/components/ui/skeleton";
 
-type VideoStatus = "completed" | "processing" | "failed";
+type VideoStatus = "completed" | "processing" | "failed" | "expired";
 
 type VideoCardFrameProps = {
   videoUrl?: string;

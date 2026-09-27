@@ -8,7 +8,7 @@ import { btnClasses } from "./styles";
 const TRUST_ITEMS = [
   "Cancel anytime",
   "No watermarks on any plan",
-  "4K MP4 export",
+  "1080p MP4 export",
 ];
 
 function CheckIcon({ className = "" }: { className?: string }) {

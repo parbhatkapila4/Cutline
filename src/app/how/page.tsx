@@ -182,7 +182,7 @@ export default function HowPage() {
                 { name: "Remotion 4", role: "Programmatic video. The final MP4 is rendered by Remotion from a React composition: it layers images, motion, subtitles, and audio into one file. Same codebase as the app, so rendering is deterministic and easy to reason about." },
                 { name: "BullMQ + Redis", role: "Background jobs. When you submit a video, a job is added to a queue. A separate worker process (npm run worker) runs the pipeline. Redis stores the queue and is also used for rate limiting. You must run Redis (locally or a managed service) for generation to work." },
                 { name: "Google Veo (optional)", role: "Used only in “Talking object” mode: AI-generated talking character clips. Runs on Google Vertex AI; requires GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION and Vertex credentials. For videos longer than ~8 seconds, multiple clips are stitched with ffmpeg." },
-                { name: "Storage", role: "Uploads can be stored on disk (local) or in S3. There is no database for pipeline state-job status lives in Redis. Rendered videos and temp assets are cleaned up automatically based on retention settings." },
+                { name: "Storage", role: "Uploads can be stored on disk (local) or in S3. There is no database for pipeline state-job status lives in Redis. Rendered videos are cleaned up automatically on a per-plan schedule (24h on Free, 90 days on paid); uploads and temp assets have their own shorter windows." },
               ].map((item, i) => (
                 <div key={i} className="rounded-xl border border-white/10 bg-white/2 p-4">
                   <h3 className="font-semibold text-white mb-1">{item.name}</h3>
@@ -283,7 +283,7 @@ export default function HowPage() {
                 <span className="text-blue-400 font-mono shrink-0 font-semibold">4.</span>
                 <div>
                   <p className="font-semibold text-zinc-300 mb-1">Cleanup</p>
-                  <p>When the worker is running, a repeatable BullMQ job also runs periodically. It deletes old temp videos, expired uploads, and per-job image caches based on <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">VIDEO_RETENTION_HOURS</code>, <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">UPLOAD_RETENTION_HOURS</code>, and <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">CLEANUP_ENABLED</code>. So you don’t have to manually delete old files.</p>
+                  <p>When the worker is running, a repeatable BullMQ job also runs periodically. Rendered videos go on a per-plan schedule - 24 hours on Free, 90 days on paid - which <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">VIDEO_RETENTION_HOURS</code> can override with one flat window. Expired uploads use <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">UPLOAD_RETENTION_HOURS</code>, and per-job image caches use a fixed 1-hour window that is not configurable. <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-300">CLEANUP_ENABLED</code> turns the whole sweep off. So you don’t have to manually delete old files.</p>
                 </div>
               </div>
             </div>
@@ -337,7 +337,7 @@ export default function HowPage() {
               <div><span className="text-amber-400/80">GOOGLE_SERVICE_ACCOUNT_JSON_B64</span> - base64 Vertex service-account key for talking_object mode (Veo). Omit locally to use ambient ADC.</div>
               <div><span className="text-amber-400/80">VEO_MODEL</span> - override the Veo model (default veo-3.1-fast-generate-001).</div>
               <div><span className="text-amber-400/80">FFMPEG_PATH</span> - for talking_object videos longer than 8 seconds (concatenation).</div>
-              <div><span className="text-amber-400/80">CLEANUP_ENABLED</span>, <span className="text-amber-400/80">VIDEO_RETENTION_HOURS</span>, <span className="text-amber-400/80">UPLOAD_RETENTION_HOURS</span>, <span className="text-amber-400/80">RATE_LIMIT_*</span> - tune cleanup and rate limits.</div>
+              <div><span className="text-amber-400/80">CLEANUP_ENABLED</span>, <span className="text-amber-400/80">VIDEO_RETENTION_HOURS</span> (flat override for every plan; leave unset for per-plan retention), <span className="text-amber-400/80">UPLOAD_RETENTION_HOURS</span>, <span className="text-amber-400/80">RATE_LIMIT_*</span> - tune cleanup and rate limits.</div>
             </div>
           </section>
 

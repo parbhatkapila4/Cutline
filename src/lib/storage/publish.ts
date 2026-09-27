@@ -60,12 +60,20 @@ export async function deletePublishedBlob(url: string | undefined | null): Promi
   }
 }
 
+export type BlobRetentionPolicy = {
+  overrideHours: number | null;
+};
 export async function cleanupExpiredBlobs(
-  olderThanHours: number
+  policy: BlobRetentionPolicy
 ): Promise<{ deleted: number; errors: number }> {
   if (!isBlobConfigured()) return { deleted: 0, errors: 0 };
-  const cutoff = Date.now() - olderThanHours * 60 * 60 * 1000;
-  const toDelete: string[] = [];
+
+  const { MIN_VIDEO_RETENTION_HOURS, videoRetentionHoursForPlan } = await import("@/lib/plans");
+  const candidateHours = policy.overrideHours ?? MIN_VIDEO_RETENTION_HOURS;
+  const now = Date.now();
+  const candidateCutoff = now - candidateHours * 60 * 60 * 1000;
+  const candidates: Array<{ url: string; uploadedAt: number }> = [];
+  let toDelete: string[] = [];
   let errors = 0;
 
   try {
@@ -76,10 +84,27 @@ export async function cleanupExpiredBlobs(
       for (const b of res.blobs) {
         const uploadedAt =
           b.uploadedAt instanceof Date ? b.uploadedAt.getTime() : new Date(b.uploadedAt).getTime();
-        if (Number.isFinite(uploadedAt) && uploadedAt < cutoff) toDelete.push(b.url);
+        if (Number.isFinite(uploadedAt) && uploadedAt < candidateCutoff) {
+          candidates.push({ url: b.url, uploadedAt });
+        }
       }
       cursor = res.hasMore ? res.cursor : undefined;
     } while (cursor);
+
+    if (policy.overrideHours != null) {
+      toDelete = candidates.map((c) => c.url);
+    } else if (candidates.length > 0) {
+      const { getPlanIdsByFinalUrl } = await import("@/lib/jobs/videoJobService");
+      const planByUrl = await getPlanIdsByFinalUrl(candidates.map((c) => c.url));
+      for (const c of candidates) {
+        const hours = videoRetentionHoursForPlan(planByUrl.get(c.url));
+        if (c.uploadedAt < now - hours * 60 * 60 * 1000) toDelete.push(c.url);
+      }
+      const kept = candidates.length - toDelete.length;
+      if (kept > 0) {
+        console.log(`[blob] retained ${kept} blob(s) still inside a paid retention window`);
+      }
+    }
 
     if (toDelete.length > 0) {
       await del(toDelete);

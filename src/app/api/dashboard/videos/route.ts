@@ -9,7 +9,7 @@ export type DashboardVideoItem = {
   prompt: string;
   date: string;
   duration: string;
-  status: "completed" | "processing" | "failed";
+  status: "completed" | "processing" | "failed" | "expired";
   videoUrl?: string;
   timestamp: number;
 };
@@ -61,9 +61,13 @@ async function loadPersistedItems(owner: DashboardOwner): Promise<DashboardVideo
   const rows = await listVideoJobsByOwner(owner.ownerType, owner.id, 100);
   return rows.map((row) => {
     const ts = row.created_at instanceof Date ? row.created_at.getTime() : 0;
-    const status: DashboardVideoItem["status"] =
-      row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "processing";
     const videoUrl = row.final_url ?? row.preview_url ?? undefined;
+    const status: DashboardVideoItem["status"] =
+      row.status === "completed"
+        ? (videoUrl ? "completed" : "expired")
+        : row.status === "failed"
+          ? "failed"
+          : "processing";
     return {
       id: row.queue_job_id ?? row.id,
       title: titleFromInput(row.prompt),
@@ -162,13 +166,23 @@ export async function GET(request: Request) {
     for (const item of items) {
       if (item.id) byId.set(item.id, item);
     }
+    const TERMINAL: ReadonlyArray<DashboardVideoItem["status"]> = ["completed", "failed", "expired"];
     for (const item of persisted) {
       const live = byId.get(item.id);
-      if (live && item.status !== "completed" && item.status !== "failed") {
+      if (live && !TERMINAL.includes(item.status)) {
         byId.set(item.id, { ...item, status: live.status, videoUrl: live.videoUrl });
         continue;
       }
-      byId.set(item.id, live ? { ...live, ...item } : item);
+      if (!live) {
+        byId.set(item.id, item);
+        continue;
+      }
+      const mergedItem: DashboardVideoItem = { ...live, ...item };
+      if (item.status === "expired" || item.videoUrl == null) {
+        delete mergedItem.videoUrl;
+      }
+      if (item.status === "expired") mergedItem.status = "expired";
+      byId.set(item.id, mergedItem);
     }
 
     const merged = [...byId.values()];

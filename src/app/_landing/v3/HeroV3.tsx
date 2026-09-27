@@ -57,7 +57,7 @@ const STAGES = [
 
 const PROOF = [
   { value: "12", label: "stages, one pass" },
-  { value: "4K", label: "mp4, no watermark" },
+  { value: "1080p", label: "mp4, no watermark" },
   { value: "97.9%", label: "render success" },
 ];
 
@@ -188,7 +188,7 @@ function RenderConsole() {
             cutline · render
           </span>
           <span className="font-plex text-[10.5px] tracking-[0.05em] text-[#f4f3f3]/35">
-            4K
+            1080p
           </span>
         </div>
 

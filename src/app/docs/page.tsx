@@ -265,7 +265,7 @@ job_id = res.json()["jobId"]`}</CodeBlock>
               <Endpoint method="GET" path="/api/v1/generate/:jobId/download" />
 
               <p className="text-[14px] text-zinc-400 leading-relaxed">
-                Streams the rendered MP4 as <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">Content-Disposition: attachment</code>. Files are retained for <span className="font-mono text-zinc-200">VIDEO_RETENTION_HOURS</span> (default 24h) - fetch within the window. Returns <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">404 VIDEO_NOT_FOUND</code> after expiry.
+                Streams the rendered MP4 as <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">Content-Disposition: attachment</code>. Files are retained for 24 hours on the Free plan and 90 days on paid plans - fetch within the window. Self-hosted deployments can override both with one flat window via <span className="font-mono text-zinc-200">VIDEO_RETENTION_HOURS</span>. Returns <code className="bg-white/10 px-1.5 py-0.5 rounded text-zinc-200 font-mono text-[12.5px]">404 VIDEO_NOT_FOUND</code> after expiry.
               </p>
 
               <CodeBlock language="curl">{`curl -L \\

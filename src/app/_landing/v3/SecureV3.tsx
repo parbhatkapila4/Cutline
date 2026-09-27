@@ -46,7 +46,8 @@ export function SecureV3() {
             <p className="mt-6 max-w-[460px] font-sans text-[15.5px] font-medium leading-[1.5] text-[#1d1c1b]/75">
               No watermark on any plan, at any tier. Your uploads stay yours and
               are never used to train anything. Download the master, cancel
-              whenever, keep every render you made.
+              whenever. Your library stays up for 90 days on paid plans, and the
+              file is yours forever.
             </p>
             <Btn href="/privacy" variant="light" className="mt-8">
               Learn more

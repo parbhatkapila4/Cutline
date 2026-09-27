@@ -77,7 +77,8 @@ function CreateBrandMark({ className }: { className?: string }) {
   );
 }
 
-type JobStatus = "pending" | "processing" | "completed" | "failed";
+type JobStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
+type CancelState = "idle" | "requesting" | "requested" | "failed";
 type Mode = "slideshow" | "talking_object";
 type VideoKind = "slideshow" | "talking_cartoon" | "talking_real";
 type TalkingRealMode = "studio" | "scenario";
@@ -263,6 +264,8 @@ export default function CreatePage() {
   const [stageDetail, setStageDetail] = useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [videoDurationSec, setVideoDurationSec] = useState<number | null>(null);
+  const [cancelState, setCancelState] = useState<CancelState>("idle");
+  const [cancelNote, setCancelNote] = useState<string | null>(null);
   const [workerOnline, setWorkerOnline] = useState<boolean | null>(null);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [shareSupported, setShareSupported] = useState(false);
@@ -439,6 +442,31 @@ export default function CreatePage() {
     else trackGenerateFailed(ctx.mode, ctx.plan, errorCode ?? "UNKNOWN");
   }, []);
 
+  const requestCancel = useCallback(async (id: string) => {
+    setCancelState("requesting");
+    setCancelNote(null);
+    try {
+      const r = await fetch(`/api/generate/${encodeURIComponent(id)}/cancel`, { method: "POST" });
+      const d = await r.json().catch(() => null);
+      if (r.ok && d?.cancelled === true) {
+        setCancelState("requested");
+        setCancelNote("Cancel sent. Finishing the current step, then stopping.");
+        return;
+      }
+      setCancelState("failed");
+      setCancelNote(
+        r.status === 409
+          ? "This job already finished, so it can no longer be cancelled."
+          : r.status === 404
+            ? "We couldn't find this job to cancel it."
+            : "Cancel didn't go through. The job is still running — try again."
+      );
+    } catch {
+      setCancelState("failed");
+      setCancelNote("Cancel didn't go through. The job is still running — check your connection and try again.");
+    }
+  }, []);
+
   const poll = useCallback(async (id: string) => {
     if (Date.now() < backoffUntilRef.current) return;
     try {
@@ -477,6 +505,14 @@ export default function CreatePage() {
       if (d.status === "failed") {
         setError(getUserFriendlyErrorMessage(d.error || "Failed"));
         settleGa("failed", typeof d.failureCode === "string" ? d.failureCode : "UNKNOWN");
+        stop();
+      }
+      if (d.status === "cancelled") {
+        setCancelState("idle");
+        setCancelNote(null);
+        setError("Generation was cancelled.");
+        setErrorCode("CANCELLED");
+        settleGa("failed", "CANCELLED");
         stop();
       }
     } catch {
@@ -546,6 +582,7 @@ export default function CreatePage() {
       return;
     }
     setError(null); setErrorCode(null); setVideoUrl(null); setStatus(null); setJobId(null); setCompletionMessage(null); setSubmitting(true);
+    setCancelState("idle"); setCancelNote(null);
     try {
       let assetIds: string[] = [];
       let avatarUploadAssetId: string | undefined;
@@ -634,6 +671,7 @@ export default function CreatePage() {
 
   const reset = () => {
     stop(); setJobId(null); setStatus(null); setVideoUrl(null); setError(null); setErrorCode(null);
+    setCancelState("idle"); setCancelNote(null);
     setPrompt(""); setImgs([]); setMode("slideshow"); setPlatform("general"); setAspectRatio("16:9");
     setDur(30); setCc(true); setObjStyle("cartoon");
     setTalkingRealMode("studio");
@@ -968,20 +1006,32 @@ export default function CreatePage() {
                           <span className="hidden sm:inline">Usually 1-5 mins</span>
                         </div>
                         <button
-                          onClick={() => {
-                            stop();
-                            setStatus("failed");
-                            setError("Cancelled");
-                            setJobId(null);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium leading-none text-zinc-400 hover:text-red-300 hover:bg-red-500/8 border border-transparent hover:border-red-500/20 transition-colors"
+                          type="button"
+                          disabled={!jobId || cancelState === "requesting" || cancelState === "requested"}
+                          onClick={() => { if (jobId) void requestCancel(jobId); }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium leading-none text-zinc-400 hover:text-red-300 hover:bg-red-500/8 border border-transparent hover:border-red-500/20 transition-colors disabled:opacity-60 disabled:hover:text-zinc-400 disabled:hover:bg-transparent disabled:hover:border-transparent disabled:cursor-default"
                         >
                           <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                           </svg>
-                          <span className="leading-none">Cancel</span>
+                          <span className="leading-none">
+                            {cancelState === "requesting" || cancelState === "requested" ? "Cancelling…" : "Cancel"}
+                          </span>
                         </button>
                       </div>
+
+                      {cancelNote && (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className={`px-6 py-2.5 border-t text-[11.5px] leading-snug ${cancelState === "failed"
+                            ? "border-red-500/20 bg-red-500/8 text-red-200/90"
+                            : "border-white/8 bg-black/40 text-zinc-400"
+                            }`}
+                        >
+                          {cancelNote}
+                        </div>
+                      )}
                     </motion.div>
 
                     <p className="mt-4 text-center text-[11.5px] text-zinc-300/85">
@@ -1018,7 +1068,7 @@ export default function CreatePage() {
                 <span className="text-white/15">/</span>
                 <span className="text-zinc-400">MP4</span>
                 <span className="text-white/15">·</span>
-                <span className="text-zinc-400">4K</span>
+                <span className="text-zinc-400">1080p</span>
                 {videoDurationSec != null && (
                   <>
                     <span className="text-white/15">·</span>
@@ -1134,7 +1184,7 @@ export default function CreatePage() {
                   </svg>
                   <span className="relative">Download MP4</span>
                   <span className="relative inline-flex items-center font-mono text-[10px] font-bold tracking-[0.16em] uppercase opacity-65">
-                    4K
+                    1080p
                   </span>
                   <svg className="relative w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -2195,8 +2245,8 @@ export default function CreatePage() {
                       </span>
                       <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
                       <span className="inline-flex items-center gap-1.5">
-                        <strong className="font-mono font-medium text-[#ededed] text-[11px] tabular-nums">4K</strong>
-                        {isFreePlan ? " UHD, stock imagery" : " UHD"}
+                        <strong className="font-mono font-medium text-[#ededed] text-[11px] tabular-nums">1080p</strong>
+                        {isFreePlan ? " Full HD, stock imagery" : " Full HD"}
                       </span>
                       {secondsThisVideo > 0 && secondsBalance ? (
                         <>

@@ -3,104 +3,12 @@ import {
   AbsoluteFill,
   Audio,
   Sequence,
-  interpolate,
-  useCurrentFrame,
   useVideoConfig,
 } from "remotion";
 import { CaptionedVideo } from "./components/CaptionedVideo";
 import { ImageBackground } from "./components/ImageBackground";
 import { LogoOverlay } from "./components/LogoOverlay";
 import type { CUTLINECompositionProps } from "./types";
-
-const OUTRO_DURATION_SECONDS = 2;
-
-function OutroOverlay({ durationInFrames }: { durationInFrames: number }) {
-  const frame = useCurrentFrame();
-  const progress = durationInFrames > 0 ? frame / durationInFrames : 0;
-
-  const dimOpacity = interpolate(progress, [0, 0.7, 1], [0, 0.6, 0.82], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const markOpacity = interpolate(progress, [0.3, 0.75], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const markScale = interpolate(progress, [0.3, 0.85], [1.06, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const markTranslate = interpolate(progress, [0.3, 0.85], [12, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  return (
-    <AbsoluteFill>
-      <AbsoluteFill
-        style={{ backgroundColor: "#000", opacity: dimOpacity }}
-      />
-      <AbsoluteFill
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 22,
-          opacity: markOpacity,
-          transform: `translateY(${markTranslate}px) scale(${markScale})`,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 18,
-          }}
-        >
-          <span
-            style={{
-              width: 14,
-              height: 14,
-              borderRadius: "50%",
-              background: "#34d399",
-              boxShadow:
-                "0 0 18px rgba(16,185,129,0.7), 0 0 4px rgba(16,185,129,0.95) inset",
-            }}
-          />
-          <span
-            style={{
-              color: "#f5f5f5",
-              fontFamily:
-                "Inter, 'Helvetica Neue', system-ui, -apple-system, sans-serif",
-              fontWeight: 900,
-              fontSize: 96,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              lineHeight: 1,
-            }}
-          >
-            CUTLINE
-          </span>
-        </div>
-        <span
-          style={{
-            color: "rgba(255,255,255,0.55)",
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: 22,
-            letterSpacing: "0.34em",
-            textTransform: "uppercase",
-          }}
-        >
-          Made with Cutline
-        </span>
-      </AbsoluteFill>
-    </AbsoluteFill>
-  );
-}
 
 const FALLBACK_IMAGE = "/fallback.png";
 
@@ -125,7 +33,7 @@ const DEFAULT_CAPTION_STYLE = {
 export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
   props
 ) => {
-  const { fps, durationInFrames: compositionDurationInFrames } = useVideoConfig();
+  const { fps } = useVideoConfig();
   const {
     shotList,
     subtitleTrack,
@@ -239,25 +147,6 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
           captionPosition={{ x: 0.5, y: 0.86 }}
         />
       )}
-
-      {(() => {
-        const outroFrames = Math.min(
-          Math.round(OUTRO_DURATION_SECONDS * fps),
-          compositionDurationInFrames
-        );
-        if (outroFrames <= 0) return null;
-        const outroStart = compositionDurationInFrames - outroFrames;
-        return (
-          <Sequence
-            from={outroStart}
-            durationInFrames={outroFrames}
-            name="cutline-outro"
-            layout="none"
-          >
-            <OutroOverlay durationInFrames={outroFrames} />
-          </Sequence>
-        );
-      })()}
     </AbsoluteFill>
   );
 };

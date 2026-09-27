@@ -438,7 +438,7 @@ function VideoCard({ item }: { item: GalleryItem }) {
             render <span className="text-zinc-300 tabular-nums">{item.renderSec}s</span>
           </span>
           <span className="text-zinc-700" aria-hidden>·</span>
-          <span>4K</span>
+          <span>1080p</span>
           <span className="text-zinc-700" aria-hidden>·</span>
           <span>MP4</span>
         </div>

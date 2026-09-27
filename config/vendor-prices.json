@@ -180,7 +180,7 @@
           "TODO": "Get Vercel Blob storage $/GB-month from the Vercel pricing page and the plan's included allowance.",
           "codeAssumedPriceUsd": null,
           "codeAssumptionSource": "NONE - storage is not modelled anywhere in the cost tracker.",
-          "notes": "Effective residency is ~24h, not a month: the hourly cleanup deletes every blob under videos/ older than VIDEO_RETENTION_HOURS, default 24 (src/lib/storage/cleanup.ts:5, src/lib/storage/publish.ts:75-84). A GB-month rate therefore overstates cost badly unless prorated."
+          "notes": "Residency is per plan, not a month: the hourly cleanup deletes blobs under videos/ once they pass their owner's window - 24h on Free, 90 days on paid (src/lib/plans.ts, applied in src/lib/storage/publish.ts cleanupExpiredBlobs). VIDEO_RETENTION_HOURS overrides both with one flat window. A GB-month rate overstates Free badly and now understates a paid library that is retained for three months."
         },
         "bandwidth_gb": {
           "unit": "1 GB served",
