@@ -7,7 +7,7 @@ type SkeletonProps = {
   tone?: Tone;
 };
 
-export function Skeleton({ className = "", tone = "light" }: SkeletonProps) {
+export function Skeleton({ className = "", tone = "dark" }: SkeletonProps) {
   const base =
     tone === "dark"
       ? "bg-white/[0.04] ring-1 ring-white/[0.04]"
@@ -35,7 +35,7 @@ export function Skeleton({ className = "", tone = "light" }: SkeletonProps) {
 
 export function SkeletonText({
   lines = 3,
-  tone = "light",
+  tone = "dark",
   className = "",
   lineClassName = "h-3.5",
 }: {

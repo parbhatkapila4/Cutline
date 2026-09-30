@@ -1,7 +1,7 @@
 "use client";
 
 import { Band, Btn, Container, RuleHeader, useLive } from "./primitives";
-import { DiagramTag, StageSlab } from "./diagrams";
+import { LaneSlab } from "./laneSlab";
 
 function EngineCard({
   name,
@@ -10,7 +10,6 @@ function EngineCard({
   body,
   href,
   slab,
-  tags,
 }: {
   name: string;
   kind: string;
@@ -18,15 +17,13 @@ function EngineCard({
   body: string;
   href: string;
   slab: React.ReactNode;
-  tags: { label: string; className: string; delay: number }[];
 }) {
   const { ref, live } = useLive<HTMLDivElement>();
   return (
     <div
       ref={ref}
-      className={`v3-diagram relative overflow-hidden rounded-[40px] bg-[#232221] px-7 pb-0 pt-12 sm:px-11 ${
-        live ? "is-live" : ""
-      }`}
+      className={`v3-diagram relative overflow-hidden rounded-[40px] bg-[#232221] px-7 pb-4 pt-12 sm:px-11 ${live ? "is-live" : ""
+        }`}
     >
       <div className="flex items-center gap-3.5">
         <span
@@ -48,16 +45,7 @@ function EngineCard({
         Learn more
       </Btn>
 
-      <div className="relative mt-8">
-        {slab}
-        <div className="pointer-events-none absolute inset-0">
-          {tags.map((tag) => (
-            <span key={tag.label} className={`absolute ${tag.className}`}>
-              <DiagramTag delay={tag.delay}>{tag.label}</DiagramTag>
-            </span>
-          ))}
-        </div>
-      </div>
+      <div className="-mx-3 mt-6 sm:-mx-5">{slab}</div>
     </div>
   );
 }
@@ -87,73 +75,69 @@ export function EngineV3() {
             name="The Director"
             kind="Planning model"
             lead="You can't cut what hasn't been written."
-            body="It reads your one line, decides what the video is actually about, and produces a timed shot list - narration, pacing, b-roll brief and caption cues - before a frame is rendered."
+            body="It reads your one line, decides what the video is actually about, and produces a timed shot list - narration, pacing, an image brief per shot and caption cues - before a frame is rendered."
             href="/how"
             slab={
-              <StageSlab
-                lanes={6}
-                dots={[
-                  [0, 0.18],
-                  [1, 0.4],
-                  [2, 0.28],
-                  [3, 0.62],
-                  [4, 0.48],
-                  [2, 0.78],
-                  [5, 0.34],
+              <LaneSlab
+                id="director"
+                className="h-auto w-full"
+                labels={[
+                  { text: "Intent", icon: "intent", seg: 7, t: 1, side: "top", y: 40 },
+                  { text: "Narrative", icon: "narrative", seg: 9, t: 0, side: "bottom", y: 290, pill: "left" },
+                  { text: "Shots", icon: "shots", seg: 11, t: 1, side: "top", y: 92 },
+                  { text: "Script", icon: "script", seg: 13, t: 0, side: "bottom", y: 362 },
                 ]}
-                className="h-[280px] w-full"
+                cubes={[
+                  [6, 0.3],
+                  [6, 0.82],
+                  [7, 0.42],
+                  [8, 0.18],
+                  [8, 0.66],
+                  [9, 0.86],
+                  [10, 0.38],
+                  [11, 0.16],
+                  [11, 0.62],
+                  [12, 0.9],
+                  [13, 0.3],
+                  [14, 0.7],
+                ]}
               />
             }
-            tags={[
-              { label: "Script", className: "left-[6%] top-[16%]", delay: 900 },
-              {
-                label: "Pacing",
-                className: "right-[12%] top-[30%]",
-                delay: 1050,
-              },
-              {
-                label: "Shot list",
-                className: "left-[14%] bottom-[16%]",
-                delay: 1200,
-              },
-            ]}
           />
 
           <EngineCard
             name="The Compositor"
             kind="Render engine"
             lead="Most tools stop at a storyboard."
-            body="This one composites the voice, the footage, the captions and the score into a single timeline and encodes it - one pass, 1080p, roughly a minute from prompt to download."
+            body="This one composites the voiceover, the images, the motion and the captions into a single timeline and encodes it - one pass, and slideshow renders come out at 1080p."
             href="/features"
             slab={
-              <StageSlab
-                lanes={7}
-                dots={[
-                  [1, 0.22],
-                  [3, 0.5],
-                  [5, 0.36],
-                  [6, 0.7],
+
+              <LaneSlab
+                id="compositor"
+                className="h-auto w-full"
+                labels={[
+                  { text: "Voice", icon: "voice", seg: 6, t: 0, side: "top", y: 36 },
+                  { text: "Captions", icon: "captions", seg: 8, t: 1, side: "bottom", y: 290, pill: "left" },
+                  { text: "Motion", icon: "motion", seg: 10, t: 0, side: "top", y: 84 },
+                  { text: "Visuals", icon: "visuals", seg: 12, t: 0, side: "top", y: 132 },
+                  { text: "Render → MP4", icon: "render", seg: 14, t: 1, side: "bottom", y: 362 },
                 ]}
-                className="h-[280px] w-full"
+                cubes={[
+                  [6, 0.62],
+                  [7, 0.2],
+                  [7, 0.74],
+                  [8, 0.44],
+                  [9, 0.14],
+                  [9, 0.84],
+                  [10, 0.56],
+                  [11, 0.3],
+                  [12, 0.76],
+                  [13, 0.22],
+                  [14, 0.5],
+                ]}
               />
             }
-            tags={[
-              {
-                label: "Voice + score",
-                className: "left-[8%] top-[14%]",
-                delay: 900,
-              },
-              {
-                label: "Captions",
-                className: "right-[10%] top-[34%]",
-                delay: 1050,
-              },
-              {
-                label: "Encode → MP4",
-                className: "left-[16%] bottom-[14%]",
-                delay: 1200,
-              },
-            ]}
           />
         </div>
       </Container>

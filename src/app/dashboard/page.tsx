@@ -601,7 +601,7 @@ export default function DashboardPage() {
                   </h1>
 
                   <p className="text-[14.5px] sm:text-[15.5px] text-zinc-400 leading-relaxed max-w-[58ch] mb-8">
-                    One sentence in. A finished MP4 out - script, visuals, voice, and edit, rendered in about 60 seconds.
+                    One sentence in. A finished MP4 out - script, visuals, voice, and edit, rendered in one pass.
                   </p>
 
                   {/* CTA row */}
@@ -714,7 +714,7 @@ export default function DashboardPage() {
                     <p className="text-[13px] text-zinc-500 leading-relaxed max-w-[42ch] mx-auto mb-6">
                       {isFiltered
                         ? "Try clearing the search or switching to a different status."
-                        : "Generate your first video from a single sentence - script, visuals, voice, and edit in about 60 seconds."}
+                        : "Generate your first video from a single sentence - script, visuals, voice, and edit in one pass."}
                     </p>
 
                     <div className="flex items-center justify-center gap-2">

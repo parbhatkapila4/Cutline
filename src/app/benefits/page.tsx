@@ -4,10 +4,10 @@ import { CutlineLogo } from "@/components/brand/CutlineLogo";
 const WHAT_YOU_GET = [
   { title: "One MP4, 10-60 seconds", desc: "A single video file you can download or share. Duration is inferred from your prompt or set by you. No trimming or export steps." },
   { title: "Script and voiceover", desc: "The system writes the script and generates AI voiceover (ElevenLabs or PlayHT). You get spoken copy that matches the narrative, no hiring a voice artist or recording yourself." },
-  { title: "Images per shot", desc: "Every shot gets an image: sourced from stock (Unsplash, Pexels) or generated (DALL·E), or from your uploads. The pipeline picks; you don't hunt for B-roll." },
+  { title: "Images per shot", desc: "Every shot gets an image: sourced from stock (Unsplash, Pexels) or generated (DALL·E), or from your uploads. The pipeline picks; you don't hunt for stock imagery." },
   { title: "Motion and pacing", desc: "Pan, zoom, and shot length are decided by the pipeline from the narrative. The edit feels intentional, not random or template-flat." },
-  { title: "Synced subtitles", desc: "Captions are aligned to the voice using word-level timings from TTS. Viewers can watch with or without sound and still follow along." },
-  { title: "No watermarks, no account", desc: "The video is yours. No \"upgrade to remove watermark\" or sign-up wall. Rate limits apply per session, and the free render is a stock-image slideshow up to 20 seconds - talking-character videos and AI-generated imagery are on the paid plans." },
+  { title: "Synced subtitles", desc: "Captions are timed to the voiceover using the measured duration of each spoken segment. Viewers can watch with or without sound and still follow along." },
+  { title: "No watermarks", desc: "The video is yours. No \"upgrade to remove watermark\". Generating needs a free account, rate limits apply, and the free render is a stock-image slideshow up to 20 seconds - talking-character videos and AI-generated imagery are on the paid plans." },
 ];
 
 const WHY_BETTER = [
@@ -123,11 +123,11 @@ export default function BenefitsPage() {
             <div className="grid md:grid-cols-3 gap-8 md:gap-12">
               <div>
                 <h3 className="text-lg font-semibold text-white mb-3">Time to first video</h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">Generation runs in the background (usually 1-3 minutes). You get a job ID right away and the UI polls until the video is ready. No blocking; when it’s done, you get a link to the MP4.</p>
+                <p className="text-sm text-zinc-400 leading-relaxed">Generation runs in the background. You get a job ID right away and the UI polls until the video is ready. No blocking; when it’s done, you get a link to the MP4.</p>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white mb-3">No account or credit card</h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">You can create videos without signing up. Rate limits apply per session. If you run CUTLINE yourself, you pay for the APIs (OpenRouter, TTS, image sources); the app doesn’t charge you.</p>
+                <h3 className="text-lg font-semibold text-white mb-3">No credit card</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">Creating videos needs a free account - sign in with Google, no card. Rate limits apply. If you run CUTLINE yourself, you pay for the APIs (OpenRouter, TTS, image sources); the app doesn’t charge you.</p>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white mb-3">Your video, no lock-in</h3>

@@ -17,6 +17,17 @@ export function useHydrated() {
     () => false,
   );
 }
+const REDUCED_QUERY = "(prefers-reduced-motion: reduce)";
+const subscribeMotion = (cb: () => void) => {
+  const mq = window.matchMedia(REDUCED_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+const getMotion = () => window.matchMedia(REDUCED_QUERY).matches;
+const getServerMotion = () => true;
+export function useReducedMotion() {
+  return useSyncExternalStore(subscribeMotion, getMotion, getServerMotion);
+}
 
 export function useLive<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
@@ -218,6 +229,7 @@ export function NumberedList({
   tone = "dark",
   numbered = true,
   bodyWidth = "max-w-[300px]",
+  dwellMs,
 }: {
   items: NumberedItem[];
   openId: string;
@@ -225,6 +237,7 @@ export function NumberedList({
   tone?: "light" | "dark";
   numbered?: boolean;
   bodyWidth?: string;
+  dwellMs?: number;
 }) {
   const dark = tone === "dark";
   return (
@@ -237,7 +250,7 @@ export function NumberedList({
               type="button"
               onClick={() => onOpen(item.id)}
               aria-expanded={open}
-              className={`flex w-full items-baseline gap-3 rounded-[14px] px-5 py-4 text-left transition-colors ${open
+              className={`relative flex w-full items-baseline gap-3 overflow-hidden rounded-[14px] px-5 py-4 text-left transition-colors ${open
                   ? dark
                     ? "bg-[#f4f3f3]/[0.07] text-[#f4f3f3]"
                     : "bg-[#1d1c1b]/[0.05] text-[#1d1c1b]"
@@ -254,6 +267,16 @@ export function NumberedList({
               <span className="font-sans text-[17px] font-normal tracking-[-0.01em]">
                 {item.title}
               </span>
+              {open && dwellMs ? (
+                <span
+                  key={`${item.id}-dwell`}
+                  aria-hidden
+                  className={`v3-stage-dwell absolute inset-x-0 bottom-0 h-px ${
+                    dark ? "bg-[#f4f3f3]/35" : "bg-[#1d1c1b]/30"
+                  }`}
+                  style={{ ["--dwell" as string]: `${dwellMs}ms` }}
+                />
+              ) : null}
             </button>
 
             <div

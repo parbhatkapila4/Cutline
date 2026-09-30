@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://cutline.cloud"),
   title: "Cutline: AI-directed video, one sentence in",
   description:
-    "Cutline turns a single sentence into a finished 30-60 second MP4: script, voice, captions, b-roll, and score, rendered in a single pass.",
+    "Cutline turns a single sentence into a finished 10-60 second MP4: script, voice, captions and images, rendered in a single pass.",
   applicationName: "Cutline",
   alternates: { canonical: "/" },
   openGraph: {
@@ -49,13 +49,13 @@ export const metadata: Metadata = {
     siteName: "Cutline",
     title: "Cutline: AI-directed video, one sentence in",
     description:
-      "Cutline turns a single sentence into a finished 30-60 second MP4: script, voice, captions, b-roll, and score, rendered in a single pass.",
+      "Cutline turns a single sentence into a finished 10-60 second MP4: script, voice, captions and images, rendered in a single pass.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Cutline: AI-directed video, one sentence in",
     description:
-      "One sentence in, one finished MP4 out. Script, voice, captions, b-roll, and score in a single render.",
+      "One sentence in, one finished MP4 out. Script, voice, captions and images in a single render.",
   },
 };
 

@@ -38,9 +38,9 @@ const CAPABILITIES: Capability[] = [
     body: "Describe the video in a sentence. Cutline writes narration with a hook, a middle and a landing - paced to the length you asked for, not padded to fill it.",
     prompt: "A 45-second launch film for our new analytics dashboard",
     run: "RUN 4821",
-    chip: "Script · 112 words",
+    chip: "Script",
     ruleLabel: "Shot list",
-    ruleMeta: "5 shots · 0:44",
+    ruleMeta: "shot list",
     unit: "Shot",
     shots: [
       { label: "Hook - the 3am spreadsheet", time: "0:00" },
@@ -53,13 +53,13 @@ const CAPABILITIES: Capability[] = [
   {
     id: "visuals",
     title: "Source the visuals",
-    body: "Every shot gets a brief, then footage to match - your uploads first, then stock, then generated frames. No empty slots, no manual hunting.",
-    prompt: "Match b-roll to each beat, prefer my brand kit",
+    body: "Every shot gets a brief, then a still image to match, panned and zoomed - your uploads first, then stock, then generated frames. No manual hunting.",
+    prompt: "Match an image to each beat, prefer my uploads",
     run: "RUN 4822",
-    chip: "Visuals · 5 shots matched",
+    chip: "Visuals",
     ruleLabel: "Sources",
-    ruleMeta: "2 uploads · 2 stock · 1 gen",
-    unit: "Clip",
+    ruleMeta: "uploads, stock, generated",
+    unit: "Image",
     shots: [
       { label: "Stock - the before", time: "0:00" },
       { label: "Uploaded - the product", time: "0:09" },
@@ -74,33 +74,29 @@ const CAPABILITIES: Capability[] = [
     body: "A read that matches the tone of the piece rather than the default announcer - warm for a story, flat and quick for a product note.",
     prompt: "Warm, unhurried, second person",
     run: "RUN 4823",
-    chip: "Voice · 44s read",
+    chip: "Voice",
     ruleLabel: "Takes",
-    ruleMeta: "5 takes · 1 picked",
+    ruleMeta: "one read",
     unit: "Take",
     shots: [
       { label: "Warm - unhurried", time: "0:44" },
-      { label: "Brisk - product note", time: "0:39" },
-      { label: "Neutral - straight read", time: "0:42" },
-      { label: "Warm, slower - retimed", time: "0:46" },
-      { label: "Warm, second pass - picked", time: "0:44" },
     ],
   },
   {
     id: "captions",
     title: "Cut the captions",
-    body: "Word-level timing burned into the frame, styled to the video rather than dropped on top of it. Sized correctly for sound-off feeds.",
-    prompt: "Burn word-level captions, brand yellow",
+    body: "Captions burned into the frame, timed to the voiceover and styled to the video rather than dropped on top of it. Sized correctly for sound-off feeds.",
+    prompt: "Burn captions, brand yellow",
     run: "RUN 4824",
-    chip: "Captions · 112 cues",
+    chip: "Captions",
     ruleLabel: "Cue sheet",
-    ruleMeta: "112 cues · 5 checks",
+    ruleMeta: "burned in",
     unit: "Step",
     shots: [
       { label: "Cue sheet exported", time: "0:00" },
       { label: "Timing pass", time: "0:09" },
       { label: "Safe-area checked", time: "0:19" },
-      { label: "Styled to brand kit", time: "0:29" },
+      { label: "Styled for legibility", time: "0:29" },
       { label: "Burned to frame", time: "0:37" },
     ],
   },
@@ -108,12 +104,12 @@ const CAPABILITIES: Capability[] = [
   {
     id: "render",
     title: "Render the cut",
-    body: "Voice, footage, captions and motion composited into one timeline and encoded in a single pass. What lands in your downloads is a 1080p MP4, not a project file.",
+    body: "Voice, images, captions and motion composited into one timeline and encoded in a single pass. What lands in your downloads is a 1080p MP4, not a project file.",
     prompt: "Burn it down to a 1080p MP4",
     run: "RUN 4825",
-    chip: "Render · 1080p H.264",
+    chip: "Render · H.264",
     ruleLabel: "Output",
-    ruleMeta: "1 pass · 0:44",
+    ruleMeta: "single pass",
     unit: "Step",
     shots: [
       { label: "Timeline assembled", time: "0:00" },
@@ -244,7 +240,7 @@ function StageList({
             How it works
           </Btn>
           <span className="font-plex text-[10.5px] uppercase tracking-[0.07em] text-[#1d1c1b]/40">
-            12 stages · one pass
+            slideshow: 12 stages · one pass
           </span>
         </div>
       </div>
@@ -528,7 +524,7 @@ function AppPanel({
         <div className="mt-3 flex items-center gap-2.5">
           <StatusChip>{item.chip}</StatusChip>
           <span className="truncate font-plex text-[10px] text-[#1d1c1b]/40">
-            1080p · MP4 · no watermark
+            MP4 · no watermark
           </span>
         </div>
 
@@ -537,11 +533,6 @@ function AppPanel({
             <SectionRule label={item.ruleLabel} meta={item.ruleMeta} />
 
             <ul className="relative mt-3 flex flex-1 flex-col divide-y divide-[#1d1c1b]/[0.09] border-y border-[#1d1c1b]/[0.09]">
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 left-[52px] hidden w-px bg-[#1d1c1b]/[0.09] sm:block"
-              />
-
               {item.shots.map((s, i) => {
                 const on = i === shotIdx;
 

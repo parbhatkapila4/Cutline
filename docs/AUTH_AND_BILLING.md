@@ -4,9 +4,9 @@ This document describes the current identity and usage model, and the plan to ad
 
 ## Current state
 
-**Identity.** There is no login or signup. The server identifies the client using `getClientIdentifier(request)`, which returns the request IP (from `x-forwarded-for` or `x-real-ip`) or `"anonymous"` if unavailable.
+**Identity.** Generating requires a signed-in user or an API key: `POST /api/generate` returns `401 AUTH_REQUIRED` otherwise, and no anonymous session cookie is ever set (`src/app/api/generate/authGate.test.ts`). Sign-in is Google OAuth only - `emailAndPassword` is disabled in `src/lib/auth.ts`, and the Google provider is registered only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. `getClientIdentifier(request)` is still used, but for rate limiting rather than identity.
 
-**Scoping.** Jobs (video generation), dashboard videos, usage stats, and token balance are keyed by this identifier. Each "user" is effectively an IP address (or anonymous).
+**Scoping.** Jobs (video generation), dashboard videos, usage stats, and token balance are keyed by the signed-in user id.
 
 **Limitations.**
 

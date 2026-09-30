@@ -143,7 +143,7 @@ const STAGE_META: StageMeta[] = [
   },
   {
     title: "Sourcing visuals",
-    description: "Pulling shots, b-roll and references.",
+    description: "Pulling images and references for each shot.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 7l3-3h12l3 3v12a1 1 0 01-1 1H4a1 1 0 01-1-1V7zM3 7h18M9 4v3M15 4v3M9 13l2 2 4-4" />

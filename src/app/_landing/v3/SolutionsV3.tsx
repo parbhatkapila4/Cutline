@@ -35,12 +35,12 @@ const SOLUTIONS: Solution[] = [
     tab: "Creators",
     eyebrow: "For creators",
     title: "Creators & solo founders",
-    body: "The idea you had this morning, posted before lunch. No editor, no timeline, no three-hour render - describe the video and download the cut.",
+    body: "No editor, no timeline, no manual assembly - describe the video and download the cut.",
     image: "/hero/card-creators.jpg",
     focus: "50% 10%",
     zoom: 1,
     prompt: "A 45-second explainer on why cold brew tastes sweeter",
-    status: "Rendering · 0:45",
+    status: "Rendering",
     job: "RUN 4821",
     panel: "render",
     href: "/features",
@@ -54,8 +54,8 @@ const SOLUTIONS: Solution[] = [
     image: "/hero/card-marketing.jpg",
     focus: "50% 50%",
     zoom: 1.18,
-    prompt: "Launch cut for Q3 - brand kit, every channel",
-    status: "3 aspects · ready",
+    prompt: "Launch cut for Q3, vertical for Reels",
+    status: "ready",
     job: "RUN 5107",
     panel: "formats",
     href: "/features",
@@ -70,7 +70,7 @@ const SOLUTIONS: Solution[] = [
     focus: "50% 44%",
     zoom: 1.1,
     prompt: "Module 2 - extraction, as a 6-minute lecture",
-    status: "Captions · 112 cues",
+    status: "Captions",
     job: "RUN 5233",
     panel: "lesson",
     href: "/features",
@@ -366,7 +366,7 @@ function AppPanel({ item }: { item: Solution }) {
             {item.status}
           </span>
           <span className="truncate font-plex text-[10px] text-[#f4f3f3]/45">
-            1080p · MP4 · no watermark
+            MP4 · no watermark
           </span>
         </div>
 
@@ -470,7 +470,7 @@ function RatioTag({ children }: { children: ReactNode }) {
 
 const RENDER_STAGES: { label: string; done: boolean }[] = [
   { label: "Script + storyboard", done: true },
-  { label: "Voice + score", done: true },
+  { label: "Voice", done: true },
   { label: "Captions", done: true },
   { label: "Render + export", done: false },
 ];
@@ -528,7 +528,7 @@ function RenderBody() {
       </div>
 
       <div className="mt-3.5">
-        <SectionRule label="Shot list" meta="4 shots · 0:45" />
+        <SectionRule label="Shot list" meta="one image per shot" />
         <div className="flex gap-1.5">
           {SHOT_STRIP.map((id) => (
             <Frame
@@ -581,7 +581,7 @@ const BRAND_SWATCHES = ["#e8dcc8", "#c3603c", "#2f4f43"];
 function FormatsBody() {
   return (
     <>
-      <SectionRule label="Channels" meta="one cut · 3 aspects" />
+      <SectionRule label="Channels" meta="pick a ratio per render" />
       <div className="flex items-start gap-2">
         {FORMATS.map((format) => (
           <div key={format.ratio} className={`min-w-0 ${format.grow}`}>

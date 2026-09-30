@@ -69,7 +69,7 @@ export default function PrivacyPage() {
                 <li>We collect the minimum needed to run the service: account info, the prompts and assets you submit, the videos we generate for you, and basic technical/operational logs.</li>
                 <li>We send your prompts and scripts to third-party AI providers (OpenRouter, ElevenLabs or PlayHT, OpenAI, optionally Google Veo) so they can run the pipeline. Your prompts leave our servers when this happens.</li>
                 <li>Free renders are deleted after roughly 24 hours. Paid renders are kept for 90 days, then deleted. Uploaded assets are deleted after roughly 24 hours on every plan.</li>
-                <li>We do not run third-party analytics, ad-tracking, or behavioural profiling on this site.</li>
+                <li>We use Google Analytics to measure site traffic. It loads on every page, but only when a measurement ID is configured for the deployment. We do not run ad-tracking or behavioural profiling.</li>
                 <li>Payments are processed by Dodo Payments. We never see or store your card number.</li>
                 <li>You can request access, export, or deletion of your data at any time by writing to {CONTACT_EMAIL}.</li>
               </ul>
@@ -81,10 +81,6 @@ export default function PrivacyPage() {
                 <div>
                   <h3 className="font-semibold text-zinc-200 mb-1">Account information</h3>
                   <p>If you sign up, we collect your email address, a hashed password (we never store the raw password), and an optional display name. If you sign in with Google, we receive your Google account email, profile name, and the OAuth identifier Google sends us. We do not request additional Google permissions.</p>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-zinc-200 mb-1">Anonymous session data</h3>
-                  <p>If you use Cutline without signing in, we set a first-party cookie containing an anonymous session identifier and we store the count of videos you have generated in that session. We do this so you can try the product before signing up. There is no advertising profile or cross-site tracking.</p>
                 </div>
                 <div>
                   <h3 className="font-semibold text-zinc-200 mb-1">Inputs you give us</h3>
@@ -130,8 +126,9 @@ export default function PrivacyPage() {
                   { name: "Unsplash and Pexels", what: "Image search queries derived from your shot list.", why: "Returns stock photos used as the visual layer of each shot. Standard image-search API requests." },
                   { name: "Google (Gemini / Veo)", what: "Used only if you select \"Talking object\" mode. The script text is sent to Google Veo to generate the talking character clip.", why: "Generates AI character video. Optional and only triggered when you explicitly choose this mode." },
                   { name: "Better Auth + Google OAuth", what: "If you sign in with Google: your Google email, name, and OAuth identifier.", why: "Authenticates you and creates your account record." },
+                  { name: "Google Analytics", what: "Standard web-analytics data (page views, referrer, approximate location from IP, browser and device) plus a few product events: which mode you generated in, your plan name, and a failure code if a render fails. We do not send your email, account ID, or prompt text.", why: "Measures site traffic and how far people get through generation. Loads on every page, and only when a measurement ID is configured for the deployment." },
                   { name: "Dodo Payments", what: "Your email address and the plan you are purchasing. Card data goes directly to them, not to us.", why: "Processes subscriptions and one-time payments. PCI-DSS compliant; we are not in scope for cardholder data." },
-                  { name: "Neon (Postgres)", what: "Account records, job metadata, anonymous-session records, subscription state.", why: "Database hosting." },
+                  { name: "Neon (Postgres)", what: "Account records, job metadata, subscription state.", why: "Database hosting." },
                   { name: "Redis", what: "Job queue entries, cancellation flags, rate-limit counters.", why: "Queue and ephemeral state. May be hosted by a managed Redis provider." },
                   { name: "Object storage (optional)", what: "Uploaded assets and generated videos.", why: "Either local disk on our server or S3-compatible object storage. Files are deleted on the retention schedule below." },
                 ].map((sub) => (
@@ -163,18 +160,17 @@ export default function PrivacyPage() {
                 <li><span className="text-zinc-300 font-medium">Per-job temp files:</span> deleted as soon as the job finishes, regardless of success or failure.</li>
                 <li><span className="text-zinc-300 font-medium">Job records (status, timing, error metadata):</span> kept while your account is active so you can see history; deleted with your account.</li>
                 <li><span className="text-zinc-300 font-medium">Account data:</span> kept until you delete your account or close it. After deletion we retain only what is required for legal, tax, fraud-prevention, or accounting purposes.</li>
-                <li><span className="text-zinc-300 font-medium">Anonymous-session records:</span> kept for the lifetime of the cookie. Clearing your browser or cookies effectively deletes them.</li>
                 <li><span className="text-zinc-300 font-medium">Logs:</span> kept up to 90 days for operational and security purposes.</li>
               </ul>
             </section>
 
             <section id="cookies" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Cookies</h2>
-              <p className="text-zinc-400 text-sm leading-relaxed mb-4">We set the following first-party cookies on the <span className="text-zinc-200">cutline.cloud</span> domain. We do not set third-party advertising or analytics cookies.</p>
+              <p className="text-zinc-400 text-sm leading-relaxed mb-4">We set the following cookies on the <span className="text-zinc-200">cutline.cloud</span> domain. We do not set third-party advertising cookies.</p>
               <ul className="space-y-2 text-zinc-400 text-sm leading-relaxed list-disc pl-5">
                 <li><span className="text-zinc-300 font-medium">Authentication session:</span> set after you sign in. Used to keep you signed in. Deleted when you sign out.</li>
-                <li><span className="text-zinc-300 font-medium">Anonymous session:</span> set on first visit if you have not signed in. Stores an opaque session identifier so you can try a free generation.</li>
                 <li><span className="text-zinc-300 font-medium">Idempotency / rate-limit:</span> short-lived cookies used to prevent duplicate submissions and enforce per-IP limits.</li>
+                <li><span className="text-zinc-300 font-medium">Google Analytics:</span> analytics cookies set by Google to count visits and distinguish browsers. Set only when a measurement ID is configured for the deployment.</li>
               </ul>
             </section>
 
@@ -231,7 +227,7 @@ export default function PrivacyPage() {
                   <ul className="space-y-1.5 list-disc pl-5 mt-2">
                     <li><span className="text-zinc-300 font-medium">Identifiers</span>: name, email address, account identifier, IP address.</li>
                     <li><span className="text-zinc-300 font-medium">Commercial information</span>: subscription plan, transaction history (returned to us by our payment processors).</li>
-                    <li><span className="text-zinc-300 font-medium">Internet or other electronic network activity</span>: session cookies, anonymous-funnel session identifiers, request logs (IP, user-agent, timestamps).</li>
+                    <li><span className="text-zinc-300 font-medium">Internet or other electronic network activity</span>: session cookies, analytics data, request logs (IP, user-agent, timestamps).</li>
                     <li><span className="text-zinc-300 font-medium">User-generated content</span>: prompts you submit, files you upload, configuration choices.</li>
                   </ul>
                 </div>

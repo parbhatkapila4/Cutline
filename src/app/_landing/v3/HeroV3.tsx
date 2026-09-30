@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useCachedSession } from "@/lib/auth-client";
 import { Container, Btn, MonoChip, useHydrated } from "./primitives";
+import { HeroField } from "./heroField";
 
 const PROMPT = "A 60-second explainer on cold brew";
 const RUNTIME_S = 58;
@@ -56,9 +57,9 @@ const STAGES = [
 ];
 
 const PROOF = [
-  { value: "12", label: "stages, one pass" },
+  { value: "12", label: "slideshow stages, one pass" },
   { value: "1080p", label: "mp4, no watermark" },
-  { value: "97.9%", label: "render success" },
+  { value: "4", label: "ways to make it" },
 ];
 
 const WAVE = Array.from({ length: 52 }, (_, i) => {
@@ -100,9 +101,8 @@ function Bars({ lit }: { lit?: boolean }) {
       {WAVE.map((height, i) => (
         <span
           key={i}
-          className={`flex-1 rounded-full ${
-            lit ? "bg-[#b0d67e]" : "bg-[#f4f3f3]/25"
-          }`}
+          className={`flex-1 rounded-full ${lit ? "bg-[#b0d67e]" : "bg-[#f4f3f3]/25"
+            }`}
           style={{ height: `${Math.round(height * 100)}%` }}
         />
       ))}
@@ -143,7 +143,7 @@ function RenderConsole() {
       if (!video) return;
       if (i === shot && !reduced) {
         video.currentTime = 0;
-        void video.play().catch(() => {});
+        void video.play().catch(() => { });
       } else {
         video.pause();
       }
@@ -160,7 +160,7 @@ function RenderConsole() {
   );
   const pct = Math.round(
     Math.min(1, Math.max(0, (t - STAGE_START) / (STAGE_END - STAGE_START))) *
-      100,
+    100,
   );
 
   const words = SHOTS[shot].caption.split(" ");
@@ -168,15 +168,6 @@ function RenderConsole() {
 
   return (
     <div className="v3-console-in relative" style={delay(240)}>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -inset-x-16 -inset-y-20 -z-10"
-        style={{
-          background:
-            "radial-gradient(52% 50% at 52% 46%, rgba(217,155,18,0.16), transparent 72%)",
-        }}
-      />
-
       <div className="rounded-[26px] border border-[#f4f3f3]/12 bg-[#1f1e1d]/80 p-2.5 shadow-[0_44px_120px_-36px_rgba(0,0,0,0.95)] backdrop-blur-xl transition-transform duration-500 ease-out hover:-translate-y-1">
         <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5 pt-1.5">
           <div aria-hidden className="flex items-center gap-[5px]">
@@ -223,9 +214,8 @@ function RenderConsole() {
               preload={i === 0 ? "auto" : "none"}
               aria-hidden
               tabIndex={-1}
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[600ms] ease-out ${
-                i === shot ? "opacity-100" : "opacity-0"
-              }`}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[600ms] ease-out ${i === shot ? "opacity-100" : "opacity-0"
+                }`}
             />
           ))}
 
@@ -290,11 +280,10 @@ function RenderConsole() {
               onClick={() => setShot(i)}
               aria-label={`Shot ${i + 1}: ${s.caption}`}
               aria-pressed={i === shot}
-              className={`relative aspect-[16/9] overflow-hidden rounded-[8px] transition-all duration-500 ${
-                i === shot
+              className={`relative aspect-[16/9] overflow-hidden rounded-[8px] transition-all duration-500 ${i === shot
                   ? "opacity-100 ring-1 ring-[#b0d67e]/70"
                   : "opacity-35 hover:opacity-70"
-              }`}
+                }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -334,9 +323,8 @@ function RenderConsole() {
             {STAGES.map((name, i) => (
               <span
                 key={name}
-                className={`h-[3px] flex-1 rounded-full transition-colors duration-500 ${
-                  started && i <= stage ? "bg-[#b0d67e]/80" : "bg-[#f4f3f3]/10"
-                }`}
+                className={`h-[3px] flex-1 rounded-full transition-colors duration-500 ${started && i <= stage ? "bg-[#b0d67e]/80" : "bg-[#f4f3f3]/10"
+                  }`}
               />
             ))}
           </div>
@@ -361,27 +349,18 @@ export function HeroV3() {
   const hydrated = useHydrated();
   const isLoggedIn = hydrated && !sessionPending && !!sessionData;
   const startHref = isLoggedIn ? "/create" : "/auth/sign-in";
+  const copyRef = useRef<HTMLDivElement | null>(null);
+  const statsRef = useRef<HTMLDListElement | null>(null);
 
   return (
-    <section className="relative isolate overflow-hidden pb-16 pt-[132px] sm:pb-20 sm:pt-[164px] lg:pb-24 lg:pt-[176px]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-20"
-        style={{
-          background:
-            "radial-gradient(120% 88% at 80% 4%, rgba(217,155,18,0.11), transparent 56%), radial-gradient(96% 82% at 4% 98%, rgba(139,122,232,0.09), transparent 60%), #161514",
-        }}
+    <section className="relative isolate overflow-hidden bg-[#161514] pb-16 pt-[132px] sm:pb-20 sm:pt-[164px] lg:pb-24 lg:pt-[176px]">
+      <HeroField
+        blocks={[
+          { ref: copyRef, inside: 0.2 },
+          { ref: statsRef, inside: 0.3 },
+        ]}
+        className="absolute inset-0 -z-20 h-full w-full"
       />
-
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <Container className="h-full">
-          <div className="grid h-full grid-cols-4 border-r border-[#f4f3f3]/[0.055]">
-            {STAGES.slice(0, 4).map((k) => (
-              <div key={k} className="border-l border-[#f4f3f3]/[0.055]" />
-            ))}
-          </div>
-        </Container>
-      </div>
 
       <div
         aria-hidden
@@ -393,7 +372,10 @@ export function HeroV3() {
 
       <Container>
         <div className="grid gap-y-9 pl-6 sm:gap-y-11 sm:pl-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:grid-rows-[auto_auto] lg:gap-x-14 xl:gap-x-20">
-          <div className="max-w-[620px] lg:col-start-1 lg:row-start-1">
+          <div
+            ref={copyRef}
+            className="max-w-[620px] lg:col-start-1 lg:row-start-1"
+          >
             <div className="v3-rise" style={delay(40)}>
               <MonoChip tone="dark" className="border-[#f4f3f3]/25">
                 One sentence → one mp4
@@ -411,7 +393,7 @@ export function HeroV3() {
             >
               Every video you meant to make is still a sentence in your notes
               app. Cutline takes the sentence and hands back the finished cut -
-              script, voice, footage, captions.
+              script, voice, images, captions.
             </p>
 
             <div
@@ -439,11 +421,12 @@ export function HeroV3() {
           </div>
 
           <dl
+            ref={statsRef}
             className="v3-rise grid max-w-[620px] grid-cols-3 gap-x-6 border-t border-[#f4f3f3]/12 pt-8 lg:col-start-1 lg:row-start-2"
             style={delay(600)}
           >
             {PROOF.map((item) => (
-              <div key={item.label}>
+              <div key={item.label} className="text-center">
                 <dt className="font-sans text-[25px] font-normal tracking-[-0.03em] text-[#f4f3f3] sm:text-[27px]">
                   {item.value}
                 </dt>

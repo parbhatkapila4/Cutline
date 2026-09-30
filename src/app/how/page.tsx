@@ -123,7 +123,7 @@ export default function HowPage() {
                 {
                   num: "6. TTS (text-to-speech)",
                   title: "Generating the voiceover",
-                  body: "Each script segment is sent to ElevenLabs or PlayHT. They return audio (and, where supported, word-level timings). Segments with no text get silence. The result is one continuous audio track plus timing data used to refine subtitles.",
+                  body: "Each script segment is sent to ElevenLabs or PlayHT, which return the audio for that segment. Segments with no text get silence. The result is one continuous audio track plus per-segment durations used to refine subtitle timing.",
                 },
                 {
                   num: "7. Subtitle refine",

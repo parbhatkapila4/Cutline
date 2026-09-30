@@ -6,11 +6,11 @@ const CAPABILITIES = [
     label: "Edit by asking · Professional and up",
   },
   {
-    body: "Not every video wants b-roll. The same sentence can come back as a slideshow, as a talking cartoon, or as a realistic speaker on camera, in a studio or on location.",
+    body: "Not every video wants stills. The same sentence can come back as a slideshow, as a talking cartoon, or as a realistic speaker on camera, in a studio or on location.",
     label: "Four ways to shoot it",
   },
   {
-    body: "Every render reports what it actually consumed, against a seconds balance you can see. No credits that vanish, no bill you find out about at the end of the month.",
+    body: "Talking-character renders are metered in seconds against a balance you can see. No credits that vanish, no bill you find out about at the end of the month.",
     label: "Metered per render",
   },
 ] as const;

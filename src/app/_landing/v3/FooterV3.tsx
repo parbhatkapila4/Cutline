@@ -1,5 +1,6 @@
+import Image from "next/image";
 import { LoadingLink } from "@/components/ui/loading-link";
-import { Container } from "./primitives";
+import { Container, MonoChip } from "./primitives";
 
 type FooterLink = { label: string; href: string; external?: boolean };
 
@@ -92,34 +93,28 @@ function Column({ heading, links }: { heading: string; links: FooterLink[] }) {
 }
 
 function FooterScene() {
-  const imgCls =
-    "pointer-events-none absolute inset-0 h-full w-full object-cover select-none";
   return (
     <div
       aria-hidden
-      className="relative aspect-[21/9] w-full overflow-hidden border-t border-[#1d1c1b]/12 [container-type:inline-size] sm:aspect-[2400/810]"
+      className="relative aspect-[16/10] w-full overflow-hidden bg-[#e8ebeb] [container-type:inline-size] sm:aspect-[2400/1018]"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/hero/footer-far.svg"
+      <Image
+        src="/hero/footer-painting.jpg"
         alt=""
-        className={imgCls}
-        loading="lazy"
-        decoding="async"
+        fill
+        sizes="100vw"
         draggable={false}
+        className="pointer-events-none select-none object-cover object-[52%_50%] sm:object-center"
       />
-      <span className="absolute inset-x-0 top-[15.5%] select-none text-center font-sans text-[17cqw] font-normal leading-none tracking-[-0.045em] text-[#1d1c1b] sm:text-[13.4cqw]">
-        Cutline
-      </span>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/hero/footer-near.svg"
-        alt=""
-        className={imgCls}
-        loading="lazy"
-        decoding="async"
-        draggable={false}
-      />
+      <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-[#f4f3f3] to-transparent" />
+      <div className="absolute inset-x-0 top-[1.4%] flex flex-col items-center gap-[1.4cqw] sm:gap-[0.5cqw]">
+        <MonoChip className="bg-[#f4f3f3]/75 backdrop-blur-[2px]">
+          AI-directed video · one sentence in
+        </MonoChip>
+        <span className="select-none text-center font-sans text-[10.5cqw] font-normal leading-none tracking-[-0.045em] text-[#1d1c1b] mix-blend-multiply sm:text-[6cqw]">
+          Cutline
+        </span>
+      </div>
     </div>
   );
 }
@@ -133,33 +128,25 @@ export function FooterV3() {
             <Column key={column.heading} {...column} />
           ))}
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-x border-t border-[#1d1c1b]/14 px-6 py-4 font-plex text-[11px] text-[#1d1c1b]/55 sm:px-8">
+          <span>© 2026 Cutline</span>
+          <nav aria-label="Social" className="flex items-center gap-5">
+            {SOCIAL.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-[#1d1c1b]"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        </div>
       </Container>
 
       <FooterScene />
-
-      <div className="bg-[#1d1c1b]">
-        <Container className="py-5">
-          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 font-plex text-[11px] text-[#f4f3f3]/50">
-            <span>© 2026 Cutline, Inc. All rights reserved.</span>
-            <span className="hidden md:inline">
-              sentence → mp4 · 12 stages · 1080p · single pass
-            </span>
-            <nav aria-label="Social" className="flex items-center gap-5">
-              {SOCIAL.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="transition-colors hover:text-[#f4f3f3]"
-                >
-                  {link.label}
-                </a>
-              ))}
-            </nav>
-          </div>
-        </Container>
-      </div>
     </footer>
   );
 }

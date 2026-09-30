@@ -116,7 +116,7 @@ export default function FeaturesPage() {
                 AI script and natural voiceover
               </h2>
               <p className="text-zinc-400 mb-6 leading-relaxed">
-                From the intent, the system plans the narrative (e.g. hook → explanation → conclusion), then breaks it into 8-12 shots and writes the actual words for each shot. That script is sent to ElevenLabs or PlayHT (you choose one provider via TTS_PROVIDER). They return audio and, where supported, word-level timings. So you get a single continuous voiceover that matches the tone and length of your request, with no manual script writing or voice recording.
+                From the intent, the system plans the narrative (e.g. hook → explanation → conclusion), then breaks it into 8-12 shots and writes the actual words for each shot. That script is sent to ElevenLabs or PlayHT (you choose one provider via TTS_PROVIDER). They return the audio for each segment. So you get a single continuous voiceover that matches the tone and length of your request, with no manual script writing or voice recording.
               </p>
             </section>
 
@@ -134,7 +134,7 @@ export default function FeaturesPage() {
                 Auto subtitles synced to voice
               </h2>
               <p className="text-zinc-400 mb-6 leading-relaxed">
-                The script is chunked into subtitle-sized segments and given an initial timing estimate. After TTS, word-level timings from the provider are used to refine when each subtitle appears and disappears, so captions stay in sync with what is actually spoken. You don’t have to time or edit subtitles manually.
+                The script is chunked into subtitle-sized segments and given an initial timing estimate. After TTS, the measured duration of each spoken segment is used to refine when each subtitle appears and disappears, so captions stay in sync with the voiceover. You don’t have to time or edit subtitles manually.
               </p>
             </section>
 

@@ -17,16 +17,10 @@ const STATS: {
   caption: string;
 }[] = [
   {
-    head: "60",
-    tint: "s",
-    ramp: [LILAC, AMBER, PEACH, GREEN],
-    caption: "Prompt to finished 1080p MP4, in a single pass",
-  },
-  {
     head: "1",
     tint: "2",
     ramp: [AMBER, PEACH, GREEN, LILAC],
-    caption: "Stages of AI direction behind every render",
+    caption: "Stages of AI direction behind every slideshow render",
   },
   {
     head: "1080",
@@ -34,6 +28,12 @@ const STATS: {
     tail: "",
     ramp: [PEACH, GREEN, LILAC, AMBER],
     caption: "Full HD on every plan. No watermark, ever",
+  },
+  {
+    head: "",
+    tint: "3",
+    ramp: [GREEN, LILAC, AMBER, PEACH],
+    caption: "free renders a month. No card.",
   },
 ];
 
@@ -85,14 +85,14 @@ export function StatsV3() {
 
         <div
           ref={ref}
-          className={`mt-20 grid grid-cols-1 sm:grid-cols-3 ${live ? "is-live" : ""}`}
+          className={`mt-20 grid grid-cols-1 gap-x-8 gap-y-12 md:grid-cols-3 ${live ? "is-live" : ""}`}
         >
           {STATS.map((stat, i) => (
             <div
               key={stat.head + stat.tint}
-              className="flex min-h-[190px] flex-col justify-between border-t border-[#1d1c1b]/15 px-0 py-8 sm:border-l sm:border-t-0 sm:px-8 sm:py-2 sm:first:pl-0 sm:last:border-r"
+              className="flex flex-col justify-between text-center md:min-h-[190px]"
             >
-              <p className="font-sans text-[62px] font-normal leading-none tracking-[-0.045em] text-[#1d1c1b] sm:text-[76px] lg:text-[86px]">
+              <p className="font-sans text-[62px] font-normal leading-none tracking-[-0.045em] text-[#1d1c1b] md:text-[68px] lg:text-[86px]">
                 {stat.head}
                 <span
                   className="v3-tint"
@@ -111,7 +111,7 @@ export function StatsV3() {
                 </span>
                 {stat.tail ? <>{stat.tail}</> : null}
               </p>
-              <p className="mt-8 max-w-[260px] font-sans text-[15px] font-medium leading-[1.45] text-[#1d1c1b]/75">
+              <p className="mt-8 font-sans text-[15px] font-medium leading-[1.45] text-[#1d1c1b]/75">
                 {stat.caption}
               </p>
             </div>
