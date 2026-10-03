@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { RegenSnapshotV1 } from "@/lib/types/pipelineEnhancements";
 import { sourceImageForShot } from "@/lib/images/source";
-import { normalizeImageSpecForRender } from "@/lib/images/source";
+import { normalizeImageSpecForRender, assertPlaceholderFloor } from "@/lib/images/source";
 import type { AlreadyUsedForShots } from "@/lib/images/deriveQuery";
 
 function copyShotAssetBetweenJobs(
@@ -27,7 +27,8 @@ function copyShotAssetBetweenJobs(
 export async function buildImageSpecForRegen(
   snapshot: RegenSnapshotV1,
   newJobId: string,
-  regenerateShotIds: string[]
+  regenerateShotIds: string[],
+  stockOnly: boolean = false
 ): Promise<ReturnType<typeof normalizeImageSpecForRender>> {
   const regenSet = new Set(regenerateShotIds.filter(Boolean));
   const cwd = process.cwd();
@@ -63,7 +64,7 @@ export async function buildImageSpecForRegen(
       snapshot.script,
       snapshot.intent,
       newJobId,
-      false,
+      stockOnly,
       usedImageUrls,
       alreadyUsedForOtherShots
     );
@@ -80,6 +81,10 @@ export async function buildImageSpecForRegen(
       fallbackUsed: result.fallbackUsed,
     });
   }
+  await assertPlaceholderFloor(entries, {
+    jobId: newJobId,
+    maxPlaceholderRatio: stockOnly ? 1 : undefined,
+  });
 
   const spec = { entries };
   return normalizeImageSpecForRender(spec, newJobId, cwd);

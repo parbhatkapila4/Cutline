@@ -25,6 +25,12 @@ import { auth } from "@/lib/auth";
 import { ensureInProcessWorkerStarted } from "@/lib/queue/autoStartWorker";
 import { validateApiKeyAndGetUserId } from "@/lib/api-keys/service";
 import { mergeRemixFromJob } from "@/lib/regen/remixFromJob";
+import {
+  admitVideoJob,
+  emptyReservation,
+  releaseReservation,
+  reservationJobFields,
+} from "@/lib/jobs/admission";
 import { brandKitToPipelineFields, getBrandKitForUser } from "@/lib/brand-kits/service";
 import type { BrandColors } from "@/lib/assets/types";
 import fs from "fs";
@@ -342,160 +348,24 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
 
   const spendIdentifier = userId;
 
-  let effectiveMode: "slideshow" | "talking_object" | null = null;
-  let downgradeNotice: string | null = null;
-  let reservedCinematicSeconds = 0;
-  let reservedCinematicSplit: { fromMonthly: number; fromTopup: number } = {
-    fromMonthly: 0,
-    fromTopup: 0,
-  };
-  let reservedSpendUsd = 0;
+  const reservation = emptyReservation(spendIdentifier);
+  let queued = false;
 
   try {
     await ensureInProcessWorkerStarted();
     const queue = getVideoQueue();
-    const { incrementApiCallsThisMonth, getVideosCompletedThisMonth } = await import("@/lib/usage");
-    const { getUserPlan } = await import("@/lib/users/planService");
-    const creditsCheckRequested =
-      process.env.DISABLE_CREDITS_CHECK === "true" || process.env.DISABLE_CREDITS_CHECK === "1";
-    const creditsCheckDisabled =
-      creditsCheckRequested && process.env.NODE_ENV !== "production";
-    if (creditsCheckRequested && !creditsCheckDisabled) {
-      console.warn(
-        "[api] DISABLE_CREDITS_CHECK is set but ignored in production; spend limits remain enforced."
-      );
-    }
-    if (!creditsCheckDisabled) {
-      const userPlan = await getUserPlan(userId);
-
-      const { estimateUnmeteredCostUsd, cinematicSecondsFor } = await import("@/lib/cost/pricing");
-      const {
-        getBudgetState,
-        decideSpend,
-        reserveCinematicSeconds,
-        reserveSpendUsd,
-        releaseCinematicSeconds: releaseCine,
-        resetsAt,
-      } = await import("@/lib/cost/budget");
-      const requestedMode = data.regenFromJobId ? "slideshow" : (data.mode ?? "slideshow");
-      const requestedDuration = data.durationSeconds ?? 30;
-      const requestedVariations = data.variationCount ?? 1;
-      const providerArgs = {
-        talkingObjectStyle: data.talkingObjectStyle,
-        talkingRealMode: data.talkingRealMode,
-        avatar: data.avatar,
-      };
-      const costArgs = {
-        mode: requestedMode,
-        durationSeconds: requestedDuration,
-        variationCount: requestedVariations,
-        ...providerArgs,
-        stockImagesOnly: isFreePlan,
-      } as const;
-      const budgetState = await getBudgetState(spendIdentifier, userPlan.id);
-      const decision = decideSpend({
-        state: budgetState,
-        estimateUsd: estimateUnmeteredCostUsd(costArgs),
-        cinematicSeconds: cinematicSecondsFor(costArgs),
-        fallbackEstimateUsd: estimateUnmeteredCostUsd({
-          mode: "slideshow",
-          durationSeconds: requestedDuration,
-          variationCount: requestedVariations,
-          stockImagesOnly: isFreePlan,
-        }),
-      });
-
-      if (decision.outcome === "deny") {
-        return apiError({
-          code: ErrorCode.MONTHLY_LIMIT_REACHED,
-          message: decision.reason,
-          status: 402,
-          details: {
-            plan: userPlan.id,
-            allowanceUsedPercent: Math.round(decision.state.fractionUsed * 100),
-            resetsAt: resetsAt(),
-          },
-          headers,
-        });
-      }
-      if (decision.outcome === "downgrade") {
-        effectiveMode = decision.toMode;
-        downgradeNotice = decision.reason;
-      }
-
-      const admittedMode = effectiveMode ?? requestedMode;
-      const admittedArgs = {
-        mode: admittedMode,
-        durationSeconds: requestedDuration,
-        variationCount: requestedVariations,
-        ...providerArgs,
-        stockImagesOnly: isFreePlan,
-      } as const;
-
-      const seconds = cinematicSecondsFor(admittedArgs);
-      if (seconds > 0) {
-        const cine = await reserveCinematicSeconds(
-          spendIdentifier,
-          budgetState.cinematicSecondsAllowed,
-          seconds
-        );
-        if (!cine.ok) {
-          return apiError({
-            code: ErrorCode.MONTHLY_LIMIT_REACHED,
-            message:
-              "Cinematic seconds for this month are used up. Standard renders are still available, and this resets next month.",
-            status: 402,
-            details: { plan: userPlan.id, resetsAt: resetsAt() },
-            headers,
-          });
-        }
-        reservedCinematicSeconds = seconds;
-        reservedCinematicSplit = {
-          fromMonthly: cine.fromMonthly ?? seconds,
-          fromTopup: cine.fromTopup ?? 0,
-        };
-      }
-
-      reservedSpendUsd = estimateUnmeteredCostUsd(admittedArgs);
-      const claim = await reserveSpendUsd(
-        spendIdentifier,
-        budgetState.budgetUsd,
-        reservedSpendUsd
-      );
-      if (!claim.ok) {
-        if (reservedCinematicSeconds > 0) {
-          await releaseCine(spendIdentifier, reservedCinematicSeconds, reservedCinematicSplit);
-          reservedCinematicSeconds = 0;
-          reservedCinematicSplit = { fromMonthly: 0, fromTopup: 0 };
-        }
-        reservedSpendUsd = 0;
-        return apiError({
-          code: ErrorCode.MONTHLY_LIMIT_REACHED,
-          message:
-            "You have used this month's generation allowance. It resets at the start of next month.",
-          status: 402,
-          details: { plan: userPlan.id, resetsAt: resetsAt() },
-          headers,
-        });
-      }
-
-      const videosCompletedThisMonth = await getVideosCompletedThisMonth(creditsIdentifier);
-      if (
-        userPlan.videosPerMonth != null &&
-        videosCompletedThisMonth >= userPlan.videosPerMonth
-      ) {
-        return apiError({
-          code: ErrorCode.MONTHLY_LIMIT_REACHED,
-          message: "Your current plan limit has been reached. Please upgrade to continue creating videos.",
-          status: 402,
-          details: {
-            videosUsed: videosCompletedThisMonth,
-            videosLimit: userPlan.videosPerMonth,
-            plan: userPlan.id,
-          },
-          headers,
-        });
-      }
+    const { incrementApiCallsThisMonth } = await import("@/lib/usage");
+    const admission = await admitVideoJob(reservation, {
+      mode: data.regenFromJobId ? "slideshow" : (data.mode ?? "slideshow"),
+      durationSeconds: data.durationSeconds,
+      variationCount: data.variationCount,
+      talkingObjectStyle: data.talkingObjectStyle,
+      talkingRealMode: data.talkingRealMode,
+      avatar: data.avatar,
+      stockImagesOnly: isFreePlan,
+    });
+    if (!admission.ok) {
+      return apiError({ ...admission.error, headers });
     }
     const jobPayload = {
       input: data.input,
@@ -504,15 +374,9 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(userId ? { userId } : {}),
       ...(data.assetIds?.length ? { assetIds: data.assetIds } : {}),
       ...(data.brandColors ? { brandColors: data.brandColors } : {}),
-      mode: effectiveMode ?? (data.regenFromJobId ? "slideshow" : (data.mode ?? "slideshow")),
+      mode: admission.mode,
       durationSeconds: data.durationSeconds,
-      ...(reservedSpendUsd > 0 ? { reservedSpendUsd } : {}),
-      ...(reservedCinematicSeconds > 0
-        ? {
-          reservedCinematicSeconds,
-          reservedCinematicSplit,
-        }
-        : {}),
+      ...reservationJobFields(reservation),
       ...(spendIdentifier !== creditsIdentifier ? { spendIdentifier } : {}),
       ...(isFreePlan ? { stockImagesOnly: true } : {}),
       ...(data.textModel ? { textModel: data.textModel } : {}),
@@ -562,6 +426,12 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
           " error=" +
           (e instanceof Error ? e.message : String(e))
         );
+        return apiError({
+          code: ErrorCode.INTERNAL_ERROR,
+          message: "Could not start the job. Please try again.",
+          status: 500,
+          headers,
+        });
       }
     }
 
@@ -570,6 +440,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
         const again = getIdempotencyResult(idempotencyKey);
         if (again) return again.responseBody as { jobId: string };
         const job = await queue.add("video", jobPayload, queueAddOptions);
+        queued = true;
         await incrementApiCallsThisMonth(creditsIdentifier);
         const jobId = String(job.id);
         const responseBody = { jobId };
@@ -585,29 +456,15 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     }
 
     const job = await queue.add("video", jobPayload, queueAddOptions);
+    queued = true;
     await incrementApiCallsThisMonth(creditsIdentifier);
     const jobId = String(job.id);
     console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + jobId);
     return NextResponse.json(
-      { jobId, ...(downgradeNotice ? { notice: downgradeNotice } : {}) },
+      { jobId, ...(admission.notice ? { notice: admission.notice } : {}) },
       { headers }
     );
   } catch (e) {
-    if (reservedCinematicSeconds > 0 || reservedSpendUsd > 0) {
-      try {
-        const { releaseCinematicSeconds, adjustSpendUsd } = await import("@/lib/cost/budget");
-        if (reservedCinematicSeconds > 0) {
-          await releaseCinematicSeconds(
-            spendIdentifier,
-            reservedCinematicSeconds,
-            reservedCinematicSplit,
-          );
-        }
-        if (reservedSpendUsd > 0) {
-          await adjustSpendUsd(spendIdentifier, -reservedSpendUsd);
-        }
-      } catch { }
-    }
     const { logServerError } = await import("@/lib/utils/error");
     logServerError("POST /api/generate", e);
     const errMsg = e instanceof Error ? e.message : String(e);
@@ -630,6 +487,8 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       status: 500,
       headers,
     });
+  } finally {
+    if (!queued) await releaseReservation(reservation);
   }
 }
 

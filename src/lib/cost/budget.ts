@@ -127,9 +127,9 @@ export async function reserveSpendUsd(
   identifier: string,
   budgetUsd: number,
   usd: number
-): Promise<{ ok: boolean; spentUsd: number }> {
+): Promise<{ ok: boolean; spentUsd: number; reserved: number }> {
   if (!Number.isFinite(usd) || usd <= 0) {
-    return { ok: true, spentUsd: await getSpendUsd(identifier) };
+    return { ok: true, spentUsd: await getSpendUsd(identifier), reserved: 0 };
   }
   const key = spendKey(identifier);
   const micros = Math.round(usd * MICROS_PER_USD);
@@ -142,16 +142,16 @@ export async function reserveSpendUsd(
       `[budget] FAIL-OPEN: spend ceiling unavailable for ${identifier}; admitting this render unmetered. ` +
       `error=${e instanceof Error ? e.message : String(e)}`
     );
-    return { ok: true, spentUsd: 0 };
+    return { ok: true, spentUsd: 0, reserved: 0 };
   }
   if (next / MICROS_PER_USD > budgetUsd) {
     try {
       await getRedis().incrby(key, -micros);
     } catch {
     }
-    return { ok: false, spentUsd: (next - micros) / MICROS_PER_USD };
+    return { ok: false, spentUsd: (next - micros) / MICROS_PER_USD, reserved: 0 };
   }
-  return { ok: true, spentUsd: next / MICROS_PER_USD };
+  return { ok: true, spentUsd: next / MICROS_PER_USD, reserved: usd };
 }
 export async function getTopupSecondsRemaining(identifier: string): Promise<number> {
   return readCounter(topupKey(identifier));

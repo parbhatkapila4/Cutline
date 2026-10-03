@@ -419,6 +419,15 @@ export async function sourceImages(
     }
   }
 
+  await assertPlaceholderFloor(entries, { jobId, maxPlaceholderRatio });
+
+  return { entries };
+}
+export async function assertPlaceholderFloor(
+  entries: ReadonlyArray<{ imageUrl: string }>,
+  options: { jobId?: string; maxPlaceholderRatio?: number }
+): Promise<void> {
+  const { jobId, maxPlaceholderRatio } = options;
   const placeholderCount = entries.filter(
     (e) => e.imageUrl === FALLBACK_IMAGE_PATH
   ).length;
@@ -448,8 +457,6 @@ export async function sourceImages(
       shotCount
     );
   }
-
-  return { entries };
 }
 
 export function normalizeImageSpecForRender(

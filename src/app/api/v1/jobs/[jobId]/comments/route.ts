@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 import { getSql, isDatabaseConfigured } from "@/lib/db";
 import { validateJobId } from "@/lib/validation/input";
-import { auth } from "@/lib/auth";
+import { authorizeJobOwner } from "@/lib/jobs/jobAccess";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params;
   const v = validateJobId(jobId);
   if (!v.valid) {
     return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
+  }
+  const access = await authorizeJobOwner(request, jobId);
+  if (!access.ok) {
+    return NextResponse.json(access.body, { status: access.status });
   }
   if (!isDatabaseConfigured()) {
     return NextResponse.json({ comments: [] });
@@ -39,19 +43,17 @@ export async function POST(
   if (!v.valid) {
     return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
   }
+
+  const access = await authorizeJobOwner(request, jobId);
+  if (!access.ok) {
+    return NextResponse.json(access.body, { status: access.status });
+  }
+
   if (!isDatabaseConfigured()) {
     return NextResponse.json(
       { error: "DATABASE_URL is not configured." },
       { status: 503 }
     );
-  }
-
-  let userId: string | null = null;
-  try {
-    const session = await auth.api.getSession({ headers: request.headers });
-    userId = session?.user?.id != null ? String(session.user.id) : null;
-  } catch {
-    userId = null;
   }
 
   let body: { body?: unknown };
@@ -69,7 +71,7 @@ export async function POST(
     const sql = getSql();
     const rows = await sql`
       INSERT INTO job_comments (job_id, user_id, body)
-      VALUES (${jobId}, ${userId}, ${text})
+      VALUES (${jobId}, ${access.userId}, ${text})
       RETURNING id, job_id, user_id, body, created_at
     `;
     const row = (rows as Record<string, unknown>[])[0];

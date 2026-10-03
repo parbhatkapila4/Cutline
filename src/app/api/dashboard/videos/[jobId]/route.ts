@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { validateJobId } from "@/lib/validation/input";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
-import { auth } from "@/lib/auth";
+import { resolveOwnerCandidates } from "@/lib/jobs/jobOwnership";
 import { purgeUserVideo } from "@/lib/dashboard/purgeUserVideo";
 
 export type DashboardVideoDetail = {
@@ -45,18 +45,6 @@ function titleFromInput(input: string | undefined): string {
   if (trimmed.length <= 50) return trimmed;
   return trimmed.slice(0, 50);
 }
-async function resolveOwnerCandidates(request: Request): Promise<string[]> {
-  const candidates: string[] = [];
-  try {
-    const session = await auth.api.getSession({ headers: request.headers });
-    const userId = session?.user?.id;
-    if (typeof userId === "string" && userId.trim()) candidates.push(userId);
-  } catch {
-  }
-  candidates.push(getClientIdentifier(request));
-  return candidates;
-}
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ jobId: string }> }

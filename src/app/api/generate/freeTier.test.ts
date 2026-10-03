@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "./route";
+import { PLAN_CONFIGS } from "@/lib/plans";
+import { fakeRedis } from "@/test/fakeRedis";
 
 const {
   mockAdd,
@@ -7,14 +9,12 @@ const {
   mockScheduleCleanupJob,
   mockGetUserPlan,
   mockGetVideosCompleted,
-  mockReserveCinematicSeconds,
 } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
   mockStartVideoWorker: vi.fn(() => ({})),
   mockScheduleCleanupJob: vi.fn(async () => { }),
   mockGetUserPlan: vi.fn(),
   mockGetVideosCompleted: vi.fn(),
-  mockReserveCinematicSeconds: vi.fn(async () => ({ ok: true, usedSeconds: 0 })),
 }));
 
 vi.mock("@/lib/queue/videoQueue", () => ({
@@ -50,25 +50,7 @@ vi.mock("@/lib/usage", () => ({
   getVideosCompletedThisMonth: mockGetVideosCompleted,
 }));
 
-vi.mock("@/lib/cost/budget", () => ({
-  getBudgetState: vi.fn(async () => ({
-    plan: "free",
-    budgetUsd: 1000,
-    spentUsd: 0,
-    remainingUsd: 1000,
-    fractionUsed: 0,
-    cinematicSecondsAllowed: 1000,
-    cinematicSecondsUsed: 0,
-    cinematicSecondsRemaining: 1000,
-  })),
-  decideSpend: vi.fn(() => ({ outcome: "allow", state: {} })),
-  recordCinematicSeconds: vi.fn(async () => 0),
-  reserveCinematicSeconds: mockReserveCinematicSeconds,
-  reserveSpendUsd: vi.fn(async () => ({ ok: true, spentUsd: 0 })),
-  releaseCinematicSeconds: vi.fn(async () => { }),
-  adjustSpendUsd: vi.fn(async () => 0),
-  resetsAt: vi.fn(() => "Oct 1, 2026"),
-}));
+vi.mock("@/lib/redis/managedRedis", async () => (await import("@/test/fakeRedis")).managedRedisMock);
 
 vi.mock("@/lib/users/planService", () => ({
   getUserPlan: mockGetUserPlan,
@@ -82,19 +64,9 @@ vi.mock("@/lib/regen/remixFromJob", () => ({
   })),
 }));
 
-const FREE = {
-  id: "free",
-  label: "Free",
-  videosPerMonth: 3,
-  apiCallsPerMonth: 1,
-};
-const BEGINNER = { ...FREE, id: "beginner", label: "Beginner", videosPerMonth: 10 };
-const PRO = {
-  id: "professional",
-  label: "Professional",
-  videosPerMonth: null,
-  apiCallsPerMonth: 100_000,
-};
+const FREE = PLAN_CONFIGS.free;
+const BEGINNER = PLAN_CONFIGS.beginner;
+const PRO = PLAN_CONFIGS.professional;
 
 const generate = (body: Record<string, unknown> = {}) =>
   POST(
@@ -113,11 +85,11 @@ const latestJobPayload = () =>
   mockAdd.mock.calls.at(-1)?.[1] as Record<string, unknown> | undefined;
 
 beforeEach(() => {
+  fakeRedis.store.clear();
   mockAdd.mockReset();
   mockAdd.mockResolvedValue({ id: "free-tier-job-1" });
   mockGetUserPlan.mockReset();
   mockGetVideosCompleted.mockReset();
-  mockReserveCinematicSeconds.mockClear();
   delete process.env.DISABLE_CREDITS_CHECK;
   mockGetUserPlan.mockResolvedValue(FREE);
   mockGetVideosCompleted.mockResolvedValue(0);
@@ -237,30 +209,20 @@ describe("meter: HeyGen does not charge Veo seconds at admission", () => {
     mockGetUserPlan.mockResolvedValue(PRO);
     const res = await generate(heygenBody);
     expect(res.status).toBe(200);
-    expect(mockReserveCinematicSeconds).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      30,
-    );
+    expect(latestJobPayload()?.reservedCinematicSeconds).toBe(30);
   });
 
   it("still reserves whole 8-second blocks for a Veo render", async () => {
     mockGetUserPlan.mockResolvedValue(PRO);
-    mockReserveCinematicSeconds.mockClear();
     const res = await generate({ mode: "talking_object", durationSeconds: 30 });
     expect(res.status).toBe(200);
-    expect(mockReserveCinematicSeconds).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      32,
-    );
+    expect(latestJobPayload()?.reservedCinematicSeconds).toBe(32);
   });
 
   it("reserves nothing cinematic for a slideshow", async () => {
     mockGetUserPlan.mockResolvedValue(PRO);
-    mockReserveCinematicSeconds.mockClear();
     const res = await generate({ mode: "slideshow", durationSeconds: 30 });
     expect(res.status).toBe(200);
-    expect(mockReserveCinematicSeconds).not.toHaveBeenCalled();
+    expect(latestJobPayload()?.reservedCinematicSeconds).toBeUndefined();
   });
 });

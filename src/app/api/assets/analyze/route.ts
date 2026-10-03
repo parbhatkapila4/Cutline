@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { analyzeAssets } from "@/lib/assets/analysis";
 import type { BrandColors } from "@/lib/assets/types";
+import { auth } from "@/lib/auth";
+import { validateApiKeyAndGetUserId } from "@/lib/api-keys/service";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 function isBrandColors(v: unknown): v is BrandColors {
   if (v === null || typeof v !== "object") return false;
@@ -12,6 +15,33 @@ function isBrandColors(v: unknown): v is BrandColors {
 }
 
 export async function POST(request: Request) {
+  const fromApiKey = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
+  let userId: string | undefined = fromApiKey?.userId;
+  if (!userId) {
+    try {
+      const session = await auth.api.getSession({ headers: request.headers });
+      userId = session?.user?.id != null ? String(session.user.id) : undefined;
+    } catch {
+      userId = undefined;
+    }
+  }
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Sign in to analyze assets.", code: "AUTH_REQUIRED" },
+      { status: 401 }
+    );
+  }
+
+  const rateKey = fromApiKey ? `apk:${fromApiKey.keyId}` : `user:${userId}`;
+  const limit = await checkRateLimit(rateKey, "general");
+  if (!limit.allowed) {
+    const retryAfter = limit.retryAfter ?? 60;
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later.", retryAfter },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();

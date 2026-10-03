@@ -629,7 +629,8 @@ async function runPipelineOnce(
     const normalizedImageSpec = await buildImageSpecForRegen(
       snap,
       jobId,
-      options.regenerateShotIds ?? []
+      options.regenerateShotIds ?? [],
+      Boolean(options.stockImagesOnly)
     );
     const qgm = options.qualityGateMode ?? "warn";
     let qualityReport = runQualityGate(snap.script, snap.shotList, options.brandBrain);

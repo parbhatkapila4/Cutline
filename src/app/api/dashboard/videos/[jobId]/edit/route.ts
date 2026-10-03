@@ -2,25 +2,23 @@ import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData } from "@/lib/queue/videoQueue";
 import { validateJobId } from "@/lib/validation/input";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
+import { resolveOwnerCandidates } from "@/lib/jobs/jobOwnership";
 import { interpretEdit } from "@/lib/edit/interpreter";
 import { auth } from "@/lib/auth";
 import { getUserPlan } from "@/lib/users/planService";
 import { isProPlan } from "@/lib/plans";
 import { isDatabaseConfigured } from "@/lib/db";
+import { apiError } from "@/lib/api/errors";
+import { randomUUID } from "crypto";
+import {
+  admitVideoJob,
+  emptyReservation,
+  releaseReservation,
+  reservationJobFields,
+  type Reservation,
+} from "@/lib/jobs/admission";
 
 type EditBody = { message?: unknown };
-
-async function resolveOwnerCandidates(request: Request): Promise<string[]> {
-  const candidates: string[] = [];
-  try {
-    const session = await auth.api.getSession({ headers: request.headers });
-    const userId = session?.user?.id;
-    if (typeof userId === "string" && userId.trim()) candidates.push(userId);
-  } catch {
-  }
-  candidates.push(getClientIdentifier(request));
-  return candidates;
-}
 
 export async function POST(
   request: Request,
@@ -64,6 +62,8 @@ export async function POST(
     );
   }
 
+  let reservation: Reservation | null = null;
+  let queued = false;
   try {
     const queue = getVideoQueue();
     const job = await queue.getJob(jobId);
@@ -133,6 +133,26 @@ export async function POST(
       }
     }
 
+    const jobData: Omit<VideoJobData, "input"> = {
+      ...(data?.clientId ? { clientId: data.clientId } : {}),
+      ...(data?.mode ? { mode: data.mode } : {}),
+      ...(data?.durationSeconds !== undefined ? { durationSeconds: data.durationSeconds } : {}),
+      ...(Array.isArray(data?.assetIds) && data.assetIds.length > 0 ? { assetIds: data.assetIds } : {}),
+      ...(data?.brandColors ? { brandColors: data.brandColors } : {}),
+      ...(typeof data?.textModel === "string" && data.textModel.trim() !== "" ? { textModel: data.textModel.trim() } : {}),
+      ...(data?.captions === "on" || data?.captions === "off" ? { captions: data.captions } : {}),
+      ...(typeof data?.aspectRatio === "string" && data.aspectRatio.trim() !== ""
+        ? { aspectRatio: data.aspectRatio }
+        : {}),
+      ...(data?.platform ? { platform: data.platform } : {}),
+    };
+
+    reservation = emptyReservation(String(clientId));
+    const admission = await admitVideoJob(reservation, jobData);
+    if (!admission.ok) {
+      return apiError(admission.error);
+    }
+
     let newInput: string;
     try {
       newInput = await interpretEdit(originalInput, message, {
@@ -149,25 +169,43 @@ export async function POST(
       );
     }
 
-    const jobData: VideoJobData = {
-      input: newInput,
-      ...(data?.clientId ? { clientId: data.clientId } : {}),
-      ...(data?.mode ? { mode: data.mode } : {}),
-      ...(data?.durationSeconds !== undefined ? { durationSeconds: data.durationSeconds } : {}),
-      ...(Array.isArray(data?.assetIds) && data.assetIds.length > 0 ? { assetIds: data.assetIds } : {}),
-      ...(data?.brandColors ? { brandColors: data.brandColors } : {}),
-      ...(typeof data?.textModel === "string" && data.textModel.trim() !== "" ? { textModel: data.textModel.trim() } : {}),
-      ...(data?.captions === "on" || data?.captions === "off" ? { captions: data.captions } : {}),
-      ...(typeof data?.aspectRatio === "string" && data.aspectRatio.trim() !== ""
-        ? { aspectRatio: data.aspectRatio }
-        : {}),
-      ...(data?.platform ? { platform: data.platform } : {}),
-    };
+    const newJobId = randomUUID();
+    if (isDatabaseConfigured()) {
+      try {
+        const { createVideoJob } = await import("@/lib/jobs/videoJobService");
+        await createVideoJob({
+          owner_type: "user",
+          owner_id: String(clientId),
+          prompt: newInput,
+          status: "queued",
+          queue_job_id: newJobId,
+        });
+      } catch (e) {
+        console.error(
+          "[api] POST /api/dashboard/videos/[jobId]/edit could not persist video_jobs row jobId=" +
+          newJobId + " error=" + (e instanceof Error ? e.message : String(e))
+        );
+        return NextResponse.json(
+          { error: "Could not start the edit. Please try again." },
+          { status: 500 }
+        );
+      }
+    }
 
-    const newJob = await queue.add("video", jobData);
-    const newJobId = String(newJob.id);
-    console.log("[api] POST /api/dashboard/videos/[jobId]/edit jobId=" + jobId + " newJobId=" + newJobId);
-    return NextResponse.json({ newJobId });
+    const newJob = await queue.add(
+      "video",
+      {
+        ...jobData,
+        input: newInput,
+        mode: admission.mode,
+        ...reservationJobFields(reservation),
+      },
+      { jobId: newJobId }
+    );
+    queued = true;
+    const returnedJobId = String(newJob.id);
+    console.log("[api] POST /api/dashboard/videos/[jobId]/edit jobId=" + jobId + " newJobId=" + returnedJobId);
+    return NextResponse.json({ newJobId: returnedJobId, ...(admission.notice ? { notice: admission.notice } : {}) });
   } catch (e) {
     const { logServerError, sanitizeErrorMessage } = await import("@/lib/utils/error");
     logServerError("POST /api/dashboard/videos/[jobId]/edit", e);
@@ -175,5 +213,7 @@ export async function POST(
       { error: sanitizeErrorMessage(e) },
       { status: 500 }
     );
+  } finally {
+    if (!queued && reservation) await releaseReservation(reservation);
   }
 }

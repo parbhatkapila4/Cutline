@@ -13,7 +13,6 @@ async function getSessionUserId(request: Request): Promise<string | null> {
   const userId = result?.user?.id;
   return typeof userId === "string" && userId.trim() ? userId : null;
 }
-
 export async function resolveOwnerCandidates(request: Request): Promise<string[]> {
   const candidates: string[] = [];
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -28,10 +27,8 @@ export async function resolveOwnerCandidates(request: Request): Promise<string[]
       }
     }
   }
-  candidates.push(getClientIdentifier(request));
   return candidates;
 }
-
 export async function resolveOwnerIdentifier(request: Request): Promise<string> {
   const [first] = await resolveOwnerCandidates(request);
   return first ?? getClientIdentifier(request);
