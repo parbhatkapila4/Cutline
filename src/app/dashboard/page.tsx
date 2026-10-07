@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { DashboardVideoItem } from "@/app/api/dashboard/videos/route";
 import { authClient } from "@/lib/auth-client";
 import { isEnterprisePlan } from "@/lib/plans";
+import { DeleteVideoDialog, type DeleteFailure } from "@/components/dashboard/DeleteVideoDialog";
 import { VideoCardFrame } from "@/components/dashboard/VideoCardFrame";
-import { PendingLabel, Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type VideoStatus = "completed" | "processing" | "failed" | "expired";
 
@@ -57,6 +58,8 @@ function toDownloadHref(url: string): string {
   return url + (url.includes("?") ? "&" : "?") + "download=1";
 }
 
+const DELETE_TIMEOUT_MS = 30_000;
+
 const DEFAULT_USAGE: UsageData = {
   plan: "free",
   planLabel: "Free",
@@ -87,9 +90,11 @@ export default function DashboardPage() {
   const [usageError, setUsageError] = useState<string | null>(null);
   const [videoFilter, setVideoFilter] = useState<VideoStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<DashboardVideoItem | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteFailure, setDeleteFailure] = useState<DeleteFailure | null>(null);
+  const deleteInFlight = useRef(false);
+  const deletingId = deletePending ? (confirmTarget?.id ?? null) : null;
   const [toast, setToast] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -133,61 +138,77 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const refreshVideos = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/videos");
+      if (!res.ok) return;
+      const data = (await res.json()) as DashboardVideoItem[] | unknown;
+      if (Array.isArray(data)) setVideos(data);
+    } catch {
+    }
+  }, []);
+
   const requestDelete = useCallback((video: DashboardVideoItem) => {
-    setDeleteError(null);
+    if (deleteInFlight.current) return;
+    setDeleteFailure(null);
     setConfirmTarget(video);
   }, []);
 
   const cancelDelete = useCallback(() => {
-    if (deletingId) return;
+    if (deleteInFlight.current) return;
     setConfirmTarget(null);
-    setDeleteError(null);
-  }, [deletingId]);
+    setDeleteFailure(null);
+  }, []);
 
   const confirmDelete = useCallback(async () => {
     const video = confirmTarget;
-    if (!video) return;
-    setDeletingId(video.id);
-    setDeleteError(null);
+    if (!video || deleteInFlight.current) return;
+    deleteInFlight.current = true;
+    setDeletePending(true);
+    setDeleteFailure(null);
+    const label = video.title.trim() || "Video";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DELETE_TIMEOUT_MS);
     try {
       const res = await fetch(`/api/dashboard/videos/${encodeURIComponent(video.id)}`, {
         method: "DELETE",
+        signal: controller.signal,
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        const msg = typeof data.error === "string" && data.error.trim() ? data.error : "Could not delete the video.";
-        setDeleteError(msg);
+      if (res.ok || res.status === 404) {
+        setVideos((prev) => prev.filter((v) => v.id !== video.id));
+        setConfirmTarget(null);
+        setToast({
+          kind: "success",
+          message: res.ok ? `“${label}” was deleted.` : `“${label}” had already been deleted.`,
+        });
+        if (!res.ok) void refreshVideos();
         return;
       }
-      setVideos((prev) => prev.filter((v) => v.id !== video.id));
-      setConfirmTarget(null);
-      setToast({ kind: "success", message: `“${video.title.trim() || "Video"}” was deleted.` });
+      const message =
+        typeof data.error === "string" && data.error.trim() ? data.error : "Could not delete the video.";
+      setDeleteFailure({ message, action: res.status === 401 ? "signin" : "retry" });
+      if (res.status !== 401) void refreshVideos();
     } catch {
-      setDeleteError("Could not delete the video. Check your connection and try again.");
+      setDeleteFailure({
+        message: controller.signal.aborted
+          ? "This is taking longer than it should. It may still go through, so check your library before trying again."
+          : "Could not delete the video. Check your connection and try again.",
+        action: "retry",
+      });
+      void refreshVideos();
     } finally {
-      setDeletingId(null);
+      clearTimeout(timeout);
+      deleteInFlight.current = false;
+      setDeletePending(false);
     }
-  }, [confirmTarget]);
+  }, [confirmTarget, refreshVideos]);
 
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
   }, [toast]);
-
-  useEffect(() => {
-    if (!confirmTarget) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cancelDelete();
-    };
-    window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [confirmTarget, cancelDelete]);
 
   const fetchUsage = useCallback(async () => {
     setUsageLoading(true);
@@ -660,7 +681,7 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="flex rounded-lg border border-white/10 p-0.5 bg-zinc-900/60">
-                  {(["all", "completed", "processing", "failed"] as const).map((f) => (
+                  {(["all", "completed", "processing"] as const).map((f) => (
                     <button
                       key={f}
                       type="button"
@@ -818,95 +839,13 @@ export default function DashboardPage() {
       </div>
 
       {confirmTarget ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-6"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-video-title"
-        >
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-md animate-[fadeIn_140ms_ease-out]"
-            onClick={cancelDelete}
-            aria-hidden
-          />
-          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950/95 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] overflow-hidden animate-[popIn_180ms_cubic-bezier(0.2,0.9,0.3,1.2)]">
-            <div className="absolute -top-32 -right-24 h-64 w-64 rounded-full bg-red-500/15 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-32 -left-24 h-64 w-64 rounded-full bg-red-500/10 blur-3xl pointer-events-none" />
-            <div className="relative px-6 pt-6 pb-5">
-              <div className="flex items-start gap-4">
-                <div className="shrink-0 flex h-11 w-11 items-center justify-center rounded-xl bg-red-500/15 border border-red-500/30">
-                  <svg className="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M3 6h18" />
-                    <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
-                    <path d="M19 6l-.84 13.07A2 2 0 0 1 16.16 21H7.84a2 2 0 0 1-2-1.93L5 6" />
-                    <path d="M10 11v6" />
-                    <path d="M14 11v6" />
-                  </svg>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 id="delete-video-title" className="text-lg font-semibold text-white leading-snug">Delete this video?</h2>
-                  <p className="mt-1.5 text-sm text-zinc-400 leading-relaxed">
-                    You&apos;re about to permanently delete{" "}
-                    <span className="font-medium text-white">
-                      “{(confirmTarget.title.trim() || "Untitled video").length > 60
-                        ? (confirmTarget.title.trim() || "Untitled video").slice(0, 60) + "…"
-                        : (confirmTarget.title.trim() || "Untitled video")}”
-                    </span>
-                    . This removes the file, links, and all related data. This cannot be undone.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={cancelDelete}
-                  disabled={deletingId !== null}
-                  className="shrink-0 -mr-1 -mt-1 p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40"
-                  aria-label="Close dialog"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {deleteError ? (
-                <div className="mt-4 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2 text-xs text-red-300">
-                  {deleteError}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="relative px-6 py-4 bg-white/2 border-t border-white/5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-              <button
-                type="button"
-                onClick={cancelDelete}
-                disabled={deletingId !== null}
-                className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/4 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-white/8 hover:border-white/20 transition-colors disabled:opacity-40"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmDelete()}
-                disabled={deletingId !== null}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-linear-to-b from-red-500 to-red-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-8px_rgba(239,68,68,0.6)] hover:from-red-500 hover:to-red-700 active:from-red-600 active:to-red-700 transition-all disabled:opacity-60 disabled:pointer-events-none"
-              >
-                {deletingId !== null ? (
-                  <PendingLabel>Deleting…</PendingLabel>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M3 6h18" />
-                      <path d="M19 6l-.84 13.07A2 2 0 0 1 16.16 21H7.84a2 2 0 0 1-2-1.93L5 6" />
-                      <path d="M10 11v6" />
-                      <path d="M14 11v6" />
-                    </svg>
-                    Delete video
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteVideoDialog
+          video={confirmTarget}
+          pending={deletePending}
+          failure={deleteFailure}
+          onCancel={cancelDelete}
+          onConfirm={() => void confirmDelete()}
+        />
       ) : null}
 
       {toast ? (

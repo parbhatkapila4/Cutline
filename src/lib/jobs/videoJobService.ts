@@ -75,6 +75,26 @@ export async function getVideoJobById(jobId: string): Promise<VideoJob | null> {
   return mapRow(row as VideoJobRow);
 }
 
+export async function findVideoJobForOwners(
+  jobId: string,
+  ownerIds: string[]
+): Promise<VideoJob | null> {
+  if (ownerIds.length === 0) return null;
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id
+    FROM video_jobs
+    WHERE (queue_job_id = ${jobId} OR id::text = ${jobId})
+      AND owner_type = 'user'::video_job_owner_type
+      AND owner_id = ANY(${ownerIds})
+    ORDER BY created_at DESC
+    LIMIT 1
+  `) as VideoJobRow[];
+  const row = rows[0];
+  if (!row || typeof row !== "object") return null;
+  return mapRow(row as VideoJobRow);
+}
+
 export async function listVideoJobsByOwner(
   ownerType: OwnerType,
   ownerId: string,
@@ -93,7 +113,7 @@ export async function listVideoJobsByOwner(
 
 export async function deleteVideoJobRelatedDbRows(
   bullJobId: string,
-  clientId: string
+  ownerIds: string[]
 ): Promise<void> {
   if (!isDatabaseConfigured()) return;
   const sql = getSql();
@@ -113,18 +133,12 @@ export async function deleteVideoJobRelatedDbRows(
       e instanceof Error ? e.message : String(e)
     );
   }
-  try {
-    await sql`
-      DELETE FROM video_jobs
-      WHERE (queue_job_id = ${bullJobId} OR id::text = ${bullJobId})
-        AND owner_id = ${clientId}
-    `;
-  } catch (e) {
-    console.warn(
-      "[videoJobService] delete video_jobs failed:",
-      e instanceof Error ? e.message : String(e)
-    );
-  }
+  await sql`
+    DELETE FROM video_jobs
+    WHERE (queue_job_id = ${bullJobId} OR id::text = ${bullJobId})
+      AND owner_type = 'user'::video_job_owner_type
+      AND owner_id = ANY(${ownerIds})
+  `;
 }
 
 export async function getPlanIdsByFinalUrl(

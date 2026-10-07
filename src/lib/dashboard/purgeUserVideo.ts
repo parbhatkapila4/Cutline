@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
 
-import { deleteVideoJobRelatedDbRows } from "@/lib/jobs/videoJobService";
+import { isDatabaseConfigured } from "@/lib/db/client";
+import { deleteVideoJobRelatedDbRows, findVideoJobForOwners } from "@/lib/jobs/videoJobService";
 import { deletePreviewArtifactsFromRedis } from "@/lib/preview/artifacts";
 import { cancelJob, CLEANUP_JOB_NAME, getVideoQueue, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { deleteRegenSnapshot } from "@/lib/regen/snapshotStore";
@@ -35,27 +36,45 @@ function deleteMp4OutputsForJob(jobId: string): void {
 
 export type PurgeUserVideoResult =
   | { ok: true }
-  | { ok: false; status: 404 | 409 | 500; error: string };
+  | { ok: false; status: 401 | 404 | 409 | 500; error: string };
 
 export async function purgeUserVideo(
-  jobId: string,
+  videoId: string,
   ownerCandidates: string[]
 ): Promise<PurgeUserVideoResult> {
+  if (ownerCandidates.length === 0) {
+    return {
+      ok: false,
+      status: 401,
+      error: "We couldn’t confirm you’re signed in. Sign in again to delete this video.",
+    };
+  }
+
+  const row = isDatabaseConfigured() ? await findVideoJobForOwners(videoId, ownerCandidates) : null;
+  const jobId = row?.queue_job_id ?? videoId;
+
   const queue = getVideoQueue();
   const job = await queue.getJob(jobId);
-  if (!job || job.name === CLEANUP_JOB_NAME) {
-    return { ok: false, status: 404, error: "Video not found." };
+  if (job) {
+    const data = job.data as VideoJobData | undefined;
+    const clientId = data?.clientId;
+    if (
+      job.name === CLEANUP_JOB_NAME ||
+      clientId === undefined ||
+      clientId === null ||
+      !ownerCandidates.includes(String(clientId))
+    ) {
+      return { ok: false, status: 404, error: "Video not found." };
+    }
   }
-  const data = job.data as VideoJobData | undefined;
-  const clientId = data?.clientId;
-  if (clientId === undefined || clientId === null || !ownerCandidates.includes(String(clientId))) {
+  if (!row && !job) {
     return { ok: false, status: 404, error: "Video not found." };
   }
 
-  const result = job.returnvalue as VideoJobResult | undefined;
+  const result = job?.returnvalue as VideoJobResult | undefined;
 
   try {
-    await job.remove();
+    await job?.remove();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.toLowerCase().includes("locked")) {
@@ -79,17 +98,31 @@ export async function purgeUserVideo(
     return { ok: false, status: 500, error: "Could not remove this video. Please try again." };
   }
 
+  try {
+    await deleteVideoJobRelatedDbRows(jobId, ownerCandidates);
+  } catch (e) {
+    console.error(
+      "[purgeUserVideo] video_jobs delete failed jobId=" + jobId,
+      e instanceof Error ? e.message : String(e)
+    );
+    return { ok: false, status: 500, error: "Could not remove this video. Please try again." };
+  }
+
   await deleteRegenSnapshot(jobId);
   await deletePreviewArtifactsFromRedis(jobId);
   cleanupJobArtifacts(jobId);
   deleteMp4OutputsForJob(jobId);
-  await deletePublishedBlob(result?.videoPath);
-  if (result?.variations?.length) {
-    for (const v of result.variations) {
-      await deletePublishedBlob(v?.videoUrl);
-    }
+  const blobUrls = new Set(
+    [
+      row?.final_url,
+      row?.preview_url,
+      result?.videoPath,
+      ...(result?.variations ?? []).map((v) => v?.videoUrl),
+    ].filter((url): url is string => typeof url === "string" && url !== "")
+  );
+  for (const url of blobUrls) {
+    await deletePublishedBlob(url);
   }
-  await deleteVideoJobRelatedDbRows(jobId, String(clientId));
 
   return { ok: true };
 }

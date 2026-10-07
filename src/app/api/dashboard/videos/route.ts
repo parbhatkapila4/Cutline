@@ -185,7 +185,8 @@ export async function GET(request: Request) {
       byId.set(item.id, mergedItem);
     }
 
-    const merged = [...byId.values()];
+    const HIDDEN: ReadonlyArray<DashboardVideoItem["status"]> = ["failed", "expired"];
+    const merged = [...byId.values()].filter((item) => !HIDDEN.includes(item.status));
     merged.sort((a, b) => b.timestamp - a.timestamp);
 
     return NextResponse.json(merged);
