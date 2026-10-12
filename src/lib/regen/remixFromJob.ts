@@ -1,5 +1,6 @@
 import { getVideoQueue, type VideoJobData } from "@/lib/queue/videoQueue";
 import { validateJobId } from "@/lib/validation/input";
+import { isDatabaseConfigured } from "@/lib/db/client";
 
 export type RemixMergeResult =
   | { ok: true; merged: Record<string, unknown>; remixFromJobId: string }
@@ -26,19 +27,26 @@ export async function mergeRemixFromJob(
     return { ok: false, message: jv.error };
   }
 
-  const queue = getVideoQueue();
-  const job = await queue.getJob(remixFromJobId);
-  if (!job) {
-    return { ok: false, message: "Source job not found." };
+  let jd: VideoJobData | undefined;
+  if (opts.userId && isDatabaseConfigured()) {
+    const { findVideoJobForOwners } = await import("@/lib/jobs/videoJobService");
+    const row = await findVideoJobForOwners(remixFromJobId, [opts.userId]);
+    if (row?.job_data) jd = row.job_data;
   }
 
-  const jd = job.data as VideoJobData;
-  const owns =
-    opts.userId != null &&
-    (jd.userId === opts.userId || jd.clientId === opts.userId);
-
-  if (!owns) {
-    return { ok: false, message: "Cannot remix this job (wrong account or session)." };
+  if (!jd) {
+    const job = await getVideoQueue().getJob(remixFromJobId);
+    if (!job) {
+      return { ok: false, message: "Source job not found." };
+    }
+    const queued = job.data as VideoJobData;
+    const owns =
+      opts.userId != null &&
+      (queued.userId === opts.userId || queued.clientId === opts.userId);
+    if (!owns) {
+      return { ok: false, message: "Cannot remix this job (wrong account or session)." };
+    }
+    jd = queued;
   }
 
   const defaults: Record<string, unknown> = stripUndefined({

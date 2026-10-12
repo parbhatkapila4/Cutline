@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { cleanupExpiredBlobs } from "./publish";
+import { cleanupExpiredBlobs, cleanupExpiredUploadBlobs } from "./publish";
 import { FREE_VIDEO_RETENTION_HOURS } from "@/lib/plans";
 const DEFAULT_VIDEO_RETENTION_HOURS = FREE_VIDEO_RETENTION_HOURS;
 export function getTempDirForJob(jobId: string): string {
@@ -20,8 +20,9 @@ export async function cleanupJobArtifacts(jobId: string): Promise<void> {
 
 export async function cleanupExpiredTempDirs(options: {
   olderThanHours: number;
+  skipJobIds?: ReadonlySet<string>;
 }): Promise<{ deleted: number; errors: number }> {
-  const { olderThanHours } = options;
+  const { olderThanHours, skipJobIds } = options;
   const tempRoot = path.join(process.cwd(), "public", "temp");
 
   const cutoff = Date.now() - olderThanHours * 60 * 60 * 1000;
@@ -35,6 +36,7 @@ export async function cleanupExpiredTempDirs(options: {
     const entries = fs.readdirSync(tempRoot, { withFileTypes: true });
     for (const ent of entries) {
       if (!ent.isDirectory()) continue;
+      if (skipJobIds?.has(ent.name)) continue;
       const fullPath = path.join(tempRoot, ent.name);
       const relative = path.relative(path.resolve(tempRoot), path.resolve(fullPath));
       if (relative.startsWith("..") || path.isAbsolute(relative)) continue;
@@ -112,7 +114,7 @@ function getLocalVideoRetentionHours(): number {
   return getVideoRetentionOverrideHours() ?? DEFAULT_VIDEO_RETENTION_HOURS;
 }
 
-function getUploadRetentionHours(): number {
+export function getUploadRetentionHours(): number {
   return parseRetentionHours(
     process.env.UPLOAD_RETENTION_HOURS,
     DEFAULT_UPLOAD_RETENTION_HOURS,
@@ -160,35 +162,31 @@ function safeDeleteDir(
   }
 }
 
-function cleanRenderedVideos(
-  cwd: string,
-  errors: string[]
-): { deleted: number; publicUrls: string[] } {
+type ExpiredRender = { fullPath: string; publicUrl: string };
+
+function findExpiredRenderedVideos(cwd: string, errors: string[]): ExpiredRender[] {
   const hours = getLocalVideoRetentionHours();
-  if (hours === 0) return { deleted: 0, publicUrls: [] };
+  if (hours === 0) return [];
   const cutoff = Date.now() - hours * 60 * 60 * 1000;
-  const counter = { deleted: 0 };
-  const publicUrls: string[] = [];
+  const expired: ExpiredRender[] = [];
   for (const basename of [PUBLIC_TEMP_BASENAME, PUBLIC_OUTPUT_BASENAME]) {
-    cleanRenderedVideosInDir(
+    findExpiredRenderedVideosInDir(
       resolveAllowedDir(cwd, path.join("public", basename)),
       basename,
       cutoff,
       errors,
-      counter,
-      publicUrls
+      expired
     );
   }
-  return { deleted: counter.deleted, publicUrls };
+  return expired;
 }
 
-function cleanRenderedVideosInDir(
+function findExpiredRenderedVideosInDir(
   dir: string,
   publicBasename: string,
   cutoff: number,
   errors: string[],
-  counter: { deleted: number },
-  publicUrls: string[]
+  expired: ExpiredRender[]
 ): void {
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return;
 
@@ -200,11 +198,7 @@ function cleanRenderedVideosInDir(
     try {
       const mtime = fs.statSync(fullPath).mtimeMs;
       if (mtime >= cutoff) continue;
-      const before = counter.deleted;
-      safeDeleteFile(fullPath, errors, counter);
-      if (counter.deleted > before) {
-        publicUrls.push(`/${publicBasename}/${ent.name}`);
-      }
+      expired.push({ fullPath, publicUrl: `/${publicBasename}/${ent.name}` });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`stat failed ${fullPath}: ${msg}`);
@@ -212,7 +206,11 @@ function cleanRenderedVideosInDir(
   }
 }
 
-function cleanTempImageDirs(cwd: string, errors: string[]): number {
+function cleanTempImageDirs(
+  cwd: string,
+  errors: string[],
+  skipJobIds?: ReadonlySet<string>
+): number {
   const retentionMs = getTempImagesRetentionMs();
   const cutoff = Date.now() - retentionMs;
   const counter = { deleted: 0 };
@@ -222,6 +220,7 @@ function cleanTempImageDirs(cwd: string, errors: string[]): number {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const ent of entries) {
     if (!ent.isDirectory()) continue;
+    if (skipJobIds?.has(ent.name)) continue;
     const fullPath = path.join(dir, ent.name);
     if (!isUnderBase(dir, fullPath)) continue;
     try {
@@ -267,7 +266,9 @@ function cleanUploads(cwd: string, errors: string[]): number {
   return counter.deleted;
 }
 
-export async function runCleanup(): Promise<CleanupResult> {
+export async function runCleanup(options?: {
+  skipJobIds?: ReadonlySet<string>;
+}): Promise<CleanupResult> {
   const result: CleanupResult = {
     videosDeleted: 0,
     uploadsDeleted: 0,
@@ -281,26 +282,21 @@ export async function runCleanup(): Promise<CleanupResult> {
 
   const cwd = process.cwd();
 
-  let localVideoUrls: string[] = [];
   try {
-    const videos = cleanRenderedVideos(cwd, result.errors);
-    result.videosDeleted = videos.deleted;
-    localVideoUrls = videos.publicUrls;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    result.errors.push(`rendered videos cleanup: ${msg}`);
-  }
-  if (localVideoUrls.length > 0) {
-    try {
+    const expired = findExpiredRenderedVideos(cwd, result.errors);
+    if (expired.length > 0) {
       const { clearFinalUrls } = await import("@/lib/jobs/videoJobService");
-      const cleared = await clearFinalUrls(localVideoUrls);
+      const cleared = await clearFinalUrls(expired.map((render) => render.publicUrl));
       if (cleared > 0) {
         console.log(`[cleanup] cleared final_url on ${cleared} local render row(s)`);
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      result.errors.push(`local final_url clear: ${msg}`);
+      const counter = { deleted: 0 };
+      for (const render of expired) safeDeleteFile(render.fullPath, result.errors, counter);
+      result.videosDeleted = counter.deleted;
     }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    result.errors.push(`rendered videos cleanup: ${msg}`);
   }
 
   try {
@@ -315,7 +311,7 @@ export async function runCleanup(): Promise<CleanupResult> {
   }
 
   try {
-    result.tempImagesDeleted = cleanTempImageDirs(cwd, result.errors);
+    result.tempImagesDeleted = cleanTempImageDirs(cwd, result.errors, options?.skipJobIds);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     result.errors.push(`temp images cleanup: ${msg}`);
@@ -326,6 +322,15 @@ export async function runCleanup(): Promise<CleanupResult> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     result.errors.push(`uploads cleanup: ${msg}`);
+  }
+
+  try {
+    const uploadBlobs = await cleanupExpiredUploadBlobs(getUploadRetentionHours());
+    result.uploadsDeleted += uploadBlobs.deleted;
+    if (uploadBlobs.errors > 0) result.errors.push(`blob upload cleanup: ${uploadBlobs.errors} error(s)`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    result.errors.push(`blob upload cleanup: ${msg}`);
   }
 
   return result;

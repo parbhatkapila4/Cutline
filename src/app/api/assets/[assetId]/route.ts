@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAssetFilePath, getAssetMetadata } from "@/lib/assets/storage";
+import { getAssetMetadata, getLocalAssetPath } from "@/lib/assets/storage";
 import { requestOwnsResource } from "@/lib/jobs/jobOwnership";
 
 export async function GET(
@@ -11,7 +11,7 @@ export async function GET(
     return NextResponse.json({ error: "Missing assetId." }, { status: 400 });
   }
 
-  const meta = getAssetMetadata(assetId);
+  const meta = await getAssetMetadata(assetId);
   if (!meta) {
     return NextResponse.json({ error: "Asset not found." }, { status: 404 });
   }
@@ -22,7 +22,11 @@ export async function GET(
     }
   }
 
-  const filePath = getAssetFilePath(assetId);
+  if (meta.storage === "blob" && meta.url) {
+    return NextResponse.redirect(meta.url, 302);
+  }
+
+  const filePath = getLocalAssetPath(meta);
   if (!filePath) {
     return NextResponse.json(
       { error: "Asset file not found or storage not local." },

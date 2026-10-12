@@ -15,9 +15,16 @@ try {
   process.exit(1);
 }
 
-import { scheduleCleanupJob, startVideoWorker, deleteStaleJobs, getVideoQueueName } from "@/lib/queue/videoQueue";
+import {
+  removeLegacyCleanupJobs,
+  startVideoWorker,
+  deleteStaleJobs,
+  getActiveJobIds,
+  getVideoQueueName,
+} from "@/lib/queue/videoQueue";
 import { cleanupExpiredTempDirs } from "@/lib/storage/cleanup";
 import { startWorkerHeartbeat, stopWorkerHeartbeat } from "@/lib/queue/heartbeat";
+import { getMaintenanceIntervalMs, startMaintenanceLoop, stopMaintenanceLoop } from "@/lib/queue/maintenance";
 
 const worker = startVideoWorker();
 startWorkerHeartbeat();
@@ -25,7 +32,7 @@ startWorkerHeartbeat();
 const expiredHours = process.env.CLEANUP_EXPIRED_HOURS ? Number(process.env.CLEANUP_EXPIRED_HOURS) : 0;
 if (expiredHours > 0) {
   const runExpired = () => {
-    cleanupExpiredTempDirs({ olderThanHours: expiredHours }).then((r) => {
+    cleanupExpiredTempDirs({ olderThanHours: expiredHours, skipJobIds: getActiveJobIds() }).then((r) => {
       if (r.deleted > 0 || r.errors > 0) {
         console.log("[worker] cleanupExpiredTempDirs deleted=" + r.deleted + " errors=" + r.errors);
       }
@@ -37,9 +44,17 @@ if (expiredHours > 0) {
   console.log("[worker] cleanupExpiredTempDirs scheduled every 60min (olderThanHours=" + expiredHours + ")");
 }
 
-scheduleCleanupJob()
-  .then(() => console.log("[worker] Cleanup job scheduled (every CLEANUP_INTERVAL_HOURS)"))
-  .catch((err) => console.error("[worker] Failed to schedule cleanup job:", err));
+removeLegacyCleanupJobs()
+  .then((removed) => {
+    if (removed > 0) console.log("[worker] Removed " + removed + " legacy cleanup job(s) from the video queue");
+  })
+  .catch((err) => console.error("[worker] Could not remove legacy cleanup jobs:", err));
+
+startMaintenanceLoop();
+console.log(
+  "[worker] Maintenance (cleanup + video_jobs reconciliation) scheduled every " +
+  Math.round(getMaintenanceIntervalMs() / 60_000) + "min"
+);
 
 const retentionDays = process.env.JOB_RETENTION_DAYS != null ? Number(process.env.JOB_RETENTION_DAYS) : 0;
 if (retentionDays > 0) {
@@ -60,6 +75,7 @@ console.log("[worker] Video generation worker started. Queue: " + getVideoQueueN
 
 process.on("SIGTERM", async () => {
   console.log("[worker] SIGTERM received, closing worker…");
+  stopMaintenanceLoop();
   await stopWorkerHeartbeat();
   await worker.close();
   process.exit(0);
@@ -67,6 +83,7 @@ process.on("SIGTERM", async () => {
 
 process.on("SIGINT", async () => {
   console.log("[worker] SIGINT received, closing worker…");
+  stopMaintenanceLoop();
   await stopWorkerHeartbeat();
   await worker.close();
   process.exit(0);

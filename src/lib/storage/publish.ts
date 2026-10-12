@@ -1,7 +1,10 @@
 import fs from "fs";
 import path from "path";
+import type { VideoJobResult, VideoJobVariation } from "@/lib/queue/videoQueue";
 
 const BLOB_PREFIX = "videos";
+const UPLOAD_BLOB_PREFIX = "uploads/";
+const BLOB_DELETE_BATCH = 500;
 
 export function isBlobConfigured(): boolean {
   const t = process.env.BLOB_READ_WRITE_TOKEN;
@@ -47,6 +50,25 @@ export async function publishRenderedVideo(videoUrl: string, jobId: string): Pro
     );
     return videoUrl;
   }
+}
+
+export async function findPublishedVideoForJob(jobId: string): Promise<VideoJobResult | null> {
+  if (!jobId || !isBlobConfigured()) return null;
+  const { list } = await import("@vercel/blob");
+  const res = await list({ prefix: `${BLOB_PREFIX}/${jobId}`, limit: 100 });
+  const urlByName = new Map<string, string>();
+  for (const b of res.blobs) urlByName.set(path.posix.basename(b.pathname), b.url);
+
+  const single = urlByName.get(`${jobId}.mp4`);
+  if (single) return { videoPath: single };
+  const variations: VideoJobVariation[] = [];
+  for (let n = 1; urlByName.has(`${jobId}-v${n}.mp4`); n++) {
+    variations.push({ videoUrl: urlByName.get(`${jobId}-v${n}.mp4`)! });
+  }
+  if (variations.length > 0) return { videoPath: variations[0].videoUrl, variations };
+  const preview = urlByName.get(`${jobId}-preview.mp4`);
+  if (preview) return { videoPath: preview, isPreview: true };
+  return null;
 }
 
 export async function deletePublishedBlob(url: string | undefined | null): Promise<void> {
@@ -107,22 +129,53 @@ export async function cleanupExpiredBlobs(
     }
 
     if (toDelete.length > 0) {
-      await del(toDelete);
       try {
         const { clearFinalUrls } = await import("@/lib/jobs/videoJobService");
         const cleared = await clearFinalUrls(toDelete);
         if (cleared > 0) console.log(`[blob] cleared final_url on ${cleared} expired job row(s)`);
       } catch (e) {
         console.warn(
-          "[blob] could not clear final_url for purged blobs:",
+          "[blob] could not clear final_url for expired blobs; keeping them until the next sweep:",
           e instanceof Error ? e.message : String(e)
         );
+        return { deleted: 0, errors: errors + 1 };
       }
+      await del(toDelete);
     }
     return { deleted: toDelete.length, errors };
   } catch (e) {
     errors += 1;
     console.warn("[blob] cleanupExpiredBlobs failed:", e instanceof Error ? e.message : String(e));
     return { deleted: 0, errors };
+  }
+}
+
+export async function cleanupExpiredUploadBlobs(
+  retentionHours: number
+): Promise<{ deleted: number; errors: number }> {
+  if (!isBlobConfigured() || !(retentionHours > 0)) return { deleted: 0, errors: 0 };
+  const cutoff = Date.now() - retentionHours * 60 * 60 * 1000;
+  const toDelete: string[] = [];
+  try {
+    const { list, del } = await import("@vercel/blob");
+    let cursor: string | undefined;
+    do {
+      const res = await list({ prefix: UPLOAD_BLOB_PREFIX, cursor, limit: 1000 });
+      for (const b of res.blobs) {
+        if (typeof b.pathname !== "string" || !b.pathname.startsWith(UPLOAD_BLOB_PREFIX)) continue;
+        const uploadedAt =
+          b.uploadedAt instanceof Date ? b.uploadedAt.getTime() : new Date(b.uploadedAt).getTime();
+        if (Number.isFinite(uploadedAt) && uploadedAt < cutoff) toDelete.push(b.url);
+      }
+      cursor = res.hasMore ? res.cursor : undefined;
+    } while (cursor);
+
+    for (let i = 0; i < toDelete.length; i += BLOB_DELETE_BATCH) {
+      await del(toDelete.slice(i, i + BLOB_DELETE_BATCH));
+    }
+    return { deleted: toDelete.length, errors: 0 };
+  } catch (e) {
+    console.warn("[blob] cleanupExpiredUploadBlobs failed:", e instanceof Error ? e.message : String(e));
+    return { deleted: 0, errors: 1 };
   }
 }

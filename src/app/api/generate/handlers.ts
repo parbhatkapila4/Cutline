@@ -23,6 +23,7 @@ import { isDatabaseConfigured } from "@/lib/db";
 import { isProPlan } from "@/lib/plans";
 import { auth } from "@/lib/auth";
 import { ensureInProcessWorkerStarted } from "@/lib/queue/autoStartWorker";
+import { getVideoQueueName } from "@/lib/queue/queueName";
 import { validateApiKeyAndGetUserId } from "@/lib/api-keys/service";
 import { mergeRemixFromJob } from "@/lib/regen/remixFromJob";
 import {
@@ -32,14 +33,99 @@ import {
   reservationJobFields,
 } from "@/lib/jobs/admission";
 import { brandKitToPipelineFields, getBrandKitForUser } from "@/lib/brand-kits/service";
-import type { BrandColors } from "@/lib/assets/types";
+import { jobUploadIds, resolveAssetRecords } from "@/lib/assets/storage";
+import type { AssetMetadata, BrandColors } from "@/lib/assets/types";
+import type { VideoJob } from "@/lib/db/types";
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 
 const FREE_MAX_DURATION_SECONDS = 20;
 
+class JobRowWriteError extends Error {
+  readonly jobId: string;
+
+  constructor(jobId: string, cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "JobRowWriteError";
+    this.jobId = jobId;
+  }
+}
+
+async function removeUnqueuedRow(jobId: string): Promise<void> {
+  try {
+    const { deleteOpenVideoJob } = await import("@/lib/jobs/videoJobService");
+    await deleteOpenVideoJob(jobId);
+  } catch (e) {
+    console.error(
+      "[api] could not remove the video_jobs row for unqueued jobId=" + jobId +
+      " error=" + (e instanceof Error ? e.message : String(e))
+    );
+  }
+}
+
 type JobStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
+
+type JobCost = { llm: number; tts: number; video: number; images: number; total: number };
+
+type JobStatusResponse = {
+  status: JobStatus;
+  videoUrl?: string;
+  message?: string;
+  error?: string;
+  failureCode?: string;
+  queuePosition?: number | null;
+  queueEtaSeconds?: number | null;
+  isPreview?: boolean;
+  stage?: string;
+  stageDetail?: string;
+  stageStartedAt?: string;
+  workerOnline?: boolean;
+  cost?: JobCost;
+  variations?: Array<{ videoUrl: string; cost?: JobCost }>;
+  qualityReport?: { passed: boolean; score: number; issues: string[] };
+};
+
+async function findTerminalJobRow(request: Request, jobId: string): Promise<VideoJob | null> {
+  if (!isDatabaseConfigured()) return null;
+  const ownerIds = await resolveOwnerCandidates(request);
+  if (ownerIds.length === 0) return null;
+  const { findVideoJobForOwners, isTerminalVideoJobStatus } = await import("@/lib/jobs/videoJobService");
+  const row = await findVideoJobForOwners(jobId, ownerIds);
+  return row && isTerminalVideoJobStatus(row.status) ? row : null;
+}
+
+async function statusFromRow(row: VideoJob): Promise<JobStatusResponse> {
+  if (row.status === "failed") {
+    const status = mapStateToStatus("failed", row.error);
+    if (status === "cancelled") return { status };
+    const { getUserFriendlyErrorMessage, mapFailedReasonToFailureCode } = await import("@/lib/utils/error");
+    return {
+      status,
+      error: getUserFriendlyErrorMessage(row.error ?? "Job failed."),
+      failureCode: mapFailedReasonToFailureCode(row.error),
+    };
+  }
+  const result = row.result ?? undefined;
+  const response: JobStatusResponse = { status: "completed" };
+  if (result?.variations && result.variations.length > 0) {
+    response.videoUrl = result.variations[0].videoUrl;
+    response.variations = result.variations;
+  } else if (row.final_url) {
+    response.videoUrl = row.final_url;
+  }
+  if (result?.message) response.message = result.message;
+  if (result?.isPreview === true) response.isPreview = true;
+  if (result?.cost) response.cost = result.cost;
+  if (result?.qualityReport) {
+    response.qualityReport = {
+      passed: result.qualityReport.passed,
+      score: result.qualityReport.score,
+      issues: result.qualityReport.issues,
+    };
+  }
+  return response;
+}
 
 function mapStateToStatus(state: string, failedReason?: string | null): JobStatus {
   if (state === "failed" && failedReason?.includes("cancelled")) {
@@ -344,6 +430,50 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
     });
   }
 
+  const uploadIds = jobUploadIds(data);
+  let uploadedAssets: AssetMetadata[] = [];
+  if (uploadIds.length > 0) {
+    let lookup: { found: AssetMetadata[]; missing: string[] };
+    try {
+      lookup = await resolveAssetRecords(uploadIds);
+    } catch (e) {
+      const { logServerError } = await import("@/lib/utils/error");
+      logServerError("POST /api/generate (asset lookup)", e);
+      return apiError({
+        code: ErrorCode.INTERNAL_ERROR,
+        message: "Your uploaded files could not be checked. Please try again.",
+        status: 503,
+        headers,
+      });
+    }
+    if (lookup.missing.length > 0) {
+      return apiError({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: "Your uploaded files are no longer available. Please upload them again.",
+        status: 400,
+        details: {
+          errors: [{ field: "assetIds", message: "Unknown or expired asset id." }],
+          missing: lookup.missing,
+        },
+        headers,
+      });
+    }
+    const avatarId = data.avatar?.mode === "upload" ? data.avatar.uploadAssetId : undefined;
+    const avatarAsset = avatarId ? lookup.found.find((a) => a.id === avatarId) : undefined;
+    if (avatarAsset && avatarAsset.type !== "referenceImage") {
+      return apiError({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: "Uploaded avatar image is invalid. Please re-upload your photo and try again.",
+        status: 400,
+        details: {
+          errors: [{ field: "avatar.uploadAssetId", message: "Must be an uploaded reference image." }],
+        },
+        headers,
+      });
+    }
+    uploadedAssets = lookup.found;
+  }
+
   const creditsIdentifier = userId;
 
   const spendIdentifier = userId;
@@ -373,6 +503,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       requestId,
       ...(userId ? { userId } : {}),
       ...(data.assetIds?.length ? { assetIds: data.assetIds } : {}),
+      ...(uploadedAssets.length ? { assets: uploadedAssets } : {}),
       ...(data.brandColors ? { brandColors: data.brandColors } : {}),
       mode: admission.mode,
       durationSeconds: data.durationSeconds,
@@ -406,43 +537,41 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       ...(remixSourceJobId ? { remixFromJobId: remixSourceJobId } : {}),
     };
 
-    const newJobId = randomUUID();
-    const queueAddOptions = { jobId: newJobId };
-
-    if (isDatabaseConfigured()) {
-      try {
-        const { createVideoJob } = await import("@/lib/jobs/videoJobService");
-        await createVideoJob({
-          owner_type: "user",
-          owner_id: userId,
-          prompt: typeof data.input === "string" ? data.input : String(data.input ?? ""),
-          status: "queued",
-          queue_job_id: newJobId,
-        });
-      } catch (e) {
-        console.error(
-          "[api] POST /api/generate could not persist video_jobs row jobId=" +
-          newJobId +
-          " error=" +
-          (e instanceof Error ? e.message : String(e))
-        );
-        return apiError({
-          code: ErrorCode.INTERNAL_ERROR,
-          message: "Could not start the job. Please try again.",
-          status: 500,
-          headers,
-        });
+    const enqueue = async (): Promise<string> => {
+      const newJobId = randomUUID();
+      const writeRow = isDatabaseConfigured();
+      if (writeRow) {
+        try {
+          const { createVideoJob } = await import("@/lib/jobs/videoJobService");
+          await createVideoJob({
+            owner_type: "user",
+            owner_id: userId,
+            prompt: typeof data.input === "string" ? data.input : String(data.input ?? ""),
+            status: "queued",
+            queue_job_id: newJobId,
+            job_data: jobPayload,
+            queue_name: getVideoQueueName(),
+          });
+        } catch (e) {
+          throw new JobRowWriteError(newJobId, e);
+        }
       }
-    }
+      try {
+        const job = await queue.add("video", jobPayload, { jobId: newJobId });
+        queued = true;
+        return String(job.id);
+      } catch (e) {
+        if (writeRow) await removeUnqueuedRow(newJobId);
+        throw e;
+      }
+    };
 
     if (idempotencyKey) {
       const result = await withIdempotencyLock(idempotencyKey, async () => {
         const again = getIdempotencyResult(idempotencyKey);
         if (again) return again.responseBody as { jobId: string };
-        const job = await queue.add("video", jobPayload, queueAddOptions);
-        queued = true;
+        const jobId = await enqueue();
         await incrementApiCallsThisMonth(creditsIdentifier);
-        const jobId = String(job.id);
         const responseBody = { jobId };
         setIdempotencyResult(idempotencyKey, {
           jobId,
@@ -455,16 +584,28 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
       return NextResponse.json(result, { headers });
     }
 
-    const job = await queue.add("video", jobPayload, queueAddOptions);
-    queued = true;
+    const jobId = await enqueue();
     await incrementApiCallsThisMonth(creditsIdentifier);
-    const jobId = String(job.id);
     console.log("[api] POST /api/generate requestId=" + requestId + " jobId=" + jobId);
     return NextResponse.json(
       { jobId, ...(admission.notice ? { notice: admission.notice } : {}) },
       { headers }
     );
   } catch (e) {
+    if (e instanceof JobRowWriteError) {
+      console.error(
+        "[api] POST /api/generate could not persist video_jobs row jobId=" +
+        e.jobId +
+        " error=" +
+        e.message
+      );
+      return apiError({
+        code: ErrorCode.INTERNAL_ERROR,
+        message: "Could not start the job. Please try again.",
+        status: 500,
+        headers,
+      });
+    }
     const { logServerError } = await import("@/lib/utils/error");
     logServerError("POST /api/generate", e);
     const errMsg = e instanceof Error ? e.message : String(e);
@@ -530,7 +671,38 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
   try {
     const queue = getVideoQueue();
     const job = await queue.getJob(jobId);
-    if (!job) {
+    if (job) {
+      const owns = await requestOwnsResource(
+        request,
+        (job.data as { clientId?: string } | undefined)?.clientId
+      );
+      if (!owns) {
+        console.log("[api] GET /api/generate/[jobId] jobId=" + jobId + " status=404 (not owner)");
+        return apiError({
+          code: ErrorCode.JOB_NOT_FOUND,
+          message: "Job not found.",
+          status: 404,
+          headers: corsHeaders,
+        });
+      }
+    }
+
+    const state = job ? await job.getState() : null;
+    if (!job || state === "completed" || state === "failed") {
+      const row = await findTerminalJobRow(request, jobId);
+      if (row?.status === "completed" && !row.final_url) {
+        return apiError({
+          code: ErrorCode.VIDEO_NOT_FOUND,
+          message: "Video file not found. It may have been cleaned up.",
+          status: 404,
+          headers: corsHeaders,
+        });
+      }
+      if (row) {
+        return NextResponse.json(await statusFromRow(row), { headers: corsHeaders });
+      }
+    }
+    if (!job || !state) {
       console.log("[api] GET /api/generate/[jobId] jobId=" + jobId + " status=404");
       return apiError({
         code: ErrorCode.JOB_NOT_FOUND,
@@ -540,41 +712,10 @@ export async function handleJobGet(request: Request, jobId: string): Promise<Nex
       });
     }
 
-    const owns = await requestOwnsResource(
-      request,
-      (job.data as { clientId?: string } | undefined)?.clientId
-    );
-    if (!owns) {
-      console.log("[api] GET /api/generate/[jobId] jobId=" + jobId + " status=404 (not owner)");
-      return apiError({
-        code: ErrorCode.JOB_NOT_FOUND,
-        message: "Job not found.",
-        status: 404,
-        headers: corsHeaders,
-      });
-    }
-
-    const state = await job.getState();
     const failedReason = job.failedReason;
     const status: JobStatus = mapStateToStatus(state, failedReason);
 
-    const response: {
-      status: JobStatus;
-      videoUrl?: string;
-      message?: string;
-      error?: string;
-      failureCode?: string;
-      queuePosition?: number | null;
-      queueEtaSeconds?: number | null;
-      isPreview?: boolean;
-      stage?: string;
-      stageDetail?: string;
-      stageStartedAt?: string;
-      workerOnline?: boolean;
-      cost?: { llm: number; tts: number; video: number; images: number; total: number };
-      variations?: Array<{ videoUrl: string; cost?: { llm: number; tts: number; video: number; images: number; total: number } }>;
-      qualityReport?: { passed: boolean; score: number; issues: string[] };
-    } = { status };
+    const response: JobStatusResponse = { status };
 
     if (status === "pending") {
       const qm = await getQueueWaitMetrics(jobId);
@@ -778,19 +919,24 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
   try {
     const queue = getVideoQueue();
     const job = await queue.getJob(jobId);
-    if (!job) {
-      return apiError({
-        code: ErrorCode.JOB_NOT_FOUND,
-        message: "Job not found.",
-        status: 404,
-        headers: corsHeaders,
-      });
+    if (job) {
+      const owns = await requestOwnsResource(
+        request,
+        (job.data as { clientId?: string } | undefined)?.clientId
+      );
+      if (!owns) {
+        return apiError({
+          code: ErrorCode.JOB_NOT_FOUND,
+          message: "Job not found.",
+          status: 404,
+          headers: corsHeaders,
+        });
+      }
     }
-    const owns = await requestOwnsResource(
-      request,
-      (job.data as { clientId?: string } | undefined)?.clientId
-    );
-    if (!owns) {
+
+    const state = job ? await job.getState() : null;
+    const row = !job || state === "completed" ? await findTerminalJobRow(request, jobId) : null;
+    if (!job && !row) {
       return apiError({
         code: ErrorCode.JOB_NOT_FOUND,
         message: "Job not found.",
@@ -799,8 +945,20 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
       });
     }
 
-    const state = await job.getState();
-    if (state !== "completed") {
+    let result: VideoJobResult | undefined;
+    if (row?.status === "completed") {
+      if (!row.final_url) {
+        return apiError({
+          code: ErrorCode.VIDEO_NOT_FOUND,
+          message: "Video file not found. It may have been cleaned up.",
+          status: 404,
+          headers: corsHeaders,
+        });
+      }
+      result = { ...(row.result ?? {}), videoPath: row.final_url };
+    } else if (job && state === "completed") {
+      result = job.returnvalue as VideoJobResult | undefined;
+    } else {
       return apiError({
         code: ErrorCode.JOB_NOT_READY,
         message: "Video not ready. Job is not completed.",
@@ -809,7 +967,6 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
       });
     }
 
-    const result = job.returnvalue as VideoJobResult | undefined;
     let videoPath: string | undefined;
 
     if (result?.variations && result.variations.length > 0) {

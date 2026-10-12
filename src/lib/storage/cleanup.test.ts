@@ -12,10 +12,22 @@ const blobState = {
   deleted: [] as string[],
 };
 
+const events: string[] = [];
+
+const pathnameOf = (url: string) => new URL(url).pathname.replace(/^\//, "");
+
 vi.mock("@vercel/blob", () => ({
-  list: async () => ({ blobs: blobState.blobs, hasMore: false, cursor: undefined }),
+  list: async (options?: { prefix?: string }) => ({
+    blobs: blobState.blobs
+      .map((b) => ({ ...b, pathname: pathnameOf(b.url) }))
+      .filter((b) => !options?.prefix || b.pathname.startsWith(options.prefix)),
+    hasMore: false,
+    cursor: undefined,
+  }),
   del: async (urls: string | string[]) => {
-    blobState.deleted.push(...(Array.isArray(urls) ? urls : [urls]));
+    const list = Array.isArray(urls) ? urls : [urls];
+    blobState.deleted.push(...list);
+    events.push(...list.map((url) => `del ${url}`));
   },
   put: async () => {
     throw new Error("put() should not be reached by these tests");
@@ -26,6 +38,7 @@ const dbState = {
   planByUrl: new Map<string, string>(),
   planLookupCalls: 0,
   cleared: [] as string[],
+  clearError: null as Error | null,
 };
 
 vi.mock("@/lib/jobs/videoJobService", () => ({
@@ -39,13 +52,18 @@ vi.mock("@/lib/jobs/videoJobService", () => ({
     return out;
   },
   clearFinalUrls: async (urls: string[]) => {
+    if (dbState.clearError) throw dbState.clearError;
     dbState.cleared.push(...urls);
+    events.push(...urls.map((url) => `clear ${url}`));
     return urls.length;
   },
 }));
 
-const { cleanupExpiredBlobs, publishRenderedVideo } = await import("@/lib/storage/publish");
-const { getVideoRetentionOverrideHours, runCleanup } = await import("@/lib/storage/cleanup");
+const { cleanupExpiredBlobs, cleanupExpiredUploadBlobs, findPublishedVideoForJob, publishRenderedVideo } =
+  await import("@/lib/storage/publish");
+const { cleanupExpiredTempDirs, getVideoRetentionOverrideHours, runCleanup } = await import(
+  "@/lib/storage/cleanup"
+);
 const { FREE_VIDEO_RETENTION_HOURS, PAID_VIDEO_RETENTION_HOURS } = await import("@/lib/plans");
 
 const ENV_KEYS = [
@@ -68,6 +86,8 @@ beforeEach(() => {
   dbState.planByUrl = new Map();
   dbState.planLookupCalls = 0;
   dbState.cleared = [];
+  dbState.clearError = null;
+  events.length = 0;
 });
 
 afterEach(() => {
@@ -289,5 +309,230 @@ describe("no-Blob-token path: local URL form matches what publish wrote", () => 
     expect(result.videosDeleted).toBe(0);
     expect(fs.existsSync(filePath)).toBe(true);
     expect(dbState.cleared).toEqual([]);
+  });
+});
+
+describe("cleanupExpiredBlobs: the row is cleared before the blob is deleted", () => {
+  const blobUrl = "https://blob.example.com/videos/job-9.mp4";
+
+  beforeEach(() => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    blobState.blobs = [
+      { url: blobUrl, uploadedAt: new Date(Date.now() - (FREE_VIDEO_RETENTION_HOURS + 6) * HOUR_MS) },
+    ];
+  });
+
+  it("clears final_url first, then deletes the blob", async () => {
+    const res = await cleanupExpiredBlobs({ overrideHours: null });
+
+    expect(res.deleted).toBe(1);
+    expect(events).toEqual([`clear ${blobUrl}`, `del ${blobUrl}`]);
+  });
+
+  it("keeps the blob when the row cannot be cleared, so no row is left pointing at a deleted file", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => { });
+    dbState.clearError = new Error("db down");
+
+    const res = await cleanupExpiredBlobs({ overrideHours: null });
+
+    expect(res).toEqual({ deleted: 0, errors: 1 });
+    expect(blobState.deleted).toEqual([]);
+  });
+});
+
+describe("cleanupExpiredUploadBlobs: uploads older than the window are deleted", () => {
+  const upload = (name: string, hours: number): FakeBlob => ({
+    url: `https://blob.example.com/uploads/${name}`,
+    uploadedAt: new Date(Date.now() - hours * HOUR_MS),
+  });
+
+  beforeEach(() => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+  });
+
+  it("deletes an upload past the window and keeps a newer one", async () => {
+    blobState.blobs = [upload("old.png", 25), upload("new.png", 23)];
+
+    const res = await cleanupExpiredUploadBlobs(24);
+
+    expect(res).toEqual({ deleted: 1, errors: 0 });
+    expect(blobState.deleted).toEqual(["https://blob.example.com/uploads/old.png"]);
+  });
+
+  it("never touches a rendered video", async () => {
+    blobState.blobs = [
+      { url: "https://blob.example.com/videos/job-1.mp4", uploadedAt: new Date(Date.now() - 48 * HOUR_MS) },
+    ];
+
+    const res = await cleanupExpiredUploadBlobs(24);
+
+    expect(res.deleted).toBe(0);
+    expect(blobState.deleted).toEqual([]);
+  });
+
+  it("keeps every upload when the window is 0", async () => {
+    blobState.blobs = [upload("old.png", 1000)];
+
+    const res = await cleanupExpiredUploadBlobs(0);
+
+    expect(res.deleted).toBe(0);
+    expect(blobState.deleted).toEqual([]);
+  });
+
+  it("does nothing without a Blob token", async () => {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    blobState.blobs = [upload("old.png", 48)];
+
+    const res = await cleanupExpiredUploadBlobs(24);
+
+    expect(res).toEqual({ deleted: 0, errors: 0 });
+  });
+});
+
+describe("runCleanup in a scratch directory", () => {
+  let tmpRoot: string;
+  let originalCwd: string;
+
+  const ageBy = (target: string, hours: number) => {
+    const t = (Date.now() - hours * HOUR_MS) / 1000;
+    fs.utimesSync(target, t, t);
+  };
+
+  const enterTmpRoot = () => {
+    process.chdir(tmpRoot);
+    const cwd = fs.realpathSync(process.cwd());
+    if (!cwd.startsWith(fs.realpathSync(os.tmpdir()))) {
+      throw new Error(`refusing to run cleanup outside tmpdir (cwd=${cwd})`);
+    }
+  };
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cutline-cleanup-"));
+    fs.mkdirSync(path.join(tmpRoot, "public", "temp"), { recursive: true });
+  });
+
+  afterEach(() => {
+    try {
+      process.chdir(originalCwd);
+    } catch {
+    }
+    try {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    } catch {
+    }
+  });
+
+  it("deletes Blob uploads older than 24 hours by default", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    blobState.blobs = [
+      { url: "https://blob.example.com/uploads/old.png", uploadedAt: new Date(Date.now() - 25 * HOUR_MS) },
+      { url: "https://blob.example.com/uploads/new.png", uploadedAt: new Date(Date.now() - 23 * HOUR_MS) },
+      { url: "https://blob.example.com/videos/recent.mp4", uploadedAt: new Date(Date.now() - 2 * HOUR_MS) },
+    ];
+    enterTmpRoot();
+
+    const result = await runCleanup();
+
+    expect(result.uploadsDeleted).toBe(1);
+    expect(blobState.deleted).toEqual(["https://blob.example.com/uploads/old.png"]);
+  });
+
+  it("keeps an expired local render when its row cannot be cleared", async () => {
+    const filePath = path.join(tmpRoot, "public", "temp", "job-local-3.mp4");
+    fs.writeFileSync(filePath, "not really an mp4");
+    ageBy(filePath, 48);
+    dbState.clearError = new Error("db down");
+    enterTmpRoot();
+
+    const result = await runCleanup();
+
+    expect(result.videosDeleted).toBe(0);
+    expect(fs.existsSync(filePath)).toBe(true);
+    expect(result.errors).toEqual(expect.arrayContaining([expect.stringContaining("db down")]));
+  });
+
+  it("leaves the working folder of a job that is still rendering", async () => {
+    const active = path.join(tmpRoot, "public", "temp", "job-active");
+    const finished = path.join(tmpRoot, "public", "temp", "job-finished");
+    for (const dir of [active, finished]) {
+      fs.mkdirSync(dir);
+      fs.writeFileSync(path.join(dir, "frame.png"), "x");
+      ageBy(dir, 2);
+    }
+    enterTmpRoot();
+
+    const result = await runCleanup({ skipJobIds: new Set(["job-active"]) });
+
+    expect(result.tempImagesDeleted).toBe(1);
+    expect(fs.existsSync(active)).toBe(true);
+    expect(fs.existsSync(finished)).toBe(false);
+  });
+
+  it("cleanupExpiredTempDirs also leaves a job that is still rendering", async () => {
+    const active = path.join(tmpRoot, "public", "temp", "job-active");
+    const finished = path.join(tmpRoot, "public", "temp", "job-finished");
+    for (const dir of [active, finished]) {
+      fs.mkdirSync(dir);
+      ageBy(dir, 5);
+    }
+    enterTmpRoot();
+
+    const result = await cleanupExpiredTempDirs({ olderThanHours: 1, skipJobIds: new Set(["job-active"]) });
+
+    expect(result).toEqual({ deleted: 1, errors: 0 });
+    expect(fs.existsSync(active)).toBe(true);
+    expect(fs.existsSync(finished)).toBe(false);
+  });
+});
+
+describe("findPublishedVideoForJob: finds a finished video by the name the worker gave it", () => {
+  const JOB = "5e0c3a2b-8f1d-4b6a-9c7e-1a2b3c4d5e6f";
+  const OTHER = "5e0c3a2b-8f1d-4b6a-9c7e-ffffffffffff";
+  const at = (name: string): FakeBlob => ({
+    url: `https://blob.example.com/videos/${name}`,
+    uploadedAt: new Date(),
+  });
+
+  beforeEach(() => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+  });
+
+  it("returns the single render", async () => {
+    blobState.blobs = [at(`${JOB}.mp4`), at(`${OTHER}.mp4`)];
+
+    expect(await findPublishedVideoForJob(JOB)).toEqual({
+      videoPath: `https://blob.example.com/videos/${JOB}.mp4`,
+    });
+  });
+
+  it("returns variations in order, with the first as the main video", async () => {
+    blobState.blobs = [at(`${JOB}-v2.mp4`), at(`${JOB}-v1.mp4`)];
+
+    expect(await findPublishedVideoForJob(JOB)).toEqual({
+      videoPath: `https://blob.example.com/videos/${JOB}-v1.mp4`,
+      variations: [
+        { videoUrl: `https://blob.example.com/videos/${JOB}-v1.mp4` },
+        { videoUrl: `https://blob.example.com/videos/${JOB}-v2.mp4` },
+      ],
+    });
+  });
+
+  it("marks a preview render as a preview", async () => {
+    blobState.blobs = [at(`${JOB}-preview.mp4`)];
+
+    expect(await findPublishedVideoForJob(JOB)).toEqual({
+      videoPath: `https://blob.example.com/videos/${JOB}-preview.mp4`,
+      isPreview: true,
+    });
+  });
+
+  it("returns null when nothing was published for the job, or Blob is not configured", async () => {
+    blobState.blobs = [at(`${OTHER}.mp4`)];
+    expect(await findPublishedVideoForJob(JOB)).toBeNull();
+
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    blobState.blobs = [at(`${JOB}.mp4`)];
+    expect(await findPublishedVideoForJob(JOB)).toBeNull();
   });
 });

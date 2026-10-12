@@ -85,6 +85,9 @@ export async function POST(request: Request) {
     const analyzed = await analyzeAssets(ids, validBrandColors);
     return NextResponse.json(analyzed);
   } catch (e) {
+    if (e instanceof Error && e.name === "AssetNotFoundError") {
+      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
+    }
     const { logServerError, sanitizeErrorMessage } = await import("@/lib/utils/error");
     logServerError("POST /api/assets/analyze", e);
     return NextResponse.json({ error: sanitizeErrorMessage(e) }, { status: 500 });

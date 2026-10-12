@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData } from "@/lib/queue/videoQueue";
+import { getVideoQueueName } from "@/lib/queue/queueName";
+import { jobUploadIds, resolveAssetRecords } from "@/lib/assets/storage";
+import type { AssetMetadata } from "@/lib/assets/types";
 import { validateJobId } from "@/lib/validation/input";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { resolveOwnerCandidates } from "@/lib/jobs/jobOwnership";
@@ -19,6 +22,26 @@ import {
 } from "@/lib/jobs/admission";
 
 type EditBody = { message?: unknown };
+
+type EditSource = { data: VideoJobData; clientId: string };
+
+async function loadEditSource(request: Request, jobId: string): Promise<EditSource | null> {
+  const ownerCandidates = await resolveOwnerCandidates(request);
+  if (isDatabaseConfigured()) {
+    const { findVideoJobForOwners } = await import("@/lib/jobs/videoJobService");
+    const row = ownerCandidates.length > 0 ? await findVideoJobForOwners(jobId, ownerCandidates) : null;
+    if (!row || row.status !== "completed") return null;
+    if (row.job_data) return { data: row.job_data, clientId: row.owner_id };
+  }
+
+  const job = await getVideoQueue().getJob(jobId);
+  if (!job || job.name === CLEANUP_JOB_NAME) return null;
+  if ((await job.getState()) !== "completed") return null;
+  const data = job.data as VideoJobData | undefined;
+  const clientId = data?.clientId;
+  if (!data || clientId == null || !ownerCandidates.includes(String(clientId))) return null;
+  return { data, clientId: String(clientId) };
+}
 
 export async function POST(
   request: Request,
@@ -66,41 +89,14 @@ export async function POST(
   let queued = false;
   try {
     const queue = getVideoQueue();
-    const job = await queue.getJob(jobId);
-    if (!job) {
+    const source = await loadEditSource(request, jobId);
+    if (!source) {
       return NextResponse.json(
         { error: "Video not found" },
         { status: 404 }
       );
     }
-    if (job.name === CLEANUP_JOB_NAME) {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
-    }
-
-    const state = await job.getState();
-    if (state !== "completed") {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
-    }
-
-    const data = job.data as VideoJobData | undefined;
-    const clientId = data?.clientId;
-    const ownerCandidates = await resolveOwnerCandidates(request);
-    if (
-      clientId === undefined ||
-      clientId === null ||
-      !ownerCandidates.includes(String(clientId))
-    ) {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
-    }
+    const { data, clientId } = source;
 
     const originalInput = typeof data?.input === "string" && data.input.trim() !== ""
       ? data.input.trim()
@@ -133,11 +129,35 @@ export async function POST(
       }
     }
 
+    const uploadIds = jobUploadIds({ assetIds: data?.assetIds });
+    let uploadedAssets: AssetMetadata[] = [];
+    if (uploadIds.length > 0) {
+      let lookup: { found: AssetMetadata[]; missing: string[] };
+      try {
+        lookup = await resolveAssetRecords(uploadIds);
+      } catch (e) {
+        const { logServerError } = await import("@/lib/utils/error");
+        logServerError("POST /api/dashboard/videos/[jobId]/edit (asset lookup)", e);
+        return NextResponse.json(
+          { error: "Your uploaded files could not be checked. Please try again." },
+          { status: 503 }
+        );
+      }
+      if (lookup.missing.length > 0) {
+        return NextResponse.json(
+          { error: "Your uploaded files are no longer available. Please upload them again." },
+          { status: 400 }
+        );
+      }
+      uploadedAssets = lookup.found;
+    }
+
     const jobData: Omit<VideoJobData, "input"> = {
       ...(data?.clientId ? { clientId: data.clientId } : {}),
       ...(data?.mode ? { mode: data.mode } : {}),
       ...(data?.durationSeconds !== undefined ? { durationSeconds: data.durationSeconds } : {}),
       ...(Array.isArray(data?.assetIds) && data.assetIds.length > 0 ? { assetIds: data.assetIds } : {}),
+      ...(uploadedAssets.length > 0 ? { assets: uploadedAssets } : {}),
       ...(data?.brandColors ? { brandColors: data.brandColors } : {}),
       ...(typeof data?.textModel === "string" && data.textModel.trim() !== "" ? { textModel: data.textModel.trim() } : {}),
       ...(data?.captions === "on" || data?.captions === "off" ? { captions: data.captions } : {}),
@@ -170,7 +190,14 @@ export async function POST(
     }
 
     const newJobId = randomUUID();
-    if (isDatabaseConfigured()) {
+    const payload: VideoJobData = {
+      ...jobData,
+      input: newInput,
+      mode: admission.mode,
+      ...reservationJobFields(reservation),
+    };
+    const writeRow = isDatabaseConfigured();
+    if (writeRow) {
       try {
         const { createVideoJob } = await import("@/lib/jobs/videoJobService");
         await createVideoJob({
@@ -179,6 +206,8 @@ export async function POST(
           prompt: newInput,
           status: "queued",
           queue_job_id: newJobId,
+          job_data: payload,
+          queue_name: getVideoQueueName(),
         });
       } catch (e) {
         console.error(
@@ -192,16 +221,23 @@ export async function POST(
       }
     }
 
-    const newJob = await queue.add(
-      "video",
-      {
-        ...jobData,
-        input: newInput,
-        mode: admission.mode,
-        ...reservationJobFields(reservation),
-      },
-      { jobId: newJobId }
-    );
+    let newJob;
+    try {
+      newJob = await queue.add("video", payload, { jobId: newJobId });
+    } catch (e) {
+      if (writeRow) {
+        try {
+          const { deleteOpenVideoJob } = await import("@/lib/jobs/videoJobService");
+          await deleteOpenVideoJob(newJobId);
+        } catch (cleanupError) {
+          console.error(
+            "[api] POST /api/dashboard/videos/[jobId]/edit could not remove the row for unqueued jobId=" +
+            newJobId + " error=" + (cleanupError instanceof Error ? cleanupError.message : String(cleanupError))
+          );
+        }
+      }
+      throw e;
+    }
     queued = true;
     const returnedJobId = String(newJob.id);
     console.log("[api] POST /api/dashboard/videos/[jobId]/edit jobId=" + jobId + " newJobId=" + returnedJobId);

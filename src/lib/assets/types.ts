@@ -4,6 +4,8 @@ export type AssetType =
   | "referenceVideo"
   | "referenceImage";
 
+export type AssetStorage = "local" | "blob";
+
 export interface AssetMetadata {
   id: string;
   type: AssetType;
@@ -11,6 +13,13 @@ export interface AssetMetadata {
   originalFilename: string;
   mimeType: string;
   ownerId?: string;
+  storage?: AssetStorage;
+  url?: string;
+}
+
+export interface ResolvedAsset {
+  meta: AssetMetadata;
+  filePath: string;
 }
 
 export interface BrandColors {

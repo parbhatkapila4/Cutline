@@ -590,8 +590,17 @@ export default function CreatePage() {
         const fd = new FormData();
         imgs.forEach((f) => fd.append("productPhotos", f));
         const u = await fetch("/api/assets/upload", { method: "POST", body: fd });
-        const ud = await u.json();
-        if (u.ok && ud.assetIds) assetIds = ud.assetIds;
+        const ud = await u.json().catch(() => null);
+        const uploadedIds = Array.isArray(ud?.assetIds) ? ud.assetIds.map(String) : [];
+        if (!u.ok || uploadedIds.length !== imgs.length) {
+          setError(
+            typeof ud?.error === "string" && ud.error.trim()
+              ? ud.error
+              : "Photo upload failed. Please try again."
+          );
+          return;
+        }
+        assetIds = uploadedIds;
       }
       if (mode === "talking_object" && objStyle === "real" && avatarMode === "upload") {
         if (!avatarFile) {
@@ -601,8 +610,8 @@ export default function CreatePage() {
         const fd = new FormData();
         fd.append("referenceImages", avatarFile);
         const uploadRes = await fetch("/api/assets/upload", { method: "POST", body: fd });
-        const uploadData = await uploadRes.json();
-        if (!uploadRes.ok || !Array.isArray(uploadData.assetIds) || uploadData.assetIds.length === 0) {
+        const uploadData = await uploadRes.json().catch(() => null);
+        if (!uploadRes.ok || !Array.isArray(uploadData?.assetIds) || uploadData.assetIds.length === 0) {
           const uploadError =
             typeof uploadData?.error === "string" && uploadData.error.trim()
               ? uploadData.error

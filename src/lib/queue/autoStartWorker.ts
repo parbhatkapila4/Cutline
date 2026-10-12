@@ -17,7 +17,7 @@ export async function ensureInProcessWorkerStarted(): Promise<void> {
   if (!shouldAutoStartWorker()) return;
   if (globalThis.__cutlineInProcessWorkerStarted) return;
 
-  const { startVideoWorker, scheduleCleanupJob } = await import("@/lib/queue/videoQueue");
+  const { startVideoWorker } = await import("@/lib/queue/videoQueue");
   const worker = startVideoWorker();
   globalThis.__cutlineInProcessWorker = worker;
   globalThis.__cutlineInProcessWorkerStarted = true;
@@ -30,13 +30,25 @@ export async function ensureInProcessWorkerStarted(): Promise<void> {
       e instanceof Error ? e.message : String(e)
     );
   }
-  try {
-    await scheduleCleanupJob();
-  } catch (e) {
-    console.warn(
-      "[worker] scheduleCleanupJob failed:",
-      e instanceof Error ? e.message : String(e)
-    );
+  if (process.env.NODE_ENV !== "test") {
+    try {
+      const { removeLegacyCleanupJobs } = await import("@/lib/queue/videoQueue");
+      await removeLegacyCleanupJobs();
+    } catch (e) {
+      console.warn(
+        "[worker] removeLegacyCleanupJobs failed:",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+    try {
+      const { startMaintenanceLoop } = await import("@/lib/queue/maintenance");
+      startMaintenanceLoop();
+    } catch (e) {
+      console.warn(
+        "[worker] startMaintenanceLoop failed:",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
   }
   console.log("[worker] In-process video worker started");
 }

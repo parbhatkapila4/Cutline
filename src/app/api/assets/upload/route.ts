@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { storeAsset } from "@/lib/assets/storage";
+import { deleteStoredAsset, storeAsset } from "@/lib/assets/storage";
 import {
   validateLogo,
   validateProductPhoto,
@@ -8,9 +8,17 @@ import {
   validateBufferCorrupt,
   limits,
 } from "@/lib/assets/validation";
-import type { AssetMetadata } from "@/lib/assets/types";
+import type { AssetMetadata, AssetType } from "@/lib/assets/types";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { resolveOwnerIdentifier } from "@/lib/jobs/jobOwnership";
+
+type PendingAsset = {
+  buffer: Buffer;
+  type: AssetType;
+  name: string;
+  mimeType: string;
+};
+
 export async function POST(request: Request) {
   const identifier = getClientIdentifier(request);
   const limit = await checkRateLimit(identifier, "upload");
@@ -34,7 +42,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const uploaded: AssetMetadata[] = [];
+  const pending: PendingAsset[] = [];
   const errors: string[] = [];
 
   const logoFiles = formData.getAll("logo").filter((f): f is File => f instanceof File && f.size > 0);
@@ -51,8 +59,7 @@ export async function POST(request: Request) {
       if (corruptErr) {
         errors.push(corruptErr);
       } else {
-        const meta = storeAsset(buffer, "logo", logo.name, logo.type, ownerId);
-        uploaded.push(meta);
+        pending.push({ buffer, type: "logo", name: logo.name, mimeType: logo.type });
       }
     }
   }
@@ -74,8 +81,7 @@ export async function POST(request: Request) {
         errors.push(corruptErr);
         break;
       }
-      const meta = storeAsset(buffer, "productPhoto", file.name, file.type, ownerId);
-      uploaded.push(meta);
+      pending.push({ buffer, type: "productPhoto", name: file.name, mimeType: file.type });
     }
   }
 
@@ -93,8 +99,7 @@ export async function POST(request: Request) {
       if (corruptErr) {
         errors.push(corruptErr);
       } else {
-        const meta = storeAsset(buffer, "referenceVideo", referenceVideo.name, referenceVideo.type, ownerId);
-        uploaded.push(meta);
+        pending.push({ buffer, type: "referenceVideo", name: referenceVideo.name, mimeType: referenceVideo.type });
       }
     }
   }
@@ -116,8 +121,7 @@ export async function POST(request: Request) {
         errors.push(corruptErr);
         break;
       }
-      const meta = storeAsset(buffer, "referenceImage", file.name, file.type, ownerId);
-      uploaded.push(meta);
+      pending.push({ buffer, type: "referenceImage", name: file.name, mimeType: file.type });
     }
   }
 
@@ -125,6 +129,21 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: errors.join(" ") },
       { status: 400 }
+    );
+  }
+
+  const uploaded: AssetMetadata[] = [];
+  try {
+    for (const item of pending) {
+      uploaded.push(await storeAsset(item.buffer, item.type, item.name, item.mimeType, ownerId));
+    }
+  } catch (e) {
+    await Promise.all(uploaded.map((meta) => deleteStoredAsset(meta)));
+    const { logServerError } = await import("@/lib/utils/error");
+    logServerError("POST /api/assets/upload", e);
+    return NextResponse.json(
+      { error: "Upload failed. Please try again." },
+      { status: 503 }
     );
   }
 

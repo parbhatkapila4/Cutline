@@ -145,3 +145,17 @@ ADD COLUMN IF NOT EXISTS topup_seconds INTEGER;
 CREATE INDEX IF NOT EXISTS idx_processed_webhook_events_ref ON processed_webhook_events (provider_ref);
 ALTER TABLE render_events
 ADD COLUMN IF NOT EXISTS provider_error TEXT;
+ALTER TABLE video_jobs
+ADD COLUMN IF NOT EXISTS job_data JSONB;
+ALTER TABLE video_jobs
+ADD COLUMN IF NOT EXISTS result JSONB;
+ALTER TABLE video_jobs
+ADD COLUMN IF NOT EXISTS error TEXT;
+ALTER TABLE video_jobs
+ADD COLUMN IF NOT EXISTS queue_name TEXT;
+ALTER TABLE video_jobs
+ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE video_jobs
+ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_video_jobs_open ON video_jobs (created_at)
+WHERE status IN ('queued', 'processing');

@@ -61,6 +61,7 @@ async function loadPersistedItems(owner: DashboardOwner): Promise<DashboardVideo
   const rows = await listVideoJobsByOwner(owner.ownerType, owner.id, 100);
   return rows.map((row) => {
     const ts = row.created_at instanceof Date ? row.created_at.getTime() : 0;
+    const finishedTs = row.finished_at instanceof Date ? row.finished_at.getTime() : ts;
     const videoUrl = row.final_url ?? row.preview_url ?? undefined;
     const status: DashboardVideoItem["status"] =
       row.status === "completed"
@@ -72,8 +73,8 @@ async function loadPersistedItems(owner: DashboardOwner): Promise<DashboardVideo
       id: row.queue_job_id ?? row.id,
       title: titleFromInput(row.prompt),
       prompt: row.prompt ?? "",
-      date: formatDate(ts),
-      duration: "-",
+      date: formatDate(status === "completed" ? finishedTs : ts),
+      duration: formatDuration(row.job_data?.durationSeconds),
       status,
       ...(status === "completed" && videoUrl ? { videoUrl } : {}),
       timestamp: ts,
@@ -97,14 +98,13 @@ export async function GET(request: Request) {
     if (!owner) return NextResponse.json([]);
     const identifier = owner.id;
 
-    let persisted: DashboardVideoItem[] = [];
+    const HIDDEN: ReadonlyArray<DashboardVideoItem["status"]> = ["failed", "expired"];
     const { isDatabaseConfigured } = await import("@/lib/db/client");
     if (isDatabaseConfigured()) {
-      try {
-        persisted = await loadPersistedItems(owner);
-      } catch (e) {
-        console.error("[api] GET /api/dashboard/videos persisted read failed", e);
-      }
+      const persisted = await loadPersistedItems(owner);
+      const visible = persisted.filter((item) => !HIDDEN.includes(item.status));
+      visible.sort((a, b) => b.timestamp - a.timestamp);
+      return NextResponse.json(visible);
     }
 
     const queue = getVideoQueue();
@@ -166,26 +166,7 @@ export async function GET(request: Request) {
     for (const item of items) {
       if (item.id) byId.set(item.id, item);
     }
-    const TERMINAL: ReadonlyArray<DashboardVideoItem["status"]> = ["completed", "failed", "expired"];
-    for (const item of persisted) {
-      const live = byId.get(item.id);
-      if (live && !TERMINAL.includes(item.status)) {
-        byId.set(item.id, { ...item, status: live.status, videoUrl: live.videoUrl });
-        continue;
-      }
-      if (!live) {
-        byId.set(item.id, item);
-        continue;
-      }
-      const mergedItem: DashboardVideoItem = { ...live, ...item };
-      if (item.status === "expired" || item.videoUrl == null) {
-        delete mergedItem.videoUrl;
-      }
-      if (item.status === "expired") mergedItem.status = "expired";
-      byId.set(item.id, mergedItem);
-    }
 
-    const HIDDEN: ReadonlyArray<DashboardVideoItem["status"]> = ["failed", "expired"];
     const merged = [...byId.values()].filter((item) => !HIDDEN.includes(item.status));
     merged.sort((a, b) => b.timestamp - a.timestamp);
 

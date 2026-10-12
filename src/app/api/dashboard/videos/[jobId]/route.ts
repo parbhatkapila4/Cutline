@@ -69,6 +69,38 @@ export async function GET(
   }
 
   try {
+    const { isDatabaseConfigured } = await import("@/lib/db/client");
+    if (isDatabaseConfigured()) {
+      const ownerCandidates = await resolveOwnerCandidates(request);
+      const { findVideoJobForOwners } = await import("@/lib/jobs/videoJobService");
+      const row = ownerCandidates.length > 0 ? await findVideoJobForOwners(jobId, ownerCandidates) : null;
+      if (!row || row.status !== "completed" || !row.final_url) {
+        return NextResponse.json(
+          { error: "Video not found" },
+          { status: 404 }
+        );
+      }
+      const legacyJob = row.job_data ? null : await getVideoQueue().getJob(jobId);
+      const data = row.job_data ?? (legacyJob?.data as VideoJobData | undefined);
+      const result = row.result ?? (legacyJob?.returnvalue as VideoJobResult | undefined);
+      const finishedAt = row.finished_at ?? (legacyJob?.finishedOn ? new Date(legacyJob.finishedOn) : row.created_at);
+      const body: DashboardVideoDetail = {
+        id: row.queue_job_id ?? row.id,
+        title: titleFromInput(row.prompt),
+        prompt: row.prompt ?? "",
+        date: formatDate(finishedAt.getTime()),
+        duration: formatDuration(data?.durationSeconds),
+        status: "completed",
+        videoUrl: row.final_url,
+        mode: data?.mode,
+        durationSeconds: data?.durationSeconds,
+        ...(typeof result?.message === "string" && result.message.trim()
+          ? { message: result.message.trim() }
+          : {}),
+      };
+      return NextResponse.json(body);
+    }
+
     const queue = getVideoQueue();
     const job = await queue.getJob(jobId);
     if (!job) {

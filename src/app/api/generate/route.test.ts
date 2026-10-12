@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { POST } from "./route";
 import { fakeRedis } from "@/test/fakeRedis";
+import { storeAsset } from "@/lib/assets/storage";
 
 const {
   mockAdd,
@@ -162,26 +166,41 @@ describe("POST /api/generate", () => {
   });
 
   it("includes textModel and assetIds in job data when provided", async () => {
-    const res = await POST(
-      new Request("http://localhost/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input: "A product demo for our app.",
-          durationSeconds: 30,
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cutline-route-"));
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmp);
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    try {
+      const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+      const first = await storeAsset(png, "productPhoto", "a.png", "image/png");
+      const second = await storeAsset(png, "productPhoto", "b.png", "image/png");
+      const assetIds = [first.id, second.id];
+
+      const res = await POST(
+        new Request("http://localhost/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            input: "A product demo for our app.",
+            durationSeconds: 30,
+            textModel: "google/gemini-2.0-flash-001",
+            assetIds,
+          }),
+        })
+      );
+      expect(res.status).toBe(200);
+      expect(mockAdd).toHaveBeenCalled();
+      expect(latestJobPayload()).toEqual(
+        expect.objectContaining({
           textModel: "google/gemini-2.0-flash-001",
-          assetIds: ["asset-1", "asset-2"],
-        }),
-      })
-    );
-    expect(res.status).toBe(200);
-    expect(mockAdd).toHaveBeenCalled();
-    expect(latestJobPayload()).toEqual(
-      expect.objectContaining({
-        textModel: "google/gemini-2.0-flash-001",
-        assetIds: ["asset-1", "asset-2"],
-      })
-    );
+          assetIds,
+        })
+      );
+    } finally {
+      cwdSpy.mockRestore();
+      if (blobToken !== undefined) process.env.BLOB_READ_WRITE_TOKEN = blobToken;
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 
   it("defaults captions to on when missing", async () => {

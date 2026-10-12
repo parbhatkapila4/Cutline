@@ -23,6 +23,13 @@ export const fakeRedis = {
   async expire(): Promise<number> {
     return 1;
   },
+  async del(...keys: string[]): Promise<number> {
+    let removed = 0;
+    for (const key of keys) {
+      if (store.delete(key)) removed += 1;
+    }
+    return removed;
+  },
 };
 
 export const managedRedisMock = {

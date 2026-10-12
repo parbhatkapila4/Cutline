@@ -118,6 +118,7 @@ export async function purgeUserVideo(
       row?.preview_url,
       result?.videoPath,
       ...(result?.variations ?? []).map((v) => v?.videoUrl),
+      ...(row?.final_url ? (row.result?.variations ?? []).map((v) => v?.videoUrl) : []),
     ].filter((url): url is string => typeof url === "string" && url !== "")
   );
   for (const url of blobUrls) {

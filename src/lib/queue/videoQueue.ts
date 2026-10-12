@@ -4,17 +4,19 @@ import { logPipelineEvent } from "@/lib/utils/pipelineLogger";
 import Redis from "ioredis";
 import { createManagedRedis } from "@/lib/redis/managedRedis";
 import { runPipeline } from "@/lib/pipeline/orchestrator";
-import { runCleanup } from "@/lib/storage/cleanup";
 import { publishRenderedVideo } from "@/lib/storage/publish";
 import { CANCELLED_JOBS_KEY, isJobCancelled } from "./cancelCheck";
+import { getVideoQueueName } from "./queueName";
 import { notifyWebhook } from "@/lib/webhook/notify";
 
-export { isJobCancelled };
+export { isJobCancelled, getVideoQueueName };
 
-const QUEUE_NAME = process.env.VIDEO_QUEUE_NAME || "video-generation";
+const QUEUE_NAME = getVideoQueueName();
 
-export function getVideoQueueName(): string {
-  return QUEUE_NAME;
+const activeJobIds = new Set<string>();
+
+export function getActiveJobIds(): ReadonlySet<string> {
+  return activeJobIds;
 }
 
 function getRedisConnection(): Redis {
@@ -30,7 +32,7 @@ export function createRedisConnection(): Redis {
 
 import { recordRenderEvent } from "@/lib/telemetry/renderEvents";
 import { mapFailedReasonToFailureCode } from "@/lib/utils/error";
-import type { BrandColors } from "@/lib/assets/types";
+import type { AssetMetadata, BrandColors } from "@/lib/assets/types";
 import type { Platform } from "@/lib/platform/types";
 import type { CostBreakdown } from "@/lib/cost/types";
 import type { AvatarSelection } from "@/lib/types/avatar";
@@ -46,6 +48,7 @@ export type VideoJobData = {
   requestId?: string;
   userId?: string;
   assetIds?: string[];
+  assets?: AssetMetadata[];
   brandColors?: BrandColors;
   mode?: "slideshow" | "talking_object";
   durationSeconds?: number;
@@ -292,14 +295,57 @@ export async function deleteStaleJobs(options: { retentionDays: number }): Promi
   }
 }
 
-export async function scheduleCleanupJob(): Promise<void> {
-  if (process.env.CLEANUP_ENABLED === "false") return;
-  const intervalHours = Number(process.env.CLEANUP_INTERVAL_HOURS) || 1;
-  const everyMs = Math.max(60_000, intervalHours * 60 * 60 * 1000);
+const LEGACY_CLEANUP_SCAN_LIMIT = 1000;
+
+export async function removeLegacyCleanupJobs(): Promise<number> {
   const queue = getVideoQueue();
-  await queue.add(CLEANUP_JOB_NAME, {} as VideoJobData, {
-    repeat: { every: everyMs },
-  });
+  let removed = 0;
+  for (const repeatable of await queue.getRepeatableJobs()) {
+    if (repeatable.name !== CLEANUP_JOB_NAME) continue;
+    if (await queue.removeRepeatableByKey(repeatable.key)) removed += 1;
+  }
+  const jobs = await queue.getJobs(
+    ["waiting", "delayed", "completed", "failed"],
+    0,
+    LEGACY_CLEANUP_SCAN_LIMIT - 1
+  );
+  for (const job of jobs) {
+    if (job?.name !== CLEANUP_JOB_NAME) continue;
+    try {
+      await job.remove();
+      removed += 1;
+    } catch {
+    }
+  }
+  return removed;
+}
+
+const JOB_RECORD_RETRY_DELAYS_MS = [1000, 3000];
+
+async function writeJobRecord(write: () => Promise<unknown>): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await write();
+      return;
+    } catch (e) {
+      const delayMs = JOB_RECORD_RETRY_DELAYS_MS[attempt];
+      if (delayMs === undefined) throw e;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+}
+
+async function persistCompletion(jobId: string, result: VideoJobResult): Promise<void> {
+  const finalUrl = result.videoPath || result.variations?.[0]?.videoUrl || null;
+  try {
+    const { markVideoJobCompleted } = await import("@/lib/jobs/videoJobService");
+    await writeJobRecord(() => markVideoJobCompleted(jobId, { finalUrl, result }));
+  } catch (e) {
+    console.error(
+      "[worker] jobId=" + jobId + " video_jobs completion write failed; the maintenance pass will settle it. error=" +
+      (e instanceof Error ? e.message : String(e))
+    );
+  }
 }
 
 export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
@@ -308,27 +354,12 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
     QUEUE_NAME,
     async (job: Job<VideoJobData, VideoJobResult>) => {
       if (job.name === CLEANUP_JOB_NAME) {
-        const result = await runCleanup();
-        console.log(
-          "[worker] jobId=cleanup videos=" +
-          result.videosDeleted +
-          " uploads=" +
-          result.uploadsDeleted +
-          " tempImages=" +
-          result.tempImagesDeleted +
-          " errors=" +
-          result.errors.length
-        );
-        if (result.errors.length > 0) {
-          result.errors.forEach((e) =>
-            console.error("[worker] jobId=cleanup error=" + String(e).replace(/\s+/g, " "))
-          );
-        }
         return { videoPath: "" } as VideoJobResult;
       }
       const {
         input,
         assetIds,
+        assets,
         brandColors,
         mode,
         durationSeconds,
@@ -363,6 +394,16 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
       if (await isJobCancelled(jobIdStr)) {
         throw new Error("Job cancelled");
       }
+      activeJobIds.add(jobIdStr);
+      try {
+        const { markVideoJobProcessing } = await import("@/lib/jobs/videoJobService");
+        await markVideoJobProcessing(jobIdStr);
+      } catch (e) {
+        console.error(
+          "[worker] jobId=" + jobIdStr + " video_jobs processing write failed error=" +
+          (e instanceof Error ? e.message : String(e))
+        );
+      }
       logPipelineEvent({ jobId: jobIdStr, event: "job_started", ...(requestId ? { requestId } : {}) });
       recordRenderEvent({
         jobId: jobIdStr,
@@ -374,6 +415,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
           input,
           jobId: jobIdStr,
           assetIds,
+          ...(assets?.length ? { assets } : {}),
           brandColors,
           mode,
           durationSeconds,
@@ -417,11 +459,14 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
             if (v?.videoUrl) v.videoUrl = await publish(v.videoUrl);
           }
         }
+        await persistCompletion(jobIdStr, result);
         return result;
       } catch (e) {
         const message =
           e instanceof Error ? e.message : "Pipeline failed. Please try again.";
         throw new Error(message);
+      } finally {
+        activeJobIds.delete(jobIdStr);
       }
     },
     {
@@ -514,14 +559,6 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         console.error("[worker] jobId=" + job?.id + " budget/credits error=" + (e instanceof Error ? e.message : String(e)));
       }
       try {
-        const { updateVideoJobStatusByQueueId } = await import("@/lib/jobs/videoJobService");
-        await updateVideoJobStatusByQueueId(String(job?.id ?? ""), "completed", {
-          final_url: vid || null,
-        });
-      } catch (e) {
-        console.error("[worker] jobId=" + job?.id + " video_jobs update error=" + (e instanceof Error ? e.message : String(e)));
-      }
-      try {
         const { incrementVideosCompletedThisMonth } = await import("@/lib/usage");
         await incrementVideosCompletedThisMonth(clientId);
       } catch (e) {
@@ -600,8 +637,9 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
     })();
     void (async () => {
       try {
-        const { updateVideoJobStatusByQueueId } = await import("@/lib/jobs/videoJobService");
-        await updateVideoJobStatusByQueueId(String(jid), "failed");
+        const { markVideoJobFailed } = await import("@/lib/jobs/videoJobService");
+        const reason = job?.failedReason || (err instanceof Error ? err.message : String(err));
+        await writeJobRecord(() => markVideoJobFailed(String(jid), reason));
       } catch (e) {
         console.error("[worker] jobId=" + jid + " video_jobs fail-update error=" + (e instanceof Error ? e.message : String(e)));
       }

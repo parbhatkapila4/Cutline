@@ -2,8 +2,9 @@ import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 import {
-  getAssetFilePath,
+  fetchAssetBytes,
   getAssetMetadata,
+  getLocalAssetPath,
 } from "@/lib/assets/storage";
 import type {
   AnalyzedAssets,
@@ -19,6 +20,19 @@ import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_VISION_MODEL = "anthropic/claude-haiku-4.5";
 const HEX_REGEX = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+
+export type AnalysisAsset = {
+  meta: AssetMetadata;
+  filePath?: string;
+  bytes?: Buffer;
+};
+
+export class AssetNotFoundError extends Error {
+  constructor(assetId: string) {
+    super(`Asset not found: ${assetId}`);
+    this.name = "AssetNotFoundError";
+  }
+}
 
 function normalizeHex(s: string): string {
   const t = s.trim();
@@ -116,16 +130,17 @@ async function visionAnalyzeImage(
   }
 }
 
-function readImageAsBase64(filePath: string, mimeType: string): string {
-  const buffer = fs.readFileSync(filePath);
-  return buffer.toString("base64");
+function readAssetBase64(asset: AnalysisAsset, label: string): string {
+  if (asset.bytes) return asset.bytes.toString("base64");
+  if (!asset.filePath || !fs.existsSync(asset.filePath)) {
+    throw new Error(`${label} asset file not found: ${asset.meta.id}`);
+  }
+  return fs.readFileSync(asset.filePath).toString("base64");
 }
 
-async function analyzeLogo(meta: AssetMetadata): Promise<LogoAnalysis> {
-  const filePath = getAssetFilePath(meta.id);
-  if (!filePath || !fs.existsSync(filePath)) {
-    throw new Error(`Logo asset file not found: ${meta.id}`);
-  }
+async function analyzeLogo(asset: AnalysisAsset): Promise<LogoAnalysis> {
+  const { meta } = asset;
+  const base64 = readAssetBase64(asset, "Logo");
 
   const prompt = `Analyze this logo image. Return a single JSON object with exactly these keys (no markdown, no explanation):
 - dominantColors: array of 2-3 hex color strings (e.g. ["#000000", "#ffffff"])
@@ -136,7 +151,6 @@ async function analyzeLogo(meta: AssetMetadata): Promise<LogoAnalysis> {
   const systemPrompt =
     "You are an asset analyst for a video editing system. Output only valid JSON with the requested keys.";
 
-  const base64 = readImageAsBase64(filePath, meta.mimeType);
   const raw = await visionAnalyzeImage(
     base64,
     meta.mimeType,
@@ -168,12 +182,10 @@ async function analyzeLogo(meta: AssetMetadata): Promise<LogoAnalysis> {
 }
 
 async function analyzeProductPhoto(
-  meta: AssetMetadata
+  asset: AnalysisAsset
 ): Promise<ProductPhotoAnalysis> {
-  const filePath = getAssetFilePath(meta.id);
-  if (!filePath || !fs.existsSync(filePath)) {
-    throw new Error(`Product photo asset file not found: ${meta.id}`);
-  }
+  const { meta } = asset;
+  const base64 = readAssetBase64(asset, "Product photo");
 
   const prompt = `Analyze this product photo. Return a single JSON object with exactly these keys (no markdown, no explanation):
 - dominantColors: array of 2-4 hex color strings (e.g. ["#1a1a2e", "#e8e8e8"])
@@ -184,7 +196,6 @@ async function analyzeProductPhoto(
   const systemPrompt =
     "You are an asset analyst for a video editing system. Output only valid JSON with the requested keys.";
 
-  const base64 = readImageAsBase64(filePath, meta.mimeType);
   const raw = await visionAnalyzeImage(
     base64,
     meta.mimeType,
@@ -222,12 +233,10 @@ async function analyzeProductPhoto(
 }
 
 async function analyzeReferenceImage(
-  meta: AssetMetadata
+  asset: AnalysisAsset
 ): Promise<ReferenceImageAnalysis> {
-  const filePath = getAssetFilePath(meta.id);
-  if (!filePath || !fs.existsSync(filePath)) {
-    throw new Error(`Reference image asset file not found: ${meta.id}`);
-  }
+  const { meta } = asset;
+  const base64 = readAssetBase64(asset, "Reference image");
 
   const prompt = `Analyze this reference image for visual style. Return a single JSON object with exactly these keys (no markdown, no explanation):
 - colorPalette: array of 3-5 hex color strings that represent the image's color palette (e.g. ["#1a1a2e", "#e94560", "#f8b500"])
@@ -236,7 +245,6 @@ async function analyzeReferenceImage(
   const systemPrompt =
     "You are an asset analyst for a video editing system. Output only valid JSON with the requested keys.";
 
-  const base64 = readImageAsBase64(filePath, meta.mimeType);
   const raw = await visionAnalyzeImage(
     base64,
     meta.mimeType,
@@ -324,9 +332,9 @@ function detectCutsPerMinute(videoPath: string): number | undefined {
 }
 
 async function analyzeReferenceVideo(
-  meta: AssetMetadata
+  asset: AnalysisAsset
 ): Promise<ReferenceVideoAnalysis> {
-  const filePath = getAssetFilePath(meta.id);
+  const { meta, filePath } = asset;
   if (!filePath || !fs.existsSync(filePath)) {
     throw new Error(`Reference video asset file not found: ${meta.id}`);
   }
@@ -380,32 +388,51 @@ export async function analyzeAssets(
   assetIds: string[],
   brandColors?: BrandColors
 ): Promise<AnalyzedAssets> {
+  const assets: AnalysisAsset[] = [];
+  for (const id of assetIds) {
+    const meta = await getAssetMetadata(id);
+    if (!meta) throw new AssetNotFoundError(id);
+    if (meta.storage === "blob") {
+      const bytes = await fetchAssetBytes(meta);
+      if (!bytes) throw new AssetNotFoundError(id);
+      assets.push({ meta, bytes });
+    } else {
+      const filePath = getLocalAssetPath(meta);
+      if (!filePath) throw new AssetNotFoundError(id);
+      assets.push({ meta, filePath });
+    }
+  }
+  return analyzeResolvedAssets(assets, brandColors);
+}
+
+export async function analyzeResolvedAssets(
+  assets: AnalysisAsset[],
+  brandColors?: BrandColors
+): Promise<AnalyzedAssets> {
   const result: AnalyzedAssets = {};
 
   if (brandColors) {
     result.brandColors = analyzeBrandColors(brandColors);
   }
 
-  const logos: AssetMetadata[] = [];
-  const productPhotos: AssetMetadata[] = [];
-  const referenceVideos: AssetMetadata[] = [];
-  const referenceImages: AssetMetadata[] = [];
+  const logos: AnalysisAsset[] = [];
+  const productPhotos: AnalysisAsset[] = [];
+  const referenceVideos: AnalysisAsset[] = [];
+  const referenceImages: AnalysisAsset[] = [];
 
-  for (const id of assetIds) {
-    const meta = getAssetMetadata(id);
-    if (!meta) continue;
-    switch (meta.type) {
+  for (const asset of assets) {
+    switch (asset.meta.type) {
       case "logo":
-        logos.push(meta);
+        logos.push(asset);
         break;
       case "productPhoto":
-        productPhotos.push(meta);
+        productPhotos.push(asset);
         break;
       case "referenceVideo":
-        referenceVideos.push(meta);
+        referenceVideos.push(asset);
         break;
       case "referenceImage":
-        referenceImages.push(meta);
+        referenceImages.push(asset);
         break;
       default:
         break;

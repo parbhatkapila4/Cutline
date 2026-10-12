@@ -3,9 +3,9 @@ import path from "path";
 
 import { getVariationStrategy } from "@/lib/variation/strategies";
 import type { Platform } from "@/lib/platform/types";
-import { analyzeAssets } from "@/lib/assets/analysis";
-import { getAssetFilePath, getAssetMetadata } from "@/lib/assets/storage";
-import type { BrandColors } from "@/lib/assets/types";
+import { analyzeResolvedAssets } from "@/lib/assets/analysis";
+import { materializeJobAssets } from "@/lib/assets/materialize";
+import type { AssetMetadata, BrandColors, ResolvedAsset } from "@/lib/assets/types";
 import type { AvatarSelection } from "@/lib/types/avatar";
 import { sourceImages, normalizeImageSpecForRender } from "@/lib/images/source";
 import {
@@ -148,6 +148,8 @@ export type PipelineOptions = {
   jobId: string;
   requestId?: string;
   assetIds?: string[];
+  assets?: AssetMetadata[];
+  resolvedAssets?: Map<string, ResolvedAsset>;
   brandColors?: BrandColors;
   mode?: "slideshow" | "talking_object";
   durationSeconds?: number;
@@ -460,9 +462,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
   }
 
   try {
+    const resolvedAssets = options.resolvedAssets ?? (await materializeJobAssets(jobId, options));
+    const pipelineOptions: PipelineOptions = { ...options, resolvedAssets };
+
     if (count === 1) {
       const costTracker = createCostTracker();
-      const result = await runPipelineOnce(options, costTracker);
+      const result = await runPipelineOnce(pipelineOptions, costTracker);
       if (jobId) {
         try {
           recordJobEnd(jobId, "completed");
@@ -477,7 +482,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     for (let v = 0; v < count; v++) {
       const costTracker = createCostTracker();
       const iterOpts: PipelineOptions = {
-        ...options,
+        ...pipelineOptions,
         outputSuffix: `-v${v + 1}`,
         variationStrategy: getVariationStrategy(v),
       };
@@ -556,6 +561,7 @@ async function runPipelineOnce(
     jobId,
     requestId,
     assetIds,
+    resolvedAssets,
     brandColors,
     mode,
     durationSeconds: optionsDuration,
@@ -871,15 +877,14 @@ async function runPipelineOnce(
       if (!resolvedAvatarPath && talkingRealMode !== "scenario" && talkingObjectStyle === "real" && avatar?.mode === "upload") {
         const uploadedAvatarId = avatar.uploadAssetId;
         if (uploadedAvatarId) {
-          const uploadedMeta = getAssetMetadata(uploadedAvatarId);
-          if (!uploadedMeta || uploadedMeta.type !== "referenceImage") {
-            throw new Error("Uploaded avatar image is invalid. Please re-upload your photo and try again.");
-          }
-          const uploadedPath = getAssetFilePath(uploadedAvatarId);
-          if (!uploadedPath) {
+          const uploaded = resolvedAssets?.get(uploadedAvatarId);
+          if (!uploaded) {
             throw new Error("Uploaded avatar image is missing from storage. Please re-upload and try again.");
           }
-          resolvedAvatarPath = uploadedPath;
+          if (uploaded.meta.type !== "referenceImage") {
+            throw new Error("Uploaded avatar image is invalid. Please re-upload your photo and try again.");
+          }
+          resolvedAvatarPath = uploaded.filePath;
         }
       }
 
@@ -1064,15 +1069,12 @@ async function runPipelineOnce(
         if (avatar.mode === "upload") {
           const uploadedId = avatar.uploadAssetId;
           if (!uploadedId) return "";
-          const uploadedMeta = getAssetMetadata(uploadedId);
-          if (!uploadedMeta || uploadedMeta.type !== "referenceImage") {
-            console.warn("[pipeline] jobId=" + jobId + " avatar upload is invalid; falling back to default avatar");
-            return "";
+          const uploaded = resolvedAssets?.get(uploadedId);
+          if (!uploaded) {
+            throw new Error("Uploaded avatar image is missing from storage. Please re-upload and try again.");
           }
-          const uploadedPath = getAssetFilePath(uploadedId);
-          if (!uploadedPath) {
-            console.warn("[pipeline] jobId=" + jobId + " avatar upload path missing; falling back to default avatar");
-            return "";
+          if (uploaded.meta.type !== "referenceImage") {
+            throw new Error("Uploaded avatar image is invalid. Please re-upload your photo and try again.");
           }
           return " Match the same person identity and appearance from the uploaded avatar reference image.";
         }
@@ -1646,6 +1648,10 @@ async function runPipelineOnce(
     composeMotion(shotList, { motionStyle: options.brandBrain?.motionStyle ?? "default" })
   );
 
+  const jobAssets = (assetIds ?? []).flatMap((id) => {
+    const asset = resolvedAssets?.get(id);
+    return asset ? [asset] : [];
+  });
   const hasAssets =
     (Array.isArray(assetIds) && assetIds.length > 0) || brandColors != null;
   const analyzedAssets = hasAssets
@@ -1653,7 +1659,7 @@ async function runPipelineOnce(
       await checkCancelledAndThrow();
       logEvent({ jobId, event: "stage_start", stage: "asset_analysis" });
       return retry(
-        () => analyzeAssets(assetIds ?? [], brandColors).then((r) => {
+        () => analyzeResolvedAssets(jobAssets, brandColors).then((r) => {
           costTracker.recordLlmTokens(TOKENS_ESTIMATE.assetAnalysis);
           return r;
         }),
@@ -1673,20 +1679,10 @@ async function runPipelineOnce(
     composeVisuals(intent, shotList, analyzedAssets)
   );
 
-  const assetPaths =
-    Array.isArray(assetIds) && assetIds.length > 0
-      ? (() => {
-        const productPhotos: string[] = [];
-        for (const id of assetIds) {
-          const meta = getAssetMetadata(id);
-          if (meta?.type === "productPhoto") {
-            const fp = getAssetFilePath(id);
-            if (fp) productPhotos.push(fp);
-          }
-        }
-        return productPhotos.length > 0 ? { productPhotos } : undefined;
-      })()
-      : undefined;
+  const productPhotos = jobAssets
+    .filter((asset) => asset.meta.type === "productPhoto")
+    .map((asset) => asset.filePath);
+  const assetPaths = productPhotos.length > 0 ? { productPhotos } : undefined;
 
   await checkCancelledAndThrow();
   logEvent({ jobId, event: "stage_start", stage: "image_sourcing" });
@@ -1723,23 +1719,15 @@ async function runPipelineOnce(
 
   let logoUrl: string | undefined;
   let logoPlacement: "outro" | "watermark" | "hero" | undefined;
-  if (analyzedAssets?.logo && Array.isArray(assetIds) && assetIds.length > 0) {
-    for (const id of assetIds) {
-      const meta = getAssetMetadata(id);
-      if (meta?.type === "logo") {
-        const logoPath = getAssetFilePath(id);
-        if (logoPath) {
-          const imagesDir = path.join(cwd, "public", "temp", jobId, "images");
-          fs.mkdirSync(imagesDir, { recursive: true });
-          const ext = path.extname(logoPath) || ".png";
-          const destPath = path.join(imagesDir, `logo${ext}`);
-          fs.copyFileSync(logoPath, destPath);
-          logoUrl = `/temp/${jobId}/images/logo${ext}`;
-          logoPlacement = analyzedAssets.logo.suggestedPlacement;
-          break;
-        }
-      }
-    }
+  const logoAsset = jobAssets.find((asset) => asset.meta.type === "logo");
+  if (analyzedAssets?.logo && logoAsset) {
+    const imagesDir = path.join(cwd, "public", "temp", jobId, "images");
+    fs.mkdirSync(imagesDir, { recursive: true });
+    const ext = path.extname(logoAsset.filePath) || ".png";
+    const destPath = path.join(imagesDir, `logo${ext}`);
+    fs.copyFileSync(logoAsset.filePath, destPath);
+    logoUrl = `/temp/${jobId}/images/logo${ext}`;
+    logoPlacement = analyzedAssets.logo.suggestedPlacement;
   }
 
   const audioBase64 =

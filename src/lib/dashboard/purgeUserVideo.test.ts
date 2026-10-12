@@ -58,6 +58,7 @@ type Row = {
   status: string;
   final_url: string | null;
   preview_url: string | null;
+  result?: { videoPath?: string; variations?: Array<{ videoUrl: string }> } | null;
 };
 
 let table: Row[] = [];
@@ -131,6 +132,31 @@ describe("purgeUserVideo - a row with no BullMQ job behind it", () => {
 
     expect(result).toEqual({ ok: true });
     expect(table).toEqual([]);
+  });
+
+  it("deletes every take recorded on the row after the queue has dropped the job", async () => {
+    table = [
+      videoRow({ result: { videoPath: BLOB, variations: [{ videoUrl: BLOB }, { videoUrl: VARIATION_BLOB }] } }),
+    ];
+
+    const result = await purgeUserVideo(JOB_ID, [USER]);
+
+    expect(result).toEqual({ ok: true });
+    expect(mockDeleteBlob.mock.calls).toEqual([[BLOB], [VARIATION_BLOB]]);
+  });
+
+  it("leaves the blob store alone for an expired row, even with takes recorded on it", async () => {
+    table = [
+      videoRow({
+        final_url: null,
+        result: { videoPath: BLOB, variations: [{ videoUrl: BLOB }, { videoUrl: VARIATION_BLOB }] },
+      }),
+    ];
+
+    const result = await purgeUserVideo(JOB_ID, [USER]);
+
+    expect(result).toEqual({ ok: true });
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 });
 
