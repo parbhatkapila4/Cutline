@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   buildRemotionProps,
   classifyRenderResult,
+  getRenderTimeoutMs,
   type RenderInput,
   type RenderSpawnOutcome,
 } from "./renderVideo";
@@ -138,5 +139,49 @@ describe("classifyRenderResult", () => {
     const lines = (err?.message ?? "").split("\n");
     expect(lines[0]).toBe("Remotion render failed (exit 1) after 120s.");
     expect(err?.message).toContain("Remotion props kept for reproduction: /tmp/props-job-abc.json");
+  });
+});
+
+describe("RENDER_TIMEOUT_MS", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("defaults to 600 s when unset", () => {
+    vi.stubEnv("RENDER_TIMEOUT_MS", undefined);
+    expect(getRenderTimeoutMs()).toBe(BUDGET_MS);
+  });
+
+  it("uses a valid value as given", () => {
+    vi.stubEnv("RENDER_TIMEOUT_MS", "900000");
+    expect(getRenderTimeoutMs()).toBe(900_000);
+  });
+
+  it("falls back to the default, with a warning, for a value that is not a positive number", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => { });
+    for (const value of ["ten minutes", "0", "-5"]) {
+      vi.stubEnv("RENDER_TIMEOUT_MS", value);
+      expect(getRenderTimeoutMs(), value).toBe(BUDGET_MS);
+    }
+    expect(warn).toHaveBeenCalledTimes(3);
+  });
+
+  it("clamps to 60 s - 25 min, because a longer render outlives the worker's job lock", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => { });
+    vi.stubEnv("RENDER_TIMEOUT_MS", "1000");
+    expect(getRenderTimeoutMs()).toBe(60_000);
+    vi.stubEnv("RENDER_TIMEOUT_MS", "3600000");
+    expect(getRenderTimeoutMs()).toBe(1_500_000);
+  });
+
+  it("reports the configured budget when a render times out", () => {
+    vi.stubEnv("RENDER_TIMEOUT_MS", "900000");
+
+    const err = classifyRenderResult(outcome({ errorCode: "ETIMEDOUT", signal: "SIGTERM", elapsedMs: 900_400 }));
+
+    expect(err?.message.split("\n")[0]).toBe(
+      "Remotion render timed out after 900s (budget 900s). Try a shorter video or raise RENDER_TIMEOUT_MS.",
+    );
   });
 });

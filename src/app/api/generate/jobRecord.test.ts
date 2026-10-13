@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POST } from "./route";
-import { handleDownloadGet, handleJobGet } from "./handlers";
+import { handleDownloadGet, handleJobGet, handleJobsGet } from "./handlers";
 import { PLAN_CONFIGS } from "@/lib/plans";
 import { fakeRedis } from "@/test/fakeRedis";
 import { getSpendUsd } from "@/lib/cost/budget";
@@ -14,6 +14,10 @@ const {
   mockCreateVideoJob,
   mockFindRow,
   mockDeleteOpenRow,
+  mockListRows,
+  mockListRecentJobs,
+  mockApiKeyUser,
+  mockFetch,
 } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
   mockGetJob: vi.fn(),
@@ -23,6 +27,10 @@ const {
   ),
   mockFindRow: vi.fn(),
   mockDeleteOpenRow: vi.fn(async () => true),
+  mockListRows: vi.fn(),
+  mockListRecentJobs: vi.fn(async () => []),
+  mockApiKeyUser: vi.fn(async (): Promise<{ userId: string; keyId: string } | null> => null),
+  mockFetch: vi.fn(),
 }));
 
 vi.mock("@/lib/queue/videoQueue", () => ({
@@ -30,7 +38,7 @@ vi.mock("@/lib/queue/videoQueue", () => ({
   getQueueWaitMetrics: vi.fn(async () => null),
   startVideoWorker: vi.fn(() => ({})),
   cancelJob: vi.fn(),
-  listRecentJobs: vi.fn(async () => []),
+  listRecentJobs: mockListRecentJobs,
 }));
 
 vi.mock("@/lib/queue/heartbeat", () => ({
@@ -52,6 +60,7 @@ vi.mock("@/lib/jobs/videoJobService", () => ({
   createVideoJob: mockCreateVideoJob,
   findVideoJobForOwners: mockFindRow,
   deleteOpenVideoJob: mockDeleteOpenRow,
+  listVideoJobsForOwners: mockListRows,
   isTerminalVideoJobStatus: (status: string) => status === "completed" || status === "failed",
 }));
 
@@ -60,7 +69,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/api-keys/service", () => ({
-  validateApiKeyAndGetUserId: vi.fn(async () => null),
+  validateApiKeyAndGetUserId: mockApiKeyUser,
 }));
 
 vi.mock("@/lib/users/planService", () => ({
@@ -140,6 +149,18 @@ beforeEach(() => {
   mockFindRow.mockReset();
   mockFindRow.mockResolvedValue(null);
   mockDeleteOpenRow.mockClear();
+  mockListRows.mockReset();
+  mockListRows.mockResolvedValue([]);
+  mockListRecentJobs.mockClear();
+  mockApiKeyUser.mockReset();
+  mockApiKeyUser.mockResolvedValue(null);
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue(new Response(null, { status: 200 }));
+  vi.stubGlobal("fetch", mockFetch);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("GET /api/generate/[jobId] - a finished job is answered from video_jobs", () => {
@@ -364,5 +385,129 @@ describe("POST /api/generate - the row is written once, with what it needs", () 
     expect((await secondRes.json()).jobId).toBe(firstId);
     expect(mockCreateVideoJob).toHaveBeenCalledTimes(1);
     expect(mockAdd).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("GET /api/generate/[jobId]/download - a file that is gone is not redirected to", () => {
+  it("returns 404 when the store says the file is gone", async () => {
+    mockFindRow.mockResolvedValue(row());
+    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+
+    const res = await download();
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).code).toBe("VIDEO_NOT_FOUND");
+    expect(mockFetch).toHaveBeenCalledWith(VIDEO, expect.objectContaining({ method: "HEAD" }));
+  });
+
+  it("checks the variation it is about to hand out, not just the main file", async () => {
+    mockFindRow.mockResolvedValue(
+      row({ result: { videoPath: VIDEO, variations: [{ videoUrl: VIDEO }, { videoUrl: SECOND_TAKE }] } }),
+    );
+    mockFetch.mockImplementation(async (url: string) =>
+      new Response(null, { status: url === SECOND_TAKE ? 410 : 200 }),
+    );
+
+    expect((await download()).status).toBe(302);
+    expect((await download("?variant=1")).status).toBe(404);
+  });
+
+  it("still redirects when the store cannot be reached to check", async () => {
+    mockFindRow.mockResolvedValue(row());
+    mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+
+    const res = await download();
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(`${VIDEO}?download=1`);
+  });
+});
+
+describe("GET /api/generate/jobs - the job list is read from video_jobs", () => {
+  const list = () => handleJobsGet(new Request("http://localhost/api/generate/jobs?limit=10"));
+
+  it("lists the caller's rows with the status a client expects", async () => {
+    mockListRows.mockResolvedValue([
+      row({ queue_job_id: "job-waiting", status: "queued", final_url: null, result: null }),
+      row({ queue_job_id: "job-running", status: "processing", final_url: null, result: null }),
+      row({ queue_job_id: "job-done" }),
+      row({ queue_job_id: "job-expired", final_url: null }),
+      row({ queue_job_id: "job-broke", status: "failed", final_url: null, result: null, error: "TTS provider returned 500" }),
+      row({ queue_job_id: "job-stopped", status: "failed", final_url: null, result: null, error: "Job cancelled" }),
+    ]);
+
+    const res = await list();
+
+    expect(res.status).toBe(200);
+    const { jobs } = await res.json();
+    expect(jobs.map((j: { jobId: string; status: string }) => [j.jobId, j.status])).toEqual([
+      ["job-waiting", "pending"],
+      ["job-running", "processing"],
+      ["job-done", "completed"],
+      ["job-expired", "completed"],
+      ["job-broke", "failed"],
+      ["job-stopped", "cancelled"],
+    ]);
+    expect(jobs[2].videoUrl).toBe(VIDEO);
+    expect(jobs[3]).not.toHaveProperty("videoUrl");
+    expect(jobs[4].error).toBe("TTS provider returned 500");
+    expect(jobs[5]).not.toHaveProperty("error");
+    expect(jobs[0].topic).toBe("A short explainer about cold brew coffee.");
+    expect(mockListRows).toHaveBeenCalledWith([USER], 10);
+    expect(mockListRecentJobs).not.toHaveBeenCalled();
+  });
+
+  it("includes the jobs of the account behind an API key", async () => {
+    mockApiKeyUser.mockResolvedValue({ userId: "api-key-owner", keyId: "key-1" });
+
+    await list();
+
+    expect(mockListRows).toHaveBeenCalledWith([USER, "api-key-owner"], 10);
+  });
+});
+
+describe("POST /api/generate - finalising a preview reads the preview's row", () => {
+  const PREVIEW_ID = "7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d";
+  const finalise = () =>
+    POST(
+      new Request("http://localhost/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: "A short explainer about cold brew coffee in one sentence.",
+          mode: "slideshow",
+          durationSeconds: 30,
+          renderMode: "final",
+          previewJobId: PREVIEW_ID,
+        }),
+      }),
+    );
+
+  it("finalises the caller's own finished preview after the queue has dropped it", async () => {
+    mockFindRow.mockResolvedValue(row({ queue_job_id: PREVIEW_ID, result: { videoPath: VIDEO, isPreview: true } }));
+
+    const res = await finalise();
+
+    expect(res.status).toBe(200);
+    expect(mockFindRow).toHaveBeenCalledWith(PREVIEW_ID, [USER]);
+    expect(mockGetJob).not.toHaveBeenCalledWith(PREVIEW_ID);
+    expect(mockAdd.mock.calls[0][1]).toEqual(expect.objectContaining({ previewJobId: PREVIEW_ID }));
+  });
+
+  it("refuses a preview id that belongs to someone else", async () => {
+    const res = await finalise();
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("PREVIEW_JOB_NOT_FOUND");
+    expect(mockAdd).not.toHaveBeenCalled();
+  });
+
+  it("refuses a preview that has not finished", async () => {
+    mockFindRow.mockResolvedValue(row({ queue_job_id: PREVIEW_ID, status: "processing", final_url: null, result: null }));
+
+    const res = await finalise();
+
+    expect(res.status).toBe(400);
+    expect(mockAdd).not.toHaveBeenCalled();
   });
 });

@@ -71,6 +71,22 @@ export async function findPublishedVideoForJob(jobId: string): Promise<VideoJobR
   return null;
 }
 
+const PUBLISHED_CHECK_TIMEOUT_MS = 5_000;
+
+export async function isPublishedVideoGone(url: string): Promise<boolean> {
+  if (!isAbsoluteUrl(url)) return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PUBLISHED_CHECK_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { method: "HEAD", cache: "no-store", signal: controller.signal });
+    return res.status === 404 || res.status === 410;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function deletePublishedBlob(url: string | undefined | null): Promise<void> {
   if (!url || typeof url !== "string" || !isAbsoluteUrl(url)) return;
   if (!isBlobConfigured()) return;

@@ -34,7 +34,8 @@ vi.mock("@/lib/api-keys/service", () => ({
 
 vi.mock("@/lib/usage", () => ({
   incrementApiCallsThisMonth: vi.fn(async () => { }),
-  getVideosCompletedThisMonth: vi.fn(async () => 0),
+  reserveVideoThisMonth: vi.fn(async () => ({ ok: true, used: 1, month: "2026-10" })),
+  releaseVideoThisMonth: vi.fn(async () => { }),
 }));
 
 vi.mock("@/lib/redis/managedRedis", async () => (await import("@/test/fakeRedis")).managedRedisMock);

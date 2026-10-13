@@ -2,20 +2,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "./route";
 import { PLAN_CONFIGS } from "@/lib/plans";
 import { fakeRedis } from "@/test/fakeRedis";
+import { getVideosUsedThisMonth, incrementVideosCompletedThisMonth } from "@/lib/usage";
 
 const {
   mockAdd,
   mockStartVideoWorker,
   mockScheduleCleanupJob,
   mockGetUserPlan,
-  mockGetVideosCompleted,
   mockGetSession,
 } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
   mockStartVideoWorker: vi.fn(() => ({})),
   mockScheduleCleanupJob: vi.fn(async () => {}),
   mockGetUserPlan: vi.fn(),
-  mockGetVideosCompleted: vi.fn(),
   mockGetSession: vi.fn(),
 }));
 
@@ -43,11 +42,6 @@ vi.mock("@/lib/api-keys/service", () => ({
   validateApiKeyAndGetUserId: vi.fn(async () => null),
 }));
 
-vi.mock("@/lib/usage", () => ({
-  incrementApiCallsThisMonth: vi.fn(async () => {}),
-  getVideosCompletedThisMonth: mockGetVideosCompleted,
-}));
-
 vi.mock("@/lib/redis/managedRedis", async () => (await import("@/test/fakeRedis")).managedRedisMock);
 
 vi.mock("@/lib/users/planService", () => ({
@@ -65,6 +59,11 @@ vi.mock("@/lib/regen/remixFromJob", () => ({
 const FREE = PLAN_CONFIGS.free;
 const BEGINNER = PLAN_CONFIGS.beginner;
 const PRO = PLAN_CONFIGS.professional;
+const USER = "quota-test-user";
+
+const useVideos = async (count: number) => {
+  for (let i = 0; i < count; i++) await incrementVideosCompletedThisMonth(USER);
+};
 
 const generate = (body: Record<string, unknown> = {}) =>
   POST(
@@ -85,12 +84,10 @@ describe("POST /api/generate - plan quotas", () => {
     mockAdd.mockReset();
     mockAdd.mockResolvedValue({ id: "quota-job-1" });
     mockGetUserPlan.mockClear();
-    mockGetVideosCompleted.mockClear();
     mockGetSession.mockReset();
-    mockGetSession.mockResolvedValue({ user: { id: "quota-test-user" } });
+    mockGetSession.mockResolvedValue({ user: { id: USER } });
     delete process.env.DISABLE_CREDITS_CHECK;
     mockGetUserPlan.mockResolvedValue(FREE);
-    mockGetVideosCompleted.mockResolvedValue(0);
   });
 
   it("lets a free account through on its first video of the month", async () => {
@@ -100,7 +97,7 @@ describe("POST /api/generate - plan quotas", () => {
   });
 
   it("blocks a free account that has already used its three videos", async () => {
-    mockGetVideosCompleted.mockResolvedValue(3);
+    await useVideos(3);
     const res = await generate();
     expect(res.status).toBe(402);
     const body = await res.json();
@@ -114,11 +111,10 @@ describe("POST /api/generate - plan quotas", () => {
   it("blocks a beginner at 10 of 10 but not at 9", async () => {
     mockGetUserPlan.mockResolvedValue(BEGINNER);
 
-    mockGetVideosCompleted.mockResolvedValue(9);
+    await useVideos(9);
     expect((await generate()).status).toBe(200);
 
     mockAdd.mockClear();
-    mockGetVideosCompleted.mockResolvedValue(10);
     const blocked = await generate();
     expect(blocked.status).toBe(402);
     expect((await blocked.json()).code).toBe("MONTHLY_LIMIT_REACHED");
@@ -127,10 +123,60 @@ describe("POST /api/generate - plan quotas", () => {
 
   it("never caps a plan whose videosPerMonth is null, however many it has run", async () => {
     mockGetUserPlan.mockResolvedValue(PRO);
-    mockGetVideosCompleted.mockResolvedValue(9_999);
+    await useVideos(9_999);
     expect((await generate()).status).toBe(200);
+    expect(await getVideosUsedThisMonth(USER)).toBe(10_000);
+  });
+});
+
+describe("POST /api/generate - the monthly video count is taken at admission", () => {
+  beforeEach(() => {
+    fakeRedis.store.clear();
+    mockAdd.mockReset();
+    mockAdd.mockResolvedValue({ id: "quota-job-1" });
+    mockGetSession.mockReset();
+    mockGetSession.mockResolvedValue({ user: { id: USER } });
+    delete process.env.DISABLE_CREDITS_CHECK;
+    mockGetUserPlan.mockResolvedValue(FREE);
   });
 
+  it("lets exactly the remaining videos through when submissions race", async () => {
+    await useVideos(1);
 
+    const results = await Promise.all([generate(), generate(), generate(), generate()]);
 
+    expect(results.map((r) => r.status).sort()).toEqual([200, 200, 402, 402]);
+    expect(mockAdd).toHaveBeenCalledTimes(2);
+    expect(await getVideosUsedThisMonth(USER)).toBe(3);
+  });
+
+  it("does not use up a video when it refuses one", async () => {
+    await useVideos(3);
+
+    expect((await generate()).status).toBe(402);
+
+    expect(await getVideosUsedThisMonth(USER)).toBe(3);
+  });
+
+  it("gives the video back when the job cannot be queued", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => { });
+    await useVideos(2);
+    mockAdd.mockRejectedValueOnce(new Error("queue unavailable"));
+
+    const failed = await generate();
+
+    expect(failed.status).toBeGreaterThanOrEqual(500);
+    expect(await getVideosUsedThisMonth(USER)).toBe(2);
+    expect((await generate()).status).toBe(200);
+    expect(await getVideosUsedThisMonth(USER)).toBe(3);
+  });
+
+  it("tells the worker which month the video was counted in", async () => {
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    expect((await generate()).status).toBe(200);
+
+    expect(mockAdd.mock.calls[0][1]).toEqual(expect.objectContaining({ reservedVideoMonth: month }));
+  });
 });

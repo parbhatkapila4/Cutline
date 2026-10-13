@@ -161,6 +161,84 @@ export async function listVideoJobsByOwner(
   return (Array.isArray(rows) ? rows : []).map((r) => mapRow(r as VideoJobRow));
 }
 
+export async function listVideoJobsForOwners(
+  ownerIds: string[],
+  limit: number
+): Promise<VideoJob[]> {
+  if (ownerIds.length === 0) return [];
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id,
+           job_data, result, error, queue_name, started_at, finished_at
+    FROM video_jobs
+    WHERE owner_type = 'user'::video_job_owner_type AND owner_id = ANY(${ownerIds})
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return (Array.isArray(rows) ? rows : []).map((r) => mapRow(r as VideoJobRow));
+}
+
+export async function listRecentFinishedVideoJobs(
+  ownerId: string,
+  limit: number
+): Promise<VideoJob[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id,
+           job_data, result, error, queue_name, started_at, finished_at
+    FROM video_jobs
+    WHERE owner_type = 'user'::video_job_owner_type AND owner_id = ${ownerId}
+      AND status IN ('completed'::video_job_status, 'failed'::video_job_status)
+    ORDER BY COALESCE(finished_at, created_at) DESC
+    LIMIT ${limit}
+  `;
+  return (Array.isArray(rows) ? rows : []).map((r) => mapRow(r as VideoJobRow));
+}
+
+export type VideoJobOverview = {
+  totalVideos: number;
+  thisWeek: number;
+  inProgress: number;
+  totalDurationSec: number;
+  totalCostUsd: number;
+};
+
+export async function getVideoJobOverview(ownerId: string, weekStart: Date): Promise<VideoJobOverview> {
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT
+      count(*) FILTER (WHERE status = 'completed'::video_job_status) AS total_videos,
+      count(*) FILTER (
+        WHERE status = 'completed'::video_job_status AND COALESCE(finished_at, created_at) >= ${weekStart}
+      ) AS this_week,
+      count(*) FILTER (
+        WHERE status IN ('queued'::video_job_status, 'processing'::video_job_status)
+      ) AS in_progress,
+      COALESCE(sum(
+        CASE WHEN jsonb_typeof(job_data->'durationSeconds') = 'number'
+          THEN (job_data->>'durationSeconds')::numeric END
+      ) FILTER (WHERE status = 'completed'::video_job_status), 0) AS total_duration_sec,
+      COALESCE(sum(
+        CASE WHEN jsonb_typeof(result->'cost'->'total') = 'number'
+          THEN (result->'cost'->>'total')::numeric END
+      ) FILTER (WHERE status = 'completed'::video_job_status), 0) AS total_cost_usd
+    FROM video_jobs
+    WHERE owner_type = 'user'::video_job_owner_type AND owner_id = ${ownerId}
+  `) as Array<Record<string, unknown>>;
+  const row = rows[0] ?? {};
+  const num = (v: unknown) => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  return {
+    totalVideos: num(row.total_videos),
+    thisWeek: num(row.this_week),
+    inProgress: num(row.in_progress),
+    totalDurationSec: num(row.total_duration_sec),
+    totalCostUsd: num(row.total_cost_usd),
+  };
+}
+
 export async function listOpenVideoJobs(options: {
   olderThanMinutes: number;
   queueNames: string[];

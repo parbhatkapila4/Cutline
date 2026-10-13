@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { cleanupExpiredBlobs, cleanupExpiredUploadBlobs } from "./publish";
 import { FREE_VIDEO_RETENTION_HOURS } from "@/lib/plans";
+import { isCleanupEnabled } from "@/lib/config/cleanupEnabled";
 const DEFAULT_VIDEO_RETENTION_HOURS = FREE_VIDEO_RETENTION_HOURS;
 export function getTempDirForJob(jobId: string): string {
   return path.join(process.cwd(), "public", "temp", jobId);
@@ -124,11 +125,6 @@ export function getUploadRetentionHours(): number {
 
 function getTempImagesRetentionMs(): number {
   return TEMP_IMAGES_RETENTION_HOURS * 60 * 60 * 1000;
-}
-
-function isCleanupEnabled(): boolean {
-  const v = process.env.CLEANUP_ENABLED;
-  return v === undefined || v === "" || v.toLowerCase() === "true";
 }
 
 function safeDeleteFile(

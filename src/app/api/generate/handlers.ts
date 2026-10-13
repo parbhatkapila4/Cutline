@@ -4,6 +4,7 @@ import {
   cancelJob,
   listRecentJobs,
   getQueueWaitMetrics,
+  type JobSummary,
   type VideoJobResult,
 } from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
@@ -34,6 +35,7 @@ import {
 } from "@/lib/jobs/admission";
 import { brandKitToPipelineFields, getBrandKitForUser } from "@/lib/brand-kits/service";
 import { jobUploadIds, resolveAssetRecords } from "@/lib/assets/storage";
+import { isPublishedVideoGone } from "@/lib/storage/publish";
 import type { AssetMetadata, BrandColors } from "@/lib/assets/types";
 import type { VideoJob } from "@/lib/db/types";
 import fs from "fs";
@@ -85,6 +87,18 @@ type JobStatusResponse = {
   variations?: Array<{ videoUrl: string; cost?: JobCost }>;
   qualityReport?: { passed: boolean; score: number; issues: string[] };
 };
+
+async function callerHasCompletedPreview(previewJobId: string, userId: string): Promise<boolean> {
+  if (isDatabaseConfigured()) {
+    const { findVideoJobForOwners } = await import("@/lib/jobs/videoJobService");
+    const row = await findVideoJobForOwners(previewJobId, [userId]);
+    return row?.status === "completed";
+  }
+  const previewJob = await getVideoQueue().getJob(previewJobId);
+  if (!previewJob) return false;
+  if ((previewJob.data as { clientId?: string } | undefined)?.clientId !== userId) return false;
+  return (await previewJob.getState()) === "completed";
+}
 
 async function findTerminalJobRow(request: Request, jobId: string): Promise<VideoJob | null> {
   if (!isDatabaseConfigured()) return null;
@@ -293,18 +307,7 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
 
   if (renderModeValid === "final" && previewJobIdStr) {
     try {
-      const queue = getVideoQueue();
-      const previewJob = await queue.getJob(previewJobIdStr);
-      if (!previewJob) {
-        return apiError({
-          code: ErrorCode.PREVIEW_JOB_NOT_FOUND,
-          message: "Preview job not found or not completed.",
-          status: 400,
-          headers,
-        });
-      }
-      const state = await previewJob.getState();
-      if (state !== "completed") {
+      if (!(await callerHasCompletedPreview(previewJobIdStr, userIdEarly))) {
         return apiError({
           code: ErrorCode.PREVIEW_JOB_NOT_FOUND,
           message: "Preview job not found or not completed.",
@@ -986,6 +989,14 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
     }
 
     if (/^https?:\/\//i.test(videoPath)) {
+      if (await isPublishedVideoGone(videoPath)) {
+        return apiError({
+          code: ErrorCode.VIDEO_NOT_FOUND,
+          message: "Video file not found. It may have been cleaned up.",
+          status: 404,
+          headers: corsHeaders,
+        });
+      }
       const downloadUrl = videoPath + (videoPath.includes("?") ? "&" : "?") + "download=1";
       return new NextResponse(null, {
         status: 302,
@@ -1032,6 +1043,32 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
 
 const LIST_JOBS_DEFAULT_LIMIT = 20;
 const LIST_JOBS_MAX_LIMIT = 50;
+
+async function listJobsFromRows(ownerIds: string[], limit: number): Promise<JobSummary[]> {
+  const { listVideoJobsForOwners } = await import("@/lib/jobs/videoJobService");
+  const rows = await listVideoJobsForOwners(ownerIds, limit);
+  return rows.map((row) => {
+    const status: JobStatus =
+      row.status === "queued"
+        ? "pending"
+        : row.status === "processing"
+          ? "processing"
+          : row.status === "completed"
+            ? "completed"
+            : mapStateToStatus("failed", row.error);
+    const videoUrl = row.final_url
+      ? (row.result?.variations?.[0]?.videoUrl ?? row.final_url)
+      : undefined;
+    return {
+      jobId: row.queue_job_id ?? row.id,
+      status,
+      createdAt: row.created_at.getTime(),
+      ...(status === "completed" && videoUrl ? { videoUrl } : {}),
+      topic: row.prompt,
+      ...(status === "failed" && row.error ? { error: row.error } : {}),
+    };
+  });
+}
 
 export function handleJobsOptions(request: Request): NextResponse {
   const origin = request.headers.get("Origin");
@@ -1095,7 +1132,9 @@ export async function handleJobsGet(request: Request): Promise<NextResponse> {
     limit = parsed;
   }
   try {
-    const jobs = await listRecentJobs({ limit, ownerIds: [...ownerIds] });
+    const jobs = isDatabaseConfigured()
+      ? await listJobsFromRows([...ownerIds], limit)
+      : await listRecentJobs({ limit, ownerIds: [...ownerIds] });
     const body = {
       jobs: jobs.map((j) => ({
         jobId: j.jobId,

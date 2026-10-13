@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData } from "@/lib/queue/videoQueue";
 import { getVideoQueueName } from "@/lib/queue/queueName";
 import { jobUploadIds, resolveAssetRecords } from "@/lib/assets/storage";
+import { getUploadRetentionHours } from "@/lib/storage/cleanup";
 import type { AssetMetadata } from "@/lib/assets/types";
 import { validateJobId } from "@/lib/validation/input";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
@@ -22,6 +23,38 @@ import {
 } from "@/lib/jobs/admission";
 
 type EditBody = { message?: unknown };
+
+const NOT_CARRIED_OVER: ReadonlyArray<keyof VideoJobData> = [
+  "input",
+  "assets",
+  "requestId",
+  "callbackUrl",
+  "previewJobId",
+  "regenFromJobId",
+  "regenerateShotIds",
+  "remixFromJobId",
+  "stockImagesOnly",
+  "spendIdentifier",
+  "reservedSpendUsd",
+  "reservedCinematicSeconds",
+  "reservedCinematicSplit",
+  "reservedVideoMonth",
+];
+
+function carriedSettings(data: VideoJobData): Omit<VideoJobData, "input"> {
+  const carried: Partial<VideoJobData> = { ...data };
+  for (const key of NOT_CARRIED_OVER) delete carried[key];
+  return carried;
+}
+
+function uploadsDeletedMessage(): string {
+  const hours = getUploadRetentionHours();
+  const keptFor = hours > 0 ? ` (uploads are kept for ${hours} hour${hours === 1 ? "" : "s"})` : "";
+  return (
+    `This video was made with files you uploaded, and those files have been deleted${keptFor}, ` +
+    "so it can't be edited. To change it, create a new video and upload the files again."
+  );
+}
 
 type EditSource = { data: VideoJobData; clientId: string };
 
@@ -129,7 +162,7 @@ export async function POST(
       }
     }
 
-    const uploadIds = jobUploadIds({ assetIds: data?.assetIds });
+    const uploadIds = jobUploadIds({ assetIds: data?.assetIds, avatar: data?.avatar });
     let uploadedAssets: AssetMetadata[] = [];
     if (uploadIds.length > 0) {
       let lookup: { found: AssetMetadata[]; missing: string[] };
@@ -145,7 +178,7 @@ export async function POST(
       }
       if (lookup.missing.length > 0) {
         return NextResponse.json(
-          { error: "Your uploaded files are no longer available. Please upload them again." },
+          { error: uploadsDeletedMessage(), code: "UPLOADS_DELETED" },
           { status: 400 }
         );
       }
@@ -153,18 +186,9 @@ export async function POST(
     }
 
     const jobData: Omit<VideoJobData, "input"> = {
-      ...(data?.clientId ? { clientId: data.clientId } : {}),
-      ...(data?.mode ? { mode: data.mode } : {}),
-      ...(data?.durationSeconds !== undefined ? { durationSeconds: data.durationSeconds } : {}),
-      ...(Array.isArray(data?.assetIds) && data.assetIds.length > 0 ? { assetIds: data.assetIds } : {}),
+      ...carriedSettings(data),
+      clientId: String(clientId),
       ...(uploadedAssets.length > 0 ? { assets: uploadedAssets } : {}),
-      ...(data?.brandColors ? { brandColors: data.brandColors } : {}),
-      ...(typeof data?.textModel === "string" && data.textModel.trim() !== "" ? { textModel: data.textModel.trim() } : {}),
-      ...(data?.captions === "on" || data?.captions === "off" ? { captions: data.captions } : {}),
-      ...(typeof data?.aspectRatio === "string" && data.aspectRatio.trim() !== ""
-        ? { aspectRatio: data.aspectRatio }
-        : {}),
-      ...(data?.platform ? { platform: data.platform } : {}),
     };
 
     reservation = emptyReservation(String(clientId));

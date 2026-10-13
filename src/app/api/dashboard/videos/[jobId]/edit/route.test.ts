@@ -8,6 +8,7 @@ import {
   monthlyBudgetUsd,
   recordSpendUsd,
 } from "@/lib/cost/budget";
+import { getVideosUsedThisMonth } from "@/lib/usage";
 
 const {
   mockGetJob,
@@ -288,14 +289,19 @@ describe("POST /api/dashboard/videos/[jobId]/edit - uploaded files", () => {
     const res = await edit();
 
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe(
-      "Your uploaded files are no longer available. Please upload them again.",
-    );
+    expect(await res.json()).toEqual({
+      error:
+        "This video was made with files you uploaded, and those files have been deleted " +
+        "(uploads are kept for 24 hours), so it can't be edited. " +
+        "To change it, create a new video and upload the files again.",
+      code: "UPLOADS_DELETED",
+    });
     expect(mockResolveAssets).toHaveBeenCalledWith([ASSET_ID]);
     expect(mockInterpretEdit).not.toHaveBeenCalled();
     expect(mockAdd).not.toHaveBeenCalled();
     expect(await getCinematicSecondsUsed(USER)).toBe(0);
     expect(await getSpendUsd(USER)).toBe(0);
+    expect(await getVideosUsedThisMonth(USER)).toBe(0);
   });
 
   it("returns 503 and reserves nothing when the upload records cannot be read", async () => {
@@ -325,5 +331,93 @@ describe("POST /api/dashboard/videos/[jobId]/edit - uploaded files", () => {
     expect(mockAdd.mock.calls.at(-1)?.[1]).toEqual(
       expect.objectContaining({ assetIds: [ASSET_ID], assets: [fresh] }),
     );
+  });
+});
+
+describe("POST /api/dashboard/videos/[jobId]/edit - what the edited job carries over", () => {
+  const carried = {
+    mode: "talking_object",
+    durationSeconds: 20,
+    aspectRatio: "9:16",
+    platform: "tiktok",
+    captions: "off",
+    textModel: "model-x",
+    brandColors: { primary: "#112233" },
+    ttsVoiceId: "voice-9",
+    avatar: { mode: "preset", presetId: "anna" },
+    talkingObjectStyle: "real",
+    talkingRealMode: "studio",
+    variationCount: 2,
+    placeholders: { brand: "Acme" },
+    brandBrain: { tone: "warm" },
+    scriptFidelity: "strict",
+    strictScript: "Cold brew is coffee steeped cold for twelve hours.",
+    locale: "de-DE",
+    characterLockId: "char-1",
+    qualityGateMode: "warn",
+    seriesId: "series-7",
+    renderMode: "final",
+    userId: USER,
+  };
+  const dropped = {
+    requestId: "req-old",
+    callbackUrl: "https://hooks.example.com/cutline",
+    previewJobId: "preview-1",
+    regenFromJobId: "regen-1",
+    regenerateShotIds: ["shot-1"],
+    remixFromJobId: "remix-1",
+    stockImagesOnly: true,
+    spendIdentifier: "someone-else",
+    reservedSpendUsd: 9,
+    reservedCinematicSeconds: 99,
+    reservedCinematicSplit: { fromMonthly: 99, fromTopup: 0 },
+    reservedVideoMonth: "2020-01",
+  };
+
+  it("carries every setting except the ones that would undo the edit or belong to the old request", async () => {
+    useSource({ ...carried, ...dropped });
+
+    const res = await edit();
+
+    expect(res.status).toBe(200);
+    const payload = mockAdd.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect(payload).toEqual(
+      expect.objectContaining({
+        ...carried,
+        input: "A punchier explainer about cold brew coffee.",
+        clientId: USER,
+      }),
+    );
+    for (const key of ["requestId", "callbackUrl", "previewJobId", "regenFromJobId", "regenerateShotIds",
+      "remixFromJobId", "stockImagesOnly", "spendIdentifier"]) {
+      expect(payload).not.toHaveProperty(key);
+    }
+    expect(payload.reservedSpendUsd).not.toBe(9);
+    expect(payload.reservedCinematicSeconds).not.toBe(99);
+    expect(payload.reservedVideoMonth).not.toBe("2020-01");
+  });
+
+  it("checks an uploaded avatar too, and refuses the edit once it is gone", async () => {
+    const AVATAR_ID = "4c3b2a19-0f8e-4d7c-b6a5-948372615041";
+    useSource({ mode: "talking_object", durationSeconds: 20, avatar: { mode: "upload", uploadAssetId: AVATAR_ID } });
+    mockResolveAssets.mockResolvedValue({ found: [], missing: [AVATAR_ID] });
+
+    const res = await edit();
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("UPLOADS_DELETED");
+    expect(mockResolveAssets).toHaveBeenCalledWith([AVATAR_ID]);
+    expect(mockAdd).not.toHaveBeenCalled();
+  });
+
+  it("counts the edit as a video, and gives it back when the edit cannot start", async () => {
+    useSource({ mode: "slideshow", durationSeconds: 30 });
+
+    expect((await edit()).status).toBe(200);
+    expect(await getVideosUsedThisMonth(USER)).toBe(1);
+
+    mockInterpretEdit.mockRejectedValueOnce(new Error("model unavailable"));
+    expect((await edit()).status).toBe(500);
+    expect(await getVideosUsedThisMonth(USER)).toBe(1);
   });
 });

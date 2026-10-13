@@ -4,7 +4,7 @@ import { logPipelineEvent } from "@/lib/utils/pipelineLogger";
 import Redis from "ioredis";
 import { createManagedRedis } from "@/lib/redis/managedRedis";
 import { runPipeline } from "@/lib/pipeline/orchestrator";
-import { publishRenderedVideo } from "@/lib/storage/publish";
+import { deletePublishedBlob, publishRenderedVideo } from "@/lib/storage/publish";
 import { CANCELLED_JOBS_KEY, isJobCancelled } from "./cancelCheck";
 import { getVideoQueueName } from "./queueName";
 import { notifyWebhook } from "@/lib/webhook/notify";
@@ -55,6 +55,7 @@ export type VideoJobData = {
   reservedSpendUsd?: number;
   reservedCinematicSeconds?: number;
   reservedCinematicSplit?: { fromMonthly?: number; fromTopup?: number };
+  reservedVideoMonth?: string;
   spendIdentifier?: string;
   stockImagesOnly?: boolean;
   textModel?: string;
@@ -459,6 +460,12 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
             if (v?.videoUrl) v.videoUrl = await publish(v.videoUrl);
           }
         }
+        if (await isJobCancelled(jobIdStr)) {
+          for (const [source, published] of publishCache) {
+            if (published !== source) await deletePublishedBlob(published);
+          }
+          throw new Error("Job cancelled");
+        }
         await persistCompletion(jobIdStr, result);
         return result;
       } catch (e) {
@@ -558,11 +565,13 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
       } catch (e) {
         console.error("[worker] jobId=" + job?.id + " budget/credits error=" + (e instanceof Error ? e.message : String(e)));
       }
-      try {
-        const { incrementVideosCompletedThisMonth } = await import("@/lib/usage");
-        await incrementVideosCompletedThisMonth(clientId);
-      } catch (e) {
-        console.error("[worker] jobId=" + job?.id + " incrementVideosCompletedThisMonth error=" + (e instanceof Error ? e.message : String(e)));
+      if (!data?.reservedVideoMonth) {
+        try {
+          const { incrementVideosCompletedThisMonth } = await import("@/lib/usage");
+          await incrementVideosCompletedThisMonth(clientId);
+        } catch (e) {
+          console.error("[worker] jobId=" + job?.id + " incrementVideosCompletedThisMonth error=" + (e instanceof Error ? e.message : String(e)));
+        }
       }
     }
     if (result?.cost) {
@@ -603,6 +612,19 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         " budget reservation (spend already incurred is unknown)"
       );
     }
+    void (async () => {
+      try {
+        const { releaseJobVideo } = await import("@/lib/jobs/jobReservation");
+        if (await releaseJobVideo(String(jid), data)) {
+          console.log("[worker] jobId=" + jid + " failed; gave its video back to the monthly count");
+        }
+      } catch (e) {
+        console.error(
+          "[worker] jobId=" + jid + " video count release failed error=" +
+          (e instanceof Error ? e.message : String(e))
+        );
+      }
+    })();
     void (async () => {
       const reserved = typeof data?.reservedCinematicSeconds === "number" ? data.reservedCinematicSeconds : 0;
       if (reserved <= 0) return;

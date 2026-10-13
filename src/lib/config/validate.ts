@@ -1,3 +1,5 @@
+import { isCleanupEnabled } from "@/lib/config/cleanupEnabled";
+
 export type ValidatedConfig = {
   redisUrl: string;
   openRouterApiKey: string;
@@ -132,7 +134,7 @@ export function validateConfig(): ValidatedConfig {
   }
 
   const telemetryFile = getEnv("TELEMETRY_FILE") ?? getEnv("TELEMETRY_PERSIST_PATH");
-  const cleanupEnabled = process.env.CLEANUP_ENABLED !== "false";
+  const cleanupEnabled = isCleanupEnabled();
   const videoRetentionHours = parseNumber(process.env.VIDEO_RETENTION_HOURS, 24);
   const uploadRetentionHours = parseNumber(process.env.UPLOAD_RETENTION_HOURS, 24);
 

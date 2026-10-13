@@ -3,6 +3,7 @@ import path from "path";
 
 import { isDatabaseConfigured } from "@/lib/db/client";
 import { deleteVideoJobRelatedDbRows, findVideoJobForOwners } from "@/lib/jobs/videoJobService";
+import { releaseUnstartedJobReservation } from "@/lib/jobs/jobReservation";
 import { deletePreviewArtifactsFromRedis } from "@/lib/preview/artifacts";
 import { cancelJob, CLEANUP_JOB_NAME, getVideoQueue, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { deleteRegenSnapshot } from "@/lib/regen/snapshotStore";
@@ -33,6 +34,14 @@ function deleteMp4OutputsForJob(jobId: string): void {
     );
   }
 }
+
+const NOT_STARTED_STATES: ReadonlySet<string> = new Set([
+  "waiting",
+  "delayed",
+  "prioritized",
+  "paused",
+  "waiting-children",
+]);
 
 export type PurgeUserVideoResult =
   | { ok: true }
@@ -72,6 +81,7 @@ export async function purgeUserVideo(
   }
 
   const result = job?.returnvalue as VideoJobResult | undefined;
+  const neverStarted = job ? NOT_STARTED_STATES.has(await job.getState()) : false;
 
   try {
     await job?.remove();
@@ -96,6 +106,9 @@ export async function purgeUserVideo(
     }
     console.error("[purgeUserVideo] job.remove failed jobId=" + jobId, msg);
     return { ok: false, status: 500, error: "Could not remove this video. Please try again." };
+  }
+  if (job && neverStarted) {
+    await releaseUnstartedJobReservation(jobId, job.data as VideoJobData | undefined);
   }
 
   try {

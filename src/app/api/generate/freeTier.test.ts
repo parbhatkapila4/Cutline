@@ -2,19 +2,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "./route";
 import { PLAN_CONFIGS } from "@/lib/plans";
 import { fakeRedis } from "@/test/fakeRedis";
+import { incrementVideosCompletedThisMonth } from "@/lib/usage";
 
 const {
   mockAdd,
   mockStartVideoWorker,
   mockScheduleCleanupJob,
   mockGetUserPlan,
-  mockGetVideosCompleted,
 } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
   mockStartVideoWorker: vi.fn(() => ({})),
   mockScheduleCleanupJob: vi.fn(async () => { }),
   mockGetUserPlan: vi.fn(),
-  mockGetVideosCompleted: vi.fn(),
 }));
 
 vi.mock("@/lib/queue/videoQueue", () => ({
@@ -43,11 +42,6 @@ vi.mock("@/lib/api-keys/service", () => ({
 
 vi.mock("@/lib/jobs/videoJobService", () => ({
   createVideoJob: vi.fn(async () => ({ id: "row-1" })),
-}));
-
-vi.mock("@/lib/usage", () => ({
-  incrementApiCallsThisMonth: vi.fn(async () => { }),
-  getVideosCompletedThisMonth: mockGetVideosCompleted,
 }));
 
 vi.mock("@/lib/redis/managedRedis", async () => (await import("@/test/fakeRedis")).managedRedisMock);
@@ -89,11 +83,13 @@ beforeEach(() => {
   mockAdd.mockReset();
   mockAdd.mockResolvedValue({ id: "free-tier-job-1" });
   mockGetUserPlan.mockReset();
-  mockGetVideosCompleted.mockReset();
   delete process.env.DISABLE_CREDITS_CHECK;
   mockGetUserPlan.mockResolvedValue(FREE);
-  mockGetVideosCompleted.mockResolvedValue(0);
 });
+
+const useVideos = async (count: number) => {
+  for (let i = 0; i < count; i++) await incrementVideosCompletedThisMonth("user-1");
+};
 
 describe("gate: talking_object is Professional+", () => {
   it("rejects talking_object on free", async () => {
@@ -149,16 +145,15 @@ describe("gate: stock images only on free", () => {
 describe("gate: free video count", () => {
   it("allows a free account through its first three videos", async () => {
     mockGetUserPlan.mockResolvedValue(FREE);
-    for (const used of [0, 1, 2]) {
+    for (let i = 0; i < 3; i++) {
       mockAdd.mockClear();
-      mockGetVideosCompleted.mockResolvedValue(used);
       expect((await generate()).status).toBe(200);
     }
   });
 
   it("blocks a free account at 3 of 3", async () => {
     mockGetUserPlan.mockResolvedValue(FREE);
-    mockGetVideosCompleted.mockResolvedValue(3);
+    await useVideos(3);
     const res = await generate();
     expect(res.status).toBe(402);
     const body = await res.json();

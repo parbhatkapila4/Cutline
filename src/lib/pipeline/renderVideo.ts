@@ -13,7 +13,9 @@ import type { ImageSpec } from "@/lib/images/types";
 
 const REMOTION_ENTRY = "src/remotion/index.tsx";
 const COMPOSITION_ID = "CUTLINEComposition";
-const RENDER_TIMEOUT_MS = 600_000;
+const DEFAULT_RENDER_TIMEOUT_MS = 600_000;
+const MIN_RENDER_TIMEOUT_MS = 60_000;
+const MAX_RENDER_TIMEOUT_MS = 1_500_000;
 const TIMEOUT_TOLERANCE_MS = 5_000;
 const OOM_SIGNATURE_RE = /\bSIGKILL\b|\bENOMEM\b|out of memory|cannot allocate memory/i;
 const MAX_RENDER_STDERR_CHARS = 2000;
@@ -26,6 +28,32 @@ const IS_WINDOWS = process.platform === "win32";
 const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
 const DEFAULT_DURATION_SECONDS = 30;
+
+const warnedRenderTimeouts = new Set<string>();
+
+export function getRenderTimeoutMs(): number {
+  const raw = process.env.RENDER_TIMEOUT_MS?.trim();
+  if (!raw) return DEFAULT_RENDER_TIMEOUT_MS;
+  const requested = Number(raw);
+  let timeoutMs = Math.round(requested);
+  let problem: string | null = null;
+  if (!Number.isFinite(requested) || requested <= 0) {
+    timeoutMs = DEFAULT_RENDER_TIMEOUT_MS;
+    problem = "is not a positive number of milliseconds";
+  } else if (requested < MIN_RENDER_TIMEOUT_MS) {
+    timeoutMs = MIN_RENDER_TIMEOUT_MS;
+    problem = "is under the 60 s minimum";
+  } else if (requested > MAX_RENDER_TIMEOUT_MS) {
+    timeoutMs = MAX_RENDER_TIMEOUT_MS;
+    problem =
+      "is over the 25 min maximum (a render blocks the worker's event loop, so BullMQ cannot renew the 30 min job lock while it runs)";
+  }
+  if (problem && !warnedRenderTimeouts.has(raw)) {
+    warnedRenderTimeouts.add(raw);
+    console.warn(`[render] RENDER_TIMEOUT_MS=${JSON.stringify(raw)} ${problem}; using ${timeoutMs} ms.`);
+  }
+  return timeoutMs;
+}
 
 export class RenderTimeoutError extends Error {
   constructor(message: string) {
@@ -165,14 +193,15 @@ export type RenderSpawnOutcome = {
 
 export function classifyRenderResult(outcome: RenderSpawnOutcome): Error | null {
   const { status, signal, errorCode, errorMessage, elapsedMs, propsPath } = outcome;
+  const timeoutMs = getRenderTimeoutMs();
   const elapsedSec = Math.round(elapsedMs / 1000);
-  const budgetSec = Math.round(RENDER_TIMEOUT_MS / 1000);
+  const budgetSec = Math.round(timeoutMs / 1000);
   const detail = renderFailureDetail(outcome);
   const kept = `\nRemotion props kept for reproduction: ${propsPath}`;
 
   const weTimedOut =
     errorCode === "ETIMEDOUT" ||
-    (signal === "SIGTERM" && elapsedMs >= RENDER_TIMEOUT_MS - TIMEOUT_TOLERANCE_MS);
+    (signal === "SIGTERM" && elapsedMs >= timeoutMs - TIMEOUT_TOLERANCE_MS);
 
   if (weTimedOut) {
     return new RenderTimeoutError(
@@ -381,7 +410,7 @@ export function runRemotionRender(
   const spawnOptions: SpawnSyncOptionsWithStringEncoding = {
     cwd,
     encoding: "utf-8",
-    timeout: RENDER_TIMEOUT_MS,
+    timeout: getRenderTimeoutMs(),
     env: { ...process.env, [RENDER_TAG_ENV]: renderTag },
   };
   if (!IS_WINDOWS) {

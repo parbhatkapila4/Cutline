@@ -10,7 +10,7 @@ import {
 } from "@/lib/cost/budget";
 import { cinematicSecondsFor, estimateUnmeteredCostUsd } from "@/lib/cost/pricing";
 import type { VideoJobData } from "@/lib/queue/videoQueue";
-import { getVideosCompletedThisMonth } from "@/lib/usage";
+import { releaseVideoThisMonth, reserveVideoThisMonth } from "@/lib/usage";
 import { getUserPlan } from "@/lib/users/planService";
 
 export type Reservation = {
@@ -18,6 +18,7 @@ export type Reservation = {
   spendUsd: number;
   cinematicSeconds: number;
   cinematicSplit: { fromMonthly: number; fromTopup: number };
+  videoMonth: string | null;
 };
 
 export type AdmissionRequest = Pick<
@@ -49,6 +50,7 @@ export function emptyReservation(identifier: string): Reservation {
     spendUsd: 0,
     cinematicSeconds: 0,
     cinematicSplit: { fromMonthly: 0, fromTopup: 0 },
+    videoMonth: null,
   };
 }
 
@@ -152,27 +154,28 @@ export async function admitVideoJob(
     );
   }
 
-  const videosCompletedThisMonth = await getVideosCompletedThisMonth(spendIdentifier);
-  if (
-    userPlan.videosPerMonth != null &&
-    videosCompletedThisMonth >= userPlan.videosPerMonth
-  ) {
+  const video = await reserveVideoThisMonth(spendIdentifier, userPlan.videosPerMonth);
+  if (!video.ok) {
     return refuse(
       "Your current plan limit has been reached. Please upgrade to continue creating videos.",
       {
-        videosUsed: videosCompletedThisMonth,
+        videosUsed: video.used,
         videosLimit: userPlan.videosPerMonth,
         plan: userPlan.id,
       }
     );
   }
+  reservation.videoMonth = video.month;
 
   return { ok: true, mode: admittedMode, notice };
 }
 
 export function reservationJobFields(
   reservation: Reservation
-): Pick<VideoJobData, "reservedSpendUsd" | "reservedCinematicSeconds" | "reservedCinematicSplit"> {
+): Pick<
+  VideoJobData,
+  "reservedSpendUsd" | "reservedCinematicSeconds" | "reservedCinematicSplit" | "reservedVideoMonth"
+> {
   return {
     ...(reservation.spendUsd > 0 ? { reservedSpendUsd: reservation.spendUsd } : {}),
     ...(reservation.cinematicSeconds > 0
@@ -181,12 +184,16 @@ export function reservationJobFields(
         reservedCinematicSplit: { ...reservation.cinematicSplit },
       }
       : {}),
+    ...(reservation.videoMonth ? { reservedVideoMonth: reservation.videoMonth } : {}),
   };
 }
 
 export async function releaseReservation(reservation: Reservation): Promise<void> {
-  if (reservation.cinematicSeconds <= 0 && reservation.spendUsd <= 0) return;
+  if (reservation.cinematicSeconds <= 0 && reservation.spendUsd <= 0 && !reservation.videoMonth) return;
   try {
+    if (reservation.videoMonth) {
+      await releaseVideoThisMonth(reservation.identifier, reservation.videoMonth);
+    }
     if (reservation.cinematicSeconds > 0) {
       await releaseCinematicSeconds(
         reservation.identifier,
@@ -200,7 +207,8 @@ export async function releaseReservation(reservation: Reservation): Promise<void
   } catch (e) {
     console.error(
       `[admission] FAILED to release reservation for ${reservation.identifier}; ` +
-      `leaked spendUsd=${reservation.spendUsd} cinematicSeconds=${reservation.cinematicSeconds}. ` +
+      `leaked spendUsd=${reservation.spendUsd} cinematicSeconds=${reservation.cinematicSeconds} ` +
+      `video=${reservation.videoMonth ?? "none"}. ` +
       `error=${e instanceof Error ? e.message : String(e)}`
     );
   }

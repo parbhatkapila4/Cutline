@@ -1830,6 +1830,7 @@ async function runPipelineOnce(
 
   const slideshowCapSec = Math.max(1, Math.round(compositionDurationSec));
   trimVideoIfLongerThan(effectiveOutputPath, slideshowCapSec);
+  await checkCancelledAndThrow();
 
   if (isPreview) {
     checkOutputSizeIfConfigured(effectiveOutputPath);

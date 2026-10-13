@@ -55,19 +55,66 @@ export async function incrementApiCallsThisMonth(identifier: string): Promise<nu
   return next;
 }
 
-export async function getVideosCompletedThisMonth(identifier: string): Promise<number> {
-  const key = `${monthKey(identifier)}:videos`;
-  const raw = await getRedis().get(key);
+const VIDEO_RELEASE_GUARD_PREFIX = "cutline:videorelease:";
+const VIDEO_RELEASE_GUARD_TTL_SECONDS = 14 * 24 * 60 * 60;
+
+function videosKey(identifier: string, month: string = monthStamp()): string {
+  return `${KEY_PREFIX}${identifier}:${month}:videos`;
+}
+
+export async function getVideosUsedThisMonth(identifier: string): Promise<number> {
+  const raw = await getRedis().get(videosKey(identifier));
   if (raw === null) return 0;
   const n = parseInt(raw, 10);
   return Number.isNaN(n) || n < 0 ? 0 : n;
 }
 
 export async function incrementVideosCompletedThisMonth(identifier: string): Promise<number> {
-  const key = `${monthKey(identifier)}:videos`;
+  const key = videosKey(identifier);
   const next = await getRedis().incr(key);
   await expireIfNew(key, next);
   return next;
+}
+
+export async function reserveVideoThisMonth(
+  identifier: string,
+  limit: number | null
+): Promise<{ ok: boolean; used: number; month: string }> {
+  const month = monthStamp();
+  const key = videosKey(identifier, month);
+  const next = await getRedis().incr(key);
+  await expireIfNew(key, next);
+  if (limit != null && next > limit) {
+    try {
+      await getRedis().incrby(key, -1);
+    } catch {
+    }
+    return { ok: false, used: Math.min(next - 1, limit), month };
+  }
+  return { ok: true, used: next, month };
+}
+
+export async function releaseVideoThisMonth(identifier: string, month: string): Promise<void> {
+  const key = videosKey(identifier, month);
+  const next = await getRedis().incrby(key, -1);
+  if (next < 0) await getRedis().set(key, "0", "KEEPTTL");
+}
+
+export async function releaseVideoOnce(
+  identifier: string,
+  month: string,
+  guardKey: string
+): Promise<boolean> {
+  const claimed = await getRedis().set(
+    `${VIDEO_RELEASE_GUARD_PREFIX}${guardKey}`,
+    "1",
+    "EX",
+    VIDEO_RELEASE_GUARD_TTL_SECONDS,
+    "NX"
+  );
+  if (claimed !== "OK") return false;
+  await releaseVideoThisMonth(identifier, month);
+  return true;
 }
 
 export function getResetDate(): string {

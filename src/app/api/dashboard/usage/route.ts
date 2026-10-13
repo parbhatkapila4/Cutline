@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { getSessionSafe } from "@/lib/auth/getSessionSafe";
-import { getApiCallsThisMonth, getResetDate } from "@/lib/usage";
+import { getApiCallsThisMonth, getResetDate, getVideosUsedThisMonth } from "@/lib/usage";
 import { cinematicSecondsFor } from "@/lib/cost/pricing";
 import { getBudgetState } from "@/lib/cost/budget";
 import { getUserPlan } from "@/lib/users/planService";
+import { isDatabaseConfigured } from "@/lib/db/client";
 
 function titleFromInput(input: string | undefined): string {
   if (input == null || typeof input !== "string") return "";
@@ -34,6 +35,121 @@ async function resolveUsageContext(
     return { identifier: id, planUserId: id };
   }
   return null;
+}
+
+type RecentActivityItem = {
+  id: string;
+  title: string;
+  status: "completed" | "failed";
+  time: string;
+  cinematicSeconds?: number;
+  costUsd?: number;
+};
+
+type Activity = {
+  totalVideos: number;
+  thisWeek: number;
+  totalDurationMin: number;
+  inProgress: number;
+  totalCostUsd: number;
+  recentActivity: RecentActivityItem[];
+};
+
+function cinematicSecondsOf(data: VideoJobData | undefined): number | undefined {
+  const seconds = cinematicSecondsFor({
+    mode: data?.mode,
+    durationSeconds: data?.durationSeconds,
+    variationCount: data?.variationCount,
+    talkingObjectStyle: data?.talkingObjectStyle,
+    talkingRealMode: data?.talkingRealMode,
+    avatar: data?.avatar,
+  });
+  return seconds || undefined;
+}
+
+async function activityFromRows(identifier: string, weekStart: Date): Promise<Activity> {
+  const { getVideoJobOverview, listRecentFinishedVideoJobs } = await import("@/lib/jobs/videoJobService");
+  const [overview, recent] = await Promise.all([
+    getVideoJobOverview(identifier, weekStart),
+    listRecentFinishedVideoJobs(identifier, 5),
+  ]);
+  return {
+    totalVideos: overview.totalVideos,
+    thisWeek: overview.thisWeek,
+    totalDurationMin: Math.floor(overview.totalDurationSec / 60),
+    inProgress: overview.inProgress,
+    totalCostUsd: overview.totalCostUsd,
+    recentActivity: recent.map((row) => ({
+      id: row.queue_job_id ?? row.id,
+      title: titleFromInput(row.prompt) || "Video",
+      status: row.status === "completed" ? "completed" : "failed",
+      time: relativeTime((row.finished_at ?? row.created_at).getTime()),
+      cinematicSeconds: cinematicSecondsOf(row.job_data ?? undefined),
+      costUsd: row.result?.cost?.total,
+    })),
+  };
+}
+
+async function activityFromQueue(identifier: string, weekStart: Date): Promise<Activity> {
+  const queue = getVideoQueue();
+  const startOfWeekTs = weekStart.getTime();
+  const [completed, failed, waiting, active] = await Promise.all([
+    queue.getCompleted(0, 199),
+    queue.getFailed(0, 199),
+    queue.getWaiting(0, 199),
+    queue.getActive(),
+  ]);
+
+  const forClient = (job: { name?: string; data?: unknown }) => {
+    if (job.name === CLEANUP_JOB_NAME) return false;
+    const clientId = (job.data as VideoJobData | undefined)?.clientId;
+    return clientId != null && clientId === identifier;
+  };
+
+  const completedForClient = completed.filter((j) => forClient(j));
+  const thisWeek = completedForClient.filter(
+    (job) => (job.finishedOn ?? job.processedOn ?? 0) >= startOfWeekTs
+  ).length;
+  const totalDurationSec = completedForClient.reduce((sum, job) => {
+    const sec = (job.data as VideoJobData | undefined)?.durationSeconds;
+    return sum + (typeof sec === "number" && sec >= 0 ? sec : 0);
+  }, 0);
+  const inProgress = [...waiting, ...active].filter((j) => forClient(j)).length;
+  const totalCostUsd = completedForClient.reduce((sum, job) => {
+    const result = job.returnvalue as VideoJobResult | undefined;
+    return sum + (result?.cost?.total ?? 0);
+  }, 0);
+
+  const allForActivity = [
+    ...completedForClient.map((j) => ({ job: j, status: "completed" as const })),
+    ...failed.filter((j) => forClient(j)).map((j) => ({ job: j, status: "failed" as const })),
+  ];
+  allForActivity.sort((a, b) => {
+    const ta = a.job.finishedOn ?? a.job.processedOn ?? 0;
+    const tb = b.job.finishedOn ?? b.job.processedOn ?? 0;
+    return tb - ta;
+  });
+  const recentActivity = allForActivity.slice(0, 5).map(({ job, status }) => {
+    const data = job.data as VideoJobData | undefined;
+    const result = job.returnvalue as VideoJobResult | undefined;
+    return {
+      id: String(job.id ?? ""),
+      title: titleFromInput(data?.input) || "Video",
+      status,
+      time: relativeTime(job.finishedOn ?? job.processedOn),
+      cinematicSeconds: cinematicSecondsOf(data),
+      costUsd: result?.cost?.total,
+    };
+  });
+
+  return {
+    totalVideos: completedForClient.length,
+    thisWeek,
+    totalDurationMin: Math.floor(totalDurationSec / 60),
+    inProgress,
+    totalCostUsd,
+    recentActivity,
+  };
 }
 
 export async function GET(request: Request) {
@@ -98,95 +214,29 @@ export async function GET(request: Request) {
 
     const { identifier, planUserId } = ctx;
 
-    const queue = getVideoQueue();
     const d = new Date();
-    const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-    const startOfWeek = new Date(d);
-    startOfWeek.setHours(0, 0, 0, 0);
-    startOfWeek.setDate(d.getDate() - d.getDay());
-    const startOfWeekTs = startOfWeek.getTime();
+    const weekStart = new Date(d);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(d.getDate() - d.getDay());
 
-    const [completed, failed, waiting, active] = await Promise.all([
-      queue.getCompleted(0, 199),
-      queue.getFailed(0, 199),
-      queue.getWaiting(0, 199),
-      queue.getActive(),
-    ]);
-
-    const forClient = (job: { data?: unknown; finishedOn?: number; processedOn?: number; id?: string; failedReason?: string }) => {
-      const data = job.data as VideoJobData | undefined;
-      const clientId = data?.clientId;
-      if (clientId === undefined || clientId === null) return false;
-      return clientId === identifier;
-    };
-
-    const completedForClient = completed.filter((j) => forClient(j));
-    const completedThisMonth = completedForClient.filter(
-      (job) => (job.finishedOn ?? job.processedOn ?? 0) >= startOfMonth
-    );
-    const videosUsed = completedThisMonth.length;
-
-    const totalVideos = completedForClient.length;
-    const thisWeek = completedForClient.filter(
-      (job) => (job.finishedOn ?? job.processedOn ?? 0) >= startOfWeekTs
-    ).length;
-    const totalDurationSec = completedForClient.reduce((sum, job) => {
-      const data = job.data as VideoJobData | undefined;
-      const sec = data?.durationSeconds;
-      return sum + (typeof sec === "number" && sec >= 0 ? sec : 0);
-    }, 0);
-    const totalDurationMin = Math.floor(totalDurationSec / 60);
-    const inProgress = [
-      ...waiting.filter((j) => forClient(j)),
-      ...active.filter((j) => forClient(j)),
-    ].length;
-
-    const allForActivity = [
-      ...completed.filter((j) => forClient(j)).map((j) => ({ job: j, status: "completed" as const })),
-      ...failed.filter((j) => forClient(j)).map((j) => ({ job: j, status: "failed" as const })),
-    ];
-    allForActivity.sort((a, b) => {
-      const ta = a.job.finishedOn ?? a.job.processedOn ?? 0;
-      const tb = b.job.finishedOn ?? b.job.processedOn ?? 0;
-      return tb - ta;
-    });
-    const recentActivity = allForActivity.slice(0, 5).map(({ job, status }) => {
-      const data = job.data as VideoJobData | undefined;
-      const result = job.returnvalue as VideoJobResult | undefined;
-      const ts = job.finishedOn ?? job.processedOn;
-      const secondsCost = cinematicSecondsFor({
-        mode: data?.mode,
-        durationSeconds: data?.durationSeconds,
-        variationCount: data?.variationCount,
-        talkingObjectStyle: data?.talkingObjectStyle,
-        talkingRealMode: data?.talkingRealMode,
-        avatar: data?.avatar,
-      });
-      return {
-        id: String(job.id ?? ""),
-        title: titleFromInput(data?.input) || "Video",
-        status,
-        time: relativeTime(ts),
-        cinematicSeconds: secondsCost || undefined,
-        costUsd: result?.cost?.total,
-      };
-    });
+    const activity = isDatabaseConfigured()
+      ? await activityFromRows(identifier, weekStart)
+      : await activityFromQueue(identifier, weekStart);
 
     const plan = await getUserPlan(planUserId);
 
     const budget = await getBudgetState(identifier, plan.id);
 
     let apiCallsUsed = 0;
+    let videosUsed = 0;
     try {
-      apiCallsUsed = await getApiCallsThisMonth(identifier);
+      [apiCallsUsed, videosUsed] = await Promise.all([
+        getApiCallsThisMonth(identifier),
+        getVideosUsedThisMonth(identifier),
+      ]);
     } catch (redisErr) {
       console.warn("[api/dashboard/usage] usage counters unavailable (redis):", redisErr);
     }
-
-    const totalCostUsd = completedForClient.reduce((sum, job) => {
-      const result = job.returnvalue as VideoJobResult | undefined;
-      return sum + (result?.cost?.total ?? 0);
-    }, 0);
 
     return NextResponse.json({
       plan: plan.id,
@@ -208,14 +258,14 @@ export async function GET(request: Request) {
         topupSeconds: budget.topupSecondsRemaining,
         totalRemainingSeconds: budget.totalSecondsRemaining,
       },
-      totalCostUsd: Math.round(totalCostUsd * 100) / 100,
-      recentActivity,
+      totalCostUsd: Math.round(activity.totalCostUsd * 100) / 100,
+      recentActivity: activity.recentActivity,
       overview: {
-        totalVideos,
-        thisWeek,
+        totalVideos: activity.totalVideos,
+        thisWeek: activity.thisWeek,
         thisMonth: videosUsed,
-        totalDurationMin,
-        inProgress,
+        totalDurationMin: activity.totalDurationMin,
+        inProgress: activity.inProgress,
         storageUsed: null as string | null,
         avgRenderSec: null as number | null,
       },

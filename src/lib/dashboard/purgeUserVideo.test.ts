@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { purgeUserVideo } from "./purgeUserVideo";
 
-const { mockGetJob, mockCancelJob, mockFindRow, mockDeleteRows, mockDeleteBlob, mockDbConfigured } =
+const { mockGetJob, mockCancelJob, mockFindRow, mockDeleteRows, mockDeleteBlob, mockDbConfigured, mockReleaseUnstarted } =
   vi.hoisted(() => ({
+    mockReleaseUnstarted: vi.fn(async () => { }),
     mockGetJob: vi.fn(),
     mockCancelJob: vi.fn(),
     mockFindRow: vi.fn(),
@@ -26,6 +27,10 @@ vi.mock("@/lib/db/client", () => ({
 vi.mock("@/lib/jobs/videoJobService", () => ({
   findVideoJobForOwners: mockFindRow,
   deleteVideoJobRelatedDbRows: mockDeleteRows,
+}));
+
+vi.mock("@/lib/jobs/jobReservation", () => ({
+  releaseUnstartedJobReservation: mockReleaseUnstarted,
 }));
 
 vi.mock("@/lib/preview/artifacts", () => ({
@@ -80,6 +85,7 @@ const queueJob = (overrides: Record<string, unknown> = {}) => ({
   name: "video",
   data: { clientId: USER },
   returnvalue: { videoPath: BLOB },
+  getState: async () => "completed",
   remove: vi.fn(async () => { }),
   ...overrides,
 });
@@ -90,6 +96,7 @@ beforeEach(() => {
   mockDbConfigured.mockReturnValue(true);
   mockGetJob.mockReset();
   mockGetJob.mockResolvedValue(undefined);
+  mockReleaseUnstarted.mockClear();
   mockCancelJob.mockReset();
   mockCancelJob.mockResolvedValue({ ok: true });
   mockDeleteBlob.mockReset();
@@ -291,6 +298,7 @@ describe("purgeUserVideo - failures", () => {
     table = [videoRow({ status: "queued", final_url: null })];
     const job = queueJob({
       returnvalue: undefined,
+      getState: async () => "active",
       remove: vi.fn(async () => {
         throw new Error(`Job ${JOB_ID} could not be removed because it is locked by another worker`);
       }),
@@ -303,5 +311,36 @@ describe("purgeUserVideo - failures", () => {
     expect(mockCancelJob).toHaveBeenCalledWith(JOB_ID);
     expect(mockDeleteRows).not.toHaveBeenCalled();
     expect(table).toHaveLength(1);
+    expect(mockReleaseUnstarted).not.toHaveBeenCalled();
+  });
+});
+
+describe("purgeUserVideo - a job that never started gives its reservation back", () => {
+  const reservedData = {
+    clientId: USER,
+    reservedVideoMonth: "2026-10",
+    reservedSpendUsd: 0.5,
+    reservedCinematicSeconds: 16,
+  };
+
+  it("releases what a queued job reserved when it removes the job", async () => {
+    table = [videoRow({ status: "queued", final_url: null })];
+    const job = queueJob({ returnvalue: undefined, data: reservedData, getState: async () => "waiting" });
+    mockGetJob.mockResolvedValue(job);
+
+    const result = await purgeUserVideo(JOB_ID, [USER]);
+
+    expect(result).toEqual({ ok: true });
+    expect(job.remove).toHaveBeenCalled();
+    expect(mockReleaseUnstarted).toHaveBeenCalledWith(JOB_ID, reservedData);
+  });
+
+  it("releases nothing for a video that already rendered", async () => {
+    table = [videoRow()];
+    mockGetJob.mockResolvedValue(queueJob({ data: reservedData }));
+
+    await purgeUserVideo(JOB_ID, [USER]);
+
+    expect(mockReleaseUnstarted).not.toHaveBeenCalled();
   });
 });

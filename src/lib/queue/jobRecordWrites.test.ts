@@ -13,6 +13,9 @@ const {
   mockMarkProcessing,
   mockMarkCompleted,
   mockMarkFailed,
+  mockDeletePublished,
+  mockReleaseJobVideo,
+  mockIncrementCompleted,
 } = vi.hoisted(() => ({
   captured: { processor: null as Processor | null, handlers: {} as Record<string, Handler> },
   queueApi: {
@@ -27,6 +30,9 @@ const {
   mockMarkProcessing: vi.fn(),
   mockMarkCompleted: vi.fn(),
   mockMarkFailed: vi.fn(),
+  mockDeletePublished: vi.fn<(url: string) => Promise<void>>(async () => { }),
+  mockReleaseJobVideo: vi.fn(async () => true),
+  mockIncrementCompleted: vi.fn(async () => 1),
 }));
 
 vi.mock("bullmq", () => ({
@@ -57,7 +63,16 @@ vi.mock("./cancelCheck", () => ({
 }));
 
 vi.mock("@/lib/pipeline/orchestrator", () => ({ runPipeline: mockRunPipeline }));
-vi.mock("@/lib/storage/publish", () => ({ publishRenderedVideo: mockPublish }));
+vi.mock("@/lib/storage/publish", () => ({
+  publishRenderedVideo: mockPublish,
+  deletePublishedBlob: mockDeletePublished,
+}));
+vi.mock("@/lib/jobs/jobReservation", () => ({ releaseJobVideo: mockReleaseJobVideo }));
+vi.mock("@/lib/usage", () => ({ incrementVideosCompletedThisMonth: mockIncrementCompleted }));
+vi.mock("@/lib/cost/budget", () => ({
+  adjustSpendUsd: vi.fn(async () => 0),
+  releaseCinematicSecondsOnce: vi.fn(async () => true),
+}));
 vi.mock("@/lib/webhook/notify", () => ({ notifyWebhook: vi.fn() }));
 vi.mock("@/lib/telemetry/renderEvents", () => ({ recordRenderEvent: vi.fn() }));
 vi.mock("@/lib/utils/pipelineLogger", () => ({ logPipelineEvent: vi.fn() }));
@@ -119,6 +134,9 @@ beforeEach(() => {
   });
   mockMarkFailed.mockReset();
   mockMarkFailed.mockResolvedValue(true);
+  mockDeletePublished.mockClear();
+  mockReleaseJobVideo.mockClear();
+  mockIncrementCompleted.mockClear();
   for (const fn of Object.values(queueApi)) fn.mockReset();
 });
 
@@ -231,5 +249,47 @@ describe("removeLegacyCleanupJobs", () => {
     expect(queueApi.removeRepeatableByKey).toHaveBeenCalledWith("repeat:cleanup");
     expect(leftover.remove).toHaveBeenCalled();
     expect(render.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe("cancelling late, and the monthly video count", () => {
+  it("throws away a render that was cancelled while it was being published", async () => {
+    mockIsCancelled.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    await expect(processor()(videoJob())).rejects.toThrow("Job cancelled");
+
+    expect(mockDeletePublished.mock.calls.map((c) => c[0])).toEqual([
+      blobFor("/temp/job-record-1.mp4"),
+      blobFor("/temp/job-record-1-2.mp4"),
+    ]);
+    expect(mockMarkCompleted).not.toHaveBeenCalled();
+  });
+
+  it("gives the video back to the monthly count when a job fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => { });
+    vi.spyOn(console, "log").mockImplementation(() => { });
+    const job = videoJob({
+      data: { input: "A prompt", clientId: "user-1", reservedVideoMonth: "2026-10" },
+      failedReason: "Job cancelled",
+    });
+
+    captured.handlers.failed(job, new Error("Job cancelled"));
+
+    await vi.waitFor(() => expect(mockReleaseJobVideo).toHaveBeenCalledWith(JOB_ID, job.data));
+  });
+
+  it("counts a finished video at completion only when admission did not already count it", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => { });
+    const legacy = videoJob({ data: { input: "A prompt", clientId: "user-1" }, returnvalue: { videoPath: "x" } });
+    const counted = videoJob({
+      data: { input: "A prompt", clientId: "user-1", reservedVideoMonth: "2026-10" },
+      returnvalue: { videoPath: "x" },
+    });
+
+    await captured.handlers.completed(counted);
+    expect(mockIncrementCompleted).not.toHaveBeenCalled();
+
+    await captured.handlers.completed(legacy);
+    expect(mockIncrementCompleted).toHaveBeenCalledWith("user-1");
   });
 });

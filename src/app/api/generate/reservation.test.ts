@@ -12,7 +12,7 @@ import {
   reserveSpendUsd,
 } from "@/lib/cost/budget";
 import { estimateUnmeteredCostUsd } from "@/lib/cost/pricing";
-import { incrementVideosCompletedThisMonth } from "@/lib/usage";
+import { getVideosUsedThisMonth, incrementVideosCompletedThisMonth } from "@/lib/usage";
 
 const { mockAdd, mockGetUserPlan, mockDbConfigured, mockCreateVideoJob } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
@@ -244,5 +244,25 @@ describe("POST /api/generate - a Redis fail-open reserves nothing", () => {
     expect(res.status).toBe(402);
     expect(mockAdd).not.toHaveBeenCalled();
     expect(await getSpendUsd(USER)).toBe(5);
+  });
+});
+
+describe("POST /api/generate - the video count follows the reservation", () => {
+  it("an idempotency replay leaves the count at one video", async () => {
+    mockGetUserPlan.mockResolvedValue(PLAN_CONFIGS.beginner);
+    let finishFirstAdd: (job: { id: string }) => void = () => { };
+    mockAdd.mockImplementationOnce(
+      () => new Promise<{ id: string }>((resolve) => { finishFirstAdd = resolve; }),
+    );
+    const key = { "x-idempotency-key": "video-count-replay" };
+
+    const first = generate({ mode: "slideshow", durationSeconds: 30 }, key);
+    await vi.waitFor(() => expect(mockAdd).toHaveBeenCalledTimes(1));
+    const second = generate({ mode: "slideshow", durationSeconds: 30 }, key);
+    await vi.waitFor(async () => expect(await getVideosUsedThisMonth(USER)).toBe(2));
+    finishFirstAdd({ id: "replayed-job" });
+    await Promise.all([first, second]);
+
+    expect(await getVideosUsedThisMonth(USER)).toBe(1);
   });
 });
