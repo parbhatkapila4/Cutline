@@ -5,6 +5,7 @@ export interface ImageSpecEntry {
   imageUrl: string;
   source: ImageSource;
   fallbackUsed: boolean;
+  fit?: "cover" | "contain";
 }
 
 export interface ImageSpec {

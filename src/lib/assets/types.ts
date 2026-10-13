@@ -39,6 +39,7 @@ export interface ProductPhotoAnalysis {
   aspectRatio: number;
   subjectDescription: string;
   suggestedShotTypes: ("establish" | "detail" | "hero" | "transition")[];
+  imageKind: "screenshot" | "photo";
 }
 
 export interface ReferenceVideoAnalysis {

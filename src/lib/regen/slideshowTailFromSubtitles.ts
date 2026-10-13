@@ -10,6 +10,7 @@ import { generateSubtitles } from "@/lib/pipeline/subtitles";
 import { refineSubtitles } from "@/lib/pipeline/subtitle-refinement";
 import { generateTTS } from "@/lib/pipeline/tts";
 import { runRemotionRender } from "@/lib/pipeline/renderVideo";
+import { ENDING_FADE_SECONDS } from "@/remotion/ending";
 import { getCaptionsRenderOption } from "@/lib/pipeline/captionsRenderOption";
 import { getDimensionsForAspectRatio, isValidAspectRatio } from "@/lib/validation/aspectRatio";
 import { getMaxOutputMb } from "@/lib/config/limits";
@@ -20,6 +21,7 @@ import {
   shouldRetryForRender,
 } from "@/lib/utils/retry";
 import { saveRegenSnapshot } from "@/lib/regen/snapshotStore";
+import { withCancellationWatch } from "@/lib/queue/cancelCheck";
 import type { RegenSnapshotV1 } from "@/lib/types/pipelineEnhancements";
 import type { Intent } from "@/lib/types/intent";
 import type { NarrativePlan } from "@/lib/types/narrative";
@@ -253,7 +255,7 @@ export async function runSlideshowTailFromSubtitles(
     ...(logoUrl && logoPlacement ? { logoUrl, logoPlacement } : {}),
     audioBase64,
     audioFormat: ttsResult.audioFormat,
-    durationSeconds: compositionDurationSec,
+    durationSeconds: compositionDurationSec + ENDING_FADE_SECONDS,
     ...(isPreview ? { width: 1280, height: 720 } : aspectDimensions
       ? { width: aspectDimensions.width, height: aspectDimensions.height }
       : {}),
@@ -262,22 +264,16 @@ export async function runSlideshowTailFromSubtitles(
   await checkCancelledAndThrow();
   log({ jobId, event: "stage_start", stage: "render" });
   await withStageTelemetry(jobId, "render", () =>
-    retry(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          try {
-            runRemotionRender(renderInput, outputPath, jobId);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        }),
-      {
-        maxRetries: retryConfig.render.maxRetries,
-        backoffMs: retryConfig.render.backoffMs,
-        shouldRetry: shouldRetryForRender,
-        label: "Remotion render",
-      }
+    withCancellationWatch(jobId, (signal) =>
+      retry(
+        () => runRemotionRender(renderInput, outputPath, jobId, { signal }),
+        {
+          maxRetries: retryConfig.render.maxRetries,
+          backoffMs: retryConfig.render.backoffMs,
+          shouldRetry: shouldRetryForRender,
+          label: "Remotion render",
+        }
+      )
     )
   );
 

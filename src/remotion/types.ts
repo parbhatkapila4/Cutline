@@ -40,6 +40,7 @@ export type CUTLINECompositionProps = {
       imageUrl: string;
       source: string;
       fallbackUsed: boolean;
+      fit?: "cover" | "contain";
     }>;
   };
   logoUrl?: string;

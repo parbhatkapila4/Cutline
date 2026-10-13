@@ -53,11 +53,6 @@ const statusStyles: Record<VideoStatus, string> = {
   expired: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
 };
 
-function toDownloadHref(url: string): string {
-  if (!/^https?:\/\//i.test(url)) return url;
-  return url + (url.includes("?") ? "&" : "?") + "download=1";
-}
-
 const DELETE_TIMEOUT_MS = 30_000;
 
 const DEFAULT_USAGE: UsageData = {
@@ -417,7 +412,7 @@ export default function DashboardPage() {
                 <ul className="space-y-2.5">
                   {usage.recentActivity.map((a) => (
                     <li key={a.id} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 -mx-2 hover:bg-white/5 transition-colors">
-                      <span className={`shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full ${a.status === "completed" ? "bg-emerald-500" : a.status === "processing" ? "bg-amber-500" : "bg-red-500"}`} />
+                      <span className={`shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full ${a.status === "completed" ? "bg-emerald-500" : a.status === "processing" ? "bg-amber-500" : a.status === "cancelled" ? "bg-zinc-500" : "bg-red-500"}`} />
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium text-white truncate">{a.title}</p>
                         <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
@@ -791,7 +786,7 @@ export default function DashboardPage() {
                     <div className="px-4 pb-4 flex gap-2 items-center">
                       <Link href={`/dashboard/videos/${video.id}`} className="flex-1 text-center text-sm font-medium text-white bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2 rounded-lg transition-colors">View</Link>
                       {video.status === "completed" && video.videoUrl ? (
-                        <a href={toDownloadHref(video.videoUrl)} download className="flex-1 text-center text-sm font-medium text-black bg-white hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors">Download</a>
+                        <a href={`/api/generate/${encodeURIComponent(video.id)}/download`} download className="flex-1 text-center text-sm font-medium text-black bg-white hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors">Download</a>
                       ) : null}
                       {video.status === "completed" && video.videoUrl ? (
                         <button type="button" className="p-2 rounded-lg border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 transition-colors" title="Copy link">

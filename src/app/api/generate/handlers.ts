@@ -20,6 +20,7 @@ import {
   withIdempotencyLock,
 } from "@/lib/api/idempotency";
 import { requestOwnsResource, resolveOwnerCandidates } from "@/lib/jobs/jobOwnership";
+import { isCancelledFailure } from "@/lib/jobs/jobStatus";
 import { isDatabaseConfigured } from "@/lib/db";
 import { isProPlan } from "@/lib/plans";
 import { auth } from "@/lib/auth";
@@ -142,7 +143,7 @@ async function statusFromRow(row: VideoJob): Promise<JobStatusResponse> {
 }
 
 function mapStateToStatus(state: string, failedReason?: string | null): JobStatus {
-  if (state === "failed" && failedReason?.includes("cancelled")) {
+  if (state === "failed" && isCancelledFailure(failedReason)) {
     return "cancelled";
   }
   switch (state) {

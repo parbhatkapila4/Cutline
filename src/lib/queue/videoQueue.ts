@@ -6,6 +6,7 @@ import { createManagedRedis } from "@/lib/redis/managedRedis";
 import { runPipeline } from "@/lib/pipeline/orchestrator";
 import { deletePublishedBlob, publishRenderedVideo } from "@/lib/storage/publish";
 import { CANCELLED_JOBS_KEY, isJobCancelled } from "./cancelCheck";
+import { isCancelledFailure } from "@/lib/jobs/jobStatus";
 import { getVideoQueueName } from "./queueName";
 import { notifyWebhook } from "@/lib/webhook/notify";
 
@@ -203,7 +204,7 @@ export type JobSummary = {
 };
 
 function jobStateToStatus(state: JobState | "unknown" | "paused", failedReason?: string | null): string {
-  if (state === "failed" && failedReason?.includes("cancelled")) return "cancelled";
+  if (state === "failed" && isCancelledFailure(failedReason)) return "cancelled";
   switch (state) {
     case "waiting":
     case "delayed":

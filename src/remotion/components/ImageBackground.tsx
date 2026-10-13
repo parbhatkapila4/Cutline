@@ -2,6 +2,7 @@
 import { interpolate, useCurrentFrame } from "remotion";
 import { staticFile } from "remotion";
 import { useCallback, useState } from "react";
+import { FittedImage } from "./FittedImage";
 
 export type ImageBackgroundProps = {
   imageUrl: string;
@@ -9,6 +10,7 @@ export type ImageBackgroundProps = {
   motionParams: Record<string, unknown>;
   fromFrame: number;
   durationInFrames: number;
+  fit?: "cover" | "contain";
 };
 
 export const ImageBackground: React.FC<ImageBackgroundProps> = ({
@@ -17,6 +19,7 @@ export const ImageBackground: React.FC<ImageBackgroundProps> = ({
   motionParams,
   fromFrame,
   durationInFrames,
+  fit = "cover",
 }) => {
   const frame = useCurrentFrame();
   const frameInSequence = frame - fromFrame;
@@ -32,6 +35,17 @@ export const ImageBackground: React.FC<ImageBackgroundProps> = ({
 
   if (loadError) {
     throw new Error(`Image failed to load: ${imageUrl}`);
+  }
+
+  const src =
+    imageUrl.startsWith("data:")
+      ? imageUrl
+      : imageUrl.startsWith("http://") || imageUrl.startsWith("https://")
+        ? imageUrl
+        : staticFile(imageUrl);
+
+  if (fit === "contain") {
+    return <FittedImage src={src} onError={handleError} />;
   }
 
   let scale = 1;
@@ -60,13 +74,6 @@ export const ImageBackground: React.FC<ImageBackgroundProps> = ({
     const endY = (motionParams.endY as number) ?? 0;
     translateY = interpolate(progress, [0, 1], [startY, endY]);
   }
-
-  const src =
-    imageUrl.startsWith("data:")
-      ? imageUrl
-      : imageUrl.startsWith("http://") || imageUrl.startsWith("https://")
-        ? imageUrl
-        : staticFile(imageUrl);
 
   return (
     <div

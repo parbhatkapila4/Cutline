@@ -100,7 +100,13 @@ export function shouldRetryForImage(err: unknown): boolean {
 export function shouldRetryForRender(err: unknown): boolean {
   const name = err instanceof Error ? err.name : "";
 
-  if (name === "RenderTimeoutError" || name === "RenderOutOfMemoryError") return false;
+  if (
+    name === "RenderTimeoutError" ||
+    name === "RenderOutOfMemoryError" ||
+    name === "RenderCancelledError"
+  ) {
+    return false;
+  }
 
   const msg = err instanceof Error ? err.message : String(err);
   const lower = msg.toLowerCase();

@@ -28,9 +28,10 @@ import { generateTTS } from "@/lib/pipeline/tts";
 import { createTalkingVideo } from "@/lib/lipsync/heygen";
 import { composeMotion } from "@/lib/pipeline/motion";
 import { composeVisuals } from "@/lib/pipeline/visuals";
-import { runRemotionRender } from "@/lib/pipeline/renderVideo";
+import { renderedDurationSeconds, runRemotionRender } from "@/lib/pipeline/renderVideo";
+import { ENDING_FADE_SECONDS } from "@/remotion/ending";
 import { cleanupJobArtifacts } from "@/lib/storage/cleanup";
-import { isJobCancelled } from "@/lib/queue/cancelCheck";
+import { isJobCancelled, withCancellationWatch } from "@/lib/queue/cancelCheck";
 import { generateTalkingVideoWithVeo, VeoQuotaOrLimitError, VeoContentFilteredError } from "@/lib/veo";
 import { rewriteNarrationForSafety } from "@/lib/pipeline/safetyReword";
 import {
@@ -1793,6 +1794,7 @@ async function runPipelineOnce(
     !isPreview && aspectRatio && isValidAspectRatio(aspectRatio)
       ? getDimensionsForAspectRatio(aspectRatio)
       : null;
+  const renderDurationSec = compositionDurationSec + ENDING_FADE_SECONDS;
   const renderInput = {
     script,
     shotList: finalShotList,
@@ -1804,32 +1806,27 @@ async function runPipelineOnce(
     ...(logoUrl && logoPlacement ? { logoUrl, logoPlacement } : {}),
     audioBase64,
     audioFormat: ttsResult.audioFormat,
-    durationSeconds: compositionDurationSec,
+    durationSeconds: renderDurationSec,
     ...(isPreview ? { width: 1280, height: 720 } : aspectDimensions ? { width: aspectDimensions.width, height: aspectDimensions.height } : {}),
   };
 
   await checkCancelledAndThrow();
   logEvent({ jobId, event: "stage_start", stage: "render" });
-  await withStageTelemetry(jobId, "render", () => retry(
-    () =>
-      new Promise<void>((resolve, reject) => {
-        try {
-          runRemotionRender(renderInput, effectiveOutputPath, jobId);
-          resolve();
-        } catch (e) {
-          reject(e);
+  await withStageTelemetry(jobId, "render", () =>
+    withCancellationWatch(jobId, (signal) =>
+      retry(
+        () => runRemotionRender(renderInput, effectiveOutputPath, jobId, { signal }),
+        {
+          maxRetries: retryConfig.render.maxRetries,
+          backoffMs: retryConfig.render.backoffMs,
+          shouldRetry: shouldRetryForRender,
+          label: "Remotion render",
         }
-      }),
-    {
-      maxRetries: retryConfig.render.maxRetries,
-      backoffMs: retryConfig.render.backoffMs,
-      shouldRetry: shouldRetryForRender,
-      label: "Remotion render",
-    }
-  ));
+      )
+    )
+  );
 
-  const slideshowCapSec = Math.max(1, Math.round(compositionDurationSec));
-  trimVideoIfLongerThan(effectiveOutputPath, slideshowCapSec);
+  trimVideoIfLongerThan(effectiveOutputPath, renderedDurationSeconds(renderDurationSec));
   await checkCancelledAndThrow();
 
   if (isPreview) {

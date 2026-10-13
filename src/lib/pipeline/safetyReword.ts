@@ -1,3 +1,5 @@
+import { cleanSpokenText } from "@/lib/pipeline/spokenText";
+
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
@@ -55,5 +57,5 @@ export async function rewriteNarrationForSafety(
   if (typeof content !== "string" || !content.trim()) {
     throw new Error("Safety reword failed: empty response from model");
   }
-  return content.trim().replace(/^["'“”]+|["'“”]+$/g, "").trim();
+  return cleanSpokenText(content.trim().replace(/^["'“”]+|["'“”]+$/g, ""));
 }

@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import {
   buildRemotionProps,
   classifyRenderResult,
   getRenderTimeoutMs,
+  runRemotionRender,
+  runRenderProcess,
+  RenderCancelledError,
   type RenderInput,
+  type RenderProcessOptions,
   type RenderSpawnOutcome,
 } from "./renderVideo";
 import { mapFailedReasonToFailureCode } from "@/lib/utils/error";
@@ -167,12 +174,14 @@ describe("RENDER_TIMEOUT_MS", () => {
     expect(warn).toHaveBeenCalledTimes(3);
   });
 
-  it("clamps to 60 s - 25 min, because a longer render outlives the worker's job lock", () => {
+  it("clamps to 60 s - 60 min; the ceiling only guards against a typo now that the lock renews mid-render", () => {
     vi.spyOn(console, "warn").mockImplementation(() => { });
     vi.stubEnv("RENDER_TIMEOUT_MS", "1000");
     expect(getRenderTimeoutMs()).toBe(60_000);
-    vi.stubEnv("RENDER_TIMEOUT_MS", "3600000");
-    expect(getRenderTimeoutMs()).toBe(1_500_000);
+    vi.stubEnv("RENDER_TIMEOUT_MS", "2700000");
+    expect(getRenderTimeoutMs()).toBe(2_700_000);
+    vi.stubEnv("RENDER_TIMEOUT_MS", "36000000");
+    expect(getRenderTimeoutMs()).toBe(3_600_000);
   });
 
   it("reports the configured budget when a render times out", () => {
@@ -183,5 +192,163 @@ describe("RENDER_TIMEOUT_MS", () => {
     expect(err?.message.split("\n")[0]).toBe(
       "Remotion render timed out after 900s (budget 900s). Try a shorter video or raise RENDER_TIMEOUT_MS.",
     );
+  });
+});
+
+describe("runRenderProcess", () => {
+  const nodeScript = (script: string, overrides: Partial<RenderProcessOptions> = {}): RenderProcessOptions => ({
+    args: ["-e", script],
+    cwd: process.cwd(),
+    env: process.env,
+    renderTag: "test-render",
+    traceId: "test",
+    timeoutMs: 60_000,
+    ...overrides,
+  });
+
+  const isRunning = (pid: number | undefined): boolean => {
+    if (pid == null) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keeps the event loop free while the render runs", async () => {
+    let ticks = 0;
+    const ticker = setInterval(() => {
+      ticks += 1;
+    }, 25);
+    try {
+      const result = await runRenderProcess(nodeScript("setTimeout(() => {}, 1500)"));
+      expect(result.status).toBe(0);
+    } finally {
+      clearInterval(ticker);
+    }
+    expect(ticks).toBeGreaterThanOrEqual(20);
+  });
+
+  it("collects output and the exit status of a render that fails", async () => {
+    const result = await runRenderProcess(
+      nodeScript("process.stdout.write('progress'); process.stderr.write('Error: boom'); process.exit(3)")
+    );
+    expect(result).toEqual(
+      expect.objectContaining({ status: 3, signal: null, stdout: "progress", stderr: "Error: boom", stoppedBy: null })
+    );
+    expect(classifyRenderResult({ ...result, elapsedMs: 1_000, propsPath: "/tmp/p.json" })?.message).toContain(
+      "Remotion render failed (exit 3)"
+    );
+  });
+
+  it("does not kill a render for printing a lot, and keeps the start and end of what it printed", async () => {
+    const result = await runRenderProcess(
+      nodeScript("process.stdout.write('START' + 'x'.repeat(3 * 1024 * 1024) + 'END')")
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.startsWith("START")).toBe(true);
+    expect(result.stdout.endsWith("END")).toBe(true);
+    expect(result.stdout).toContain("chars omitted");
+    expect(result.stdout.length).toBeLessThan(1.2 * 1024 * 1024);
+  });
+
+  it("stops a render that runs past its budget and reports it as a timeout", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => { });
+    const startedAt = Date.now();
+    const result = await runRenderProcess(
+      nodeScript("console.log(process.pid); setTimeout(() => {}, 60000)", { timeoutMs: 400 })
+    );
+    const childPid = Number(result.stdout.trim()) || undefined;
+    expect(result.stoppedBy).toBe("timeout");
+    expect(result.errorCode).toBe("ETIMEDOUT");
+    expect(Date.now() - startedAt).toBeLessThan(15_000);
+    expect(isRunning(childPid)).toBe(false);
+    const err = classifyRenderResult({ ...result, elapsedMs: 60_000, propsPath: "/tmp/p.json" });
+    expect(err?.name).toBe("RenderTimeoutError");
+  });
+
+  it("stops a render in progress when the job is cancelled", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => { });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 400);
+    const startedAt = Date.now();
+    const result = await runRenderProcess(
+      nodeScript("console.log(process.pid); setTimeout(() => {}, 60000)", { signal: controller.signal })
+    );
+    const childPid = Number(result.stdout.trim()) || undefined;
+    expect(result.stoppedBy).toBe("cancelled");
+    expect(Date.now() - startedAt).toBeLessThan(15_000);
+    expect(isRunning(childPid)).toBe(false);
+  });
+
+  it("stops at once when the job was already cancelled", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => { });
+    const controller = new AbortController();
+    controller.abort();
+    const result = await runRenderProcess(nodeScript("setTimeout(() => {}, 60000)", { signal: controller.signal }));
+    expect(result.stoppedBy).toBe("cancelled");
+  });
+
+  it("gives the render its own temp dir and removes it even when the render is stopped", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => { });
+    const scratchDir = path.join(os.tmpdir(), `cutline-render-test-${process.pid}-${Date.now()}`);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 500);
+    const result = await runRenderProcess(
+      nodeScript(
+        "const fs = require('fs'), os = require('os'), path = require('path');" +
+        "fs.writeFileSync(path.join(os.tmpdir(), 'frame-0001.jpeg'), 'x');" +
+        "console.log(os.tmpdir()); setTimeout(() => {}, 60000)",
+        { signal: controller.signal, scratchDir }
+      )
+    );
+    expect(result.stoppedBy).toBe("cancelled");
+    expect(path.resolve(result.stdout.trim())).toBe(path.resolve(scratchDir));
+    expect(fs.existsSync(scratchDir)).toBe(false);
+  });
+
+  it("removes the render's temp dir after a clean exit too", async () => {
+    const scratchDir = path.join(os.tmpdir(), `cutline-render-test-${process.pid}-${Date.now()}-ok`);
+    const result = await runRenderProcess(
+      nodeScript(
+        "require('fs').writeFileSync(require('path').join(require('os').tmpdir(), 'bundle.js'), 'x')",
+        { scratchDir }
+      )
+    );
+    expect(result.status).toBe(0);
+    expect(fs.existsSync(scratchDir)).toBe(false);
+  });
+
+  it("reports a render process that cannot start", async () => {
+    const result = await runRenderProcess(
+      nodeScript("", { command: "definitely-not-a-real-binary-cutline" })
+    );
+    expect(result.status).toBeNull();
+    expect(result.errorCode).toBe("ENOENT");
+    expect(classifyRenderResult({ ...result, elapsedMs: 0, propsPath: "/tmp/p.json" })?.message).toContain(
+      "Render failed after 0s"
+    );
+  });
+});
+
+describe("render cancellation", () => {
+  it("rejects before doing anything when the job is already cancelled", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      runRemotionRender(minimalRenderInput(), "/nonexistent/out.mp4", "job-x", { signal: controller.signal })
+    ).rejects.toBeInstanceOf(RenderCancelledError);
+  });
+
+  it("is a cancellation everywhere downstream, and is never retried", () => {
+    const err = new RenderCancelledError();
+    expect(err.message).toBe("Job cancelled");
+    expect(mapFailedReasonToFailureCode(err.message)).toBe("CANCELLED");
+    expect(shouldRetryForRender(err)).toBe(false);
   });
 });

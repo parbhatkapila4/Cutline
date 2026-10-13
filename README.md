@@ -43,7 +43,7 @@ Twelve stages, each a pure function over the previous stage's output. Determinis
 
 ### Worker separate from app
 
-Rendering is CPU-heavy. A single render attempt is allowed 600 s by default (`RENDER_TIMEOUT_MS` on the worker, clamped to 60 s - 25 min) and is retried up to 2 more times (`RETRY_RENDER_MAX`), so worst-case wall clock is far longer than a typical run. Serverless functions time out, and even when they don't, billing-by-execution is the wrong shape for long jobs. The Next.js app handles UI + API + job enqueue; a separate BullMQ worker pipelines and renders. This split is load-bearing for the deploy story: app on Vercel, worker on a long-running host (Railway / Render / Fly), same Redis.
+Rendering is CPU-heavy. A single render attempt is allowed 600 s by default (`RENDER_TIMEOUT_MS` on the worker, clamped to 60 s - 60 min) and is retried up to 2 more times (`RETRY_RENDER_MAX`), so worst-case wall clock is far longer than a typical run. Serverless functions time out, and even when they don't, billing-by-execution is the wrong shape for long jobs. The Next.js app handles UI + API + job enqueue; a separate BullMQ worker pipelines and renders. This split is load-bearing for the deploy story: app on Vercel, worker on a long-running host (Railway / Render / Fly), same Redis.
 
 ---
 

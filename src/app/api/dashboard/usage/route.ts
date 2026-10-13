@@ -7,6 +7,7 @@ import { cinematicSecondsFor } from "@/lib/cost/pricing";
 import { getBudgetState } from "@/lib/cost/budget";
 import { getUserPlan } from "@/lib/users/planService";
 import { isDatabaseConfigured } from "@/lib/db/client";
+import { isCancelledFailure } from "@/lib/jobs/jobStatus";
 
 function titleFromInput(input: string | undefined): string {
   if (input == null || typeof input !== "string") return "";
@@ -40,11 +41,16 @@ async function resolveUsageContext(
 type RecentActivityItem = {
   id: string;
   title: string;
-  status: "completed" | "failed";
+  status: "completed" | "failed" | "cancelled";
   time: string;
   cinematicSeconds?: number;
   costUsd?: number;
 };
+
+function finishedStatus(completed: boolean, failure: string | null | undefined): RecentActivityItem["status"] {
+  if (completed) return "completed";
+  return isCancelledFailure(failure) ? "cancelled" : "failed";
+}
 
 type Activity = {
   totalVideos: number;
@@ -82,7 +88,7 @@ async function activityFromRows(identifier: string, weekStart: Date): Promise<Ac
     recentActivity: recent.map((row) => ({
       id: row.queue_job_id ?? row.id,
       title: titleFromInput(row.prompt) || "Video",
-      status: row.status === "completed" ? "completed" : "failed",
+      status: finishedStatus(row.status === "completed", row.error),
       time: relativeTime((row.finished_at ?? row.created_at).getTime()),
       cinematicSeconds: cinematicSecondsOf(row.job_data ?? undefined),
       costUsd: row.result?.cost?.total,
@@ -121,8 +127,8 @@ async function activityFromQueue(identifier: string, weekStart: Date): Promise<A
   }, 0);
 
   const allForActivity = [
-    ...completedForClient.map((j) => ({ job: j, status: "completed" as const })),
-    ...failed.filter((j) => forClient(j)).map((j) => ({ job: j, status: "failed" as const })),
+    ...completedForClient.map((j) => ({ job: j, status: finishedStatus(true, null) })),
+    ...failed.filter((j) => forClient(j)).map((j) => ({ job: j, status: finishedStatus(false, j.failedReason) })),
   ];
   allForActivity.sort((a, b) => {
     const ta = a.job.finishedOn ?? a.job.processedOn ?? 0;

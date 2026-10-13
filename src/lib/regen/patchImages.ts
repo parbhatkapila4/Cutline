@@ -50,6 +50,7 @@ export async function buildImageSpecForRegen(
         imageUrl: copied ?? e.imageUrl,
         source: e.source,
         fallbackUsed: e.fallbackUsed,
+        ...(e.fit ? { fit: e.fit } : {}),
       });
       continue;
     }

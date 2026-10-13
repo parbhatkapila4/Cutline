@@ -2,15 +2,29 @@ import React, { useMemo } from "react";
 import {
   AbsoluteFill,
   Audio,
+  Easing,
   Sequence,
+  interpolate,
+  useCurrentFrame,
   useVideoConfig,
 } from "remotion";
 import { CaptionedVideo } from "./components/CaptionedVideo";
 import { ImageBackground } from "./components/ImageBackground";
 import { LogoOverlay } from "./components/LogoOverlay";
+import { ENDING_FADE_SECONDS } from "./ending";
 import type { CUTLINECompositionProps } from "./types";
 
 const FALLBACK_IMAGE = "/fallback.png";
+
+function EndingFade({ durationInFrames }: { durationInFrames: number }) {
+  const frame = useCurrentFrame();
+  const opacity = interpolate(frame, [0, Math.max(1, durationInFrames - 1)], [0, 1], {
+    easing: Easing.inOut(Easing.quad),
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  return <AbsoluteFill style={{ backgroundColor: "#000", opacity, zIndex: 1000 }} />;
+}
 
 const DEFAULT_CAPTION_STYLE = {
   fontFamily: "Inter",
@@ -33,7 +47,7 @@ const DEFAULT_CAPTION_STYLE = {
 export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
   props
 ) => {
-  const { fps } = useVideoConfig();
+  const { fps, durationInFrames: compositionFrames } = useVideoConfig();
   const {
     shotList,
     subtitleTrack,
@@ -68,11 +82,11 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
   );
   const getImageForShot = (shotId: string) => {
     const exact = imageByShot.get(shotId);
-    if (exact?.imageUrl) return exact.imageUrl;
+    if (exact?.imageUrl) return exact;
     const normalized = shotId.replace(/_/g, "-").replace(/\s+/g, "-").toLowerCase();
     for (const [id, entry] of imageByShot) {
       if (id.replace(/_/g, "-").replace(/\s+/g, "-").toLowerCase() === normalized && entry.imageUrl) {
-        return entry.imageUrl;
+        return entry;
       }
     }
     return null;
@@ -84,6 +98,7 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
     : undefined;
 
   const totalShots = shots.length;
+  const fadeFrames = Math.min(Math.round(ENDING_FADE_SECONDS * fps), compositionFrames);
   const shotStartFrames = shots.map((_, index) =>
     shots
       .slice(0, index)
@@ -97,19 +112,22 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
       )}
       {shots.map((shot, index) => {
         const fromFrame = shotStartFrames[index] ?? 0;
-        const durationInFrames = Math.ceil(
-          (shot.durationSeconds ?? 0) * fps
-        );
-        const motionEntry = motionByShot.get(shot.id);
-        const imageUrl = getImageForShot(shot.id) ?? FALLBACK_IMAGE;
-
         const isFirstShot = index === 0;
         const isLastShot = index === totalShots - 1;
+        const shotFrames = Math.ceil(
+          (shot.durationSeconds ?? 0) * fps
+        );
+        const durationInFrames = isLastShot
+          ? Math.max(shotFrames, compositionFrames - fromFrame)
+          : shotFrames;
+        const motionEntry = motionByShot.get(shot.id);
+        const image = getImageForShot(shot.id);
 
         const content = (
           <>
             <ImageBackground
-              imageUrl={imageUrl}
+              imageUrl={image?.imageUrl ?? FALLBACK_IMAGE}
+              fit={image?.fit}
               motionType={motionEntry?.motionType ?? "static"}
               motionParams={motionEntry?.params ?? {}}
               fromFrame={fromFrame}
@@ -146,6 +164,16 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
           captionStyle={DEFAULT_CAPTION_STYLE}
           captionPosition={{ x: 0.5, y: 0.86 }}
         />
+      )}
+      {fadeFrames > 0 && (
+        <Sequence
+          from={compositionFrames - fadeFrames}
+          durationInFrames={fadeFrames}
+          name="ending-fade"
+          layout="none"
+        >
+          <EndingFade durationInFrames={fadeFrames} />
+        </Sequence>
       )}
     </AbsoluteFill>
   );

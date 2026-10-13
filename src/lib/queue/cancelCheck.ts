@@ -2,6 +2,7 @@ import Redis from "ioredis";
 import { createManagedRedis, FAIL_FAST_REDIS_OPTIONS } from "@/lib/redis/managedRedis";
 
 export const CANCELLED_JOBS_KEY = "cutline:job:cancelled";
+const CANCEL_POLL_INTERVAL_MS = 3_000;
 let cancelRedis: Redis | null = null;
 
 function getRedisConnection(): Redis {
@@ -19,5 +20,37 @@ export async function isJobCancelled(jobId: string): Promise<boolean> {
     return exists === 1;
   } catch {
     return false;
+  }
+}
+
+export async function withCancellationWatch<T>(
+  jobId: string,
+  run: (signal: AbortSignal) => Promise<T>,
+  options: { intervalMs?: number; isCancelled?: (jobId: string) => Promise<boolean> } = {}
+): Promise<T> {
+  const controller = new AbortController();
+  const isCancelled = options.isCancelled ?? isJobCancelled;
+  const intervalMs = options.intervalMs ?? CANCEL_POLL_INTERVAL_MS;
+  let done = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const poll = async () => {
+    let cancelled = false;
+    try {
+      cancelled = await isCancelled(jobId);
+    } catch {
+    }
+    if (done) return;
+    if (cancelled) {
+      controller.abort();
+      return;
+    }
+    timer = setTimeout(poll, intervalMs);
+  };
+  timer = setTimeout(poll, intervalMs);
+  try {
+    return await run(controller.signal);
+  } finally {
+    done = true;
+    clearTimeout(timer);
   }
 }

@@ -4,15 +4,16 @@ import { PLAN_CONFIGS } from "@/lib/plans";
 import { fakeRedis } from "@/test/fakeRedis";
 import { reserveVideoThisMonth } from "@/lib/usage";
 
-const { mockOverview, mockRecent, mockQueue } = vi.hoisted(() => ({
+const { mockOverview, mockRecent, mockQueue, db } = vi.hoisted(() => ({
   mockOverview: vi.fn(),
   mockRecent: vi.fn(),
   mockQueue: {
-    getCompleted: vi.fn(async () => []),
-    getFailed: vi.fn(async () => []),
-    getWaiting: vi.fn(async () => []),
-    getActive: vi.fn(async () => []),
+    getCompleted: vi.fn(async (): Promise<unknown[]> => []),
+    getFailed: vi.fn(async (): Promise<unknown[]> => []),
+    getWaiting: vi.fn(async (): Promise<unknown[]> => []),
+    getActive: vi.fn(async (): Promise<unknown[]> => []),
   },
+  db: { configured: true },
 }));
 
 vi.mock("@/lib/auth/getSessionSafe", () => ({
@@ -25,7 +26,7 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 vi.mock("@/lib/db/client", () => ({
-  isDatabaseConfigured: () => true,
+  isDatabaseConfigured: () => db.configured,
 }));
 
 vi.mock("@/lib/jobs/videoJobService", () => ({
@@ -67,6 +68,7 @@ const row = (overrides: Record<string, unknown>) => ({
 
 beforeEach(() => {
   fakeRedis.store.clear();
+  db.configured = true;
   mockOverview.mockReset();
   mockOverview.mockResolvedValue({
     totalVideos: 7,
@@ -131,5 +133,58 @@ describe("GET /api/dashboard/usage", () => {
       time: "3 hours ago",
     });
     expect(mockRecent).toHaveBeenCalledWith(USER, 5);
+  });
+
+  it("calls a cancelled row cancelled, the way the job list does, and a real failure failed", async () => {
+    mockRecent.mockResolvedValue([
+      row({ queue_job_id: "job-cancelled", status: "failed", final_url: null, error: "Job cancelled" }),
+      row({
+        queue_job_id: "job-cancelled-on-last-retry",
+        status: "failed",
+        final_url: null,
+        error: "Job cancelled Failed after 3 retries.",
+      }),
+      row({
+        queue_job_id: "job-broken",
+        status: "failed",
+        final_url: null,
+        error: "Remotion render failed (exit 1) after 12s.",
+      }),
+    ]);
+
+    const { recentActivity } = await (await GET(new Request("http://localhost/api/dashboard/usage"))).json();
+
+    expect(recentActivity.map((a: { id: string; status: string }) => [a.id, a.status])).toEqual([
+      ["job-cancelled", "cancelled"],
+      ["job-cancelled-on-last-retry", "cancelled"],
+      ["job-broken", "failed"],
+    ]);
+  });
+
+  it("makes the same distinction when it has to read the queue", async () => {
+    db.configured = false;
+    mockQueue.getFailed.mockResolvedValueOnce([
+      {
+        name: "video",
+        id: "q-cancelled",
+        data: { clientId: USER, input: "Cancelled one" },
+        failedReason: "Job cancelled",
+        finishedOn: Date.now() - 1_000,
+      },
+      {
+        name: "video",
+        id: "q-failed",
+        data: { clientId: USER, input: "Broken one" },
+        failedReason: "ElevenLabs TTS failed: 500.",
+        finishedOn: Date.now() - 2_000,
+      },
+    ]);
+
+    const { recentActivity } = await (await GET(new Request("http://localhost/api/dashboard/usage"))).json();
+
+    expect(recentActivity.map((a: { id: string; status: string }) => [a.id, a.status])).toEqual([
+      ["q-cancelled", "cancelled"],
+      ["q-failed", "failed"],
+    ]);
   });
 });

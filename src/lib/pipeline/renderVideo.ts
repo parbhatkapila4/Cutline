@@ -1,4 +1,4 @@
-import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import fs from "fs";
 import path from "path";
 
@@ -15,14 +15,18 @@ const REMOTION_ENTRY = "src/remotion/index.tsx";
 const COMPOSITION_ID = "CUTLINEComposition";
 const DEFAULT_RENDER_TIMEOUT_MS = 600_000;
 const MIN_RENDER_TIMEOUT_MS = 60_000;
-const MAX_RENDER_TIMEOUT_MS = 1_500_000;
+const MAX_RENDER_TIMEOUT_MS = 3_600_000;
 const TIMEOUT_TOLERANCE_MS = 5_000;
 const OOM_SIGNATURE_RE = /\bSIGKILL\b|\bENOMEM\b|out of memory|cannot allocate memory/i;
 const MAX_RENDER_STDERR_CHARS = 2000;
+const MAX_CAPTURED_OUTPUT_CHARS = 1024 * 1024;
+const CAPTURED_OUTPUT_TAIL_CHARS = 64 * 1024;
 const PROPS_RETENTION_MS = 24 * 60 * 60 * 1000;
 const MAX_KEPT_PROPS_FILES = 20;
 const RENDER_FPS = 30;
 const RENDER_KILL_GRACE_MS = 2_000;
+const RENDER_EXIT_WAIT_AFTER_KILL_MS = 10_000;
+const RENDER_OUTPUT_DRAIN_MS = 2_000;
 const RENDER_TAG_ENV = "CUTLINE_RENDER_TAG";
 const IS_WINDOWS = process.platform === "win32";
 const DEFAULT_WIDTH = 1920;
@@ -30,6 +34,10 @@ const DEFAULT_HEIGHT = 1080;
 const DEFAULT_DURATION_SECONDS = 30;
 
 const warnedRenderTimeouts = new Set<string>();
+
+export function renderedDurationSeconds(durationSeconds: number): number {
+  return Math.ceil(durationSeconds * RENDER_FPS) / RENDER_FPS;
+}
 
 export function getRenderTimeoutMs(): number {
   const raw = process.env.RENDER_TIMEOUT_MS?.trim();
@@ -46,7 +54,7 @@ export function getRenderTimeoutMs(): number {
   } else if (requested > MAX_RENDER_TIMEOUT_MS) {
     timeoutMs = MAX_RENDER_TIMEOUT_MS;
     problem =
-      "is over the 25 min maximum (a render blocks the worker's event loop, so BullMQ cannot renew the 30 min job lock while it runs)";
+      "is over the 60 min maximum (the worker runs one job at a time, so every job queued behind a render waits for it)";
   }
   if (problem && !warnedRenderTimeouts.has(raw)) {
     warnedRenderTimeouts.add(raw);
@@ -75,18 +83,23 @@ export class RenderKilledError extends Error {
   }
 }
 
-function sleepSync(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
+export class RenderCancelledError extends Error {
+  constructor() {
+    super("Job cancelled");
+    this.name = "RenderCancelledError";
   }
 }
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitAtMost(promise: Promise<unknown>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([promise, new Promise((resolve) => { timer = setTimeout(resolve, ms); })]);
+  clearTimeout(timer);
+}
+
 function signalRenderGroup(pid: number | undefined, signal: NodeJS.Signals): boolean {
   if (IS_WINDOWS) return false;
   if (!Number.isInteger(pid) || pid == null || pid <= 1 || pid === process.pid) return false;
@@ -121,28 +134,25 @@ function signalTaggedRenderProcesses(tag: string, signal: NodeJS.Signals): numbe
   return signalled;
 }
 
-function reapRenderProcessTree(
+function killWindowsProcessTree(pid: number): Promise<void> {
+  return new Promise((resolve) => {
+    const killer = spawn("taskkill", ["/T", "/F", "/PID", String(pid)], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    killer.once("error", () => resolve());
+    killer.once("exit", () => resolve());
+  });
+}
+
+async function terminateRenderTree(
   pid: number | undefined,
   tag: string,
-  traceId: string,
-  escalate: boolean
-): void {
+  traceId: string
+): Promise<void> {
   try {
     if (IS_WINDOWS) {
-      if (pid != null && isAlive(pid)) {
-        spawnSync("taskkill", ["/T", "/F", "/PID", String(pid)], { encoding: "utf-8" });
-      }
-      return;
-    }
-
-    if (!escalate) {
-      const swept = signalTaggedRenderProcesses(tag, "SIGKILL");
-      if (swept.length > 0) {
-        console.warn(
-          `[render] jobId=${traceId} render exited cleanly but left ${swept.length} ` +
-          `tagged process(es) behind; killed ${swept.join(",")}`
-        );
-      }
+      if (pid != null) await killWindowsProcessTree(pid);
       return;
     }
 
@@ -150,7 +160,7 @@ function reapRenderProcessTree(
     const taggedTerm = signalTaggedRenderProcesses(tag, "SIGTERM");
     if (!groupTerm && taggedTerm.length === 0) return;
 
-    sleepSync(RENDER_KILL_GRACE_MS);
+    await delay(RENDER_KILL_GRACE_MS);
 
     const groupKill = signalRenderGroup(pid, "SIGKILL");
     const taggedKill = signalTaggedRenderProcesses(tag, "SIGKILL");
@@ -165,6 +175,212 @@ function reapRenderProcessTree(
       (e instanceof Error ? e.message : String(e))
     );
   }
+}
+
+async function sweepRenderLeftovers(
+  pid: number | undefined,
+  tag: string,
+  traceId: string,
+  failed: boolean
+): Promise<void> {
+  if (IS_WINDOWS) return;
+  if (failed) {
+    await terminateRenderTree(pid, tag, traceId);
+    return;
+  }
+  const swept = signalTaggedRenderProcesses(tag, "SIGKILL");
+  if (swept.length > 0) {
+    console.warn(
+      `[render] jobId=${traceId} render exited cleanly but left ${swept.length} ` +
+      `tagged process(es) behind; killed ${swept.join(",")}`
+    );
+  }
+}
+
+class CapturedOutput {
+  private head = "";
+  private tail = "";
+  private omitted = 0;
+
+  append(chunk: string): void {
+    let rest = chunk;
+    if (this.head.length < MAX_CAPTURED_OUTPUT_CHARS) {
+      const room = MAX_CAPTURED_OUTPUT_CHARS - this.head.length;
+      this.head += rest.slice(0, room);
+      rest = rest.slice(room);
+      if (!rest) return;
+    }
+    this.tail += rest;
+    if (this.tail.length > CAPTURED_OUTPUT_TAIL_CHARS) {
+      this.omitted += this.tail.length - CAPTURED_OUTPUT_TAIL_CHARS;
+      this.tail = this.tail.slice(-CAPTURED_OUTPUT_TAIL_CHARS);
+    }
+  }
+
+  text(): string {
+    if (this.omitted > 0) return `${this.head}\n…[${this.omitted} chars omitted]…\n${this.tail}`;
+    return this.head + this.tail;
+  }
+}
+
+type RenderStop = "timeout" | "cancelled";
+
+type RenderExit = {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  error?: NodeJS.ErrnoException;
+};
+
+export type RenderProcessOptions = {
+  args: string[];
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  renderTag: string;
+  traceId: string;
+  timeoutMs: number;
+  signal?: AbortSignal;
+  command?: string;
+  scratchDir?: string;
+};
+
+export type RenderProcessResult = {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  errorCode?: string;
+  errorMessage?: string;
+  stdout: string;
+  stderr: string;
+  stoppedBy: RenderStop | null;
+};
+
+async function removeScratchDir(dir: string, traceId: string): Promise<void> {
+  try {
+    await fs.promises.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch (e) {
+    console.warn(
+      `[render] jobId=${traceId} could not remove render temp dir ${dir}: ` +
+      (e instanceof Error ? e.message : String(e))
+    );
+  }
+}
+
+export async function runRenderProcess(options: RenderProcessOptions): Promise<RenderProcessResult> {
+  const { scratchDir, traceId } = options;
+  if (!scratchDir) return runRenderChild(options);
+  try {
+    fs.mkdirSync(scratchDir, { recursive: true });
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    return {
+      status: null,
+      signal: null,
+      errorCode: err.code,
+      errorMessage: err.message,
+      stdout: "",
+      stderr: "",
+      stoppedBy: null,
+    };
+  }
+  try {
+    return await runRenderChild({
+      ...options,
+      env: { ...options.env, TMPDIR: scratchDir, TMP: scratchDir, TEMP: scratchDir },
+    });
+  } finally {
+    await removeScratchDir(scratchDir, traceId);
+  }
+}
+
+async function runRenderChild(options: RenderProcessOptions): Promise<RenderProcessResult> {
+  const { args, cwd, env, renderTag, traceId, timeoutMs, signal } = options;
+  const stdout = new CapturedOutput();
+  const stderr = new CapturedOutput();
+
+  let child: ChildProcess;
+  try {
+    child = spawn(options.command ?? process.execPath, args, {
+      cwd,
+      env,
+      detached: !IS_WINDOWS,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    return {
+      status: null,
+      signal: null,
+      errorCode: err.code,
+      errorMessage: err.message,
+      stdout: "",
+      stderr: "",
+      stoppedBy: null,
+    };
+  }
+
+  child.stdout?.setEncoding("utf-8");
+  child.stdout?.on("data", (chunk: string) => stdout.append(chunk));
+  child.stderr?.setEncoding("utf-8");
+  child.stderr?.on("data", (chunk: string) => stderr.append(chunk));
+  const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
+
+  let exited = false;
+  let resolveExit!: (exit: RenderExit) => void;
+  const exitPromise = new Promise<RenderExit>((resolve) => {
+    resolveExit = resolve;
+  });
+  const settle = (exit: RenderExit) => {
+    if (exited) return;
+    exited = true;
+    resolveExit(exit);
+  };
+  child.once("exit", (status, exitSignal) => settle({ status, signal: exitSignal }));
+  child.once("error", (error: NodeJS.ErrnoException) => settle({ status: null, signal: null, error }));
+
+  let stoppedBy = null as RenderStop | null;
+  let stopping = null as Promise<void> | null;
+  let stuckTimer: ReturnType<typeof setTimeout> | undefined;
+  const stop = (reason: RenderStop) => {
+    if (stoppedBy || exited) return;
+    stoppedBy = reason;
+    console.warn(
+      `[render] jobId=${traceId} stopping the render: ` +
+      (reason === "timeout" ? `over its ${Math.round(timeoutMs / 1000)}s budget` : "the job was cancelled")
+    );
+    stopping = terminateRenderTree(child.pid, renderTag, traceId).then(() => {
+      if (exited) return;
+      stuckTimer = setTimeout(
+        () => settle({ status: null, signal: "SIGKILL" }),
+        RENDER_EXIT_WAIT_AFTER_KILL_MS
+      );
+    });
+  };
+  const timeoutTimer = setTimeout(() => stop("timeout"), timeoutMs);
+  const onAbort = () => stop("cancelled");
+  signal?.addEventListener("abort", onAbort, { once: true });
+  if (signal?.aborted) onAbort();
+
+  const exit = await exitPromise;
+  clearTimeout(timeoutTimer);
+  signal?.removeEventListener("abort", onAbort);
+  if (stopping) {
+    await stopping;
+  } else {
+    const failed = exit.status !== 0 || exit.signal != null || exit.error != null;
+    await sweepRenderLeftovers(child.pid, renderTag, traceId, failed);
+  }
+  clearTimeout(stuckTimer);
+  await waitAtMost(closed, RENDER_OUTPUT_DRAIN_MS);
+
+  return {
+    status: exit.status,
+    signal: exit.signal,
+    errorCode: stoppedBy === "timeout" ? "ETIMEDOUT" : exit.error?.code,
+    errorMessage: stoppedBy === "timeout" ? undefined : exit.error?.message,
+    stdout: stdout.text(),
+    stderr: stderr.text(),
+    stoppedBy,
+  };
 }
 
 function renderFailureDetail(result: {
@@ -342,11 +558,29 @@ function prunePropsFiles(tempDir: string, now: number): void {
   }
 }
 
-export function runRemotionRender(
+function pruneStaleScratchDirs(tempDir: string, now: number): void {
+  try {
+    for (const name of fs.readdirSync(tempDir)) {
+      if (!name.startsWith("tmp-")) continue;
+      const full = path.join(tempDir, name);
+      try {
+        if (now - fs.statSync(full).mtimeMs > PROPS_RETENTION_MS) {
+          fs.rmSync(full, { recursive: true, force: true });
+        }
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+
+export async function runRemotionRender(
   input: RenderInput,
   outputPath: string,
-  jobId?: string
-): void {
+  jobId?: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<void> {
+  if (options.signal?.aborted) throw new RenderCancelledError();
   const cwd = process.cwd();
   const tempDir = path.join(cwd, ".remotion-temp");
 
@@ -358,6 +592,7 @@ export function runRemotionRender(
   }
 
   prunePropsFiles(tempDir, Date.now());
+  pruneStaleScratchDirs(tempDir, Date.now());
 
   const traceId =
     sanitizeForFilename(jobId ?? path.basename(outputPath, ".mp4")) || "unknown";
@@ -407,20 +642,9 @@ export function runRemotionRender(
   }
 
   const renderTag = `${traceId}-${id}`;
-  const spawnOptions: SpawnSyncOptionsWithStringEncoding = {
-    cwd,
-    encoding: "utf-8",
-    timeout: getRenderTimeoutMs(),
-    env: { ...process.env, [RENDER_TAG_ENV]: renderTag },
-  };
-  if (!IS_WINDOWS) {
-    (spawnOptions as SpawnSyncOptionsWithStringEncoding & { detached?: boolean }).detached = true;
-  }
-
   const startedAt = Date.now();
-  const result = spawnSync(
-    process.execPath,
-    [
+  const result = await runRenderProcess({
+    args: [
       remotionCli,
       "render",
       REMOTION_ENTRY,
@@ -446,22 +670,37 @@ export function runRemotionRender(
       "--concurrency",
       "1",
     ],
-    spawnOptions
-  );
+    cwd,
+    env: { ...process.env, [RENDER_TAG_ENV]: renderTag },
+    renderTag,
+    traceId,
+    timeoutMs: getRenderTimeoutMs(),
+    signal: options.signal,
+    scratchDir: path.join(tempDir, `tmp-${id}`),
+  });
 
   const elapsedMs = Date.now() - startedAt;
+  if (result.stoppedBy === "cancelled") {
+    console.log(
+      `[render] jobId=${traceId} stopped after ${Math.round(elapsedMs / 1000)}s because the job was cancelled`
+    );
+    try {
+      fs.unlinkSync(propsPath);
+    } catch {
+    }
+    throw new RenderCancelledError();
+  }
+
   const failure = classifyRenderResult({
     status: result.status,
     signal: result.signal,
-    errorCode: (result.error as NodeJS.ErrnoException | undefined)?.code,
-    errorMessage: result.error?.message,
+    errorCode: result.errorCode,
+    errorMessage: result.errorMessage,
     stdout: result.stdout,
     stderr: result.stderr,
     elapsedMs,
     propsPath,
   });
-  reapRenderProcessTree(result.pid, renderTag, traceId, failure != null);
-
   if (failure) {
     throw failure;
   }

@@ -191,7 +191,8 @@ async function analyzeProductPhoto(
 - dominantColors: array of 2-4 hex color strings (e.g. ["#1a1a2e", "#e8e8e8"])
 - aspectRatio: number (width / height)
 - subjectDescription: one short sentence describing the main subject (for matching to video shots)
-- suggestedShotTypes: array of one or more of "establish" | "detail" | "hero" | "transition" (best shot types for this image in a video)`;
+- suggestedShotTypes: array of one or more of "establish" | "detail" | "hero" | "transition" (best shot types for this image in a video)
+- imageKind: "screenshot" or "photo". Use "screenshot" for a capture of a screen or a document: an app, a website, a dashboard, a chat, code, a slide, a chart, or any image whose text has to stay readable. Use "photo" for a camera photo, a product shot or an illustration where cropping the edges loses nothing important.`;
 
   const systemPrompt =
     "You are an asset analyst for a video editing system. Output only valid JSON with the requested keys.";
@@ -222,6 +223,12 @@ async function analyzeProductPhoto(
   const suggestedShotTypes = (
     suggestedShotTypesRaw.length >= 1 ? suggestedShotTypesRaw : ["establish"]
   ) as ProductPhotoAnalysis["suggestedShotTypes"];
+  const imageKind: ProductPhotoAnalysis["imageKind"] =
+    raw.imageKind === "screenshot" || raw.imageKind === "photo"
+      ? raw.imageKind
+      : meta.mimeType === "image/png"
+        ? "screenshot"
+        : "photo";
 
   return {
     dominantColors:
@@ -229,6 +236,7 @@ async function analyzeProductPhoto(
     aspectRatio,
     subjectDescription,
     suggestedShotTypes,
+    imageKind,
   };
 }
 

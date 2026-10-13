@@ -33,8 +33,8 @@ function assignUserPhotosToShots(
   shots: Shot[],
   productPhotoPaths: string[],
   analyzedProductPhotos?: Array<{ suggestedShotTypes: string[] }>
-): Map<string, string> {
-  const assigned = new Map<string, string>();
+): Map<string, number> {
+  const assigned = new Map<string, number>();
   const used = new Set<number>();
 
   const sortedShots = [...shots].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -49,7 +49,7 @@ function assignUserPhotosToShots(
       const types = analysis?.suggestedShotTypes ?? ["establish"];
       const match = types.some((t) => allowed.includes(t));
       if (match) {
-        assigned.set(shot.id, path);
+        assigned.set(shot.id, i);
         used.add(i);
         break;
       }
@@ -369,22 +369,25 @@ export async function sourceImages(
       productPhotoPaths as string[],
       analyzedAssets?.productPhotos
     )
-    : new Map<string, string>();
+    : new Map<string, number>();
 
   const entries: ImageSpecEntry[] = [];
   const usedImageUrls = new Set<string>();
   const alreadyUsedForOtherShots: AlreadyUsedForShots = [];
 
   for (const shot of shots) {
-    const userPath = userAssigned.get(shot.id);
-    if (userPath && fs.existsSync(userPath)) {
+    const userIndex = userAssigned.get(shot.id);
+    const userPath = userIndex === undefined ? undefined : productPhotoPaths[userIndex];
+    if (userIndex !== undefined && userPath && fs.existsSync(userPath)) {
       const url = toImageUrl(userPath, jobId);
       if (url) usedImageUrls.add(normalizeImageUrl(url));
+      const isScreenshot = analyzedAssets?.productPhotos?.[userIndex]?.imageKind === "screenshot";
       entries.push({
         shotId: shot.id,
         imageUrl: url,
         source: "user",
         fallbackUsed: false,
+        ...(isScreenshot ? { fit: "contain" as const } : {}),
       });
       continue;
     }
