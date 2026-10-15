@@ -2,6 +2,14 @@ import { spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { chunkCaptionText } from "@/lib/pipeline/captionChunks";
+import { CAPTION_FONT_CELL_EM, captionTextWidthEm } from "@/lib/pipeline/captionMetrics";
+import {
+  CAPTION_BACKGROUND_OPACITY,
+  CAPTION_LINE_HEIGHT_EM,
+  captionFontSizePx,
+  layoutCaption,
+} from "@/remotion/captionLayout";
 
 export type SubtitleEntry = { text: string; startMs: number; endMs: number };
 
@@ -68,34 +76,6 @@ function formatSrtTime(ms: number): string {
   ].join(":");
 }
 
-function wrapSubtitleLines(text: string, maxCharsPerLine: number): string {
-  const t = (text || "").trim().replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  if (!t) return "";
-  const limit = Math.max(18, Math.min(42, maxCharsPerLine));
-  const words = t.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "";
-  const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const candidate = line ? `${line} ${w}` : w;
-    if (candidate.length <= limit) {
-      line = candidate;
-      continue;
-    }
-    if (line) lines.push(line);
-    if (w.length <= limit) {
-      line = w;
-    } else {
-      for (let i = 0; i < w.length; i += limit) {
-        lines.push(w.slice(i, i + limit));
-      }
-      line = "";
-    }
-  }
-  if (line) lines.push(line);
-  return lines.join("\\N");
-}
-
 function formatAssTime(ms: number): string {
   const totalSec = ms / 1000;
   const hours = Math.floor(totalSec / 3600);
@@ -141,11 +121,54 @@ export function writeSrtFile(entries: SubtitleEntry[], srtPath: string): void {
   fs.writeFileSync(srtPath, content, "utf-8");
 }
 
-function writeAssFile(
-  entries: SubtitleEntry[],
-  assPath: string,
-  dims: VideoDimensions
-): void {
+export function splitIntoDisplayCaptions(entries: SubtitleEntry[]): SubtitleEntry[] {
+  const captions: SubtitleEntry[] = [];
+  for (const entry of entries) {
+    const chunks = chunkCaptionText(entry.text || "");
+    if (chunks.length === 0) continue;
+    const span = entry.endMs - entry.startMs;
+    const maxPieces = Math.max(1, Math.floor(span / MIN_SUBTITLE_MS));
+    while (chunks.length > maxPieces) {
+      let at = 0;
+      for (let i = 1; i < chunks.length - 1; i++) {
+        if (chunks[i]!.length + chunks[i + 1]!.length < chunks[at]!.length + chunks[at + 1]!.length) {
+          at = i;
+        }
+      }
+      chunks.splice(at, 2, `${chunks[at]} ${chunks[at + 1]}`);
+    }
+    chunks.forEach((text, i) => {
+      captions.push({
+        text,
+        startMs: entry.startMs + Math.round((i * span) / chunks.length),
+        endMs: entry.startMs + Math.round(((i + 1) * span) / chunks.length),
+      });
+    });
+  }
+  return captions;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function roundedRectPath(w: number, h: number, radius: number): string {
+  const r = Math.max(0, Math.min(Math.round(radius), Math.floor(Math.min(w, h) / 2)));
+  const c = Math.round(r * 0.4477);
+  return [
+    `m ${r} 0`,
+    `l ${w - r} 0`,
+    `b ${w - c} 0 ${w} ${c} ${w} ${r}`,
+    `l ${w} ${h - r}`,
+    `b ${w} ${h - c} ${w - c} ${h} ${w - r} ${h}`,
+    `l ${r} ${h}`,
+    `b ${c} ${h} 0 ${h - c} 0 ${h - r}`,
+    `l 0 ${r}`,
+    `b 0 ${c} ${c} 0 ${r} 0`,
+  ].join(" ");
+}
+
+export function buildAssDocument(entries: SubtitleEntry[], dims: VideoDimensions): string {
   const valid = entries.filter(
     (e) => typeof e.startMs === "number" && typeof e.endMs === "number" && e.endMs > e.startMs && e.endMs - e.startMs >= MIN_SUBTITLE_MS
   );
@@ -153,33 +176,59 @@ function writeAssFile(
     throw new Error("No valid subtitle entries (each needs endMs > startMs and duration >= 400ms)");
   }
   const { width, height } = dims;
-  const fontSize = Math.max(22, Math.min(110, Math.round(height * 0.046)));
-  const outline = Math.max(2, Math.round(height * 0.0025));
-  const shadow = Math.max(0, Math.round(height * 0.0012));
-  const marginV = Math.max(28, Math.round(height * 0.11));
-  const marginH = Math.max(32, Math.round(width * 0.085));
-  const innerWidth = Math.max(200, width - 2 * marginH);
-  const approxCharsPerLine = Math.max(18, Math.floor(innerWidth / (fontSize * 0.52)));
+  const measure = (text: string, fontSizePx: number) => captionTextWidthEm(text) * fontSizePx;
+  const baseFontSize = round2(captionFontSizePx(dims) * CAPTION_FONT_CELL_EM);
+  const alpha = Math.round(255 * (1 - CAPTION_BACKGROUND_OPACITY))
+    .toString(16)
+    .toUpperCase()
+    .padStart(2, "0");
 
   const header = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${width}
 PlayResY: ${height}
 ScaledBorderAndShadow: yes
-WrapStyle: 0
+WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,${fontSize},&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,${outline},${shadow},2,${marginH},${marginH},${marginV},1
+Style: Caption,Arial,${baseFontSize},&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,8,0,0,0,1
+Style: Pill,Arial,${baseFontSize},&H${alpha}000000,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
-  const lines = valid.map(
-    (e) =>
-      `Dialogue: 0,${formatAssTime(e.startMs)},${formatAssTime(e.endMs)},Default,,0,0,0,,${wrapSubtitleLines((e.text || "").trim(), approxCharsPerLine)}`
-  );
-  fs.writeFileSync(assPath, header + lines.join("\n") + "\n", "utf-8");
+  const events: string[] = [];
+  for (const caption of splitIntoDisplayCaptions(valid)) {
+    const layout = layoutCaption(caption.text, dims, measure);
+    if (layout.lines.length === 0) continue;
+    const start = formatAssTime(caption.startMs);
+    const end = formatAssTime(caption.endMs);
+    const boxWidth = Math.round(layout.textWidthPx + 2 * layout.paddingXPx);
+    const boxHeight = Math.round(layout.lines.length * layout.lineHeightPx + 2 * layout.paddingYPx);
+    const left = Math.round((width - boxWidth) / 2);
+    const top = height - layout.bottomPx - boxHeight;
+    events.push(
+      `Dialogue: 0,${start},${end},Pill,,0,0,0,,{\\pos(${left},${top})\\p1}${roundedRectPath(boxWidth, boxHeight, layout.radiusPx)}{\\p0}`
+    );
+    const halfLeading = ((CAPTION_LINE_HEIGHT_EM - CAPTION_FONT_CELL_EM) / 2) * layout.fontSizePx;
+    const fontSize = round2(layout.fontSizePx * CAPTION_FONT_CELL_EM);
+    layout.lines.forEach((line, i) => {
+      const y = round2(top + layout.paddingYPx + i * layout.lineHeightPx + halfLeading);
+      events.push(
+        `Dialogue: 1,${start},${end},Caption,,0,0,0,,{\\pos(${round2(width / 2)},${y})\\fs${fontSize}}${line}`
+      );
+    });
+  }
+  return header + events.join("\n") + "\n";
+}
+
+function writeAssFile(
+  entries: SubtitleEntry[],
+  assPath: string,
+  dims: VideoDimensions
+): void {
+  fs.writeFileSync(assPath, buildAssDocument(entries, dims), "utf-8");
 }
 
 export function burnSubtitlesIntoVideo(

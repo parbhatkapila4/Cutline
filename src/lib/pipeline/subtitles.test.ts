@@ -41,4 +41,29 @@ describe("generateSubtitles", () => {
       expect(lastEnd).toBeGreaterThan(0);
     }
   });
+
+  it("chunks with the caption chunker and still splits each shot's time evenly between its chunks", () => {
+    const script: Script = {
+      entries: [
+        {
+          shotId: "s1",
+          text: "Your team can finally relax, because emerging threats and zero-day attacks are blocked automatically.",
+          order: 0,
+        },
+      ],
+    };
+    const shotList: ShotList = {
+      shots: [
+        { id: "s1", beatId: "b1", durationSeconds: 6, purpose: "establish", motionType: "static", emotionalIntent: "neutral", textDensity: 1, order: 0 },
+      ],
+      totalDurationSeconds: 6,
+    };
+
+    expect(generateSubtitles(script, shotList).chunks).toEqual([
+      { text: "Your team can finally relax,", startMs: 0, endMs: 1500, shotId: "s1" },
+      { text: "because emerging threats", startMs: 1500, endMs: 3000, shotId: "s1" },
+      { text: "and zero-day attacks", startMs: 3000, endMs: 4500, shotId: "s1" },
+      { text: "are blocked automatically.", startMs: 4500, endMs: 6000, shotId: "s1" },
+    ]);
+  });
 });

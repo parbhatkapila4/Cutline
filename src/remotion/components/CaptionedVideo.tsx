@@ -5,6 +5,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { CaptionPill } from "./CaptionPill";
 
 interface CaptionPhrase {
   text: string;
@@ -16,15 +17,15 @@ interface CaptionPhrase {
 
 interface CaptionStyle {
   fontFamily: string;
-  fontSize: number;
+  fontSize?: number;
   fontWeight?: number;
   letterSpacing?: number;
   fontColor: string;
-  strokeColor: string;
-  strokeWidth: number;
-  alignment: "left" | "center" | "right";
-  verticalPosition: "top" | "middle" | "bottom";
-  yOffset: number;
+  strokeColor?: string;
+  strokeWidth?: number;
+  alignment?: "left" | "center" | "right";
+  verticalPosition?: "top" | "middle" | "bottom";
+  yOffset?: number;
   maxWordsPerPhrase?: number;
   styleType?:
   | "clean"
@@ -35,7 +36,8 @@ interface CaptionStyle {
   | "black-bg"
   | "red-bg"
   | "outline"
-  | "plain-white";
+  | "plain-white"
+  | "pill";
   shadowColor?: string;
   shadowBlur?: number;
   shadowOffsetX?: number;
@@ -945,7 +947,16 @@ export const CaptionedVideo: React.FC<CaptionedVideoProps> = ({
         />
       )}
 
-      {captionStyle && !useTikTokCaptions && (
+      {captionStyle && captionStyle.styleType === "pill" && activeCaption && (
+        <CaptionPill
+          key="caption-pill"
+          text={activeCaption.text}
+          fontFamily={getFontFamily(captionStyle.fontFamily)}
+          color={captionStyle.fontColor || "#FFFFFF"}
+        />
+      )}
+
+      {captionStyle && !useTikTokCaptions && captionStyle.styleType !== "pill" && (
         <CaptionContainer
           key="caption"
           text={activeCaption?.text || ""}

@@ -1,46 +1,7 @@
 import type { Script, ScriptEntry } from "@/lib/types";
 import type { ShotList } from "@/lib/types";
 import type { SubtitleChunk, SubtitleTrack } from "@/lib/types";
-
-const MAX_WORDS_PER_CHUNK = 6;
-const MIN_WORDS_BEFORE_CONJUNCTION = 2;
-
-const PHRASE_END = /[.!?;:]$/;
-const CONJUNCTIONS = new Set(["and", "but", "or", "so", "yet", "nor"]);
-
-function chunkText(text: string): string[] {
-  const trimmed = text.trim();
-  if (trimmed.length === 0) return [];
-
-  const words = trimmed.split(/\s+/);
-  const chunks: string[] = [];
-  let current: string[] = [];
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i]!;
-    current.push(word);
-
-    const wordLower = word.toLowerCase().replace(PHRASE_END, "");
-    const endsWithPunct = PHRASE_END.test(word);
-    const isConjunction = CONJUNCTIONS.has(wordLower);
-
-    const shouldBreak =
-      endsWithPunct ||
-      (isConjunction && current.length >= MIN_WORDS_BEFORE_CONJUNCTION) ||
-      current.length >= MAX_WORDS_PER_CHUNK;
-
-    if (shouldBreak && current.length > 0) {
-      chunks.push(current.join(" "));
-      current = [];
-    }
-  }
-
-  if (current.length > 0) {
-    chunks.push(current.join(" "));
-  }
-
-  return chunks;
-}
+import { chunkCaptionText } from "@/lib/pipeline/captionChunks";
 
 function getEntryByShotId(script: Script, shotId: string): ScriptEntry | undefined {
   return script.entries.find((e) => e.shotId === shotId);
@@ -60,7 +21,7 @@ export function generateSubtitles(script: Script, shotList: ShotList): SubtitleT
       continue;
     }
 
-    const textChunks = chunkText(entry.text);
+    const textChunks = chunkCaptionText(entry.text);
     if (textChunks.length === 0) {
       cumulativeMs += durationMs;
       continue;
