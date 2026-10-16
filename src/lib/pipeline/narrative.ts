@@ -6,6 +6,7 @@ import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
 import { shouldRetryForLLM } from "@/lib/utils/retry";
 import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { MIN_SECONDS_PER_SHOT } from "@/lib/pipeline/narrationLength";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
@@ -21,7 +22,8 @@ export function getBeatCountRange(targetDuration: number): { min: number; max: n
   const rawMin = Math.ceil(content / MAX_BEAT_SECONDS) + 1;
   const rawMax = Math.floor(content / MIN_BEAT_SECONDS) + 1;
   const min = Math.max(MIN_BEATS_FLOOR, Math.min(rawMin, MAX_BEATS_CEILING));
-  const max = Math.min(MAX_BEATS_CEILING, Math.max(min + 1, rawMax));
+  const shotCap = Math.max(min, Math.floor(Math.round(targetDuration) / MIN_SECONDS_PER_SHOT));
+  const max = Math.min(MAX_BEATS_CEILING, shotCap, Math.max(min + 1, rawMax));
   return { min, max };
 }
 
@@ -107,7 +109,7 @@ export function buildSystemPrompt(targetDuration: number): string {
 
 - arc: one of "hook-build-payoff" | "problem-solution-cta" | "setup-delivery" | "teaser-reveal"
   Map from intent.goal: "explain" → hook-build-payoff, "persuade" → problem-solution-cta, "entertain" → setup-delivery or teaser-reveal.
-- beats: array of ${min}-${max} objects, each with:
+- beats: array of ${min === max ? `exactly ${min}` : `${min}-${max}`} objects, each with:
   - id: string (e.g. "beat-1", "beat-2")
   - purpose: string (e.g. "hook attention", "present problem", "deliver payoff") - must be about the topic in intent.rawInput (e.g. energy drink, product).
   - durationSeconds: number (positive integer)

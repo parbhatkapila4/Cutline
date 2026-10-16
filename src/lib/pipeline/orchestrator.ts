@@ -7,6 +7,7 @@ import { analyzeResolvedAssets } from "@/lib/assets/analysis";
 import { materializeJobAssets } from "@/lib/assets/materialize";
 import type { AssetMetadata, BrandColors, ResolvedAsset } from "@/lib/assets/types";
 import type { AvatarSelection } from "@/lib/types/avatar";
+import type { Script } from "@/lib/types";
 import { sourceImages, normalizeImageSpecForRender } from "@/lib/images/source";
 import {
   retry,
@@ -21,10 +22,25 @@ import {
 import { interpretIntent } from "@/lib/pipeline/intent";
 import { planNarrative } from "@/lib/pipeline/narrative";
 import { planShots } from "@/lib/pipeline/shots";
-import { generateScript, extendScript } from "@/lib/pipeline/script";
+import { generateScript, extendScript, insertBeforeClosingLine } from "@/lib/pipeline/script";
 import { generateSubtitles } from "@/lib/pipeline/subtitles";
 import { refineSubtitles } from "@/lib/pipeline/subtitle-refinement";
-import { generateTTS } from "@/lib/pipeline/tts";
+import { generateTTS, ttsKeepsSilentShots } from "@/lib/pipeline/tts";
+import {
+  NARRATION_CHARACTERS_PER_SECOND,
+  NARRATION_WORDS_PER_SECOND,
+  TALKING_CHARACTERS_PER_SECOND,
+  TALKING_WORDS_PER_SECOND,
+  VEO_CHUNK_SECONDS,
+  VEO_MAX_WORDS_PER_CHUNK,
+  VEO_WORDS_PER_CHUNK,
+  compositionSecondsFor,
+  endingSecondsFor,
+  estimatedNarrationSeconds,
+  fitShotsToLength,
+  narrationSecondsFor,
+  splitScriptAcrossChunks,
+} from "@/lib/pipeline/narrationLength";
 import { createTalkingVideo } from "@/lib/lipsync/heygen";
 import { composeMotion } from "@/lib/pipeline/motion";
 import { composeVisuals } from "@/lib/pipeline/visuals";
@@ -46,7 +62,6 @@ import {
   CROSSFADE_DURATION_SECONDS,
   mixBackgroundMusic,
   trimVideoIfLongerThan,
-  trimAudioBufferIfLongerThan,
   trimChunkSilence,
 } from "@/lib/pipeline/concatMp4";
 import { validateVideoChunk } from "@/lib/pipeline/validateChunk";
@@ -69,6 +84,7 @@ import { mapFailedReasonToFailureCode } from "@/lib/utils/error";
 import { savePreviewArtifacts, loadPreviewArtifacts } from "@/lib/preview/artifacts";
 import { getCaptionsRenderOption } from "@/lib/pipeline/captionsRenderOption";
 import { createCostTracker, countPaidImageCalls } from "@/lib/cost/costEstimator";
+import { talkingProviderFor } from "@/lib/cost/pricing";
 import type { CostBreakdown } from "@/lib/cost/types";
 import type { Job } from "bullmq";
 import { runQualityGate } from "@/lib/pipeline/qualityGate";
@@ -181,8 +197,6 @@ export type PipelineOptions = {
 };
 
 
-const VEO_WORDS_PER_CHUNK = 18;
-const VEO_CHUNK_SECONDS = 8;
 const VEO_CHUNK_VALIDATE_RETRIES = 2;
 const VEO_SAFETY_REWORDS = 2;
 const VEO_FILTER_REROLLS = 1;
@@ -193,13 +207,18 @@ class ChunkValidationError extends Error {
   }
 }
 
-function maxVeoChunksForTargetDuration(targetSec: number): number {
-  const L = VEO_CHUNK_SECONDS;
-  const c = CROSSFADE_DURATION_SECONDS;
-  if (!Number.isFinite(targetSec) || targetSec <= 0) return 1;
-  if (targetSec < L * 0.75) return 1;
-  const maxN = Math.floor((targetSec - c + 1e-6) / (L - c));
-  return Math.max(1, maxN);
+function veoTargetSeconds(chosenSec: number | undefined): number {
+  return chosenSec == null || chosenSec <= VEO_CHUNK_SECONDS ? 60 : chosenSec;
+}
+function veoChunkCountFor(targetSec: number): number {
+  return Math.max(1, Math.ceil(targetSec / VEO_CHUNK_SECONDS));
+}
+function spokenLines(script: Script): string[] {
+  return [...script.entries]
+    .sort((a, b) => a.order - b.order)
+    .map((e) => e.text)
+    .filter((t): t is string => t != null && t.trim() !== "")
+    .map((t) => t.trim());
 }
 
 function veoCharacterLockSuffix(characterLockId?: string, opts?: { variant?: "default" | "wardrobeAndSetOk" }): string {
@@ -745,6 +764,15 @@ async function runPipelineOnce(
 
   const clampedDuration = coerceDurationSeconds(optionsDuration, { jobId });
   const scriptDurationSec = clampedDuration ?? intent.durationSeconds;
+  const isHeygen = !isPreview && talkingProviderFor(options) === "heygen";
+  const narrationWordsPerSecond = isHeygen ? TALKING_WORDS_PER_SECOND : NARRATION_WORDS_PER_SECOND;
+  const narrationCharactersPerSecond = isHeygen ? TALKING_CHARACTERS_PER_SECOND : NARRATION_CHARACTERS_PER_SECOND;
+  const veoChunkCount =
+    !isPreview && talkingProviderFor(options) === "veo"
+      ? veoChunkCountFor(
+        veoTargetSeconds(coerceDurationSeconds(optionsDuration) ?? coerceDurationSeconds(intent.durationSeconds))
+      )
+      : undefined;
   const scriptOptions = !loadedArtifacts
     ? {
       mode: isPreview ? "slideshow" : mode,
@@ -756,6 +784,9 @@ async function runPipelineOnce(
       locale: options.locale,
       jobId,
       ...(talkingRealMode ? { talkingRealMode } : {}),
+      silentShotsInAudio: (isPreview || talkingProviderFor(options) !== "veo") && ttsKeepsSilentShots(),
+      wordsPerSecond: narrationWordsPerSecond,
+      ...(veoChunkCount ? { veoChunkCount } : {}),
     }
     : undefined;
   if (!loadedArtifacts) {
@@ -803,9 +834,9 @@ async function runPipelineOnce(
     }
   }
 
-  const isSlideshow = mode !== "talking_object" && !isPreview;
+  const lengthFollowsNarration = !isPreview && (mode !== "talking_object" || isHeygen);
   if (
-    isSlideshow &&
+    lengthFollowsNarration &&
     !loadedArtifacts &&
     options.scriptFidelity !== "strict" &&
     script != null &&
@@ -813,36 +844,27 @@ async function runPipelineOnce(
     scriptDurationSec >= 15
   ) {
     const wordCount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
-    const targetMinWords = Math.floor(scriptDurationSec * 2.5);
+    const narrationSec = narrationSecondsFor(shotList, scriptDurationSec, {
+      silentShotsInAudio: ttsKeepsSilentShots(),
+      endingSeconds: endingSecondsFor(mode),
+    });
     for (let round = 0; round < 2; round++) {
-      const scriptWordCount = script.entries
-        .filter((e) => e.text != null && e.text.trim() !== "")
-        .reduce((sum, e) => sum + wordCount(e.text!), 0);
-      if (scriptWordCount >= targetMinWords) break;
-      const fullScriptText = script.entries
-        .slice()
-        .sort((a, b) => a.order - b.order)
-        .map((e) => e.text)
-        .filter((t): t is string => t != null && t.trim() !== "")
-        .join(" ");
-      const wordsNeeded = targetMinWords - scriptWordCount;
-      const extension = await extendScript(fullScriptText, intent, wordsNeeded, textModel ? { model: textModel } : undefined);
+      const lines = spokenLines(script);
+      const scriptWordCount = lines.reduce((sum, t) => sum + wordCount(t), 0);
+      const readSec = estimatedNarrationSeconds(lines, narrationCharactersPerSecond);
+      if (readSec >= narrationSec * 0.9 || scriptWordCount === 0) break;
+      const charactersPerWord = (readSec * narrationCharactersPerSecond) / scriptWordCount;
+      const wordsNeeded = Math.max(
+        1,
+        Math.round(((narrationSec - readSec) * narrationCharactersPerSecond) / charactersPerWord)
+      );
+      const extension = await extendScript(lines.join(" "), intent, wordsNeeded, {
+        ...(textModel ? { model: textModel } : {}),
+        exactWords: true,
+      });
       if (!extension.trim()) break;
-      const entries = [...script.entries].sort((a, b) => a.order - b.order);
-      const lastWithText = entries.filter((e) => e.text != null && e.text.trim() !== "").pop();
-      if (!lastWithText) break;
-      lastWithText.text = (lastWithText.text!.trim() + " " + extension.trim()).trim();
-      script = { entries };
-      console.log("[pipeline] jobId=" + jobId + " script extended (round " + (round + 1) + ") to meet " + scriptDurationSec + "s: added " + wordCount(extension) + " words (total now ~" + (scriptWordCount + wordCount(extension)) + ")");
-    }
-    const sortedEntries = [...script.entries].sort((a, b) => a.order - b.order);
-    const lastEntry = sortedEntries[sortedEntries.length - 1];
-    if (lastEntry?.text != null && lastEntry.text.trim() !== "") {
-      const words = lastEntry.text.trim().split(/\s+/).filter(Boolean);
-      if (words.length > 5) {
-        lastEntry.text = words.slice(0, 5).join(" ").replace(/[.,;:]$/, "") + "!";
-        script = { entries: sortedEntries };
-      }
+      script = insertBeforeClosingLine(script, extension);
+      console.log("[pipeline] jobId=" + jobId + " script extended (round " + (round + 1) + ") to meet " + scriptDurationSec + "s: reads ~" + readSec.toFixed(1) + "s of " + narrationSec.toFixed(1) + "s, added " + wordCount(extension) + " words");
     }
   }
 
@@ -903,13 +925,9 @@ async function runPipelineOnce(
           .filter((t): t is string => t != null && t.trim() !== "")
           .join(" ");
 
-        const talkingAvatarMaxSec =
-          coerceDurationSeconds(optionsDuration, { jobId }) ??
-          coerceDurationSeconds(intent.durationSeconds, { jobId });
-
         await checkCancelledAndThrow();
         logEvent({ jobId, event: "stage_start", stage: "tts" });
-        let ttsResult = await withStageTelemetry(jobId, "tts", () =>
+        const ttsResult = await withStageTelemetry(jobId, "tts", () =>
           retry(
             () =>
               generateTTS(script, shotList, { voiceId: options.ttsVoiceId }).then((r) => {
@@ -924,29 +942,6 @@ async function runPipelineOnce(
             }
           )
         );
-
-        if (talkingAvatarMaxSec != null) {
-          const trimmedAudio = trimAudioBufferIfLongerThan(
-            ttsResult.audioBuffer,
-            ttsResult.audioFormat,
-            talkingAvatarMaxSec,
-            jobId
-          );
-          if (trimmedAudio.length !== ttsResult.audioBuffer.length) {
-            console.log(
-              "[pipeline] jobId=" +
-              jobId +
-              " TTS audio truncated to max " +
-              talkingAvatarMaxSec +
-              "s for HeyGen (was longer than selected duration)"
-            );
-          }
-          ttsResult = {
-            ...ttsResult,
-            audioBuffer: trimmedAudio,
-            durationMs: Math.min(ttsResult.durationMs, Math.round(talkingAvatarMaxSec * 1000)),
-          };
-        }
 
         await checkCancelledAndThrow();
         logEvent({ jobId, event: "stage_start", stage: "heygen" });
@@ -994,17 +989,9 @@ async function runPipelineOnce(
           )
         );
 
-        if (talkingAvatarMaxSec != null) {
-          trimVideoIfLongerThan(outputPath, talkingAvatarMaxSec, { throwIfCannotTrim: true });
-        }
-
         if (captions !== "off") {
           try {
-            const durationSecRaw = getDuration(outputPath);
-            const durationSec =
-              talkingAvatarMaxSec != null
-                ? Math.min(durationSecRaw, talkingAvatarMaxSec)
-                : durationSecRaw;
+            const durationSec = getDuration(outputPath);
             if (durationSec > 0 && fullScriptText.trim()) {
               const wordCountScript = fullScriptText.trim().split(/\s+/).filter(Boolean).length;
               const minCaptionSec = 1.5;
@@ -1083,10 +1070,10 @@ async function runPipelineOnce(
       };
       const avatarPromptSuffix = resolveAvatarPromptSuffix();
 
-      let effectiveDuration =
+      const chosenDuration =
         coerceDurationSeconds(optionsDuration, { jobId }) ?? coerceDurationSeconds(intent.durationSeconds, { jobId });
-      if (effectiveDuration == null || effectiveDuration <= VEO_CHUNK_SECONDS) {
-        effectiveDuration = 60;
+      const effectiveDuration = veoTargetSeconds(chosenDuration);
+      if (effectiveDuration !== chosenDuration) {
         console.log("[pipeline] jobId=" + jobId + " talking_object duration forced to 60s (safety net)");
       }
       const useMultiClip = effectiveDuration > VEO_CHUNK_SECONDS;
@@ -1195,15 +1182,7 @@ async function runPipelineOnce(
 
       const wordsPerChunk = VEO_WORDS_PER_CHUNK;
       const targetDurationSec = effectiveDuration;
-      const naiveChunkBudget = Math.max(1, Math.ceil(targetDurationSec / VEO_CHUNK_SECONDS));
-      const maxChunksFitDuration = maxVeoChunksForTargetDuration(targetDurationSec);
-      const targetChunks = Math.min(naiveChunkBudget, maxChunksFitDuration);
-      if (naiveChunkBudget > maxChunksFitDuration) {
-        console.log(
-          "[pipeline] jobId=" + jobId + " clip budget capped " + naiveChunkBudget + " → " + targetChunks +
-          " so concatenated runtime fits ~" + targetDurationSec + "s (avoids trimming mid-speech)."
-        );
-      }
+      const targetChunks = veoChunkCountFor(targetDurationSec);
       const targetTotalWords = targetChunks * wordsPerChunk;
 
       const wordCount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
@@ -1218,14 +1197,15 @@ async function runPipelineOnce(
           const currentWords = wordCount(combinedScript);
           const wordsNeeded = targetTotalWords - currentWords;
           if (wordsNeeded <= 0) break;
-          const extendOptions = textModel ? { model: textModel } : undefined;
+          const extendOptions = { ...(textModel ? { model: textModel } : {}), exactWords: true };
           const extension = await extendScript(combinedScript, intent, wordsNeeded, extendOptions);
           costTracker.recordLlmTokens(TOKENS_ESTIMATE.scriptExtend);
           if (!extension || !extension.trim()) {
             console.log("[pipeline] jobId=" + jobId + " script extension returned empty; using current content");
             break;
           }
-          combinedScript = (combinedScript + " " + extension).trim();
+          script = insertBeforeClosingLine(script, extension);
+          combinedScript = spokenLines(script).join(" ");
         }
         const chunksAfterExtend = splitScriptIntoChunks(combinedScript, wordsPerChunk);
         const wasExtended = combinedScript.length > fullScriptText.trim().length;
@@ -1241,14 +1221,14 @@ async function runPipelineOnce(
           );
         }
       }
-
-      if (naiveChunkBudget > maxChunksFitDuration) {
-        const capMsg =
-          `To finish cleanly within about ${targetDurationSec} seconds, we use ${targetChunks} segments so speech is not cut off at the end.`;
-        message = message ? `${message} ${capMsg}` : capMsg;
+      const textChunks = splitScriptAcrossChunks(spokenLines(script), targetChunks, VEO_MAX_WORDS_PER_CHUNK);
+      const fullestChunk = Math.max(0, ...textChunks.map(wordCount));
+      if (fullestChunk > VEO_MAX_WORDS_PER_CHUNK) {
+        console.warn(
+          "[pipeline] jobId=" + jobId + " script is " + wordCount(combinedScript) + " words, more than " +
+          targetChunks + " clips hold; each clip says up to " + fullestChunk
+        );
       }
-
-      const textChunks = splitScriptIntoChunks(combinedScript, wordsPerChunk).slice(0, targetChunks);
       if (isSafetyPrecheckEnabled() && textChunks.length > 0) {
         const flagged = await precheckChunksForSafety(
           textChunks,
@@ -1524,7 +1504,6 @@ async function runPipelineOnce(
       await withStageTelemetry(jobId, "concat", async () => {
         concatenateMp4s(chunkPaths, outputPath);
       });
-      trimVideoIfLongerThan(outputPath, targetDurationSec);
       try {
         mixBackgroundMusic(outputPath, outputPath, undefined, 0.22);
         console.log("[pipeline] jobId=" + jobId + " stage=background-music (mixed if available)");
@@ -1759,34 +1738,14 @@ async function runPipelineOnce(
 
   const { showCaptions, subtitleTrack: renderSubtitleTrack } = getCaptionsRenderOption(captions, subtitleTrackClamped);
 
-  let finalShotList = shotList;
-  let finalMotionSpec = motionSpec;
-  let compositionDurationSec = plannedDurationSec;
-  if (audioDurationSec > 0 && audioDurationSec < plannedDurationSec) {
-    const scale = audioDurationSec / plannedDurationSec;
-    const scaledShots = shotList.shots.map((sh) => ({
-      ...sh,
-      durationSeconds: Math.max(1, Math.round((sh.durationSeconds ?? 0) * scale)),
-    }));
-    let scaledSum = scaledShots.reduce((s, sh) => s + (sh.durationSeconds ?? 0), 0);
-    if (scaledSum !== Math.round(audioDurationSec)) {
-      const last = scaledShots[scaledShots.length - 1];
-      if (last) {
-        const diff = Math.round(audioDurationSec) - scaledSum;
-        last.durationSeconds = Math.max(1, (last.durationSeconds ?? 0) + diff);
-      }
-      scaledSum = scaledShots.reduce((s, sh) => s + (sh.durationSeconds ?? 0), 0);
-    }
-    finalShotList = { shots: scaledShots, totalDurationSeconds: scaledSum };
-    const shotDurationById = new Map(scaledShots.map((s) => [s.id, s.durationSeconds ?? 0]));
-    finalMotionSpec = {
-      entries: motionSpec.entries.map((e) => ({
-        ...e,
-        durationSeconds: Math.max(1, shotDurationById.get(e.shotId) ?? Math.round((e.durationSeconds ?? 0) * scale)),
-      })),
-    };
-    compositionDurationSec = audioDurationSec;
-    console.log("[pipeline] jobId=" + jobId + " audio shorter than planned (" + Math.round(audioDurationSec) + "s vs " + Math.round(plannedDurationSec) + "s); scaled shots and composition to audio length.");
+  const compositionDurationSec = compositionSecondsFor(audioDurationSec, plannedDurationSec);
+  const { shotList: finalShotList, motionSpec: finalMotionSpec } = fitShotsToLength(
+    shotList,
+    motionSpec,
+    compositionDurationSec
+  );
+  if (Math.round(compositionDurationSec) !== plannedDurationSec) {
+    console.log("[pipeline] jobId=" + jobId + " narration is " + audioDurationSec.toFixed(1) + "s against " + plannedDurationSec + "s planned; shots and composition fitted to " + compositionDurationSec.toFixed(1) + "s so it finishes before the fade.");
   }
 
   const effectiveOutputPath = outputPath;

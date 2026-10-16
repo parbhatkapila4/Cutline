@@ -7,6 +7,14 @@ import type { BrandBrainInput } from "@/lib/types/pipelineEnhancements";
 import { shouldRetryForLLM } from "@/lib/utils/retry";
 import { getModelCandidates } from "@/lib/pipeline/modelFallback";
 import { cleanSpokenText } from "@/lib/pipeline/spokenText";
+import {
+  VEO_CHUNK_SECONDS,
+  VEO_WORDS_PER_CHUNK,
+  endingSecondsFor,
+  narrationWordBudget,
+  veoWordBudget,
+  type NarrationWordBudget,
+} from "@/lib/pipeline/narrationLength";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
@@ -63,6 +71,7 @@ function buildSystemPrompt(options?: {
   brandBrain?: BrandBrainInput;
   locale?: string;
   talkingRealMode?: "studio" | "scenario";
+  wordBudget?: NarrationWordBudget;
 }): string {
   let prompt = BASE_SYSTEM_PROMPT;
   const variationSnippet = options?.variationStrategy
@@ -106,15 +115,27 @@ VOICE / TONE OVERRIDE: ${bb.voiceTone.trim()}`;
   const hasTargetDuration =
     durationSec != null &&
     !Number.isNaN(Number(durationSec)) &&
-    Number(durationSec) >= 15;
+    Number(durationSec) > 0;
   if (hasTargetDuration) {
     const sec = Math.round(Number(durationSec));
-    const targetWords = Math.round(sec * 2.5);
-    const minWords = Math.max(20, targetWords - 40);
-    const maxWords = targetWords + 50;
-    prompt += `
+    const budget = options?.wordBudget;
+    if (budget) {
+      const clips = budget.veoChunks;
+      const pace = !clips
+        ? `the voiceover is read at about ${budget.wordsPerSecond} words per second`
+        : clips === 1
+          ? `the video is one clip of ${VEO_CHUNK_SECONDS} seconds, with room for about ${VEO_WORDS_PER_CHUNK} spoken words`
+          : `the video is made of ${clips} clips of ${VEO_CHUNK_SECONDS} seconds, each with room for about ${VEO_WORDS_PER_CHUNK} spoken words`;
+      const perLine = clips
+        ? "Consecutive lines are said together in one clip"
+        : "Each line is spoken while its own shot is on screen";
+      const over = clips
+        ? "Going over gives a clip more to say than it has time for."
+        : "Going over makes the video longer than the user chose.";
+      prompt += `
 
-TARGET LENGTH (CRITICAL): The user chose a video duration of ${sec} seconds. The total word count of ALL spoken dialogue (sum of words in every entries[].text) MUST be approximately ${targetWords} words (between ${minWords} and ${maxWords}). At ~2.5 words per second, this fills the full ${sec} seconds with voice. Write enough substantive sentences per shot-longer sentences where needed-so the combined dialogue reaches this word count. Short scripts produce short audio and break caption sync; always hit the target word range.`;
+TARGET LENGTH (CRITICAL): The user chose a video duration of ${sec} seconds, and ${pace}, so ALL spoken dialogue together (the sum of words in every entries[].text) must come to about ${budget.totalWords} words. ${perLine}, so every speaking shot in shotList carries maxWords, the most words its line may have. textDensity only says whether a shot speaks; maxWords decides how long its line is, so a short shot gets a short line even when its textDensity is high, and a fragment such as "Instant results." is fine. Give each line one idea; do not pack a list of benefits into one line. Count the words of every line before you answer and shorten any line that is over its maxWords. ${over}`;
+    }
 
     const endingStartSec = Math.max(1, sec - 2);
     prompt += `
@@ -216,15 +237,6 @@ export function parseAndValidateScript(
         );
       }
     }
-  } else {
-    const MAX_LAST_SENTENCE_WORDS = 5;
-    const lastEntry = entries[entries.length - 1];
-    if (lastEntry?.text != null && lastEntry.text.trim() !== "") {
-      const words = lastEntry.text.trim().split(/\s+/).filter(Boolean);
-      if (words.length > MAX_LAST_SENTENCE_WORDS) {
-        lastEntry.text = words.slice(0, MAX_LAST_SENTENCE_WORDS).join(" ").replace(/[.,;:]$/, "") + "!";
-      }
-    }
   }
 
   return { entries };
@@ -240,6 +252,9 @@ export type GenerateScriptOptions = {
   locale?: string;
   jobId?: string;
   talkingRealMode?: "studio" | "scenario";
+  silentShotsInAudio?: boolean;
+  wordsPerSecond?: number;
+  veoChunkCount?: number;
 };
 
 async function requestScriptFromModel(
@@ -324,6 +339,16 @@ export async function generateScript(
     throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
   }
 
+  const durationSec = Number(options?.durationSeconds);
+  const wordBudget = !(Number.isFinite(durationSec) && durationSec > 0)
+    ? undefined
+    : options?.veoChunkCount
+      ? veoWordBudget(shotList, options.veoChunkCount)
+      : narrationWordBudget(shotList, durationSec, {
+        silentShotsInAudio: options?.silentShotsInAudio,
+        endingSeconds: endingSecondsFor(options?.mode),
+        wordsPerSecond: options?.wordsPerSecond,
+      });
   const systemPrompt = buildSystemPrompt({
     mode: options?.mode,
     durationSeconds: options?.durationSeconds,
@@ -332,8 +357,17 @@ export async function generateScript(
     brandBrain: options?.brandBrain,
     locale: options?.locale,
     talkingRealMode: options?.talkingRealMode,
+    wordBudget,
   });
   const n = shotList.shots.length;
+  const shotsForModel = wordBudget
+    ? {
+      ...shotList,
+      shots: shotList.shots.map((s) =>
+        s.id in wordBudget.byShotId ? { ...s, maxWords: wordBudget.byShotId[s.id] } : s
+      ),
+    }
+    : shotList;
 
   const isTalkingObject = options?.mode === "talking_object";
   const seed = options?.jobId
@@ -348,9 +382,9 @@ CREATIVE VARIATION (run seed: ${seed}):
 - Prefer natural spoken cadence (contractions, short clauses, mid-sentence pivots) over formal written prose.
 - Add micro-cues for delivery in punctuation only: commas for breath and emphasis, ellipses sparingly for pauses. Never add stage directions or brackets.`
     : "";
-  const userContent = `${JSON.stringify({ intent, plan, shotList })}${variationDirective}
+  const userContent = `${JSON.stringify({ intent, plan, shotList: shotsForModel })}${variationDirective}
 
-CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have exactly ${n} objects, in the same order as shots (order 1..${n}). Each entry.shotId must equal shotList.shots[i].id for that index. Do not merge shots, skip shots, or add extra entries.`;
+CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have exactly ${n} objects, in the same order as shots (order 1..${n}). Each entry.shotId must equal shotList.shots[i].id for that index. Do not merge shots, skip shots, or add extra entries.${wordBudget ? " Each entry's text must have no more words than its shot's maxWords." : ""}`;
   const modelCandidates = getModelCandidates(primaryModel);
 
   let lastError: unknown;
@@ -390,8 +424,7 @@ Rules:
 - End your added lines with a complete sentence (. ? !)-nothing dangling mid-thought-so the clip can end cleanly.
 - No dashes (— or –) as punctuation; use a comma or a period instead.
 - Plain text only. No JSON, no bullet points, no labels.`;
-
-export type ExtendScriptOptions = { model?: string };
+export type ExtendScriptOptions = { model?: string; exactWords?: boolean };
 
 export async function extendScript(
   currentScriptText: string,
@@ -406,7 +439,9 @@ export async function extendScript(
     return "";
   }
 
-  const targetWords = Math.max(20, Math.min(additionalWords + 40, 300));
+  const targetWords = options?.exactWords
+    ? Math.max(5, Math.min(additionalWords, 300))
+    : Math.max(20, Math.min(additionalWords + 40, 300));
   const userContent = `Topic: ${intent.rawInput}
 Tone: ${intent.tone}
 
@@ -463,4 +498,17 @@ Write approximately ${targetWords} words of NEW dialogue on the same topic, same
     }
   }
   return "";
+}
+export function insertBeforeClosingLine(script: Script, text: string): Script {
+  const entries = [...script.entries].sort((a, b) => a.order - b.order).map((e) => ({ ...e }));
+  const spoken = entries.filter((e) => e.text != null && e.text.trim() !== "");
+  const added = text.trim();
+  if (!added || spoken.length === 0) return { entries };
+  if (spoken.length === 1) {
+    spoken[0]!.text = `${added} ${spoken[0]!.text!.trim()}`;
+  } else {
+    const beforeClosing = spoken[spoken.length - 2]!;
+    beforeClosing.text = `${beforeClosing.text!.trim()} ${added}`;
+  }
+  return { entries };
 }

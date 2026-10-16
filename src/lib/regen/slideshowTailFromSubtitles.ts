@@ -9,6 +9,7 @@ import type { BrandBrainInput } from "@/lib/types/pipelineEnhancements";
 import { generateSubtitles } from "@/lib/pipeline/subtitles";
 import { refineSubtitles } from "@/lib/pipeline/subtitle-refinement";
 import { generateTTS } from "@/lib/pipeline/tts";
+import { compositionSecondsFor, fitShotsToLength } from "@/lib/pipeline/narrationLength";
 import { runRemotionRender } from "@/lib/pipeline/renderVideo";
 import { ENDING_FADE_SECONDS } from "@/remotion/ending";
 import { getCaptionsRenderOption } from "@/lib/pipeline/captionsRenderOption";
@@ -204,38 +205,16 @@ export async function runSlideshowTailFromSubtitles(
     subtitleTrackClamped
   );
 
-  let finalShotList = shotList;
-  let finalMotionSpec = motionSpec;
-  let compositionDurationSec = plannedDurationSec;
-  if (audioDurationSec > 0 && audioDurationSec < plannedDurationSec) {
-    const scale = audioDurationSec / plannedDurationSec;
-    const scaledShots = shotList.shots.map((sh) => ({
-      ...sh,
-      durationSeconds: Math.max(1, Math.round((sh.durationSeconds ?? 0) * scale)),
-    }));
-    let scaledSum = scaledShots.reduce((s, sh) => s + (sh.durationSeconds ?? 0), 0);
-    if (scaledSum !== Math.round(audioDurationSec)) {
-      const last = scaledShots[scaledShots.length - 1];
-      if (last) {
-        const diff = Math.round(audioDurationSec) - scaledSum;
-        last.durationSeconds = Math.max(1, (last.durationSeconds ?? 0) + diff);
-      }
-      scaledSum = scaledShots.reduce((s, sh) => s + (sh.durationSeconds ?? 0), 0);
-    }
-    finalShotList = { shots: scaledShots, totalDurationSeconds: scaledSum };
-    const shotDurationById = new Map(scaledShots.map((s) => [s.id, s.durationSeconds ?? 0]));
-    finalMotionSpec = {
-      entries: motionSpec.entries.map((e) => ({
-        ...e,
-        durationSeconds: Math.max(
-          1,
-          shotDurationById.get(e.shotId) ?? Math.round((e.durationSeconds ?? 0) * scale)
-        ),
-      })),
-    };
-    compositionDurationSec = audioDurationSec;
+  const compositionDurationSec = compositionSecondsFor(audioDurationSec, plannedDurationSec);
+  const { shotList: finalShotList, motionSpec: finalMotionSpec } = fitShotsToLength(
+    shotList,
+    motionSpec,
+    compositionDurationSec
+  );
+  if (Math.round(compositionDurationSec) !== plannedDurationSec) {
     console.log(
-      "[pipeline] jobId=" + jobId + " (regen tail) scaled shots to match shorter audio."
+      "[pipeline] jobId=" + jobId + " (regen tail) shots and composition fitted to the " +
+      compositionDurationSec.toFixed(1) + "s narration."
     );
   }
 

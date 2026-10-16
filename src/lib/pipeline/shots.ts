@@ -3,6 +3,7 @@ import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
 import { shouldRetryForLLM } from "@/lib/utils/retry";
 import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { MIN_SECONDS_PER_SHOT } from "@/lib/pipeline/narrationLength";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 import type {
   EmotionalIntent,
@@ -18,9 +19,18 @@ const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 const SHOTS_PER_BEAT_MIN = 1;
 const SHOTS_PER_BEAT_MAX = 3;
 
-export function getShotCountRange(beatCount: number): { min: number; max: number } {
+export function getShotCountRange(
+  beatCount: number,
+  durationSeconds?: number
+): { min: number; max: number } {
   const beats = Math.max(1, Math.floor(beatCount));
-  return { min: beats * SHOTS_PER_BEAT_MIN, max: beats * SHOTS_PER_BEAT_MAX };
+  const min = beats * SHOTS_PER_BEAT_MIN;
+  const perBeatMax = beats * SHOTS_PER_BEAT_MAX;
+  const lengthMax =
+    durationSeconds != null && durationSeconds > 0
+      ? Math.floor(Math.round(durationSeconds) / MIN_SECONDS_PER_SHOT)
+      : perBeatMax;
+  return { min, max: Math.max(min, Math.min(perBeatMax, lengthMax)) };
 }
 
 const SHOT_PURPOSES: ShotPurpose[] = [
@@ -49,12 +59,12 @@ const EMOTIONAL_INTENTS: EmotionalIntent[] = [
   "neutral",
 ];
 
-export function buildSystemPrompt(beatCount: number): string {
+export function buildSystemPrompt(beatCount: number, durationSeconds?: number): string {
   const beats = Math.max(1, Math.floor(beatCount));
-  const { min, max } = getShotCountRange(beats);
+  const { min, max } = getShotCountRange(beats, durationSeconds);
   return `You are a shot-level reasoner for a short video. Given an Intent and a NarrativePlan (with beats), output a single JSON object with exactly these keys (no other keys, no markdown, no explanation):
 
-- shots: array of ${min}-${max} shot objects. This NarrativePlan has ${beats} beats. Give EVERY beat at least ${SHOTS_PER_BEAT_MIN} shot and at most ${SHOTS_PER_BEAT_MAX}; leave no beat without a shot. That is where the ${min}-${max} range comes from, so staying inside the per-beat rule keeps you inside the range. Each shot has:
+- shots: array of ${min === max ? `exactly ${min}` : `${min}-${max}`} shot objects. This NarrativePlan has ${beats} beats. Give EVERY beat at least ${SHOTS_PER_BEAT_MIN} shot and at most ${SHOTS_PER_BEAT_MAX}; leave no beat without a shot. Use no more than ${max} shots in total: each shot is narrated, and a line needs about ${MIN_SECONDS_PER_SHOT} seconds, so a short video gets fewer, longer shots. Each shot has:
   - id: string (e.g. "shot-1", "shot-2")
   - beatId: string (must be one of the beat ids from the NarrativePlan)
   - durationSeconds: number (positive integer)
@@ -140,7 +150,7 @@ function parseAndValidateShotList(
 
   const shotsRaw = obj.shots;
   const beatCount = plan.beats.length;
-  const { min: minShots, max: maxShots } = getShotCountRange(beatCount);
+  const { min: minShots, max: maxShots } = getShotCountRange(beatCount, targetDuration);
   if (!Array.isArray(shotsRaw) || shotsRaw.length < minShots) {
     throw new Error(`Shot reasoning failed: shots must be an array of ${minShots}-${maxShots} items for a ${beatCount}-beat plan (got ${Array.isArray(shotsRaw) ? shotsRaw.length : "non-array"})`);
   }
@@ -338,7 +348,7 @@ export async function planShots(
     options?.platform && options.platform !== "general"
       ? getPlatformPromptSnippet(options.platform, "shots")
       : "";
-  const systemContent = buildSystemPrompt(plan.beats.length) + platformSnippet;
+  const systemContent = buildSystemPrompt(plan.beats.length, plan.totalDurationSeconds) + platformSnippet;
   const modelCandidates = getModelCandidates(primaryModel);
 
   let lastError: unknown;

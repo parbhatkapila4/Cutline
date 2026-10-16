@@ -224,6 +224,14 @@ function generatePreviewTTS(script: Script, shotList: ShotList): Promise<TTSResu
 
 export type GenerateTTSOptions = { usePreviewTTS?: boolean; voiceId?: string };
 
+function elevenLabsUsesMp3(): boolean {
+  return process.env.ELEVENLABS_USE_MP3 === "true" || process.env.ELEVENLABS_USE_MP3 === "1";
+}
+export function ttsKeepsSilentShots(): boolean {
+  const provider = (process.env.TTS_PROVIDER ?? "elevenlabs") as TTSProvider;
+  return provider === "elevenlabs" && !elevenLabsUsesMp3();
+}
+
 export async function generateTTS(
   script: Script,
   shotList: ShotList,
@@ -243,8 +251,7 @@ export async function generateTTS(
     if (!apiKey || apiKey.trim() === "") {
       throw new Error("ELEVENLABS_API_KEY is not set. Add your key to .env.local");
     }
-    const useMp3 = process.env.ELEVENLABS_USE_MP3 === "true" || process.env.ELEVENLABS_USE_MP3 === "1";
-    return useMp3
+    return elevenLabsUsesMp3()
       ? generateTTSElevenLabsMp3(script, shotList, apiKey, voiceId)
       : generateTTSElevenLabs(script, shotList, apiKey, voiceId);
   }

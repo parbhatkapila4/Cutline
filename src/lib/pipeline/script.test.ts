@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { parseAndValidateScript, extendScript } from "./script";
+import { parseAndValidateScript, extendScript, generateScript, insertBeforeClosingLine } from "./script";
 import { rewriteNarrationForSafety } from "./safetyReword";
 import type { Intent, ShotList } from "@/lib/types";
 
@@ -97,6 +97,122 @@ describe("text the model adds after the script stage is cleaned the same way", (
     respondWith("“A well-known chef — loved by many — swears by it.”");
     await expect(rewriteNarrationForSafety("A famous chef swears by it.")).resolves.toBe(
       "A well-known chef, loved by many, swears by it."
+    );
+  });
+});
+
+describe("the script fits the chosen length without cutting a line", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  function captureRequests(content: string): Array<{ messages: Array<{ role: string; content: string }> }> {
+    const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = [];
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { body: string }) => {
+        bodies.push(JSON.parse(init.body));
+        return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+      })
+    );
+    return bodies;
+  }
+
+  it("keeps a long closing line whole instead of cutting it to five words", () => {
+    const script = parseAndValidateScript(
+      modelOutput(["Hello there.", "Switch to automated invoicing today and see the difference."]),
+      shotList
+    );
+    expect(script.entries[1]!.text).toBe("Switch to automated invoicing today and see the difference.");
+  });
+
+  it("asks the model for a word budget per shot, at every length the user can pick", async () => {
+    const bodies = captureRequests(modelOutput(["Coffee, done right.", "Try it today!"]));
+    await generateScript(intent, { arc: "hook-build-payoff", beats: [], totalDurationSeconds: 10, rationale: "r" }, shotList, {
+      durationSeconds: 10,
+    });
+    const system = bodies[0]!.messages.find((m) => m.role === "system")!.content;
+    const user = bodies[0]!.messages.find((m) => m.role === "user")!.content;
+    // A 10 s slideshow ends with a 0.5 s pause and a 1 s fade, so it has 8.5 s to speak.
+    expect(system).toContain("must come to about 20 words");
+    expect(system).not.toContain("2.5 words per second");
+    const shots = (JSON.parse(user.slice(0, user.indexOf("\n\nCRITICAL"))) as { shotList: ShotList }).shotList.shots;
+    expect(shots.map((s) => (s as { maxWords?: number }).maxWords)).toEqual([10, 10]);
+    expect(user).toContain("Each entry's text must have no more words than its shot's maxWords.");
+  });
+
+  it("gives a talking video, which ends with its narration, the whole length to speak", async () => {
+    const bodies = captureRequests(modelOutput(["Coffee, done right.", "Try it today!"]));
+    await generateScript(intent, { arc: "hook-build-payoff", beats: [], totalDurationSeconds: 10, rationale: "r" }, shotList, {
+      durationSeconds: 10,
+      mode: "talking_object",
+    });
+    const system = bodies[0]!.messages.find((m) => m.role === "system")!.content;
+    expect(system).toContain("must come to about 23 words");
+  });
+
+  it("budgets a script at the pace it will be read", async () => {
+    const bodies = captureRequests(modelOutput(["Coffee, done right.", "Try it today!"]));
+    await generateScript(intent, { arc: "hook-build-payoff", beats: [], totalDurationSeconds: 10, rationale: "r" }, shotList, {
+      durationSeconds: 10,
+      mode: "talking_object",
+      wordsPerSecond: 2.6,
+    });
+    const system = bodies[0]!.messages.find((m) => m.role === "system")!.content;
+    expect(system).toContain("read at about 2.6 words per second");
+    expect(system).toContain("must come to about 26 words");
+  });
+
+  it("budgets a Veo script at what its clips can say, whatever the length chosen", async () => {
+    for (const [chunks, about, perLine, clips] of [
+      [1, 18, [9, 9], "the video is one clip of 8 seconds, with room for about 18 spoken words"],
+      [2, 36, [18, 18], "the video is made of 2 clips of 8 seconds, each with room for about 18 spoken words"],
+    ] as const) {
+      const bodies = captureRequests(modelOutput(["Coffee, done right.", "Try it today!"]));
+      await generateScript(intent, { arc: "hook-build-payoff", beats: [], totalDurationSeconds: 15, rationale: "r" }, shotList, {
+        durationSeconds: 15,
+        mode: "talking_object",
+        veoChunkCount: chunks,
+      });
+      const system = bodies[0]!.messages.find((m) => m.role === "system")!.content;
+      const user = bodies[0]!.messages.find((m) => m.role === "user")!.content;
+      expect(system).toContain(clips);
+      expect(system).toContain(`must come to about ${about} words`);
+      expect(system).toContain("Consecutive lines are said together in one clip");
+      expect(system).not.toContain("words per second");
+      const shots = (JSON.parse(user.slice(0, user.indexOf("\n\n"))) as { shotList: ShotList }).shotList.shots;
+      expect(shots.map((s) => (s as { maxWords?: number }).maxWords)).toEqual(perLine);
+    }
+  });
+
+  it("asks for exactly the missing words when told to, and still pads the request otherwise", async () => {
+    const bodies = captureRequests("It ships free.");
+    await extendScript("Hello.", intent, 12, { exactWords: true });
+    await extendScript("Hello.", intent, 12);
+    const asks = bodies.map((b) => b.messages.find((m) => m.role === "user")!.content);
+    expect(asks[0]).toContain("Write approximately 12 words of NEW dialogue");
+    expect(asks[1]).toContain("Write approximately 52 words of NEW dialogue");
+  });
+
+  it("adds extension lines before the closing line, so the sign-off is still said last", () => {
+    const script = {
+      entries: [
+        { shotId: "s1", text: "Coffee, done right.", order: 1 },
+        { shotId: "s2", text: "Try it today!", order: 2 },
+        { shotId: "s3", text: null, order: 3 },
+      ],
+    };
+    expect(insertBeforeClosingLine(script, "Roasted this week. Shipped tomorrow.").entries.map((e) => e.text)).toEqual([
+      "Coffee, done right. Roasted this week. Shipped tomorrow.",
+      "Try it today!",
+      null,
+    ]);
+    expect(script.entries[0]!.text).toBe("Coffee, done right.");
+    const single = { entries: [{ shotId: "s1", text: "Try it today!", order: 1 }] };
+    expect(insertBeforeClosingLine(single, "Roasted this week.").entries[0]!.text).toBe(
+      "Roasted this week. Try it today!"
     );
   });
 });
