@@ -118,7 +118,7 @@ Output: public/temp/[jobId].mp4
 
 1. Add a dedicated section component in `src/app/_landing/`.
 2. Keep styles/local copy inside that section component.
-3. Compose it from `src/app/page.tsx`; avoid cross-importing landing sections into non-landing pages.
+3. Compose it from `src/app/(landing)/page.tsx`; avoid cross-importing landing sections into non-landing pages.
 
 #### Add pipeline stage behavior
 

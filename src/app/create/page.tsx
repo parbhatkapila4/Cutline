@@ -26,7 +26,7 @@ import {
 import { ProBadge } from "@/components/ui/pro-badge";
 import { useRouter } from "next/navigation";
 import WarpShaderHero from "@/components/ui/warp-shader";
-import { PendingLabel } from "@/components/ui/skeleton";
+import { PendingLabel, SkeletonInline } from "@/components/ui/skeleton";
 
 function CreateBrandMark({ className }: { className?: string }) {
   return (
@@ -282,7 +282,7 @@ export default function CreatePage() {
   }, []);
   const [suggesting, setSuggesting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [userPlan, setUserPlan] = useState<PlanId>("free");
+  const [userPlan, setUserPlan] = useState<PlanId | null>(null);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [canGenerateByPlan, setCanGenerateByPlan] = useState(true);
   const [planLimitMessage, setPlanLimitMessage] = useState<string | null>(null);
@@ -292,10 +292,16 @@ export default function CreatePage() {
     topup: number;
     totalRemaining: number;
   } | null>(null);
-  const canUseCinematicMode = canUseCinematicScenes(userPlan);
+  const planKnown = userPlan !== null;
+  const canUseCinematicMode = planKnown && canUseCinematicScenes(userPlan);
   const isPro = isProPlan(userPlan);
   const isFreePlan = userPlan === "free";
+  // Nothing is capped until the plan is known, so a paid caller keeps the
+  // default length; the Free cap clamps it once the plan says Free.
   const maxDur = isFreePlan ? FREE_MAX_DURATION_SECONDS : DURATION_MAX;
+  const uploadsLocked = planKnown && !isPro;
+  const untilPlanKnown = (copy: string) =>
+    planKnown ? copy : <SkeletonInline>{copy}</SkeletonInline>;
   const isSlideshow = mode === "slideshow";
   const secondsThisVideo = cinematicSecondsFor({
     mode,
@@ -350,8 +356,6 @@ export default function CreatePage() {
             totalRemaining: Number(d.cinematic.totalRemainingSeconds) || 0,
           });
         }
-        // Cap comes from the resolved plan, the same field the gate reads
-        // (userPlan.videosPerMonth), not from the usage payload.
         const limit = PLAN_CONFIGS[plan].videosPerMonth;
         const used =
           typeof d?.videosUsed === "number" && Number.isFinite(d.videosUsed)
@@ -378,24 +382,24 @@ export default function CreatePage() {
   }, [imgs]);
 
   useEffect(() => {
-    if (!canUseCinematicMode && talkingRealMode === "scenario") {
+    if (planKnown && !canUseCinematicMode && talkingRealMode === "scenario") {
       setTalkingRealMode("studio");
     }
-  }, [canUseCinematicMode, talkingRealMode]);
+  }, [planKnown, canUseCinematicMode, talkingRealMode]);
   useEffect(() => {
     setDur((prev) => (prev > maxDur ? maxDur : prev));
   }, [maxDur]);
   useEffect(() => {
-    if (!canUseCinematicMode && mode === "talking_object") {
+    if (planKnown && !canUseCinematicMode && mode === "talking_object") {
       setMode("slideshow");
     }
-  }, [canUseCinematicMode, mode]);
+  }, [planKnown, canUseCinematicMode, mode]);
 
   useEffect(() => {
-    if (isPro) return;
+    if (!planKnown || isPro) return;
     setAvatarMode((prev) => (PRO_AVATAR_MODES.includes(prev) ? "default" : prev));
     setImgs((prev) => (prev.length ? [] : prev));
-  }, [isPro]);
+  }, [planKnown, isPro]);
 
   useEffect(() => {
     if (mode !== "slideshow") {
@@ -549,7 +553,7 @@ export default function CreatePage() {
   }, [jobId, status]);
 
   const submit = async () => {
-    if (!prompt.trim() || prompt.trim().length < 5 || submitting) return;
+    if (!prompt.trim() || prompt.trim().length < 5 || submitting || userPlan === null) return;
     if (!canGenerateByPlan) {
       setError(planLimitMessage ?? "Your plan limit has been reached. Please upgrade to continue.");
       setErrorCode("MONTHLY_LIMIT_REACHED");
@@ -1456,6 +1460,8 @@ export default function CreatePage() {
                             Your images
                             {!isSlideshow ? (
                               <span className="text-[11px] font-normal text-zinc-500 px-1.5 py-px rounded-full" style={{ background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.06)" }}>Slideshow only</span>
+                            ) : !planKnown ? (
+                              <SkeletonInline className="text-[11px] font-normal px-1.5 py-px rounded-full border border-transparent">Optional</SkeletonInline>
                             ) : isPro ? (
                               <span className="text-[11px] font-normal text-zinc-500 px-1.5 py-px rounded-full" style={{ background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.06)" }}>Optional</span>
                             ) : (
@@ -1465,9 +1471,11 @@ export default function CreatePage() {
                           <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">
                             {!isSlideshow
                               ? "Image uploads apply to Slideshow mode only. Switch the video mode below to Slideshow to add your own visuals."
-                              : isPro
-                                ? "No images? We'll find visuals from the web. Add your own to use them first."
-                                : "We'll source visuals from the web. Upload your own images on Pro and above."}
+                              : untilPlanKnown(
+                                isPro
+                                  ? "No images? We'll find visuals from the web. Add your own to use them first."
+                                  : "We'll source visuals from the web. Upload your own images on Pro and above."
+                              )}
                           </p>
                         </div>
                         <span className="shrink-0 font-mono text-[11px] tabular-nums text-zinc-500">{imgs.length} / 5</span>
@@ -1480,19 +1488,21 @@ export default function CreatePage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (!isPro) { router.push("/pricing"); return; }
+                            if (!planKnown) return;
+                            if (uploadsLocked) { router.push("/pricing"); return; }
                             fileRef.current?.click();
                           }}
-                          aria-label={isPro ? "Add images" : "Upgrade to upload your own images"}
-                          className={`w-16 h-16 rounded-[9px] cursor-pointer flex flex-col items-center justify-center gap-[3px] text-[10px] transition-all ${isPro ? "text-zinc-500 hover:text-white hover:-translate-y-px" : "text-amber-300/90 hover:text-amber-200"}`}
+                          aria-disabled={!planKnown}
+                          aria-label={uploadsLocked ? "Upgrade to upload your own images" : "Add images"}
+                          className={`w-16 h-16 rounded-[9px] cursor-pointer flex flex-col items-center justify-center gap-[3px] text-[10px] transition-all ${uploadsLocked ? "text-amber-300/90 hover:text-amber-200" : "text-zinc-500 hover:text-white hover:-translate-y-px"}`}
                           style={{
                             background: "#161616",
-                            border: isPro ? "1px dashed rgba(255,255,255,0.14)" : "1px dashed rgba(251,191,36,0.32)",
+                            border: uploadsLocked ? "1px dashed rgba(251,191,36,0.32)" : "1px dashed rgba(255,255,255,0.14)",
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "#1c1c1c"; e.currentTarget.style.borderColor = isPro ? "rgba(255,255,255,0.22)" : "rgba(251,191,36,0.5)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "#161616"; e.currentTarget.style.borderColor = isPro ? "rgba(255,255,255,0.14)" : "rgba(251,191,36,0.32)"; }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#1c1c1c"; e.currentTarget.style.borderColor = uploadsLocked ? "rgba(251,191,36,0.5)" : "rgba(255,255,255,0.22)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "#161616"; e.currentTarget.style.borderColor = uploadsLocked ? "rgba(251,191,36,0.32)" : "rgba(255,255,255,0.14)"; }}
                         >
-                          {isPro ? (
+                          {!planKnown ? null : isPro ? (
                             <>
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -1626,10 +1636,11 @@ export default function CreatePage() {
                       <div>
                         <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Video length</h2>
                         <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">
-                          {DURATION_MIN}-{maxDur} seconds.{" "}
-                          {isFreePlan
-                            ? "Free videos are capped at 20 seconds - upgrade for up to 60."
-                            : "Talking videos over 8s use multiple clips."}
+                          {untilPlanKnown(
+                            `${DURATION_MIN}-${maxDur} seconds. ${isFreePlan
+                              ? "Free videos are capped at 20 seconds - upgrade for up to 60."
+                              : "Talking videos over 8s use multiple clips."}`
+                          )}
                         </p>
                       </div>
                       <div
@@ -1778,6 +1789,7 @@ export default function CreatePage() {
                                 key={id}
                                 type="button"
                                 onClick={() => {
+                                  if (locked && !planKnown) return;
                                   if (locked) { router.push("/pricing"); return; }
                                   setTalkingRealMode(id);
                                 }}
@@ -1979,6 +1991,7 @@ export default function CreatePage() {
                                         key={tab}
                                         type="button"
                                         onClick={() => {
+                                          if (locked && !planKnown) return;
                                           if (locked) { router.push("/pricing"); return; }
                                           setAvatarMode(tab);
                                         }}
@@ -2283,22 +2296,28 @@ export default function CreatePage() {
                         </>
                       ) : null}
                       <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
-                      <span
-                        className="px-[9px] py-[2px] rounded-full font-medium tracking-[0.04em] uppercase"
-                        style={{
-                          fontSize: "10px",
-                          background: "rgba(78,201,160,0.1)",
-                          color: "#4ec9a0",
-                          border: "1px solid rgba(78,201,160,0.18)",
-                        }}
-                      >
-                        Free
-                      </span>
+                      {userPlan ? (
+                        <span
+                          className="px-[9px] py-[2px] rounded-full font-medium tracking-[0.04em] uppercase"
+                          style={{
+                            fontSize: "10px",
+                            background: "rgba(78,201,160,0.1)",
+                            color: "#4ec9a0",
+                            border: "1px solid rgba(78,201,160,0.18)",
+                          }}
+                        >
+                          {PLAN_CONFIGS[userPlan].label}
+                        </span>
+                      ) : (
+                        <SkeletonInline className="px-[9px] py-[2px] rounded-full border border-transparent font-medium tracking-[0.04em] uppercase text-[10px]">
+                          Free
+                        </SkeletonInline>
+                      )}
                     </div>
                     <button
                       type="button"
                       onClick={submit}
-                      disabled={!prompt.trim() || prompt.trim().length < 5 || submitting || !canGenerateByPlan}
+                      disabled={!prompt.trim() || prompt.trim().length < 5 || submitting || !canGenerateByPlan || !planKnown}
                       className="inline-flex items-center gap-2.5 px-[18px] py-[10px] rounded-[9px] text-[13px] font-medium tracking-[-0.005em] transition-all hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                       style={{
                         background: "linear-gradient(180deg, #ffffff, #d4d4d4)",

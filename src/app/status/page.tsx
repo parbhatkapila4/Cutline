@@ -78,11 +78,16 @@ const OVERALL_HEADLINE: Record<ComponentStatus, string> = {
   outage: "Active outage",
   not_configured: "No services configured",
 };
+const STATUS_TIMEOUT_MS = 5000;
+const METRICS_TIMEOUT_MS = 2000;
 
 async function fetchStatus(): Promise<StatusPayload | null> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cutline.cloud";
-    const res = await fetch(`${baseUrl}/api/status`, { cache: "no-store" });
+    const res = await fetch(`${baseUrl}/api/status`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(STATUS_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     return (await res.json()) as StatusPayload;
   } catch {
@@ -93,7 +98,10 @@ async function fetchStatus(): Promise<StatusPayload | null> {
 async function fetchMetrics(): Promise<MetricsPayload | null> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cutline.cloud";
-    const res = await fetch(`${baseUrl}/api/metrics`, { cache: "no-store" });
+    const res = await fetch(`${baseUrl}/api/metrics`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(METRICS_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     return (await res.json()) as MetricsPayload;
   } catch {

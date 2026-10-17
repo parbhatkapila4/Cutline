@@ -31,10 +31,7 @@ export async function pingRedis(): Promise<{ ok: boolean; error?: string }> {
     await redis.quit();
     return { ok: result === "PONG" };
   } catch (e) {
-    try {
-      await redis.quit();
-    } catch {
-    }
+    redis.disconnect();
     return { ok: false, error: e instanceof Error ? e.message : "unreachable" };
   }
 }

@@ -1,24 +1,25 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { REQUEST_URL_HEADER, safeRequestPath } from "@/lib/http/requestUrl";
+import { Suspense } from "react";
+import { RequireSession } from "@/components/auth/RequireSession";
 import { SignUpTracker } from "@/components/analytics/SignUpTracker";
+import { DashboardFallback } from "@/components/dashboard/DashboardFallback";
+import DashboardLoading from "./loading";
+import VideoLoading from "./videos/[jobId]/loading";
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const requestHeaders = await headers();
-  const session = await auth.api.getSession({ headers: requestHeaders });
-  if (session?.user?.id == null) {
-    const returnTo = safeRequestPath(requestHeaders.get(REQUEST_URL_HEADER), "/dashboard");
-    redirect(`/auth/sign-in?redirect=${encodeURIComponent(returnTo)}`);
-  }
   return (
     <div className="dashboard-root">
-      <SignUpTracker />
-      {children}
+      <Suspense
+        fallback={<DashboardFallback library={<DashboardLoading />} video={<VideoLoading />} />}
+      >
+        <RequireSession fallbackPath="/dashboard">
+          <SignUpTracker />
+          {children}
+        </RequireSession>
+      </Suspense>
     </div>
   );
 }

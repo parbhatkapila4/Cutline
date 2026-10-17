@@ -619,6 +619,49 @@ html:has(.dashboard-root)::-webkit-scrollbar {
   }
 }
 
+@keyframes skeleton-inline-sheen {
+  0% {
+    background-position: 150% 0;
+  }
+
+  100% {
+    background-position: -50% 0;
+  }
+}
+.skeleton-inline {
+  color: transparent;
+  user-select: none;
+  border-radius: min(0.28em, 8px);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background-color: rgb(255 255 255 / 0.04);
+  background-image: linear-gradient(90deg,
+      transparent 25%,
+      rgb(255 255 255 / 0.07) 47.5%,
+      rgb(255 255 255 / 0.07) 52.5%,
+      transparent 75%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04);
+  animation: skeleton-inline-sheen 1.8s ease-in-out infinite;
+}
+
+.skeleton-inline-light {
+  background-color: rgb(243 244 246);
+  background-image: linear-gradient(90deg,
+      transparent 25%,
+      rgb(255 255 255 / 0.85) 47.5%,
+      rgb(255 255 255 / 0.85) 52.5%,
+      transparent 75%);
+  box-shadow: 0 0 0 1px rgb(229 231 235 / 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-inline {
+    animation: none;
+  }
+}
+
 @keyframes hero-mesh {
 
   0%,

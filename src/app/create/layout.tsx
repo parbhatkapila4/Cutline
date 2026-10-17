@@ -1,18 +1,15 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { REQUEST_URL_HEADER, safeRequestPath } from "@/lib/http/requestUrl";
+import { Suspense } from "react";
+import { RequireSession } from "@/components/auth/RequireSession";
+import CreateLoading from "./loading";
 
-export default async function CreateLayout({
+export default function CreateLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const requestHeaders = await headers();
-  const session = await auth.api.getSession({ headers: requestHeaders });
-  if (session?.user?.id == null) {
-    const returnTo = safeRequestPath(requestHeaders.get(REQUEST_URL_HEADER), "/create");
-    redirect(`/auth/sign-in?redirect=${encodeURIComponent(returnTo)}`);
-  }
-  return <>{children}</>;
+  return (
+    <Suspense fallback={<CreateLoading />}>
+      <RequireSession fallbackPath="/create">{children}</RequireSession>
+    </Suspense>
+  );
 }

@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { LibrarySkeleton } from "@/components/dashboard/LibrarySkeleton";
 
 export default function Loading() {
   return (
@@ -73,21 +74,7 @@ export default function Loading() {
             <Skeleton className="h-5 w-32 rounded-md" />
             <Skeleton className="h-9 w-32 rounded-lg" />
           </div>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="overflow-hidden rounded-xl border border-white/10 bg-zinc-950"
-              >
-                <Skeleton className="aspect-video w-full rounded-none" />
-                <div className="space-y-2 p-4">
-                  <Skeleton className="h-4 w-3/4 rounded" />
-                  <Skeleton className="h-3 w-full rounded" />
-                  <Skeleton className="h-3 w-1/2 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <LibrarySkeleton />
         </section>
       </main>
     </div>

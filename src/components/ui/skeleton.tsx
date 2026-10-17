@@ -5,9 +5,10 @@ type Tone = "light" | "dark";
 type SkeletonProps = {
   className?: string;
   tone?: Tone;
+  children?: ReactNode;
 };
 
-export function Skeleton({ className = "", tone = "dark" }: SkeletonProps) {
+export function Skeleton({ className = "", tone = "dark", children }: SkeletonProps) {
   const base =
     tone === "dark"
       ? "bg-white/[0.04] ring-1 ring-white/[0.04]"
@@ -22,6 +23,7 @@ export function Skeleton({ className = "", tone = "dark" }: SkeletonProps) {
       className={`relative overflow-hidden ${base} ${className}`}
       aria-hidden
     >
+      {children ? <div className="invisible contents">{children}</div> : null}
       <div
         className="absolute inset-y-0 left-0 w-full pointer-events-none"
         style={{
@@ -57,6 +59,24 @@ export function SkeletonText({
         />
       ))}
     </div>
+  );
+}
+
+export function SkeletonInline({
+  children,
+  className = "",
+  tone = "dark",
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: Tone;
+}) {
+  return (
+    <span className={className} aria-hidden>
+      <span className={tone === "dark" ? "skeleton-inline" : "skeleton-inline skeleton-inline-light"}>
+        {children}
+      </span>
+    </span>
   );
 }
 

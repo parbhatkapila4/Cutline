@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { isEnterprisePlan } from "@/lib/plans";
 import { DeleteVideoDialog, type DeleteFailure } from "@/components/dashboard/DeleteVideoDialog";
 import { VideoCardFrame } from "@/components/dashboard/VideoCardFrame";
+import { LibrarySkeleton } from "@/components/dashboard/LibrarySkeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type VideoStatus = "completed" | "processing" | "failed" | "expired";
@@ -691,18 +692,7 @@ export default function DashboardPage() {
             </div>
 
             {videosLoading ? (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="rounded-xl border border-white/10 bg-zinc-950 overflow-hidden animate-pulse">
-                    <div className="aspect-video bg-zinc-800" />
-                    <div className="p-4 space-y-2">
-                      <div className="h-4 w-3/4 bg-zinc-800 rounded" />
-                      <div className="h-3 w-full bg-zinc-800 rounded" />
-                      <div className="h-3 w-1/2 bg-zinc-800 rounded" />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <LibrarySkeleton />
             ) : videosError ? (
               <div className="rounded-xl border border-white/10 bg-zinc-950 p-8 text-center">
                 <p className="text-red-400 font-medium">{videosError}</p>
