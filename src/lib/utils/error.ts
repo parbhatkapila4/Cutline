@@ -88,12 +88,18 @@ export function containsOperatorDetail(message: string): boolean {
 const HEYGEN_AVATAR_QUOTA_MESSAGE =
   "Talking-character videos are temporarily unavailable. Please try Slideshow mode, or try again in a few minutes.";
 
+const IMAGE_FLOOR_MESSAGE =
+  "We couldn't find enough images for this video, so we stopped instead of rendering blank shots. Try a more specific prompt.";
+
 export function getUserFriendlyErrorMessage(raw: string | null | undefined): string {
   if (!raw || typeof raw !== "string") return GENERIC_MESSAGE;
   const cleaned = stripProviderPrefix(raw);
   const s = cleaned.toLowerCase();
   if (isHeyGenAvatarQuotaError(raw.toLowerCase()) || isHeyGenAvatarQuotaError(s)) {
     return HEYGEN_AVATAR_QUOTA_MESSAGE;
+  }
+  if (s.includes("fell back to the placeholder")) {
+    return IMAGE_FLOOR_MESSAGE;
   }
   if (
     s.includes("insufficient credit") ||

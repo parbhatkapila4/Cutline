@@ -161,9 +161,9 @@ export async function getQueueWaitMetrics(jobId: string): Promise<{
     if (state === "waiting") {
       const [waitingCount, head] = await Promise.all([
         queue.getWaitingCount(),
-        queue.getWaiting(0, QUEUE_POSITION_WINDOW - 1),
+        queue.getRanges(["waiting", "paused"], 0, QUEUE_POSITION_WINDOW - 1, true),
       ]);
-      const idx = head.findIndex((j) => String(j.id) === String(jobId));
+      const idx = head.indexOf(String(jobId));
       const position = idx >= 0 ? idx + 1 : Math.max(QUEUE_POSITION_WINDOW + 1, waitingCount);
       return {
         queuePosition: position,
@@ -173,9 +173,9 @@ export async function getQueueWaitMetrics(jobId: string): Promise<{
     if (state === "delayed") {
       const [waitingCount, delayed] = await Promise.all([
         queue.getWaitingCount(),
-        queue.getDelayed(0, QUEUE_POSITION_WINDOW - 1),
+        queue.getRanges(["delayed"], 0, QUEUE_POSITION_WINDOW - 1, true),
       ]);
-      const idx = delayed.findIndex((j) => String(j.id) === String(jobId));
+      const idx = delayed.indexOf(String(jobId));
       if (idx < 0) {
         return {
           queuePosition: waitingCount + 1,

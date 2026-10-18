@@ -778,13 +778,6 @@ export default function DashboardPage() {
                       {video.status === "completed" && video.videoUrl ? (
                         <a href={`/api/generate/${encodeURIComponent(video.id)}/download`} download className="flex-1 text-center text-sm font-medium text-black bg-white hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors">Download</a>
                       ) : null}
-                      {video.status === "completed" && video.videoUrl ? (
-                        <button type="button" className="p-2 rounded-lg border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 transition-colors" title="Copy link">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-2 2a4 4 0 01-5.656-5.656l1-1M10.172 13.828a4 4 0 010-5.656l2-2a4 4 0 115.656 5.656l-1 1" />
-                          </svg>
-                        </button>
-                      ) : null}
                       <button
                         type="button"
                         onClick={() => requestDelete(video)}

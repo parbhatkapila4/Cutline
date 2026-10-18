@@ -1,14 +1,14 @@
 
-import { interpolate, useCurrentFrame } from "remotion";
+import { useCurrentFrame } from "remotion";
 import { staticFile } from "remotion";
 import { useCallback, useState } from "react";
 import { FittedImage } from "./FittedImage";
+import { kenBurnsTransform } from "../kenBurns";
 
 export type ImageBackgroundProps = {
   imageUrl: string;
   motionType: string;
   motionParams: Record<string, unknown>;
-  fromFrame: number;
   durationInFrames: number;
   fit?: "cover" | "contain";
 };
@@ -17,16 +17,11 @@ export const ImageBackground: React.FC<ImageBackgroundProps> = ({
   imageUrl,
   motionType,
   motionParams,
-  fromFrame,
   durationInFrames,
   fit = "cover",
 }) => {
   const frame = useCurrentFrame();
-  const frameInSequence = frame - fromFrame;
-  const progress = Math.min(
-    1,
-    Math.max(0, frameInSequence / durationInFrames)
-  );
+  const progress = Math.min(1, Math.max(0, frame / durationInFrames));
 
   const [loadError, setLoadError] = useState(false);
   const handleError = useCallback(() => {
@@ -48,32 +43,7 @@ export const ImageBackground: React.FC<ImageBackgroundProps> = ({
     return <FittedImage src={src} onError={handleError} />;
   }
 
-  let scale = 1;
-  let translateX = 0;
-  let translateY = 0;
-
-  if (
-    motionType === "push" ||
-    motionType === "pull" ||
-    motionType === "zoom-in" ||
-    motionType === "zoom-out"
-  ) {
-    const start = (motionParams.startScale as number) ?? 1;
-    const end = (motionParams.endScale as number) ?? 1;
-    scale = interpolate(progress, [0, 1], [start, end]);
-  }
-
-  if (motionType === "pan-left" || motionType === "pan-right") {
-    const start = (motionParams.startX as number) ?? 0;
-    const end = (motionParams.endX as number) ?? 0;
-    translateX = interpolate(progress, [0, 1], [start, end]);
-  }
-
-  if (motionParams.startY !== undefined && motionParams.endY !== undefined) {
-    const startY = (motionParams.startY as number) ?? 0;
-    const endY = (motionParams.endY as number) ?? 0;
-    translateY = interpolate(progress, [0, 1], [startY, endY]);
-  }
+  const { scale, translateX, translateY } = kenBurnsTransform(motionType, motionParams, progress);
 
   return (
     <div

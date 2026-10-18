@@ -13,7 +13,10 @@ import {
   POLL_INITIAL_DELAY_MS,
   POLL_BACKOFF_FACTOR,
   POLL_MAX_DELAY_MS,
+  POLL_MAX_TOTAL_MS,
+  POLL_REQUEST_TIMEOUT_MS,
 } from "@/components/generate/constants";
+import { runningPollDelay } from "@/components/generate/pollSchedule";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId } from "@/lib/types/avatar";
 import { isEnterprisePlan, isProPlan, isPlanId, PLAN_CONFIGS, type PlanId } from "@/lib/plans";
@@ -94,8 +97,6 @@ function canUseCinematicScenes(plan: PlanId): boolean {
 }
 
 const FREE_MAX_DURATION_SECONDS = 20;
-
-const POLL_MS = 2500;
 
 type StageMeta = {
   title: string;
@@ -268,6 +269,7 @@ export default function CreatePage() {
   const [cancelNote, setCancelNote] = useState<string | null>(null);
   const [workerOnline, setWorkerOnline] = useState<boolean | null>(null);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [pollCappedJobId, setPollCappedJobId] = useState<string | null>(null);
   const [shareSupported, setShareSupported] = useState(false);
 
   useEffect(() => {
@@ -296,8 +298,6 @@ export default function CreatePage() {
   const canUseCinematicMode = planKnown && canUseCinematicScenes(userPlan);
   const isPro = isProPlan(userPlan);
   const isFreePlan = userPlan === "free";
-  // Nothing is capped until the plan is known, so a paid caller keeps the
-  // default length; the Free cap clamps it once the plan says Free.
   const maxDur = isFreePlan ? FREE_MAX_DURATION_SECONDS : DURATION_MAX;
   const uploadsLocked = planKnown && !isPro;
   const untilPlanKnown = (copy: string) =>
@@ -321,7 +321,7 @@ export default function CreatePage() {
     secondsThisVideo > secondsBalance.totalRemaining;
   const router = useRouter();
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stageRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transientRef = useRef(0);
   const backoffUntilRef = useRef(0);
@@ -434,7 +434,7 @@ export default function CreatePage() {
   }, [busy]);
 
   const stop = useCallback(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
+    if (pollRef.current) clearTimeout(pollRef.current);
     if (stageRef.current) clearInterval(stageRef.current);
     pollRef.current = stageRef.current = null;
   }, []);
@@ -471,10 +471,12 @@ export default function CreatePage() {
     }
   }, []);
 
-  const poll = useCallback(async (id: string) => {
-    if (Date.now() < backoffUntilRef.current) return;
+  const poll = useCallback(async (id: string): Promise<boolean> => {
+    // The next poll waits for this one, so a request that never settles must not stall the loop.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), POLL_REQUEST_TIMEOUT_MS);
     try {
-      const r = await fetch(`/api/generate/${encodeURIComponent(id)}`);
+      const r = await fetch(`/api/generate/${encodeURIComponent(id)}`, { signal: controller.signal });
       const d = await r.json();
       if (!r.ok) {
         if (r.status === 429 || r.status >= 500) {
@@ -486,13 +488,13 @@ export default function CreatePage() {
           const retryAfterMs = Number(d?.details?.retryAfter) * 1000;
           const wait = Math.max(computed, Number.isFinite(retryAfterMs) ? retryAfterMs : 0);
           backoffUntilRef.current = Date.now() + wait;
-          return;
+          return true;
         }
         setError(getUserFriendlyErrorMessage(d.error || "Error"));
         setStatus("failed");
         settleGa("failed", typeof d?.code === "string" ? d.code : "STATUS_UNAVAILABLE");
         stop();
-        return;
+        return false;
       }
       transientRef.current = 0;
       setStatus(d.status);
@@ -505,11 +507,13 @@ export default function CreatePage() {
         setCompletionMessage(typeof d.message === "string" && d.message.trim() ? d.message.trim() : null);
         settleGa("completed");
         stop();
+        return false;
       }
       if (d.status === "failed") {
         setError(getUserFriendlyErrorMessage(d.error || "Failed"));
         settleGa("failed", typeof d.failureCode === "string" ? d.failureCode : "UNKNOWN");
         stop();
+        return false;
       }
       if (d.status === "cancelled") {
         setCancelState("idle");
@@ -518,22 +522,44 @@ export default function CreatePage() {
         setErrorCode("CANCELLED");
         settleGa("failed", "CANCELLED");
         stop();
+        return false;
       }
+      return true;
     } catch {
       transientRef.current += 1;
       backoffUntilRef.current = Date.now() + Math.min(
         POLL_INITIAL_DELAY_MS * POLL_BACKOFF_FACTOR ** (transientRef.current - 1),
         POLL_MAX_DELAY_MS
       );
+      return true;
+    } finally {
+      clearTimeout(timer);
     }
   }, [stop, settleGa]);
 
+  const pollCapped = jobId != null && pollCappedJobId === jobId;
+
   useEffect(() => {
-    if (!jobId) return;
-    poll(jobId);
-    pollRef.current = setInterval(() => poll(jobId), POLL_MS);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [jobId, poll]);
+    if (!jobId || pollCapped) return;
+    let cancelled = false;
+    const startedAt = Date.now();
+    const tick = async () => {
+      const keepPolling = await poll(jobId);
+      if (cancelled || !keepPolling) return;
+      const delay = runningPollDelay(Date.now() - startedAt);
+      if (delay === null) {
+        setPollCappedJobId(jobId);
+        return;
+      }
+      pollRef.current = setTimeout(tick, Math.max(delay, backoffUntilRef.current - Date.now()));
+    };
+    void tick();
+    return () => {
+      cancelled = true;
+      if (pollRef.current) clearTimeout(pollRef.current);
+      pollRef.current = null;
+    };
+  }, [jobId, poll, pollCapped]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -1006,6 +1032,32 @@ export default function CreatePage() {
                         </div>
                       ) : null}
 
+                      {pollCapped ? (
+                        <div className="px-5 sm:px-7 pb-4">
+                          <div role="status" className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-[12px] leading-relaxed text-zinc-300">
+                            <p>
+                              <span className="font-semibold text-white">Still not done after {POLL_MAX_TOTAL_MS / 60_000} minutes.</span>{" "}
+                              This page has stopped checking, but the job keeps running. When it finishes, the video will be in your library.
+                            </p>
+                            <div className="mt-2.5 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setPollCappedJobId(null)}
+                                className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium leading-none text-zinc-200 border border-white/12 hover:bg-white/5 transition-colors"
+                              >
+                                Check again
+                              </button>
+                              <Link
+                                href="/dashboard"
+                                className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium leading-none text-zinc-200 border border-white/12 hover:bg-white/5 transition-colors"
+                              >
+                                Open library
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+
                       <div className="relative px-6 py-3.5 border-t border-white/8 bg-black/40 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 text-[11px] font-medium text-zinc-500">
                           <span className="inline-flex items-center gap-1.5">
@@ -1189,6 +1241,7 @@ export default function CreatePage() {
               >
                 <a
                   href={`/api/generate/${jobId}/download`}
+                  download={`cutline-${jobId}.mp4`}
                   className="group relative flex-1 inline-flex items-center justify-center gap-3 px-5 py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-[14px] font-semibold tracking-[-0.005em] shadow-[0_14px_32px_-10px_rgba(251,191,36,0.55)] hover:shadow-[0_18px_38px_-10px_rgba(251,191,36,0.7)] transition-all overflow-hidden"
                 >
                   <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-linear-to-r from-transparent via-white/40 to-transparent" aria-hidden />

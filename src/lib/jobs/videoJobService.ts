@@ -301,23 +301,31 @@ export async function deleteOpenVideoJob(queueJobId: string): Promise<boolean> {
   return Array.isArray(rows) && rows.length > 0;
 }
 
-export async function getPlanIdsByFinalUrl(
-  urls: string[]
+export async function getPlanIdsForTakes(
+  takes: ReadonlyArray<{ url: string; queueJobId: string | null }>
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  if (!isDatabaseConfigured() || urls.length === 0) return out;
+  if (!isDatabaseConfigured() || takes.length === 0) return out;
+  const urls = takes.map((take) => take.url);
+  const queueJobIds = [...new Set(takes.flatMap((take) => (take.queueJobId ? [take.queueJobId] : [])))];
   const sql = getSql();
   const rows = (await sql`
-    SELECT vj.final_url AS final_url, upo.plan AS plan
+    SELECT vj.final_url AS final_url, vj.queue_job_id AS queue_job_id, upo.plan AS plan
     FROM video_jobs vj
     LEFT JOIN user_plan_overrides upo ON upo.user_id = vj.owner_id
-    WHERE vj.final_url = ANY(${urls})
+    WHERE (vj.final_url = ANY(${urls}) OR vj.queue_job_id = ANY(${queueJobIds}))
       AND vj.owner_type = 'user'::video_job_owner_type
-  `) as Array<{ final_url: string | null; plan: string | null }>;
+  `) as Array<{ final_url: string | null; queue_job_id: string | null; plan: string | null }>;
+  const planByUrl = new Map<string, string>();
+  const planByJob = new Map<string, string>();
   for (const row of Array.isArray(rows) ? rows : []) {
-    if (typeof row?.final_url === "string" && typeof row?.plan === "string") {
-      out.set(row.final_url, row.plan);
-    }
+    if (typeof row?.plan !== "string") continue;
+    if (typeof row.final_url === "string") planByUrl.set(row.final_url, row.plan);
+    if (typeof row.queue_job_id === "string") planByJob.set(row.queue_job_id, row.plan);
+  }
+  for (const take of takes) {
+    const plan = planByUrl.get(take.url) ?? (take.queueJobId ? planByJob.get(take.queueJobId) : undefined);
+    if (plan) out.set(take.url, plan);
   }
   return out;
 }

@@ -118,7 +118,6 @@ export const CUTLINEComposition: React.FC<CUTLINECompositionProps> = (
               fit={image?.fit}
               motionType={motionEntry?.motionType ?? "static"}
               motionParams={motionEntry?.params ?? {}}
-              fromFrame={fromFrame}
               durationInFrames={durationInFrames}
             />
             {logoUrl && logoPlacement && (

@@ -82,10 +82,7 @@ export async function buildImageSpecForRegen(
       fallbackUsed: result.fallbackUsed,
     });
   }
-  await assertPlaceholderFloor(entries, {
-    jobId: newJobId,
-    maxPlaceholderRatio: stockOnly ? 1 : undefined,
-  });
+  await assertPlaceholderFloor(entries, { jobId: newJobId });
 
   const spec = { entries };
   return normalizeImageSpecForRender(spec, newJobId, cwd);

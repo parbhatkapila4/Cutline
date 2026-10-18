@@ -58,19 +58,13 @@ describe("buildImageSpecForRegen - stock-only is honoured (Free must not call DA
 });
 
 describe("buildImageSpecForRegen - the placeholder floor applies", () => {
-  it("enforces the floor, relaxing the cap to 1 for a free regen", async () => {
+  it("enforces the default cap for a free regen", async () => {
     await buildImageSpecForRegen(snap(), "job2", ["s1"], true);
-    expect(mockAssertFloor).toHaveBeenCalledWith(expect.any(Array), {
-      jobId: "job2",
-      maxPlaceholderRatio: 1,
-    });
+    expect(mockAssertFloor).toHaveBeenCalledWith(expect.any(Array), { jobId: "job2" });
   });
 
-  it("enforces the floor with the default cap for a paid regen", async () => {
+  it("enforces the default cap for a paid regen", async () => {
     await buildImageSpecForRegen(snap(), "job2", ["s1"], false);
-    expect(mockAssertFloor).toHaveBeenCalledWith(expect.any(Array), {
-      jobId: "job2",
-      maxPlaceholderRatio: undefined,
-    });
+    expect(mockAssertFloor).toHaveBeenCalledWith(expect.any(Array), { jobId: "job2" });
   });
 });

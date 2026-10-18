@@ -101,6 +101,11 @@ export async function deletePublishedBlob(url: string | undefined | null): Promi
 export type BlobRetentionPolicy = {
   overrideHours: number | null;
 };
+function queueJobIdForTake(pathname: string): string | null {
+  if (!pathname.startsWith(`${BLOB_PREFIX}/`)) return null;
+  return /^(.+?)(?:-v\d+)?(?:-preview)?\.mp4$/.exec(pathname.slice(BLOB_PREFIX.length + 1))?.[1] ?? null;
+}
+
 export async function cleanupExpiredBlobs(
   policy: BlobRetentionPolicy
 ): Promise<{ deleted: number; errors: number }> {
@@ -110,7 +115,7 @@ export async function cleanupExpiredBlobs(
   const candidateHours = policy.overrideHours ?? MIN_VIDEO_RETENTION_HOURS;
   const now = Date.now();
   const candidateCutoff = now - candidateHours * 60 * 60 * 1000;
-  const candidates: Array<{ url: string; uploadedAt: number }> = [];
+  const candidates: Array<{ url: string; pathname: string; uploadedAt: number }> = [];
   let toDelete: string[] = [];
   let errors = 0;
 
@@ -123,7 +128,7 @@ export async function cleanupExpiredBlobs(
         const uploadedAt =
           b.uploadedAt instanceof Date ? b.uploadedAt.getTime() : new Date(b.uploadedAt).getTime();
         if (Number.isFinite(uploadedAt) && uploadedAt < candidateCutoff) {
-          candidates.push({ url: b.url, uploadedAt });
+          candidates.push({ url: b.url, pathname: b.pathname, uploadedAt });
         }
       }
       cursor = res.hasMore ? res.cursor : undefined;
@@ -132,8 +137,10 @@ export async function cleanupExpiredBlobs(
     if (policy.overrideHours != null) {
       toDelete = candidates.map((c) => c.url);
     } else if (candidates.length > 0) {
-      const { getPlanIdsByFinalUrl } = await import("@/lib/jobs/videoJobService");
-      const planByUrl = await getPlanIdsByFinalUrl(candidates.map((c) => c.url));
+      const { getPlanIdsForTakes } = await import("@/lib/jobs/videoJobService");
+      const planByUrl = await getPlanIdsForTakes(
+        candidates.map((c) => ({ url: c.url, queueJobId: queueJobIdForTake(c.pathname) }))
+      );
       for (const c of candidates) {
         const hours = videoRetentionHoursForPlan(planByUrl.get(c.url));
         if (c.uploadedAt < now - hours * 60 * 60 * 1000) toDelete.push(c.url);

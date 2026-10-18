@@ -1677,8 +1677,7 @@ async function runPipelineOnce(
           assetPaths,
           jobId,
           isPreview || Boolean(options.stockImagesOnly),
-          aspectRatio,
-          options.stockImagesOnly ? 1 : undefined
+          aspectRatio
         ),
       {
         maxRetries: retryConfig.image.maxRetries,

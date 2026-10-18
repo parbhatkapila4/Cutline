@@ -34,20 +34,25 @@ vi.mock("@vercel/blob", () => ({
   },
 }));
 
+type Take = { url: string; queueJobId: string | null };
+
 const dbState = {
   planByUrl: new Map<string, string>(),
+  planByJob: new Map<string, string>(),
+  lookedUp: [] as Take[],
   planLookupCalls: 0,
   cleared: [] as string[],
   clearError: null as Error | null,
 };
 
 vi.mock("@/lib/jobs/videoJobService", () => ({
-  getPlanIdsByFinalUrl: async (urls: string[]) => {
+  getPlanIdsForTakes: async (takes: Take[]) => {
     dbState.planLookupCalls += 1;
+    dbState.lookedUp.push(...takes);
     const out = new Map<string, string>();
-    for (const url of urls) {
-      const plan = dbState.planByUrl.get(url);
-      if (plan) out.set(url, plan);
+    for (const take of takes) {
+      const plan = dbState.planByUrl.get(take.url) ?? (take.queueJobId ? dbState.planByJob.get(take.queueJobId) : undefined);
+      if (plan) out.set(take.url, plan);
     }
     return out;
   },
@@ -84,6 +89,8 @@ beforeEach(() => {
   blobState.blobs = [];
   blobState.deleted = [];
   dbState.planByUrl = new Map();
+  dbState.planByJob = new Map();
+  dbState.lookedUp = [];
   dbState.planLookupCalls = 0;
   dbState.cleared = [];
   dbState.clearError = null;
@@ -223,6 +230,48 @@ describe("cleanupExpiredBlobs: two-phase window selection", () => {
     expect(res.deleted).toBe(2);
     expect(blobState.deleted.sort()).toEqual([freeUrl, staleUrl].sort());
     expect(dbState.planLookupCalls).toBe(1);
+  });
+
+  it("keeps a paid user's extra takes as long as the main one, not on the free schedule", async () => {
+    const jobId = "3f2b8c1e-7d4a-4e2b-9c1f-0a5d6e7f8a9b";
+    const take = (name: string) => `https://blob.example.com/videos/${name}`;
+    const aged = (url: string, hours: number): FakeBlob => ({ url, uploadedAt: new Date(Date.now() - hours * HOUR_MS) });
+    blobState.blobs = [
+      aged(take(`${jobId}-v1.mp4`), FREE_VIDEO_RETENTION_HOURS + 6),
+      aged(take(`${jobId}-v2.mp4`), FREE_VIDEO_RETENTION_HOURS + 6),
+      aged(take(`${jobId}-v3.mp4`), FREE_VIDEO_RETENTION_HOURS + 6),
+    ];
+    dbState.planByUrl.set(take(`${jobId}-v1.mp4`), "professional");
+    dbState.planByJob.set(jobId, "professional");
+
+    const res = await cleanupExpiredBlobs({ overrideHours: null });
+
+    expect(res.deleted).toBe(0);
+    expect(blobState.deleted).toEqual([]);
+  });
+
+  it("still deletes every take together once the paid window passes", async () => {
+    const jobId = "3f2b8c1e-7d4a-4e2b-9c1f-0a5d6e7f8a9b";
+    const urls = ["-v1", "-v2"].map((suffix) => `https://blob.example.com/videos/${jobId}${suffix}.mp4`);
+    blobState.blobs = urls.map((url) => ({ url, uploadedAt: new Date(Date.now() - (PAID_VIDEO_RETENTION_HOURS + 1) * HOUR_MS) }));
+    dbState.planByJob.set(jobId, "enterprise");
+
+    const res = await cleanupExpiredBlobs({ overrideHours: null });
+
+    expect(res.deleted).toBe(2);
+    expect(blobState.deleted.sort()).toEqual([...urls].sort());
+  });
+
+  it("reads each take's job from its file name", async () => {
+    const names = ["job-a.mp4", "job-a-v2.mp4", "job-a-v12.mp4", "job-a-preview.mp4", "job-a-v2-preview.mp4", "odd.webm"];
+    blobState.blobs = names.map((name) => ({
+      url: `https://blob.example.com/videos/${name}`,
+      uploadedAt: new Date(Date.now() - (FREE_VIDEO_RETENTION_HOURS + 1) * HOUR_MS),
+    }));
+
+    await cleanupExpiredBlobs({ overrideHours: null });
+
+    expect(dbState.lookedUp.map((t) => t.queueJobId)).toEqual(["job-a", "job-a", "job-a", "job-a", "job-a", null]);
   });
 
   it("skips the plan lookup entirely when VIDEO_RETENTION_HOURS is set", async () => {

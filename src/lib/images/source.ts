@@ -356,8 +356,7 @@ export async function sourceImages(
   assetPaths?: AssetPaths,
   jobId?: string,
   stockOnly?: boolean,
-  aspectRatio?: string,
-  maxPlaceholderRatio?: number
+  aspectRatio?: string
 ): Promise<ImageSpec> {
   const shots = [...(shotList.shots ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const productPhotoPaths = assetPaths?.productPhotos ?? [];
@@ -422,7 +421,7 @@ export async function sourceImages(
     }
   }
 
-  await assertPlaceholderFloor(entries, { jobId, maxPlaceholderRatio });
+  await assertPlaceholderFloor(entries, { jobId });
 
   return { entries };
 }
