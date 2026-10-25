@@ -5,7 +5,10 @@ import Redis from "ioredis";
 import type { AssetMetadata, AssetStorage, AssetType } from "./types";
 import { isBlobConfigured } from "@/lib/storage/publish";
 import { getUploadRetentionHours } from "@/lib/storage/cleanup";
-import { createManagedRedis, FAIL_FAST_REDIS_OPTIONS } from "@/lib/redis/managedRedis";
+import {
+  createManagedRedis,
+  FAIL_FAST_REDIS_OPTIONS,
+} from "@/lib/redis/managedRedis";
 import { withRetry } from "@/lib/utils/retry";
 
 const REGISTRY_FILENAME = "_registry.json";
@@ -13,7 +16,8 @@ const DEFAULT_UPLOAD_DIR = "uploads";
 const BLOB_UPLOAD_PREFIX = "uploads";
 const ASSET_RECORD_PREFIX = "cutline:asset:";
 const ASSET_FETCH_TIMEOUT_MS = 60_000;
-const ASSET_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ASSET_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 let redis: Redis | null = null;
 
@@ -72,11 +76,7 @@ function writeRegistry(registry: Registry): void {
   const dir = getUploadDir();
   const registryPath = getRegistryPath();
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(
-    registryPath,
-    JSON.stringify(registry, null, 0),
-    "utf-8"
-  );
+  fs.writeFileSync(registryPath, JSON.stringify(registry, null, 0), "utf-8");
 }
 
 function getExtension(mimeType: string): string {
@@ -96,7 +96,7 @@ export async function storeAsset(
   type: AssetType,
   originalFilename: string,
   mimeType: string,
-  ownerId?: string
+  ownerId?: string,
 ): Promise<AssetMetadata> {
   const id = randomUUID();
   const filename = `${id}.${getExtension(mimeType)}`;
@@ -124,12 +124,17 @@ export async function storeAsset(
     try {
       const retentionHours = getUploadRetentionHours();
       if (retentionHours > 0) {
-        await getRedis().set(recordKey(id), JSON.stringify(metadata), "EX", Math.ceil(retentionHours * 3600));
+        await getRedis().set(
+          recordKey(id),
+          JSON.stringify(metadata),
+          "EX",
+          Math.ceil(retentionHours * 3600),
+        );
       } else {
         await getRedis().set(recordKey(id), JSON.stringify(metadata));
       }
     } catch (e) {
-      await del(blob.url).catch(() => { });
+      await del(blob.url).catch(() => {});
       throw e;
     }
     return metadata;
@@ -152,7 +157,9 @@ export async function storeAsset(
   return metadata;
 }
 
-export async function getAssetMetadata(assetId: string): Promise<AssetMetadata | null> {
+export async function getAssetMetadata(
+  assetId: string,
+): Promise<AssetMetadata | null> {
   if (!isAssetId(assetId)) return null;
   if (getUploadStorage() === "blob") {
     const raw = await getRedis().get(recordKey(assetId));
@@ -167,13 +174,15 @@ export async function getAssetMetadata(assetId: string): Promise<AssetMetadata |
 }
 
 export async function resolveAssetRecords(
-  assetIds: string[]
+  assetIds: string[],
 ): Promise<{ found: AssetMetadata[]; missing: string[] }> {
   const found: AssetMetadata[] = [];
   const missing: string[] = [];
   for (const id of new Set(assetIds)) {
     const meta = await getAssetMetadata(id);
-    const available = meta != null && (meta.storage === "blob" || getLocalAssetPath(meta) != null);
+    const available =
+      meta != null &&
+      (meta.storage === "blob" || getLocalAssetPath(meta) != null);
     if (meta && available) found.push(meta);
     else missing.push(id);
   }
@@ -189,33 +198,41 @@ export function getLocalAssetPath(meta: AssetMetadata): string | null {
   return fullPath;
 }
 
-export async function fetchAssetBytes(meta: AssetMetadata): Promise<Buffer | null> {
+export async function fetchAssetBytes(
+  meta: AssetMetadata,
+): Promise<Buffer | null> {
   const url = meta.url;
   if (!url || !/^https:\/\//i.test(url)) return null;
   try {
     const bytes = await withRetry(
       async () => {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), ASSET_FETCH_TIMEOUT_MS);
+        const timer = setTimeout(
+          () => controller.abort(),
+          ASSET_FETCH_TIMEOUT_MS,
+        );
         try {
           let res: Response;
           try {
             res = await fetch(url, { signal: controller.signal });
           } catch (e) {
-            throw new Error(`network error fetching asset: ${e instanceof Error ? e.message : String(e)}`);
+            throw new Error(
+              `network error fetching asset: ${e instanceof Error ? e.message : String(e)}`,
+            );
           }
-          if (!res.ok) throw new Error(`asset fetch failed with status ${res.status}`);
+          if (!res.ok)
+            throw new Error(`asset fetch failed with status ${res.status}`);
           return Buffer.from(await res.arrayBuffer());
         } finally {
           clearTimeout(timer);
         }
       },
-      { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 4000 }
+      { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 4000 },
     );
     return bytes.length > 0 ? bytes : null;
   } catch (e) {
     console.error(
-      `[assets] could not fetch asset=${meta.id}: ${e instanceof Error ? e.message : String(e)}`
+      `[assets] could not fetch asset=${meta.id}: ${e instanceof Error ? e.message : String(e)}`,
     );
     return null;
   }
@@ -240,10 +257,9 @@ export async function deleteStoredAsset(meta: AssetMetadata): Promise<void> {
     }
   } catch (e) {
     console.warn(
-      `[assets] could not delete asset=${meta.id}: ${e instanceof Error ? e.message : String(e)}`
+      `[assets] could not delete asset=${meta.id}: ${e instanceof Error ? e.message : String(e)}`,
     );
   }
 }
 
-export function cleanupOldUploads(): void {
-}
+export function cleanupOldUploads(): void {}

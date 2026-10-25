@@ -24,7 +24,7 @@ describe("cost estimates", () => {
   it("prices a Veo render far above a slideshow, which is what the meter relies on", () => {
     const cinematic = estimateCostUsd({ mode: "talking_object", durationSeconds: 60 });
     expect(SLIDESHOW_30S).toBeLessThan(1);
-    expect(cinematic).toBeGreaterThan(20);
+    expect(cinematic).toBeGreaterThan(64 * SERVICE_COSTS.VEO_PER_SECOND);
   });
 
   it("bills Veo in whole 8-second chunks", () => {
@@ -120,7 +120,7 @@ describe("decideSpend", () => {
   it("bounds cinematic spend by the SECONDS meter, since the ceiling no longer does", () => {
     const allowed = cinematicSecondsPerMonth("professional");
     const worstCaseVeoUsd = allowed * SERVICE_COSTS.VEO_PER_SECOND;
-    expect(worstCaseVeoUsd).toBeCloseTo(36, 4);
+    expect(worstCaseVeoUsd).toBeCloseTo(9, 4);
     const d = decideSpend({
       state: state({ cinematicSecondsAllowed: allowed, cinematicSecondsRemaining: allowed, totalSecondsRemaining: allowed }),
       estimateUsd: estimateUnmeteredCostUsd({ mode: "talking_object", durationSeconds: 300 }),
@@ -133,7 +133,7 @@ describe("decideSpend", () => {
   it("a single 60s render no longer eats the whole dollar ceiling", () => {
     const full = estimateCostUsd({ mode: "talking_object", durationSeconds: 60 });
     const unmetered = estimateUnmeteredCostUsd({ mode: "talking_object", durationSeconds: 60 });
-    expect(full).toBeGreaterThan(28);
+    expect(full).toBeGreaterThan(64 * SERVICE_COSTS.VEO_PER_SECOND);
     expect(unmetered).toBeLessThan(0.3);
     expect(Math.floor(29.5 / unmetered)).toBeGreaterThan(100);
   });

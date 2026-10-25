@@ -3,10 +3,9 @@ import type { NarrativePlan } from "@/lib/types/narrative";
 import type { ShotList } from "@/lib/types/shots";
 import type { Script } from "@/lib/types/script";
 import { parseAndValidateScript } from "@/lib/pipeline/script";
-import { shouldRetryForLLM } from "@/lib/utils/retry";
-import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat } from "@/lib/llm/chat";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 export async function mapStrictScriptToShots(
   intent: Intent,
@@ -15,10 +14,10 @@ export async function mapStrictScriptToShots(
   strictScript: string,
   model?: string
 ): Promise<Script> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const primaryModel = model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  const candidates = getProviderCandidates("strictScript", primaryModel, model);
+  if (candidates.length === 0) {
+    throw new Error(NO_LLM_KEY_MESSAGE);
   }
 
   const system = `You assign pre-written spoken text to video shots. The user script is FIXED: you must NOT rewrite, paraphrase, summarize, or invent new marketing copy.
@@ -43,65 +42,15 @@ ${JSON.stringify({ intent: { rawInput: intent.rawInput, tone: intent.tone }, pla
 
 Remember: entries[].text must be exact substrings assembled from the USER SCRIPT only (or null for silence shots).`;
 
-  const modelCandidates = getModelCandidates(primaryModel);
-  let lastError: unknown;
-  for (let i = 0; i < modelCandidates.length; i++) {
-    const m = modelCandidates[i]!;
-    const url = `${OPENROUTER_BASE}/chat/completions`;
-    const body = {
-      model: m,
-      messages: [
-        { role: "system" as const, content: system },
-        { role: "user" as const, content: user },
-      ],
-      temperature: 0,
-      max_tokens: 4096,
-      response_format: { type: "json_object" as const },
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60_000);
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Strict script mapping failed: API returned ${response.status}. ${text || ""}`);
-      }
-
-      const data = (await response.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-      const content = data.choices?.[0]?.message?.content;
-      if (typeof content !== "string" || content.trim() === "") {
-        throw new Error("Strict script mapping failed: empty model response");
-      }
-
-      return parseAndValidateScript(content.trim(), shotList, {
-        fidelity: "strict",
-        strictSourceText: strictScript,
-      });
-    } catch (err) {
-      lastError = err;
-      const shouldFallback = shouldRetryForLLM(err);
-      const hasNext = i < modelCandidates.length - 1;
-      if (!shouldFallback || !hasNext) {
-        throw err;
-      }
-      console.warn(
-        `[strict-script-map] Primary model failed (${m}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
-      );
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error("Strict script mapping failed");
+  return tryModelCandidates(candidates, "strict-script-map", async (candidate) => {
+    const content = await requestChat(
+      candidate,
+      { system, user, temperature: 0, maxTokens: 4096, json: true, timeoutMs: 60_000 },
+      "Strict script mapping"
+    );
+    return parseAndValidateScript(content.trim(), shotList, {
+      fidelity: "strict",
+      strictSourceText: strictScript,
+    });
+  });
 }

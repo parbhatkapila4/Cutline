@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { DURATION_MIN, DURATION_MAX } from "@/lib/validation/duration";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { LlmHttpError, requestChat } from "@/lib/llm/chat";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 const MAX_PROMPT_LENGTH = 2000;
 
@@ -18,12 +19,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
     const model = process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
+    const candidates = getProviderCandidates("promptSuggestion", model);
 
-    if (!apiKey?.trim()) {
+    if (candidates.length === 0) {
       return NextResponse.json(
-        { error: "OPENROUTER_API_KEY is not set" },
+        { error: NO_LLM_KEY_MESSAGE },
         { status: 500 }
       );
     }
@@ -88,40 +89,19 @@ Rules:
         ? `Expand this into a full video description prompt. Video duration: ${durationSeconds} seconds.\n\n"${partial}"`
         : `The user hasn't typed anything yet. Suggest a complete example prompt for an explainer video (do not include duration or length). Video duration: ${durationSeconds} seconds.`;
 
-    const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-        temperature: 0.4,
-        max_tokens: 300,
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      return NextResponse.json(
-        { error: `OpenRouter error: ${response.status}. ${response.status === 401 ? "Check API key." : text || ""}` },
-        { status: response.status >= 500 ? 502 : 400 }
+    let content: string;
+    try {
+      content = await tryModelCandidates(candidates, "suggest-prompt", (candidate) =>
+        requestChat(
+          candidate,
+          { system: systemPrompt, user: userContent, temperature: 0.4, maxTokens: 300, timeoutMs: 20_000 },
+          "Prompt suggestion"
+        )
       );
-    }
-
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content;
-
-    if (typeof content !== "string" || !content.trim()) {
+    } catch (err) {
       return NextResponse.json(
-        { error: "Empty suggestion from model" },
-        { status: 502 }
+        { error: err instanceof Error ? err.message : "Prompt suggestion failed" },
+        { status: err instanceof LlmHttpError && err.status < 500 ? 400 : 502 }
       );
     }
 

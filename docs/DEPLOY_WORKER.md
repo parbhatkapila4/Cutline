@@ -77,6 +77,7 @@ Same idea, Dockerfile-based:
 
 | Var | Notes |
 |---|---|
+| `ANTHROPIC_API_KEY` | Primary LLM provider: every LLM stage tries Anthropic first and falls back to OpenRouter. Without it, the stages use OpenRouter alone. Set it on the Vercel app too (Edit with AI, prompt suggestions, asset analysis). |
 | `DATABASE_URL` | Token deduction + usage/billing recorded on job completion. |
 | `BLOB_READ_WRITE_TOKEN` | Upload finished MP4s to Vercel Blob so the app can serve them. Same token as the Vercel app. See `docs/PRODUCTION_CHECKLIST.md`. |
 | `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | Base64 of the Vertex service-account JSON key (`base64 -w0 key.json`). Decoded to a 0600 file under the temp dir at boot. Omit only if the host provides ambient ADC (e.g. Workload Identity); Railway does not. The service account needs `roles/aiplatform.user` and `aiplatform.googleapis.com` must be enabled on the project. |

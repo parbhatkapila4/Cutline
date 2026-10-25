@@ -16,8 +16,9 @@ import type {
 } from "@/lib/assets/types";
 import type { AssetMetadata } from "@/lib/assets/types";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat } from "@/lib/llm/chat";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_VISION_MODEL = "anthropic/claude-haiku-4.5";
 const HEX_REGEX = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
 
@@ -60,68 +61,30 @@ async function visionAnalyzeImage(
   prompt: string,
   systemPrompt?: string
 ): Promise<Record<string, unknown>> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const model =
     process.env.OPENROUTER_VISION_MODEL ??
     process.env.OPENROUTER_MODEL ??
     DEFAULT_VISION_MODEL;
-
-  if (!apiKey?.trim()) {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  const candidates = getProviderCandidates("assetAnalysis", model);
+  if (candidates.length === 0) {
+    throw new Error(NO_LLM_KEY_MESSAGE);
   }
 
-  const dataUrl = `data:${mimeType};base64,${imageBase64}`;
-  const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
-    { type: "text", text: prompt },
-    { type: "image_url", image_url: { url: dataUrl } },
-  ];
-
-  const messages: Array<{ role: string; content: string | typeof content }> = [];
-  if (systemPrompt) {
-    messages.push({ role: "system", content: systemPrompt });
-  }
-  messages.push({ role: "user", content });
-
-  const body = {
-    model,
-    messages,
-    temperature: 0,
-    max_tokens: 4096,
-    response_format: { type: "json_object" as const },
-  };
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60_000);
-
-  let response: Response;
-  try {
-    response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+  const raw = await tryModelCandidates(candidates, "vision", (candidate) =>
+    requestChat(
+      candidate,
+      {
+        system: systemPrompt,
+        user: prompt,
+        images: [{ mimeType, base64: imageBase64 }],
+        temperature: 0,
+        maxTokens: 4096,
+        json: true,
+        timeoutMs: 60_000,
       },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Vision API failed: ${response.status}. ${response.status === 401 ? "Check your API key." : text || ""}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = data.choices?.[0]?.message?.content;
-  if (typeof raw !== "string" || !raw.trim()) {
-    throw new Error("Vision API returned empty content");
-  }
+      "Vision API"
+    )
+  );
 
   try {
     return JSON.parse(extractJsonFromModelOutput(raw)) as Record<string, unknown>;

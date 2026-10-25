@@ -15,6 +15,8 @@ import {
   POLL_MAX_DELAY_MS,
   POLL_MAX_TOTAL_MS,
   POLL_REQUEST_TIMEOUT_MS,
+  PIPELINE_STAGE_STEP,
+  PIPELINE_STEPS,
 } from "@/components/generate/constants";
 import { runningPollDelay } from "@/components/generate/pollSchedule";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
@@ -104,28 +106,9 @@ type StageMeta = {
   icon: React.ReactElement;
 };
 
-const STAGE_GROUP_MAP: Record<string, number> = {
-  intent: 0,
-  narrative: 0,
-  shots: 1,
-  script: 1,
-  asset_analysis: 2,
-  visuals: 2,
-  image_sourcing: 2,
-  motion: 2,
-  tts: 3,
-  subtitles: 3,
-  subtitle_refine: 3,
-  veo: 4,
-  heygen: 4,
-  concat: 4,
-  burn_subtitles: 4,
-  render: 4,
-};
-
 const STAGE_META: StageMeta[] = [
   {
-    title: "Analyzing prompt",
+    title: PIPELINE_STEPS[0],
     description: "Reading your topic and locking the tone.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
@@ -134,7 +117,7 @@ const STAGE_META: StageMeta[] = [
     ),
   },
   {
-    title: "Writing script",
+    title: PIPELINE_STEPS[1],
     description: "Drafting the narrative beats and copy.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
@@ -143,7 +126,7 @@ const STAGE_META: StageMeta[] = [
     ),
   },
   {
-    title: "Sourcing visuals",
+    title: PIPELINE_STEPS[2],
     description: "Pulling images and references for each shot.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
@@ -152,7 +135,7 @@ const STAGE_META: StageMeta[] = [
     ),
   },
   {
-    title: "Generating voice",
+    title: PIPELINE_STEPS[3],
     description: "Synthesizing the natural voiceover.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
@@ -161,7 +144,7 @@ const STAGE_META: StageMeta[] = [
     ),
   },
   {
-    title: "Rendering video",
+    title: PIPELINE_STEPS[4],
     description: "Composing frames and exporting MP4.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
@@ -568,7 +551,7 @@ export default function CreatePage() {
       setStage(0);
       return;
     }
-    const idx = STAGE_GROUP_MAP[pipelineStage];
+    const idx = PIPELINE_STAGE_STEP[pipelineStage];
     if (typeof idx === "number") setStage(idx);
   }, [jobId, status, pipelineStage]);
 

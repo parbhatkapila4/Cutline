@@ -1,6 +1,7 @@
 import { cleanSpokenText } from "@/lib/pipeline/spokenText";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat } from "@/lib/llm/chat";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const SYSTEM_PROMPT = `You rewrite ONE line of spoken video narration so it passes an automated content-safety / Responsible-AI filter for AI video generation, while preserving the original meaning and length.
@@ -18,44 +19,20 @@ export async function rewriteNarrationForSafety(
   line: string,
   options?: RewriteForSafetyOptions
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-  if (!apiKey?.trim()) {
-    throw new Error("OPENROUTER_API_KEY is not set");
+  const candidates = getProviderCandidates("safetyReword", model, options?.model);
+  if (candidates.length === 0) {
+    throw new Error(NO_LLM_KEY_MESSAGE);
   }
 
   const userContent = `Rewrite this spoken line so it passes a content-safety filter. Same meaning, same approximate length:\n\n${line}\n\nRewritten line:`;
 
-  const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userContent },
-      ],
-      temperature: 0.7,
-      max_tokens: 300,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Safety reword failed: ${response.status}. ${response.status === 401 ? "Check API key." : text || ""}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) {
-    throw new Error("Safety reword failed: empty response from model");
-  }
+  const content = await tryModelCandidates(candidates, "safety-reword", (candidate) =>
+    requestChat(
+      candidate,
+      { system: SYSTEM_PROMPT, user: userContent, temperature: 0.7, maxTokens: 300, timeoutMs: 30_000 },
+      "Safety reword"
+    )
+  );
   return cleanSpokenText(content.trim().replace(/^["'“”]+|["'“”]+$/g, ""));
 }

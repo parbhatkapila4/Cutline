@@ -1,6 +1,7 @@
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
+import { getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat } from "@/lib/llm/chat";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const SYSTEM_PROMPT = `You decide whether an AI-generated talking cartoon should be SHAPED LIKE a specific physical object, or whether it should fall back to a GENERIC HUMANOID cartoon character.
@@ -44,9 +45,9 @@ export async function resolveCartoonSubject(
   userPrompt: string,
   options?: ResolveCartoonSubjectOptions
 ): Promise<CartoonSubject> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-  if (!apiKey?.trim()) {
+  const candidates = getProviderCandidates("cartoonSubject", model, options?.model);
+  if (candidates.length === 0) {
     return { shape: "humanoid" };
   }
 
@@ -64,38 +65,20 @@ export async function resolveCartoonSubject(
   userLines.push("Output the JSON object now.");
 
   try {
-    const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userLines.join("\n") },
-        ],
-        temperature: 0.1,
-        max_tokens: 80,
-        response_format: { type: "json_object" },
-      }),
-    });
-
-    if (!response.ok) {
-      console.warn(
-        `[cartoon-subject] LLM call failed: ${response.status} ${response.statusText}`
-      );
-      return { shape: "humanoid" };
-    }
-
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const raw = data.choices?.[0]?.message?.content;
-    if (typeof raw !== "string" || !raw.trim()) {
-      return { shape: "humanoid" };
-    }
+    const raw = await tryModelCandidates(candidates, "cartoon-subject", (candidate) =>
+      requestChat(
+        candidate,
+        {
+          system: SYSTEM_PROMPT,
+          user: userLines.join("\n"),
+          temperature: 0.1,
+          maxTokens: 80,
+          json: true,
+          timeoutMs: 20_000,
+        },
+        "Cartoon subject"
+      )
+    );
 
     let parsed: unknown;
     try {

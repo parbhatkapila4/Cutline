@@ -144,6 +144,26 @@ export async function findVideoJobForOwners(
   return mapRow(row as VideoJobRow);
 }
 
+export async function listVideoJobFamily(
+  rootJobId: string,
+  ownerIds: string[],
+  limit: number = 50
+): Promise<VideoJob[]> {
+  if (ownerIds.length === 0) return [];
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, owner_type, owner_id, prompt, status, preview_url, final_url, created_at, queue_job_id,
+           job_data, result, error, queue_name, started_at, finished_at
+    FROM video_jobs
+    WHERE owner_type = 'user'::video_job_owner_type
+      AND owner_id = ANY(${ownerIds})
+      AND (queue_job_id = ${rootJobId} OR id::text = ${rootJobId} OR job_data->>'editRootJobId' = ${rootJobId})
+    ORDER BY created_at ASC
+    LIMIT ${limit}
+  `;
+  return (Array.isArray(rows) ? rows : []).map((r) => mapRow(r as VideoJobRow));
+}
+
 export async function listVideoJobsByOwner(
   ownerType: OwnerType,
   ownerId: string,

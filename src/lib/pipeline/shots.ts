@@ -1,8 +1,8 @@
 import type { Intent, NarrativePlan } from "@/lib/types";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
-import { shouldRetryForLLM } from "@/lib/utils/retry";
-import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat, type ModelCandidate } from "@/lib/llm/chat";
 import { MIN_SECONDS_PER_SHOT } from "@/lib/pipeline/narrationLength";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 import type {
@@ -14,7 +14,6 @@ import type {
   TextDensity,
 } from "@/lib/types";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 const SHOTS_PER_BEAT_MIN = 1;
 const SHOTS_PER_BEAT_MAX = 3;
@@ -266,69 +265,21 @@ export type PlanShotsOptions = { model?: string; platform?: Platform };
 async function requestShotPlanFromModel(
   intent: Intent,
   plan: NarrativePlan,
-  apiKey: string,
-  model: string,
+  candidate: ModelCandidate,
   systemContent: string
 ): Promise<ShotList> {
-  const userContent = JSON.stringify({ intent, plan });
-  const url = `${OPENROUTER_BASE}/chat/completions`;
-  const body = {
-    model,
-    messages: [
-      { role: "system" as const, content: systemContent },
-      { role: "user" as const, content: userContent },
-    ],
-    temperature: 0,
-    max_tokens: 4096,
-    response_format: { type: "json_object" as const },
-  };
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45_000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error) {
-      if (err.name === "AbortError") {
-        throw new Error("Shot reasoning timed out. Try again.");
-      }
-      throw new Error(`Shot reasoning failed: ${err.message}`);
-    }
-    throw new Error("Shot reasoning failed: unknown error");
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Shot reasoning failed: API returned ${response.status}. ${response.status === 401 ? "Check your API key." : text || ""}`
-    );
-  }
-
-  let data: { choices?: Array<{ message?: { content?: string } }> };
-  try {
-    data = (await response.json()) as typeof data;
-  } catch {
-    throw new Error("Shot reasoning failed: invalid response from API");
-  }
-
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || content.trim() === "") {
-    throw new Error("Shot reasoning failed: empty response from model");
-  }
-
+  const content = await requestChat(
+    candidate,
+    {
+      system: systemContent,
+      user: JSON.stringify({ intent, plan }),
+      temperature: 0,
+      maxTokens: 4096,
+      json: true,
+      timeoutMs: 45_000,
+    },
+    "Shot reasoning"
+  );
   return parseAndValidateShotList(content.trim(), plan, plan.totalDurationSeconds);
 }
 
@@ -337,11 +288,10 @@ export async function planShots(
   plan: NarrativePlan,
   options?: PlanShotsOptions
 ): Promise<ShotList> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  const candidates = getProviderCandidates("shots", primaryModel, options?.model);
+  if (candidates.length === 0) {
+    throw new Error(NO_LLM_KEY_MESSAGE);
   }
 
   const platformSnippet =
@@ -349,25 +299,8 @@ export async function planShots(
       ? getPlatformPromptSnippet(options.platform, "shots")
       : "";
   const systemContent = buildSystemPrompt(plan.beats.length, plan.totalDurationSeconds) + platformSnippet;
-  const modelCandidates = getModelCandidates(primaryModel);
 
-  let lastError: unknown;
-  for (let i = 0; i < modelCandidates.length; i++) {
-    const model = modelCandidates[i]!;
-    try {
-      return await requestShotPlanFromModel(intent, plan, apiKey, model, systemContent);
-    } catch (err) {
-      lastError = err;
-      const shouldFallback = shouldRetryForLLM(err);
-      const hasNext = i < modelCandidates.length - 1;
-      if (!shouldFallback || !hasNext) {
-        throw err;
-      }
-      console.warn(
-        `[shots] Primary model failed (${model}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error("Shot reasoning failed");
+  return tryModelCandidates(candidates, "shots", (candidate) =>
+    requestShotPlanFromModel(intent, plan, candidate, systemContent)
+  );
 }

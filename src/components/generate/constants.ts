@@ -32,6 +32,32 @@ export const DURATION_DEFAULT = 30;
 export const STAGE_INTERVAL_MS = 18_000;
 
 export const DEFAULT_ASPECT_RATIO: AspectRatio = "16:9";
+export const PIPELINE_STEPS = [
+  "Analyzing prompt",
+  "Writing script",
+  "Sourcing visuals",
+  "Generating voice",
+  "Rendering video",
+] as const;
+
+export const PIPELINE_STAGE_STEP: Record<string, number> = {
+  intent: 0,
+  narrative: 0,
+  shots: 1,
+  script: 1,
+  asset_analysis: 2,
+  visuals: 2,
+  image_sourcing: 2,
+  motion: 2,
+  tts: 3,
+  subtitles: 3,
+  subtitle_refine: 3,
+  veo: 4,
+  heygen: 4,
+  concat: 4,
+  burn_subtitles: 4,
+  render: 4,
+};
 
 export const EXAMPLES = [
   { label: "Explainer", prompt: "Explain why we dream in 30 seconds, friendly tone" },

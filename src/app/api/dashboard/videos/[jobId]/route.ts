@@ -1,22 +1,48 @@
 import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { validateJobId } from "@/lib/validation/input";
+import { isValidAspectRatio, type AspectRatio } from "@/lib/validation/aspectRatio";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { resolveOwnerCandidates } from "@/lib/jobs/jobOwnership";
+import { isCancelledFailure } from "@/lib/jobs/jobStatus";
 import { purgeUserVideo } from "@/lib/dashboard/purgeUserVideo";
+import { videoTitleFromPrompt } from "@/lib/dashboard/videoTitle";
+import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
+import type { VideoJob } from "@/lib/db/types";
+
+export type DashboardVideoStatus = "completed" | "processing" | "expired" | "failed";
+
+export type DashboardVideoVersion = {
+  id: string;
+  status: DashboardVideoStatus;
+  createdAt: string;
+  videoUrl?: string;
+  editMessage?: string;
+  editFromId?: string;
+  message?: string;
+  error?: string;
+};
 
 export type DashboardVideoDetail = {
   id: string;
   title: string;
   prompt: string;
+  originalPrompt: string;
   date: string;
   duration: string;
-  status: "completed";
-  videoUrl: string;
+  status: DashboardVideoStatus;
+  createdAt: string;
+  videoUrl?: string;
   mode?: "slideshow" | "talking_object";
   durationSeconds?: number;
+  aspectRatio?: AspectRatio;
   message?: string;
+  error?: string;
+  versions: DashboardVideoVersion[];
 };
+
+const NOT_FOUND = { error: "Video not found" };
+const CANCELLED_MESSAGE = "This render was cancelled.";
 
 function formatDate(ms: number | undefined): string {
   if (ms == null || typeof ms !== "number") return "-";
@@ -39,12 +65,55 @@ function formatDuration(seconds: number | undefined): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function titleFromInput(input: string | undefined): string {
-  if (input == null || typeof input !== "string") return "";
-  const trimmed = input.trim();
-  if (trimmed.length <= 50) return trimmed;
-  return trimmed.slice(0, 50);
+function failureText(reason: string | null | undefined): string {
+  return isCancelledFailure(reason) ? CANCELLED_MESSAGE : getUserFriendlyErrorMessage(reason ?? "Job failed.");
 }
+
+function resultMessage(result: VideoJobResult | null | undefined): string | undefined {
+  return typeof result?.message === "string" && result.message.trim() ? result.message.trim() : undefined;
+}
+
+function rowId(row: VideoJob): string {
+  return row.queue_job_id ?? row.id;
+}
+
+function rowStatus(row: VideoJob): DashboardVideoStatus {
+  if (row.status === "completed") return row.final_url ? "completed" : "expired";
+  if (row.status === "failed") return "failed";
+  return "processing";
+}
+
+function versionFromRow(row: VideoJob): DashboardVideoVersion {
+  const status = rowStatus(row);
+  const data = row.job_data;
+  const message = resultMessage(row.result);
+  return {
+    id: rowId(row),
+    status,
+    createdAt: row.created_at.toISOString(),
+    ...(status === "completed" && row.final_url ? { videoUrl: row.final_url } : {}),
+    ...(data?.editMessage ? { editMessage: data.editMessage } : {}),
+    ...(data?.editFromJobId ? { editFromId: data.editFromJobId } : {}),
+    ...(message ? { message } : {}),
+    ...(status === "failed" ? { error: failureText(row.error) } : {}),
+  };
+}
+
+async function loadFamily(row: VideoJob, ownerIds: string[]): Promise<VideoJob[]> {
+  const rootId = row.job_data?.editRootJobId ?? rowId(row);
+  try {
+    const { listVideoJobFamily } = await import("@/lib/jobs/videoJobService");
+    const members = await listVideoJobFamily(rootId, ownerIds, 100);
+    return members.some((m) => m.id === row.id) ? members : [...members, row];
+  } catch (e) {
+    console.warn(
+      "[api] GET /api/dashboard/videos/[jobId] could not load the edit history jobId=" + rowId(row) +
+      " error=" + (e instanceof Error ? e.message : String(e))
+    );
+    return [row];
+  }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ jobId: string }> }
@@ -62,10 +131,7 @@ export async function GET(
   const { jobId } = await params;
   const validation = validateJobId(jobId);
   if (!validation.valid) {
-    return NextResponse.json(
-      { error: "Video not found" },
-      { status: 404 }
-    );
+    return NextResponse.json(NOT_FOUND, { status: 404 });
   }
 
   try {
@@ -74,103 +140,91 @@ export async function GET(
       const ownerCandidates = await resolveOwnerCandidates(request);
       const { findVideoJobForOwners } = await import("@/lib/jobs/videoJobService");
       const row = ownerCandidates.length > 0 ? await findVideoJobForOwners(jobId, ownerCandidates) : null;
-      if (!row || row.status !== "completed" || !row.final_url) {
-        return NextResponse.json(
-          { error: "Video not found" },
-          { status: 404 }
-        );
+      if (!row) {
+        return NextResponse.json(NOT_FOUND, { status: 404 });
       }
       const legacyJob = row.job_data ? null : await getVideoQueue().getJob(jobId);
       const data = row.job_data ?? (legacyJob?.data as VideoJobData | undefined);
       const result = row.result ?? (legacyJob?.returnvalue as VideoJobResult | undefined);
       const finishedAt = row.finished_at ?? (legacyJob?.finishedOn ? new Date(legacyJob.finishedOn) : row.created_at);
+      const status = rowStatus(row);
+      const family = await loadFamily(row, ownerCandidates);
+      const rootId = data?.editRootJobId ?? rowId(row);
+      const originalPrompt = family.find((m) => rowId(m) === rootId)?.prompt ?? row.prompt ?? "";
+      const message = resultMessage(result);
       const body: DashboardVideoDetail = {
-        id: row.queue_job_id ?? row.id,
-        title: titleFromInput(row.prompt),
+        id: rowId(row),
+        title: videoTitleFromPrompt(originalPrompt),
         prompt: row.prompt ?? "",
-        date: formatDate(finishedAt.getTime()),
+        originalPrompt,
+        date: formatDate((status === "completed" ? finishedAt : row.created_at).getTime()),
         duration: formatDuration(data?.durationSeconds),
-        status: "completed",
-        videoUrl: row.final_url,
+        status,
+        createdAt: row.created_at.toISOString(),
+        ...(status === "completed" && row.final_url ? { videoUrl: row.final_url } : {}),
         mode: data?.mode,
         durationSeconds: data?.durationSeconds,
-        ...(typeof result?.message === "string" && result.message.trim()
-          ? { message: result.message.trim() }
-          : {}),
+        ...(isValidAspectRatio(data?.aspectRatio) ? { aspectRatio: data.aspectRatio } : {}),
+        ...(message ? { message } : {}),
+        ...(status === "failed" ? { error: failureText(row.error) } : {}),
+        versions: family.map(versionFromRow),
       };
       return NextResponse.json(body);
     }
 
-    const queue = getVideoQueue();
-    const job = await queue.getJob(jobId);
-    if (!job) {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
+    const job = await getVideoQueue().getJob(jobId);
+    if (!job || job.name === CLEANUP_JOB_NAME) {
+      return NextResponse.json(NOT_FOUND, { status: 404 });
     }
-    if (job.name === CLEANUP_JOB_NAME) {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
+    const data = job.data as VideoJobData | undefined;
+    const clientId = data?.clientId;
+    const ownerCandidates = await resolveOwnerCandidates(request);
+    if (clientId === undefined || clientId === null || !ownerCandidates.includes(String(clientId))) {
+      return NextResponse.json(NOT_FOUND, { status: 404 });
     }
 
     const state = await job.getState();
-    if (state !== "completed") {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
-    }
-
-    const data = job.data as VideoJobData | undefined;
     const result = job.returnvalue as VideoJobResult | undefined;
-    const videoPath = result?.videoPath;
-    if (!videoPath || typeof videoPath !== "string") {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
+    const videoPath = typeof result?.videoPath === "string" && result.videoPath ? result.videoPath : undefined;
+    if (state === "completed" && !videoPath) {
+      return NextResponse.json(NOT_FOUND, { status: 404 });
     }
-
-    const clientId = data?.clientId;
-    const ownerCandidates = await resolveOwnerCandidates(request);
-    if (
-      clientId === undefined ||
-      clientId === null ||
-      !ownerCandidates.includes(String(clientId))
-    ) {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
-    }
-
-    const input = data?.input;
-    const ts = job.finishedOn ?? job.processedOn;
-
+    const status: DashboardVideoStatus =
+      state === "completed" ? "completed" : state === "failed" ? "failed" : "processing";
+    const input = typeof data?.input === "string" ? data.input : "";
+    const createdAt = new Date(job.timestamp ?? Date.now()).toISOString();
+    const message = resultMessage(result);
+    const error = status === "failed" ? failureText(job.failedReason) : undefined;
+    const id = String(job.id ?? jobId);
     const body: DashboardVideoDetail = {
-      id: String(job.id ?? ""),
-      title: titleFromInput(input),
-      prompt: typeof input === "string" ? input : "",
-      date: formatDate(ts),
+      id,
+      title: videoTitleFromPrompt(input),
+      prompt: input,
+      originalPrompt: input,
+      date: formatDate(job.finishedOn ?? job.processedOn ?? job.timestamp),
       duration: formatDuration(data?.durationSeconds),
-      status: "completed",
-      videoUrl: videoPath,
+      status,
+      createdAt,
+      ...(videoPath ? { videoUrl: videoPath } : {}),
       mode: data?.mode,
       durationSeconds: data?.durationSeconds,
-      ...(typeof result?.message === "string" && result.message.trim()
-        ? { message: result.message.trim() }
-        : {}),
+      ...(isValidAspectRatio(data?.aspectRatio) ? { aspectRatio: data.aspectRatio } : {}),
+      ...(message ? { message } : {}),
+      ...(error ? { error } : {}),
+      versions: [
+        {
+          id,
+          status,
+          createdAt,
+          ...(videoPath ? { videoUrl: videoPath } : {}),
+          ...(message ? { message } : {}),
+          ...(error ? { error } : {}),
+        },
+      ],
     };
-
     return NextResponse.json(body);
   } catch {
-    return NextResponse.json(
-      { error: "Video not found" },
-      { status: 404 }
-    );
+    return NextResponse.json(NOT_FOUND, { status: 404 });
   }
 }
 

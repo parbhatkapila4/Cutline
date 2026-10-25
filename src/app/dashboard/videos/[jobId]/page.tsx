@@ -2,1013 +2,1097 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  type FormEvent,
-} from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import type { DashboardVideoDetail } from "@/app/api/dashboard/videos/[jobId]/route";
-import { getUserFriendlyErrorMessage } from "@/lib/utils/error";
-import { isEnterprisePlan, isPlanId, isProPlan, type PlanId } from "@/lib/plans";
-import { ProBadge } from "@/components/ui/pro-badge";
-import {
-  EDIT_QUICK_PROMPTS,
-  type EditQuickPromptCategory,
-} from "@/lib/dashboard/editQuickPrompts";
+  Check,
+  ChevronLeft,
+  Copy,
+  Download,
+  Ellipsis,
+  Film,
+  Link2,
+  Lock,
+  RefreshCw,
+  Trash2,
+  TriangleAlert,
+  Wand2,
+  X,
+} from "lucide-react";
+import type {
+  DashboardVideoDetail,
+  DashboardVideoStatus,
+  DashboardVideoVersion,
+} from "@/app/api/dashboard/videos/[jobId]/route";
+import { DeleteVideoDialog, type DeleteFailure } from "@/components/dashboard/DeleteVideoDialog";
+import { VideoCardFrame } from "@/components/dashboard/VideoCardFrame";
+import { BTN_PRIMARY, BTN_SECONDARY, BTN_SM, ICON_BTN } from "@/components/dashboard/video/buttons";
+import { Composer, MoreIdeas, QuickEdits, UpgradeCard } from "@/components/dashboard/video/EditComposer";
+import { RenderingFrame, UnavailableFrame } from "@/components/dashboard/video/RenderVisuals";
+import { AiMessage, NoteBox, RunCard, Spinner, UserBubble, VersionCard } from "@/components/dashboard/video/Thread";
+import { useRenderStatus, type RenderStatus } from "@/components/dashboard/video/useRenderStatus";
+import { VideoPageSkeleton } from "@/components/dashboard/video/VideoPageSkeleton";
+import { VideoPlayer, formatClock, type VideoDimensions } from "@/components/dashboard/video/VideoPlayer";
+import { PIPELINE_STEPS } from "@/components/generate/constants";
+import { isPlanId, isProPlan, videoRetentionHoursForPlan, type PlanId } from "@/lib/plans";
+import { cn } from "@/lib/utils";
+import { ASPECT_RATIOS } from "@/lib/validation/aspectRatio";
 
-type ChatMessage = { role: "user" | "assistant"; text: string };
+type Version = DashboardVideoVersion;
 
-const POLL_INTERVAL_MS = 2500;
-const DONE_MSG = "Done. Here is your updated video.";
-const EDIT_FAILED_MSG = "Could not start the edit. Please try again.";
-const RATE_LIMIT_MSG = "Too many requests. Try again in a minute.";
-
-const CATEGORY_META: Record<
-  EditQuickPromptCategory,
-  { label: string; bar: string; text: string }
-> = {
-  tone: { label: "Tone", bar: "bg-amber-400", text: "text-amber-300" },
-  length: { label: "Length", bar: "bg-teal-400", text: "text-teal-300" },
-  structure: { label: "Structure", bar: "bg-emerald-400", text: "text-emerald-300" },
-  angle: { label: "Angle", bar: "bg-sky-400", text: "text-sky-300" },
+type ThreadNote = {
+  key: number;
+  afterCount: number;
+  text: string;
+  request?: string;
+  retryFromId?: string;
 };
 
-const MAX_EDIT_CHARS = 280;
+const SHAPE_NAMES: Record<string, string> = {
+  "16:9": "landscape",
+  "9:16": "vertical",
+  "1:1": "square",
+  "4:5": "portrait",
+  "3:2": "landscape",
+  "21:9": "widescreen",
+};
 
-const EDIT_STAGES: { label: string; hint: string }[] = [
-  { label: "Understanding your change", hint: "Parsing intent and identifying what to tweak" },
-  { label: "Rewriting the script", hint: "Applying your direction to the narration" },
-  { label: "Re-rendering the video", hint: "Composing frames with the new script" },
-  { label: "Finalizing", hint: "Muxing audio and polishing the output" },
-];
-const STAGE_TICK_MS = 14000;
+const SETTLE_ATTEMPTS = 6;
+const SETTLE_RETRY_MS = 2000;
 
-function formatElapsed(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+function ratioValue(label: string | undefined): number {
+  const m = /^(\d+):(\d+)$/.exec(label ?? "");
+  return m ? Number(m[1]) / Number(m[2]) : 16 / 9;
 }
 
-const EDIT_OUTCOMES: Record<string, string> = {
-  "Make the tone more casual and friendly": "Warmer voice, contractions, lighter phrasing",
-  "Change to a more professional tone": "Crisper, authoritative, B2B-friendly",
-  "Make it shorter and punchier": "≈ 20% shorter with a stronger hook",
-  "Add more detail about the main topic": "Deeper context and a concrete example",
-  "Add a clear call to action at the end": "One-line CTA aimed at next step",
-  "Regenerate with a different angle": "Fresh hook and a new narrative frame",
+function ratioLabelFor(width: number, height: number): string {
+  const r = width / height;
+  return ASPECT_RATIOS.find((label) => Math.abs(ratioValue(label) - r) / r < 0.02) ?? `${width}:${height}`;
+}
+
+function madeAt(iso: string, today: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  if (d.toDateString() === today) return time;
+  return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${time}`;
+}
+
+function retentionLine(plan: PlanId | null): string {
+  if (plan === null) return "Videos are kept for 24 hours on Free and 90 days on paid plans.";
+  const hours = videoRetentionHoursForPlan(plan);
+  const span = hours >= 48 && hours % 24 === 0 ? `${hours / 24} days` : `${hours} hours`;
+  return plan === "free" ? `Free plan videos are kept for ${span}.` : `Videos on your plan are kept for ${span}.`;
+}
+
+function absoluteUrl(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `${window.location.origin}${url}`;
+}
+
+function replaceUrl(jobId: string) {
+  window.history.replaceState(null, "", `/dashboard/videos/${encodeURIComponent(jobId)}`);
+}
+
+function latest<T>(items: T[], test: (item: T) => boolean): T | null {
+  for (let i = items.length - 1; i >= 0; i--) if (test(items[i])) return items[i];
+  return null;
+}
+
+const isEditable = (v: Version) => v.status === "completed" || v.status === "expired";
+
+function initialSelection(data: DashboardVideoDetail): string {
+  const index = data.versions.findIndex((v) => v.id === data.id);
+  const own = data.versions[index];
+  if (own && (isEditable(own) || index === 0)) return own.id;
+  return latest(data.versions, (v) => v.status === "completed")?.id ?? data.id;
+}
+
+function editFailure(status: number, body: { error?: unknown; code?: unknown }): { text: string; retry: boolean } {
+  const raw = typeof body.error === "string" ? body.error.trim() : "";
+  if (status === 429) return { text: "Too many requests. Try again in a minute.", retry: true };
+  if (body.code === "PLAN_REQUIRED") {
+    return { text: "Editing is available on Professional and Enterprise plans.", retry: false };
+  }
+  if (status === 404) return { text: "This video can't be edited any more. It may have been deleted.", retry: false };
+  if (status < 500 && raw) return { text: raw, retry: false };
+  return { text: "The edit didn't start. Please try again.", retry: true };
+}
+
+const STATUS_BADGES: Record<DashboardVideoStatus, { label: string; className: string }> = {
+  completed: { label: "Ready", className: "bg-[#3fd08f]/12 text-[#62dea6]" },
+  processing: { label: "Rendering", className: "bg-[#f4b740]/11 text-[#ffd27a] [&>i]:animate-pulse" },
+  expired: { label: "Expired", className: "bg-white/6 text-zinc-400" },
+  failed: { label: "Didn't finish", className: "bg-[#f3958f]/10 text-[#f3958f]" },
 };
 
-const POWER_PROMPTS: readonly string[] = [
-  "Cut the intro in half and start with a pattern interrupt",
-  "Swap the example for a customer win story",
-  "Punch up the CTA with a sense of urgency",
-  "Reframe the whole thing for a founder audience",
-  "Add a surprising stat in the first 5 seconds",
-  "End on a question that invites a reply",
-];
+function StatusBadge({ status }: { status: DashboardVideoStatus }) {
+  const badge = STATUS_BADGES[status];
+  return (
+    <span
+      className={cn(
+        "inline-flex h-[22px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full pl-2 pr-[9px] text-xs font-medium",
+        badge.className
+      )}
+    >
+      <i
+        aria-hidden
+        className="size-1.5 rounded-full bg-current shadow-[0_0_0_3px_color-mix(in_srgb,currentColor_18%,transparent)]"
+      />
+      {badge.label}
+    </span>
+  );
+}
 
-export default function DashboardVideoDetailPage() {
+function ProTag() {
+  return (
+    <span className="inline-flex h-[18px] items-center gap-1 rounded-[5px] bg-[#f4b740]/11 px-1.5 text-[10.5px] font-semibold tracking-[0.02em] text-[#ffd27a]">
+      <Lock className="size-2.5" aria-hidden />
+      Pro
+    </span>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="flex min-h-dvh flex-col bg-[#070708] text-zinc-100">
+      <header className="flex h-14 shrink-0 items-center border-b border-white/[0.065] px-2.5">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13.5px] font-medium text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-100"
+        >
+          <ChevronLeft className="size-4" aria-hidden />
+          Library
+        </Link>
+      </header>
+      <main className="vd-canvas grid flex-1 place-items-center px-4 py-16">
+        <div className="grid max-w-sm justify-items-center gap-2 text-center">
+          <span className="mb-2 grid size-12 place-items-center rounded-2xl bg-white/[0.06] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]">
+            <Film className="size-5 text-zinc-400" aria-hidden />
+          </span>
+          <h1 className="text-lg font-semibold tracking-[-0.015em]">Video not found</h1>
+          <p className="text-[13.5px] leading-relaxed text-zinc-500">
+            It may have been deleted, or it belongs to a different account. Sign in with the account that made it, or
+            head back to your library.
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link href="/dashboard" className={BTN_PRIMARY}>
+              Back to my videos
+            </Link>
+            <Link href="/create" className={BTN_SECONDARY}>
+              Create a video
+            </Link>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function liveCopy(live: RenderStatus | null, elapsed: string): { title: string; detail: string; step: number } {
+  if (!live) return { title: "Starting…", detail: elapsed, step: 0 };
+  if (live.phase === "queued") {
+    return {
+      title: live.workerOnline === false ? "Waiting for the renderer" : "Waiting to start",
+      detail: live.queuePosition ? `Number ${live.queuePosition} in line · ${elapsed}` : `Starting soon · ${elapsed}`,
+      step: 0,
+    };
+  }
+  if (live.phase === "stalled") {
+    return { title: "Still working on it", detail: "Taking longer than usual. Refresh later to check.", step: live.step };
+  }
+  if (live.phase === "done") return { title: "Finishing up…", detail: elapsed, step: PIPELINE_STEPS.length - 1 };
+  return {
+    title: `${PIPELINE_STEPS[live.step] ?? PIPELINE_STEPS[0]}…`,
+    detail: `Step ${live.step + 1} of ${PIPELINE_STEPS.length} · ${elapsed}`,
+    step: live.step,
+  };
+}
+
+export default function DashboardVideoPage() {
   const params = useParams();
   const router = useRouter();
-  const jobId = typeof params?.jobId === "string" ? params.jobId : "";
-  const missingJobId = !jobId;
-  const [video, setVideo] = useState<DashboardVideoDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState("");
-  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
-  const [editInProgress, setEditInProgress] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [usagePlan, setUsagePlan] = useState<PlanId | null>(null);
-  const [editStage, setEditStage] = useState(0);
-  const [editElapsedSec, setEditElapsedSec] = useState(0);
-  const [showPowerPrompts, setShowPowerPrompts] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const routeJobId = typeof params?.jobId === "string" ? params.jobId : "";
 
-  const prefillInput = useCallback((text: string) => {
-    if (editInProgress) return;
-    setInputValue(text);
-    requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.focus();
-      const len = el.value.length;
-      el.setSelectionRange(len, len);
-    });
-  }, [editInProgress]);
-  const isPro = isProPlan(usagePlan);
-  const canUseCustomEdits = isPro;
-  const resolvedLoading = missingJobId ? false : loading;
-  const resolvedNotFound = missingJobId ? true : notFound;
+  const [detail, setDetail] = useState<DashboardVideoDetail | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<PlanId | null>(null);
+  const [dims, setDims] = useState<Record<string, VideoDimensions>>({});
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState<string | null>(null);
+  const [notes, setNotes] = useState<ThreadNote[]>([]);
+  const [showIdeas, setShowIdeas] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [copied, setCopied] = useState<"link" | "prompt" | null>(null);
+  const [cancel, setCancel] = useState<{ jobId: string; state: "sending" | "sent" | "failed" } | null>(null);
+  const [deleting, setDeleting] = useState<{ pending: boolean; failure: DeleteFailure | null } | null>(null);
+  const [flashUpsell, setFlashUpsell] = useState(false);
+  const [now, setNow] = useState(0);
+  const logRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const upsellRef = useRef<HTMLDivElement>(null);
+
+  const versions = detail?.versions ?? [];
+  const selected = versions.find((v) => v.id === selectedId) ?? versions[versions.length - 1] ?? null;
+  const selectedIndex = selected ? versions.indexOf(selected) : -1;
+  const renderingId = latest(versions, (v) => v.status === "processing")?.id ?? null;
+  const busy = renderingId !== null || sending !== null;
+  const planKnown = plan !== null;
+  const isPro = isProPlan(plan);
+  const editSource = selected && isEditable(selected) ? selected : latest(versions, isEditable);
+  const latestReady = latest(versions, (v) => v.status === "completed");
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/dashboard/usage")
       .then((res) => (res.ok ? res.json() : null))
       .then((d: { plan?: string } | null) => {
-        if (cancelled || !d) return;
-        const p = typeof d.plan === "string" && isPlanId(d.plan) ? d.plan : "free";
-        setUsagePlan(p);
+        if (!cancelled) setPlan(d && typeof d.plan === "string" && isPlanId(d.plan) ? d.plan : "free");
       })
       .catch(() => {
-        if (!cancelled) setUsagePlan("free");
+        if (!cancelled) setPlan("free");
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const alreadyShowing = useEffectEvent((jobId: string) => versions.some((v) => v.id === jobId));
+
   useEffect(() => {
-    if (!jobId) return;
+    if (!routeJobId || alreadyShowing(routeJobId)) return;
     let cancelled = false;
-    fetch(`/api/dashboard/videos/${encodeURIComponent(jobId)}`)
-      .then((res) => {
-        if (!cancelled && !res.ok) setNotFound(true);
-        return res.ok ? res.json() : null;
-      })
-      .then((data: DashboardVideoDetail | null) => {
-        if (!cancelled && data) {
-          setVideo(data);
-          setCurrentVideoUrl(data.videoUrl);
+    fetch(`/api/dashboard/videos/${encodeURIComponent(routeJobId)}`)
+      .then((res) => (res.ok ? (res.json() as Promise<DashboardVideoDetail>) : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (!data) {
+          setMissing(true);
+          return;
         }
+        setDetail(data);
+        setSelectedId(initialSelection(data));
       })
       .catch(() => {
-        if (!cancelled) setNotFound(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setMissing(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [jobId]);
+  }, [routeJobId]);
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
-  const pollNewJob = useCallback(
-    (newJobId: string) => {
-      const poll = async () => {
-        try {
-          const res = await fetch(`/api/generate/${encodeURIComponent(newJobId)}`);
-          const data = await res.json();
-          if (!res.ok) {
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", text: `Generation failed: ${getUserFriendlyErrorMessage(data.error || "Something went wrong")}` },
-            ]);
-            stopPolling();
-            setEditInProgress(false);
-            return;
-          }
-          if (data.status === "completed" && data.videoUrl) {
-            setCurrentVideoUrl(data.videoUrl);
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", text: DONE_MSG },
-            ]);
-            stopPolling();
-            setEditInProgress(false);
-            router.replace(`/dashboard/videos/${newJobId}`);
-            const metaRes = await fetch(`/api/dashboard/videos/${encodeURIComponent(newJobId)}`);
-            if (metaRes.ok) {
-              const meta = (await metaRes.json()) as DashboardVideoDetail;
-              setVideo(meta);
-              setCurrentVideoUrl(meta.videoUrl);
-            }
-            return;
-          }
-          if (data.status === "failed") {
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", text: `Generation failed: ${getUserFriendlyErrorMessage(data.error || "Generation failed")}` },
-            ]);
-            stopPolling();
-            setEditInProgress(false);
-          }
-        } catch {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", text: "Connection lost. Check the dashboard for your video status." },
-          ]);
-          stopPolling();
-          setEditInProgress(false);
-        }
-      };
-      poll();
-      pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
-    },
-    [stopPolling, router]
-  );
-
-  useEffect(() => {
-    return () => {
-      stopPolling();
-    };
-  }, [stopPolling]);
-
-  useEffect(() => {
-    if (!editInProgress) return;
-    const startedAt = Date.now();
-    const elapsedId = setInterval(() => {
-      setEditElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-    const stageId = setInterval(() => {
-      setEditStage((s) => Math.min(s + 1, EDIT_STAGES.length - 1));
-    }, STAGE_TICK_MS);
-    return () => {
-      clearInterval(elapsedId);
-      clearInterval(stageId);
-    };
-  }, [editInProgress]);
-
-  useEffect(() => {
-    const el = messagesScrollRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages.length, editInProgress, editStage]);
-
-  const sendEditMessage = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || editInProgress) return;
-      if (!canUseCustomEdits) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            text: "Editing is available on Professional and Enterprise plans. See Pricing to upgrade.",
-          },
-        ]);
-        return;
-      }
-      setMessages((prev) => [...prev, { role: "user", text: trimmed }]);
-      setInputValue("");
-      setEditStage(0);
-      setEditElapsedSec(0);
-      setEditInProgress(true);
-
+  const settleRender = async (jobId: string) => {
+    for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, SETTLE_RETRY_MS));
       try {
-        const res = await fetch(`/api/dashboard/videos/${encodeURIComponent(jobId)}/edit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: trimmed }),
-        });
-        const data = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          const chatMsg =
-            res.status === 429
-              ? RATE_LIMIT_MSG
-              : res.status === 403 && data?.code === "CUSTOM_EDIT_REQUIRES_PLAN"
-                ? "Custom edits are included on paid plans. Use a quick edit above, or see Pricing to upgrade."
-                : data?.code === "UPLOADS_DELETED" && typeof data?.error === "string"
-                  ? getUserFriendlyErrorMessage(data.error)
-                  : typeof data?.error === "string"
-                    ? `${EDIT_FAILED_MSG} ${getUserFriendlyErrorMessage(data.error)}`
-                    : EDIT_FAILED_MSG;
-          setMessages((prev) => [...prev, { role: "assistant", text: chatMsg }]);
-          setEditInProgress(false);
+        const res = await fetch(`/api/dashboard/videos/${encodeURIComponent(jobId)}`);
+        if (res.status === 404) {
+          setDetail((prev) => (prev ? { ...prev, versions: prev.versions.filter((v) => v.id !== jobId) } : prev));
           return;
         }
-
-        const newJobId = data?.newJobId;
-        if (typeof newJobId !== "string" || !newJobId) {
-          setMessages((prev) => [...prev, { role: "assistant", text: EDIT_FAILED_MSG }]);
-          setEditInProgress(false);
-          return;
+        if (!res.ok) continue;
+        const data = (await res.json()) as DashboardVideoDetail;
+        const settled = data.versions.find((v) => v.id === jobId);
+        if (settled?.status === "processing" && attempt < SETTLE_ATTEMPTS - 1) continue;
+        setDetail(data);
+        if (settled?.status === "completed") {
+          setSelectedId(jobId);
+          replaceUrl(jobId);
         }
-
-        pollNewJob(newJobId);
+        return;
       } catch {
-        setMessages((prev) => [...prev, { role: "assistant", text: EDIT_FAILED_MSG }]);
-        setEditInProgress(false);
+        continue;
       }
-    },
-    [jobId, editInProgress, pollNewJob, canUseCustomEdits]
-  );
-
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    sendEditMessage(inputValue);
+    }
   };
 
-  const handleCopyLink = useCallback(async () => {
-    const url = currentVideoUrl ?? video?.videoUrl;
-    if (!url) return;
+  const renderStatus = useRenderStatus(renderingId, (jobId) => void settleRender(jobId));
+
+  useEffect(() => {
+    if (!busy) return;
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [busy]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(null), 1800);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  useEffect(() => {
+    if (!flashUpsell) return;
+    const t = setTimeout(() => setFlashUpsell(false), 1400);
+    return () => clearTimeout(t);
+  }, [flashUpsell]);
+
+  const threadSize = versions.length + notes.length + (sending ? 1 : 0);
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el || (threadSize <= 1 && !renderingId)) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [threadSize, renderingId]);
+
+  if (!detail) {
+    return !routeJobId || missing ? <NotFound /> : <VideoPageSkeleton />;
+  }
+
+  const title = detail.title || "Untitled video";
+  const status = selected?.status ?? detail.status;
+  const shapeDims = (selected && dims[selected.id]) ?? Object.values(dims)[0];
+  const ratio = shapeDims ? shapeDims.width / shapeDims.height : ratioValue(detail.aspectRatio);
+  const shapeLabel = shapeDims ? ratioLabelFor(shapeDims.width, shapeDims.height) : (detail.aspectRatio ?? "16:9");
+  const shapeName = SHAPE_NAMES[shapeLabel];
+  const lengthText = shapeDims?.duration ? formatClock(shapeDims.duration) : detail.duration !== "-" ? detail.duration : null;
+  const spec = [shapeLabel, shapeDims ? `${shapeDims.width} × ${shapeDims.height}` : null, lengthText]
+    .filter(Boolean)
+    .join(" · ");
+  const today = new Date().toDateString();
+  const elapsedFor = (iso: string) => formatClock(now ? (now - Date.parse(iso)) / 1000 : 0);
+  const recreateHref = `/create?prompt=${encodeURIComponent(detail.originalPrompt)}`;
+  const cancelState = cancel && cancel.jobId === renderingId ? cancel.state : null;
+
+  const flash = () => {
+    setFlashUpsell(true);
+    upsellRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
+
+  const select = (jobId: string) => {
+    setSelectedId(jobId);
+    replaceUrl(jobId);
+  };
+
+  const copyText = async (text: string, what: "link" | "prompt") => {
     try {
-      const absolute = url.startsWith("http") ? url : `${window.location.origin}${url}`;
-      await navigator.clipboard.writeText(absolute);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
+      await navigator.clipboard.writeText(text);
+      setCopied(what);
+    } catch {}
+  };
+
+  const prefill = (text: string) => {
+    setDraft(text);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(text.length, text.length);
+    });
+  };
+
+  const sendEdit = async (text: string, from: Version | null = editSource) => {
+    const message = text.trim();
+    if (!message || busy || !from) return;
+    if (!isPro) {
+      flash();
+      return;
     }
-  }, [currentVideoUrl, video?.videoUrl]);
+    const afterCount = versions.length;
+    setSending(message);
+    setDraft("");
+    setShowIdeas(false);
+    if (textareaRef.current) textareaRef.current.style.height = "";
+    try {
+      const res = await fetch(`/api/dashboard/videos/${encodeURIComponent(from.id)}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        newJobId?: unknown;
+        notice?: unknown;
+        error?: unknown;
+        code?: unknown;
+      };
+      if (!res.ok || typeof body.newJobId !== "string" || !body.newJobId) {
+        const failure = editFailure(res.status, body);
+        setNotes((prev) => [
+          ...prev,
+          {
+            key: Date.now(),
+            afterCount,
+            request: message,
+            text: failure.text,
+            retryFromId: failure.retry ? from.id : undefined,
+          },
+        ]);
+        if (body.code === "PLAN_REQUIRED") flash();
+        return;
+      }
+      const created: Version = {
+        id: body.newJobId,
+        status: "processing",
+        createdAt: new Date().toISOString(),
+        editMessage: message,
+        editFromId: from.id,
+      };
+      setDetail((prev) => (prev ? { ...prev, versions: [...prev.versions, created] } : prev));
+      if (typeof body.notice === "string" && body.notice.trim()) {
+        setNotes((prev) => [...prev, { key: Date.now(), afterCount: afterCount + 1, text: String(body.notice) }]);
+      }
+    } catch {
+      setNotes((prev) => [
+        ...prev,
+        {
+          key: Date.now(),
+          afterCount,
+          request: message,
+          text: "The edit didn't start. Check your connection and try again.",
+          retryFromId: from.id,
+        },
+      ]);
+    } finally {
+      setSending(null);
+    }
+  };
+
+  const retryNote = (note: ThreadNote) => {
+    const from = versions.find((v) => v.id === note.retryFromId) ?? null;
+    if (!note.request || !from) return;
+    setNotes((prev) => prev.filter((n) => n.key !== note.key));
+    void sendEdit(note.request, from);
+  };
+
+  const cancelRender = async (jobId: string) => {
+    setCancel({ jobId, state: "sending" });
+    try {
+      const res = await fetch(`/api/generate/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
+      const body = (await res.json().catch(() => null)) as { cancelled?: unknown } | null;
+      setCancel({ jobId, state: res.ok && body?.cancelled === true ? "sent" : "failed" });
+    } catch {
+      setCancel({ jobId, state: "failed" });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!selected || deleting?.pending) return;
+    const target = selected;
+    setDeleting({ pending: true, failure: null });
+    try {
+      const res = await fetch(`/api/dashboard/videos/${encodeURIComponent(target.id)}`, { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as { error?: unknown };
+      if (res.ok || res.status === 404) {
+        const rest = versions.filter((v) => v.id !== target.id);
+        if (rest.length === 0) {
+          router.push("/dashboard");
+          return;
+        }
+        const next = latest(rest, (v) => v.status === "completed") ?? rest[rest.length - 1];
+        setDetail((prev) => (prev ? { ...prev, versions: rest } : prev));
+        setDeleting(null);
+        select(next.id);
+        return;
+      }
+      setDeleting({
+        pending: false,
+        failure: {
+          message: typeof body.error === "string" && body.error.trim() ? body.error : "Could not delete the video.",
+          action: res.status === 401 ? "signin" : "retry",
+        },
+      });
+    } catch {
+      setDeleting({
+        pending: false,
+        failure: { message: "Could not delete the video. Check your connection and try again.", action: "retry" },
+      });
+    }
+  };
+
+  const versionNumber = (jobId: string | undefined) => versions.findIndex((v) => v.id === jobId) + 1;
+  const watchingNumber =
+    selected?.status === "completed" ? selectedIndex + 1 : latestReady ? versionNumber(latestReady.id) : 0;
+
+  const versionMeta = (v: Version) =>
+    [madeAt(v.createdAt, today), v.status === "expired" ? "Expired" : lengthText, shapeLabel].filter(Boolean).join(" · ");
+
+  const thumb = (v: Version) => (
+    <span
+      className="relative block h-[54px] max-w-[96px] shrink-0 overflow-hidden rounded-lg bg-[#111] shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
+      style={{ aspectRatio: String(ratio) }}
+    >
+      {v.status === "processing" ? (
+        <span className="vd-shimmer absolute inset-0 bg-[#0d0c0b]" />
+      ) : (
+        <VideoCardFrame videoUrl={v.videoUrl} status={v.status} compact />
+      )}
+    </span>
+  );
+
+  const card = (v: Version, index: number) => (
+    <VersionCard
+      title={`Version ${index + 1}`}
+      meta={versionMeta(v)}
+      thumb={thumb(v)}
+      selected={selected?.id === v.id}
+      onSelect={() => select(v.id)}
+    />
+  );
+
+  const cancelButton = (jobId: string) =>
+    cancelState === "sent" ? (
+      <span className="shrink-0 text-zinc-500">Stopping…</span>
+    ) : (
+      <button
+        type="button"
+        onClick={() => void cancelRender(jobId)}
+        disabled={cancelState === "sending"}
+        className="shrink-0 font-medium text-zinc-400 underline decoration-white/20 underline-offset-[3px] transition-colors hover:text-zinc-100 disabled:opacity-50"
+      >
+        {cancelState === "failed" ? "Cancel didn't go through. Retry" : "Cancel"}
+      </button>
+    );
+
+  const latestEditable = latest(versions, isEditable);
+  const canSuggest = planKnown && !busy && latestEditable !== null && (isPro || latestEditable.status === "completed");
+  const suggestions = canSuggest ? (
+    <>
+      <p>
+        {!isPro
+          ? "Editing with AI is on Pro. These are the changes it can make:"
+          : latestEditable?.status === "expired"
+            ? "Or describe a change and I'll render a fresh version."
+            : "Want a different take? Pick one, or tell me what to change."}
+      </p>
+      <div className="grid gap-2.5">
+        <QuickEdits disabled={busy || !editSource} onPick={(text) => void sendEdit(text)} />
+        {isPro ? (
+          <MoreIdeas open={showIdeas} disabled={busy} onToggle={() => setShowIdeas((open) => !open)} onPick={prefill} />
+        ) : null}
+      </div>
+    </>
+  ) : null;
+
+  const reply = (v: Version, index: number): ReactNode => {
+    const n = index + 1;
+    const only = versions.length === 1;
+    if (v.status === "completed") {
+      const shape = shapeName ? `, ${shapeName}${shapeDims ? ` at ${shapeDims.width} × ${shapeDims.height}` : ""}` : "";
+      return (
+        <>
+          {index === 0 ? (
+            <p>
+              Here&apos;s {only ? "your video" : "version 1"}
+              {shape}.
+            </p>
+          ) : (
+            <p>
+              <b>Version {n} is ready.</b>
+            </p>
+          )}
+          {card(v, index)}
+          {v.message ? <NoteBox>{v.message}</NoteBox> : null}
+        </>
+      );
+    }
+    if (v.status === "processing") {
+      const live = liveCopy(renderStatus?.jobId === v.id ? renderStatus : null, elapsedFor(v.createdAt));
+      return (
+        <>
+          {index === 0 ? (
+            <p>
+              <b>Making your video.</b> It&apos;s safe to leave this page; the finished video lands in your library.
+            </p>
+          ) : null}
+          <RunCard
+            title={index === 0 ? live.title : `Rendering version ${n}`}
+            elapsed={elapsedFor(v.createdAt)}
+            step={live.step}
+            foot={
+              cancelState === "sent"
+                ? "Stopping after the current step."
+                : watchingNumber > 0
+                  ? `Usually 1–5 min. You can keep watching version ${watchingNumber}.`
+                  : "Usually 1–5 min."
+            }
+            action={v.id === renderingId ? cancelButton(v.id) : null}
+          />
+        </>
+      );
+    }
+    if (v.status === "expired") {
+      return (
+        <>
+          <p>
+            <b>{only ? "This video has expired." : `Version ${n} has expired.`}</b> {retentionLine(plan)}
+            {index === 0 ? " Your prompt is saved, so you can make it again." : null}
+          </p>
+          {only ? null : card(v, index)}
+          {index === 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <Link href={recreateHref} className={cn(BTN_PRIMARY, BTN_SM)}>
+                <RefreshCw aria-hidden />
+                Recreate video
+              </Link>
+              <button
+                type="button"
+                onClick={() => void copyText(detail.originalPrompt, "prompt")}
+                className={cn(BTN_SECONDARY, BTN_SM)}
+              >
+                {copied === "prompt" ? <Check aria-hidden /> : <Copy aria-hidden />}
+                {copied === "prompt" ? "Copied" : "Copy prompt"}
+              </button>
+            </div>
+          ) : null}
+        </>
+      );
+    }
+    const source = versions.find((x) => x.id === v.editFromId);
+    const canRetry = index > 0 && isPro && !busy && v.editMessage && source && isEditable(source);
+    return (
+      <>
+        <p>
+          <b>{only ? "This video didn't finish." : `Version ${n} didn't finish.`}</b> {v.error}
+        </p>
+        {canRetry ? (
+          <div>
+            <button
+              type="button"
+              onClick={() => void sendEdit(v.editMessage ?? "", source)}
+              className={cn(BTN_SECONDARY, BTN_SM)}
+            >
+              <RefreshCw aria-hidden />
+              Try again
+            </button>
+          </div>
+        ) : index === 0 ? (
+          <div>
+            <Link href={recreateHref} className={cn(BTN_PRIMARY, BTN_SM)}>
+              <RefreshCw aria-hidden />
+              Try again
+            </Link>
+          </div>
+        ) : null}
+      </>
+    );
+  };
+
+  const thread: ReactNode[] = [<UserBubble key="prompt">{detail.originalPrompt || title}</UserBubble>];
+  const lastIndex = versions.length - 1;
+  versions.forEach((v, index) => {
+    if (index > 0 && v.editMessage) {
+      const parent = versionNumber(v.editFromId);
+      thread.push(
+        <UserBubble key={`ask-${v.id}`} caption={parent > 0 && parent !== index ? `Edited from version ${parent}` : undefined}>
+          {v.editMessage}
+        </UserBubble>
+      );
+    }
+    const following = notes.filter((note) => note.afterCount === index + 1);
+    const inline = index === lastIndex && following.length === 0 && !sending ? suggestions : null;
+    thread.push(
+      <AiMessage key={`reply-${v.id}`}>
+        {reply(v, index)}
+        {inline}
+      </AiMessage>
+    );
+    for (const note of following) {
+      if (note.request) thread.push(<UserBubble key={`note-ask-${note.key}`}>{note.request}</UserBubble>);
+      thread.push(
+        <AiMessage key={`note-${note.key}`}>
+          <p>{note.text}</p>
+          {note.retryFromId && note.request ? (
+            <div>
+              <button
+                type="button"
+                onClick={() => retryNote(note)}
+                disabled={busy}
+                className={cn(BTN_SECONDARY, BTN_SM)}
+              >
+                <RefreshCw aria-hidden />
+                Try again
+              </button>
+            </div>
+          ) : null}
+        </AiMessage>
+      );
+    }
+    if (index === lastIndex && following.length > 0 && !sending && suggestions) {
+      thread.push(<AiMessage key="suggestions">{suggestions}</AiMessage>);
+    }
+  });
+  if (sending) {
+    thread.push(<UserBubble key="sending">{sending}</UserBubble>);
+    thread.push(
+      <AiMessage key="starting">
+        <RunCard title="Starting the edit…" elapsed={formatClock(0)} step={0} foot="Reading your change." />
+      </AiMessage>
+    );
+  }
+
+  const renderingVersion = renderingId ? versions.find((v) => v.id === renderingId) : undefined;
+  const composerPlaceholder =
+    renderingVersion && renderingVersion === versions[0]
+      ? "Edits open when the video is ready"
+      : renderingVersion
+        ? `Version ${versionNumber(renderingId ?? undefined)} is rendering…`
+        : !editSource
+          ? "Nothing to edit yet"
+          : editSource.status === "expired"
+            ? "Describe a change to render a fresh version…"
+            : "Ask for a change…";
+  const composerBusy = sending
+    ? "Starting the edit…"
+    : renderingVersion && renderingVersion !== versions[0]
+      ? `Rendering version ${versionNumber(renderingId ?? undefined)}`
+      : null;
+
+  const previewMedia = (() => {
+    if (!selected) return null;
+    if (selected.status === "completed" && selected.videoUrl) {
+      return (
+        <VideoPlayer
+          key={selected.id}
+          src={selected.videoUrl}
+          ratio={ratio}
+          label={`${title}, version ${selectedIndex + 1}`}
+          className="mx-auto w-[min(100%,calc(60svh*var(--ar)))] min-[900px]:w-[min(100cqw,calc(100cqh*var(--ar)))]"
+          onDimensions={(d) => setDims((prev) => ({ ...prev, [selected.id]: d }))}
+        />
+      );
+    }
+    let inner: ReactNode;
+    if (selected.status === "processing") {
+      const live = liveCopy(renderStatus?.jobId === selected.id ? renderStatus : null, elapsedFor(selected.createdAt));
+      inner = (
+        <RenderingFrame
+          step={live.step}
+          title={live.title}
+          detail={live.detail}
+          footer={
+            selectedIndex === 0
+              ? ["Safe to leave this page", "Lands in your library"]
+              : ["Usually 1–5 min", watchingNumber > 0 ? `Version ${watchingNumber} stays playable` : "Safe to leave this page"]
+          }
+        />
+      );
+    } else if (selected.status === "expired") {
+      inner = (
+        <UnavailableFrame
+          kind="expired"
+          title={versions.length > 1 ? `Version ${selectedIndex + 1} has expired` : "This video has expired"}
+          body={`${retentionLine(plan)} Your prompt is saved, so you can make it again.`}
+        />
+      );
+    } else {
+      inner = (
+        <UnavailableFrame
+          kind="failed"
+          title={versions.length > 1 ? `Version ${selectedIndex + 1} didn't finish` : "This video didn't finish"}
+          body={selected.error ?? "Something went wrong. Please try again."}
+        />
+      );
+    }
+    return (
+      <div
+        className="relative mx-auto w-[min(100%,calc(60svh*var(--ar)))] overflow-hidden rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.07),0_2px_6px_rgba(0,0,0,0.4),0_40px_90px_-30px_rgba(0,0,0,0.9)] min-[900px]:w-[min(100cqw,calc(100cqh*var(--ar)))]"
+        style={{ aspectRatio: String(ratio) }}
+      >
+        {inner}
+      </div>
+    );
+  })();
+
+  const selectedDownloadable = selected?.status === "completed" && selected.videoUrl;
+  const failedEdit = selected?.status === "failed" && selectedIndex > 0;
+  const unavailable = selected?.status === "expired" || (selected?.status === "failed" && !failedEdit);
+  const retrySource = failedEdit ? versions.find((v) => v.id === selected?.editFromId) : undefined;
+  const canRetrySelected =
+    failedEdit && isPro && !busy && Boolean(selected?.editMessage) && retrySource !== undefined && isEditable(retrySource);
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div
-        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-        aria-hidden="true"
-      >
-        <div className="absolute inset-0 bg-linear-to-br from-zinc-950 via-black to-zinc-950" />
-        <div
-          className="absolute -top-40 -right-32 h-[480px] w-[480px] rounded-full bg-amber-500/10 blur-3xl opacity-70"
-        />
-        <div
-          className="absolute -bottom-40 -left-32 h-[420px] w-[420px] rounded-full bg-teal-500/10 blur-3xl opacity-60"
-        />
-        <div
-          className="absolute inset-0 opacity-[0.035]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-            backgroundSize: "56px 56px",
-          }}
-        />
-      </div>
-
-      <main className="relative w-full pt-6 sm:pt-8 pb-20">
-        <div className="w-full px-4 sm:px-6 lg:px-10 mb-5 sm:mb-6 flex justify-start">
+    <div className="flex min-h-dvh flex-col bg-[#070708] text-zinc-100 min-[900px]:h-dvh min-[900px]:min-h-0">
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-1.5 border-b border-white/[0.065] bg-[#070708]/90 pl-2.5 pr-3.5 backdrop-blur-md">
+        <div className="flex min-w-0 items-center gap-2 text-[13.5px]">
           <Link
             href="/dashboard"
-            className="group relative inline-flex items-center gap-2.5 rounded-full border border-white/12 bg-white/5 backdrop-blur-md pl-2 pr-4 py-2 text-sm font-medium text-zinc-200 hover:text-white hover:border-amber-400/40 hover:bg-amber-500/8 transition-all duration-200 shadow-lg shadow-black/30"
-            aria-label="Back to dashboard"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 font-medium text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-100"
           >
-            <span className="relative flex items-center justify-center w-7 h-7 rounded-full bg-white text-black shadow-md shadow-black/40 transition-transform duration-200 group-hover:-translate-x-0.5">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </span>
-            <span className="leading-none">Back to dashboard</span>
-            <span
-              className="pointer-events-none absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-linear-to-r from-amber-400/0 via-amber-400/10 to-transparent"
-              aria-hidden="true"
-            />
+            <ChevronLeft className="size-4" aria-hidden />
+            Library
           </Link>
+          <span className="text-zinc-600 max-[899px]:hidden" aria-hidden>
+            /
+          </span>
+          <h1 className="min-w-0 truncate px-1 font-[550] text-zinc-100 max-[899px]:hidden" title={title}>
+            {title}
+          </h1>
+          <StatusBadge status={status} />
         </div>
-        <div className="px-4 sm:px-6 lg:px-10 max-w-7xl mx-auto">
-          {resolvedLoading ? (
-            <div
-              className="md:grid md:grid-cols-[1fr,400px] lg:grid-cols-[1fr,440px] md:gap-6 lg:gap-8 md:items-start min-w-0"
-              role="status"
-              aria-live="polite"
-              aria-label="Loading your video"
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {status === "processing" && selected ? (
+            <button
+              type="button"
+              onClick={() => void cancelRender(selected.id)}
+              disabled={selected.id !== renderingId || cancelState === "sending" || cancelState === "sent"}
+              className={cn(BTN_SECONDARY, "max-[899px]:hidden")}
             >
-              <div className="md:order-1 min-w-0 overflow-hidden">
-                <article className="rounded-2xl border border-white/10 bg-zinc-950/80 overflow-hidden shadow-2xl shadow-black/40">
-                  <div className="relative aspect-video bg-zinc-900">
-                    <div className="skeleton-block absolute inset-0 rounded-none" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="relative h-12 w-12 rounded-full border border-white/10 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-                        <span className="absolute inset-0 rounded-full border border-amber-400/30 animate-ping" />
-                        <svg
-                          className="h-5 w-5 text-amber-300/90"
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="absolute top-3 right-3 h-6 w-20 rounded-full skeleton-block" />
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 rounded-full skeleton-block" />
-                      <div className="h-3 w-10 rounded-md skeleton-block" />
-                    </div>
-                  </div>
-
-                  <div className="p-5 sm:p-6 border-t border-white/10 space-y-4">
-                    <div className="space-y-2">
-                      <div className="h-5 w-3/4 max-w-[420px] skeleton-block" />
-                      <div className="h-3.5 w-11/12 max-w-[520px] skeleton-block" />
-                      <div className="h-3.5 w-2/3 max-w-[360px] skeleton-block" />
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="h-7 w-24 rounded-lg skeleton-block" />
-                      <div className="h-7 w-16 rounded-lg skeleton-block" />
-                      <div className="h-7 w-20 rounded-lg skeleton-block" />
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
-                      <div className="h-10 w-full sm:w-40 rounded-xl skeleton-block" />
-                      <div className="h-10 w-full sm:w-32 rounded-xl skeleton-block" />
-                    </div>
-                  </div>
-                </article>
-              </div>
-
-              <section className="md:order-2 min-w-0 mt-6 md:mt-0 rounded-2xl border border-white/10 bg-zinc-950/80 overflow-hidden shadow-2xl shadow-black/40 flex flex-col min-h-[420px] lg:min-h-[calc(100vh-9rem)]">
-                <div className="px-5 py-4 border-b border-white/10 bg-linear-to-r from-amber-500/8 via-transparent to-teal-500/8">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl skeleton-block" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-4 w-32 skeleton-block" />
-                      <div className="h-3 w-48 max-w-[60%] skeleton-block" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col flex-1 min-h-0">
-                  <div className="flex-1 overflow-hidden p-5 space-y-4">
-                    <div className="h-3 w-32 skeleton-block" />
-                    <div className="grid gap-2">
-                      {[0, 1, 2, 3, 4].map((i) => (
-                        <div
-                          key={i}
-                          className="h-10 rounded-xl skeleton-block"
-                          style={{
-                            width: `${88 - i * 6}%`,
-                            opacity: 1 - i * 0.07,
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 sm:p-4 border-t border-white/10 bg-black/40 shrink-0">
-                    <div className="flex gap-2.5">
-                      <div className="h-11 flex-1 rounded-xl skeleton-block" />
-                      <div className="h-11 w-20 rounded-xl skeleton-block" />
-                    </div>
-                  </div>
-                </div>
-              </section>
-              <span className="sr-only">Loading your video and edit panel</span>
-            </div>
-          ) : resolvedNotFound || !video ? (
-            <div className="rounded-2xl border border-white/10 bg-zinc-950/80 p-12 sm:p-16 text-center shadow-2xl shadow-black/40">
-              <div className="w-16 h-16 mx-auto rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center mb-5">
-                <svg className="w-8 h-8 text-amber-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-semibold text-white mb-1.5">Video not found</h2>
-              <p className="text-sm text-zinc-500 mb-7 max-w-sm mx-auto leading-relaxed">
-                This render may have expired, been removed, or belongs to a different account. Sign in with the account that created it, or head back to your library.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors"
+              <X aria-hidden />
+              {cancelState === "sent" ? "Stopping…" : "Cancel render"}
+            </button>
+          ) : failedEdit ? null : unavailable ? (
+            <button
+              type="button"
+              onClick={() => void copyText(detail.originalPrompt, "prompt")}
+              className={cn(BTN_SECONDARY, "max-[899px]:hidden")}
+            >
+              {copied === "prompt" ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copied === "prompt" ? "Copied" : "Copy prompt"}
+            </button>
+          ) : isPro ? (
+            <button
+              type="button"
+              onClick={() => selected?.videoUrl && void copyText(absoluteUrl(selected.videoUrl), "link")}
+              className={cn(BTN_SECONDARY, "max-[899px]:hidden")}
+            >
+              {copied === "link" ? <Check className="text-[#62dea6]" aria-hidden /> : <Link2 aria-hidden />}
+              {copied === "link" ? "Link copied" : "Copy link"}
+            </button>
+          ) : planKnown ? (
+            <Link
+              href="/pricing"
+              title="Share links are on Professional and Enterprise"
+              className={cn(BTN_SECONDARY, "max-[899px]:hidden")}
+            >
+              <Link2 aria-hidden />
+              Copy link
+              <ProTag />
+            </Link>
+          ) : null}
+          <div ref={menuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label="More actions"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className={ICON_BTN}
+            >
+              <Ellipsis aria-hidden />
+            </button>
+            {menuOpen ? (
+              <div
+                role="menu"
+                className="absolute right-0 top-[calc(100%+6px)] z-40 w-[220px] rounded-xl bg-[#16161a] p-[5px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_24px_60px_rgba(0,0,0,0.6)] [&_[role=menuitem]]:flex [&_[role=menuitem]]:w-full [&_[role=menuitem]]:items-center [&_[role=menuitem]]:gap-2.5 [&_[role=menuitem]]:rounded-lg [&_[role=menuitem]]:px-2.5 [&_[role=menuitem]]:py-2 [&_[role=menuitem]]:text-left [&_[role=menuitem]]:text-[13px] [&_[role=menuitem]]:text-zinc-100 [&_[role=menuitem]:hover]:bg-white/6 [&_[role=menuitem]_svg]:size-4 [&_[role=menuitem]_svg]:text-zinc-500"
+              >
+                {selectedDownloadable && isPro ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="min-[900px]:hidden!"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      if (selected?.videoUrl) void copyText(absoluteUrl(selected.videoUrl), "link");
+                    }}
+                  >
+                    <Link2 aria-hidden />
+                    Copy link
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void copyText(detail.originalPrompt, "prompt");
+                  }}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Back to my videos
+                  <Copy aria-hidden />
+                  Copy prompt
+                </button>
+                <Link role="menuitem" href={recreateHref} onClick={() => setMenuOpen(false)}>
+                  <RefreshCw aria-hidden />
+                  Recreate from prompt
                 </Link>
-                <Link
-                  href="/create"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-white/15 text-white font-semibold text-sm hover:bg-white/5 transition-colors"
+                <hr className="mx-1 my-[5px] h-px border-0 bg-white/[0.065]" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="text-[#f3958f]! [&_svg]:text-[#f3958f]!"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setDeleting({ pending: false, failure: null });
+                  }}
                 >
-                  Create a new video
-                </Link>
+                  <Trash2 aria-hidden />
+                  {versions.length > 1 ? `Delete version ${selectedIndex + 1}` : "Delete video"}
+                </button>
               </div>
-            </div>
+            ) : null}
+          </div>
+          {canRetrySelected && selected ? (
+            <button
+              type="button"
+              onClick={() => void sendEdit(selected.editMessage ?? "", retrySource)}
+              className={BTN_PRIMARY}
+            >
+              <RefreshCw aria-hidden />
+              Try again
+            </button>
+          ) : unavailable && selected?.status === "failed" ? (
+            <Link href={recreateHref} className={BTN_PRIMARY}>
+              <RefreshCw aria-hidden />
+              Try again
+            </Link>
+          ) : unavailable ? (
+            <Link href={recreateHref} className={BTN_PRIMARY}>
+              <RefreshCw aria-hidden />
+              <span className="max-[899px]:hidden">Recreate video</span>
+              <span className="min-[900px]:hidden">Recreate</span>
+            </Link>
+          ) : selectedDownloadable ? (
+            <a
+              href={`/api/generate/${encodeURIComponent(selected.id)}/download`}
+              download={`cutline-${selected.id}.mp4`}
+              title="Download MP4"
+              className={BTN_PRIMARY}
+            >
+              <Download aria-hidden />
+              Download
+            </a>
           ) : (
-            <>
-              <div className="md:grid md:grid-cols-[1fr,400px] lg:grid-cols-[1fr,440px] md:gap-6 lg:gap-8 md:items-start min-w-0">
-                <div className="md:order-1 min-w-0 overflow-hidden">
-                  <article className="rounded-2xl border border-white/10 bg-zinc-950/80 overflow-hidden shadow-2xl shadow-black/40">
-                    <div className="relative aspect-video bg-black">
-                      <video
-                        key={currentVideoUrl ?? video.videoUrl}
-                        src={currentVideoUrl ?? video.videoUrl}
-                        controls
-                        playsInline
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
-                      <div className="absolute top-3 right-3">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Ready
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-5 sm:p-6 border-t border-white/10">
-                      <h1 className="text-lg sm:text-xl font-semibold text-white leading-snug line-clamp-2" title={video.title}>
-                        {video.title || "Untitled video"}
-                      </h1>
-                      {video.prompt ? (
-                        <p
-                          className="mt-2 text-sm text-zinc-400 leading-relaxed line-clamp-3"
-                          title={video.prompt}
-                        >
-                          {video.prompt}
-                        </p>
-                      ) : null}
-                      {video.message ? (
-                        <p
-                          role="status"
-                          className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs leading-relaxed text-amber-200/90"
-                        >
-                          <svg className="mt-0.5 w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                          </svg>
-                          <span>{video.message}</span>
-                        </p>
-                      ) : null}
-
-                      <div className="mt-4 flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-300 text-xs font-medium">
-                          <svg className="w-3.5 h-3.5 text-amber-400/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          {video.date}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-300 text-xs font-medium">
-                          <svg className="w-3.5 h-3.5 text-teal-400/90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          {video.duration}
-                        </span>
-                        {video.mode ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-300 text-xs font-medium capitalize">
-                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
-                            {video.mode === "talking_object" ? "Talking" : "Slideshow"}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-5 flex flex-col sm:flex-row gap-2.5">
-                        <a
-                          href={`/api/generate/${encodeURIComponent(jobId)}/download`}
-                          download={`cutline-${jobId}.mp4`}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-black/30"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                          Download MP4
-                        </a>
-                        {isPro ? (
-                          <button
-                            type="button"
-                            onClick={handleCopyLink}
-                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-white font-semibold text-sm hover:bg-white/5 transition-colors"
-                          >
-                            {copied ? (
-                              <>
-                                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                                Link copied
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m-1.656 3.656a4 4 0 01-5.656-5.656l3-3a4 4 0 015.656 5.656" />
-                                </svg>
-                                Copy link
-                              </>
-                            )}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => router.push("/pricing")}
-                            title="Sharing is available on Professional & Enterprise plans"
-                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-amber-400/25 text-amber-200/90 font-semibold text-sm hover:bg-amber-400/10 transition-colors"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m-1.656 3.656a4 4 0 01-5.656-5.656l3-3a4 4 0 015.656 5.656" />
-                            </svg>
-                            Copy link
-                            <ProBadge plan={usagePlan} />
-                          </button>
-                        )}
-                        <a
-                          href="#edit-section"
-                          className="inline-flex md:hidden items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 font-semibold text-sm hover:bg-amber-500/15 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          Edit with AI
-                          <ProBadge plan={usagePlan} />
-                        </a>
-                      </div>
-                    </div>
-                  </article>
-                </div>
-
-                <section
-                  id="edit-section"
-                  className="md:order-2 min-w-0 mt-6 md:mt-0 rounded-2xl border border-white/10 bg-zinc-950/80 overflow-hidden shadow-2xl shadow-black/40 flex flex-col min-h-[460px] lg:min-h-[calc(100vh-9rem)] scroll-mt-24"
-                >
-                  <div className="px-5 py-4 border-b border-white/8">
-                    <div className="flex items-center gap-2.5">
-                      <svg
-                        className="w-4 h-4 text-amber-400 shrink-0"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.8}
-                        aria-hidden
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
-                        />
-                      </svg>
-                      <h2 className="text-[14px] font-semibold text-white tracking-tight leading-none">
-                        Edit with AI
-                      </h2>
-                      <ProBadge plan={usagePlan} className="ml-0.5" />
-                    </div>
-                    <p className="text-[12px] text-zinc-500 mt-1.5 ml-[26px] leading-relaxed">
-                      Describe a change. We re-render and replace the video here.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col flex-1 min-h-0">
-                    <div
-                      ref={messagesScrollRef}
-                      className="flex-1 overflow-y-auto p-5 min-h-[220px]"
-                    >
-                      {messages.length === 0 ? (
-                        <motion.div
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                          className="space-y-5"
-                        >
-                          <div>
-                            <p className="text-[10.5px] uppercase tracking-[0.16em] text-zinc-500 font-semibold mb-2.5">
-                              Quick edits
-                            </p>
-                            <ul className="space-y-1.5">
-                              {EDIT_QUICK_PROMPTS.map((prompt, i) => {
-                                const meta = CATEGORY_META[prompt.category];
-                                const outcome = EDIT_OUTCOMES[prompt.text];
-                                return (
-                                  <li key={i}>
-                                    <button
-                                      type="button"
-                                      onClick={() => sendEditMessage(prompt.text)}
-                                      disabled={editInProgress}
-                                      className="group w-full flex items-start gap-3 text-left px-3 py-2.5 rounded-lg border border-white/8 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                      <span
-                                        className={`mt-0.5 w-0.5 self-stretch rounded-full ${meta.bar} opacity-50 group-hover:opacity-90 transition-opacity`}
-                                        aria-hidden
-                                      />
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-baseline gap-2">
-                                          <span className={`text-[10px] font-semibold uppercase tracking-wide ${meta.text}`}>
-                                            {meta.label}
-                                          </span>
-                                          <p className="text-[13px] text-zinc-100 leading-snug min-w-0 flex-1">
-                                            {prompt.text}
-                                          </p>
-                                        </div>
-                                        {outcome ? (
-                                          <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
-                                            {outcome}
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                      <svg
-                                        className="w-3.5 h-3.5 text-zinc-700 group-hover:text-zinc-300 mt-1 shrink-0 transition-colors"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                        aria-hidden
-                                      >
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                      </svg>
-                                    </button>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-
-                          {canUseCustomEdits ? (
-                            <div>
-                              <button
-                                type="button"
-                                onClick={() => setShowPowerPrompts((s) => !s)}
-                                className="group inline-flex items-center gap-1.5 text-[10.5px] uppercase tracking-[0.16em] text-zinc-500 font-semibold hover:text-zinc-300 transition-colors"
-                                aria-expanded={showPowerPrompts}
-                              >
-                                <svg
-                                  className={`w-3 h-3 transition-transform ${showPowerPrompts ? "rotate-90" : ""}`}
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2.5}
-                                  aria-hidden
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                                More ideas
-                              </button>
-                              <AnimatePresence initial={false}>
-                                {showPowerPrompts && (
-                                  <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                    className="overflow-hidden"
-                                  >
-                                    <div className="flex flex-wrap gap-1.5 pt-2.5">
-                                      {POWER_PROMPTS.map((text) => (
-                                        <button
-                                          key={text}
-                                          type="button"
-                                          onClick={() => prefillInput(text)}
-                                          disabled={editInProgress}
-                                          className="inline-flex items-center px-2.5 py-1.5 rounded-full border border-white/10 bg-white/[0.02] text-[11.5px] text-zinc-300 hover:text-white hover:border-white/20 hover:bg-white/[0.05] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                          <span className="truncate max-w-[260px]">{text}</span>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          ) : null}
-                        </motion.div>
-                      ) : (
-                        <div className="space-y-4">
-                          <AnimatePresence initial={false}>
-                            {messages.map((msg, i) => (
-                              <motion.div
-                                key={i}
-                                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                              >
-                                <div
-                                  className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.role === "user"
-                                    ? "bg-white text-black rounded-br-md shadow-lg shadow-black/30"
-                                    : "bg-white/5 text-zinc-200 border border-white/10 rounded-bl-md"
-                                    }`}
-                                >
-                                  {msg.text}
-                                </div>
-                              </motion.div>
-                            ))}
-                          </AnimatePresence>
-                          <AnimatePresence>
-                            {editInProgress && (
-                              <motion.div
-                                key="regen-card"
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -4 }}
-                                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                className="rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-4"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
-                                    <motion.svg
-                                      className="w-4 h-4 text-amber-300"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth={2.2}
-                                      animate={{ rotate: 360 }}
-                                      transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
-                                      aria-hidden
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 00-14.95-3M4 15a8 8 0 0014.95 3"
-                                      />
-                                    </motion.svg>
-                                  </div>
-
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <p className="text-[13px] font-semibold text-amber-100 leading-tight truncate">
-                                          {EDIT_STAGES[editStage]?.label ?? "Regenerating your video"}
-                                        </p>
-                                        <p className="text-[11.5px] text-amber-200/55 mt-0.5 leading-snug truncate">
-                                          {EDIT_STAGES[editStage]?.hint}
-                                        </p>
-                                      </div>
-                                      <span className="shrink-0 text-[10.5px] tabular-nums font-medium text-amber-200/80 px-1.5 py-0.5 rounded-md border border-amber-500/25 bg-black/20">
-                                        {formatElapsed(editElapsedSec)}
-                                      </span>
-                                    </div>
-
-                                    <div className="relative mt-3 h-1 w-full rounded-full bg-white/5 overflow-hidden">
-                                      <motion.div
-                                        className="absolute inset-y-0 w-1/3 rounded-full bg-linear-to-r from-transparent via-amber-400/80 to-transparent"
-                                        animate={{ x: ["-40%", "140%"] }}
-                                        transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                                      />
-                                    </div>
-
-                                    <ul className="mt-3 space-y-1">
-                                      {EDIT_STAGES.map((stage, idx) => {
-                                        const isDone = idx < editStage;
-                                        const isActive = idx === editStage;
-                                        return (
-                                          <li
-                                            key={stage.label}
-                                            className="flex items-center gap-2 text-[11.5px] leading-snug"
-                                          >
-                                            <span
-                                              className={`inline-flex items-center justify-center w-3 h-3 rounded-full shrink-0 ${isDone
-                                                ? "bg-emerald-500/25 text-emerald-300"
-                                                : isActive
-                                                  ? "bg-amber-500/25 text-amber-300"
-                                                  : "bg-white/5 text-zinc-600"
-                                                }`}
-                                              aria-hidden
-                                            >
-                                              {isDone ? (
-                                                <svg className="w-2 h-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={4}>
-                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                              ) : isActive ? (
-                                                <motion.span
-                                                  className="w-1 h-1 rounded-full bg-amber-300"
-                                                  animate={{ opacity: [0.5, 1, 0.5] }}
-                                                  transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-                                                />
-                                              ) : (
-                                                <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                                              )}
-                                            </span>
-                                            <span
-                                              className={
-                                                isDone
-                                                  ? "text-emerald-200/75"
-                                                  : isActive
-                                                    ? "text-amber-100"
-                                                    : "text-zinc-500"
-                                              }
-                                            >
-                                              {stage.label}
-                                            </span>
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-
-                                    <p className="mt-3 text-[10.5px] text-amber-200/50 leading-snug">
-                                      Usually 1-5 mins. We&apos;ll update this the moment it&apos;s ready.
-                                    </p>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      )}
-                    </div>
-
-                    {canUseCustomEdits ? (
-                      <form
-                        onSubmit={handleSubmit}
-                        className="p-3.5 sm:p-4 border-t border-white/8 bg-zinc-950/60 backdrop-blur-sm shrink-0"
-                      >
-                        <div
-                          className={`rounded-xl border bg-zinc-950 transition-colors overflow-hidden ${editInProgress
-                            ? "border-amber-500/30"
-                            : inputValue.trim()
-                              ? "border-amber-400/40"
-                              : "border-white/10 hover:border-white/15 focus-within:border-amber-400/40"
-                            }`}
-                        >
-                          <textarea
-                            ref={textareaRef}
-                            value={inputValue}
-                            onChange={(e) => {
-                              if (e.target.value.length <= MAX_EDIT_CHARS) {
-                                setInputValue(e.target.value);
-                              }
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                void sendEditMessage(inputValue);
-                              }
-                            }}
-                            rows={3}
-                            placeholder="Describe a change. e.g. Make the intro punchier and add a CTA at the end…"
-                            disabled={editInProgress}
-                            className="block w-full resize-none bg-transparent border-0 px-3.5 pt-3 pb-1 text-white placeholder:text-zinc-500 text-sm leading-relaxed focus:outline-none focus:ring-0 disabled:opacity-60 disabled:cursor-not-allowed"
-                          />
-                          <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
-                            <span
-                              className={`text-[11px] tabular-nums transition-colors ${inputValue.length >= MAX_EDIT_CHARS - 30
-                                ? "text-amber-300"
-                                : "text-zinc-600"
-                                }`}
-                            >
-                              {inputValue.length}/{MAX_EDIT_CHARS}
-                            </span>
-                            <button
-                              type="submit"
-                              disabled={!inputValue.trim() || editInProgress}
-                              className={`shrink-0 px-3.5 py-1.5 rounded-lg font-semibold text-[13px] transition-colors inline-flex items-center justify-center gap-1.5 disabled:cursor-not-allowed ${editInProgress
-                                ? "bg-amber-500/15 border border-amber-500/30 text-amber-200"
-                                : "bg-white text-black hover:bg-zinc-200 disabled:opacity-30 disabled:hover:bg-white"
-                                }`}
-                            >
-                              {editInProgress ? (
-                                <>
-                                  <span className="relative inline-flex w-3.5 h-3.5">
-                                    <span className="absolute inset-0 rounded-full border-2 border-amber-500/30" aria-hidden />
-                                    <motion.span
-                                      className="absolute inset-0 rounded-full border-2 border-transparent border-t-amber-300"
-                                      animate={{ rotate: 360 }}
-                                      transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
-                                      aria-hidden
-                                    />
-                                  </span>
-                                  <span>Working</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>Send</span>
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
-                                  </svg>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </form>
-                    ) : (
-                      <div className="p-3.5 sm:p-4 border-t border-white/8 bg-zinc-950/60 backdrop-blur-sm shrink-0">
-                        <div className="rounded-xl border border-amber-400/25 bg-amber-500/[0.04] p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="text-[14px] font-semibold text-white leading-tight">
-                                  Edit with AI
-                                </h3>
-                                <ProBadge plan={usagePlan} withLock />
-                              </div>
-                              <p className="text-[12px] text-zinc-400 mt-1 leading-relaxed">
-                                Re-edit and re-render your video with AI on Professional and Enterprise plans.
-                              </p>
-                            </div>
-                          </div>
-
-                          {!isEnterprisePlan(usagePlan) ? (
-                            <div className="mt-3 flex items-center gap-2">
-                              <Link
-                                href="/pricing"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-zinc-950 bg-amber-400 hover:bg-amber-300 transition-colors"
-                              >
-                                Upgrade
-                                <svg
-                                  className="w-3 h-3"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2.4}
-                                  aria-hidden
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
-                                </svg>
-                              </Link>
-                              <Link
-                                href="/pricing"
-                                className="text-[12px] font-medium text-zinc-500 hover:text-zinc-300 transition-colors"
-                              >
-                                See plans
-                              </Link>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              </div>
-            </>
+            <button type="button" disabled className={BTN_PRIMARY}>
+              <Download aria-hidden />
+              Download
+            </button>
           )}
         </div>
-      </main>
+      </header>
+
+      <div className="flex flex-1 flex-col min-[900px]:grid min-[900px]:min-h-0 min-[900px]:grid-cols-[400px_minmax(0,1fr)] min-[1200px]:grid-cols-[440px_minmax(0,1fr)] min-[1700px]:grid-cols-[480px_minmax(0,1fr)]">
+        <aside
+          aria-label="Edit with AI"
+          className="order-2 flex flex-col border-t border-white/[0.065] bg-[#0b0b0d] min-[900px]:order-1 min-[900px]:min-h-0 min-[900px]:border-r min-[900px]:border-t-0"
+        >
+          <div className="flex h-[46px] shrink-0 items-center gap-2 border-b border-white/[0.065] px-[18px] text-[13px] font-semibold">
+            <Wand2 className="size-[15px] text-[#f4b740]" aria-hidden />
+            Edit with AI
+            {planKnown && !isPro ? <ProTag /> : null}
+          </div>
+          <div
+            ref={logRef}
+            className="flex flex-col gap-[18px] px-[18px] pb-6 pt-5 [scrollbar-color:#26262b_transparent] [scrollbar-width:thin] min-[900px]:min-h-0 min-[900px]:flex-1 min-[900px]:overflow-y-auto"
+          >
+            {thread}
+          </div>
+          <div
+            className={cn(
+              "shrink-0 border-t border-white/[0.065] bg-[#0b0b0d] px-3.5 pb-3.5 pt-3",
+              (!planKnown || isPro) && "sticky bottom-0 z-[5]"
+            )}
+          >
+            {planKnown && !isPro ? (
+              <div ref={upsellRef}>
+                <UpgradeCard flash={flashUpsell} />
+              </div>
+            ) : (
+              <Composer
+                value={draft}
+                onChange={setDraft}
+                onSubmit={() => void sendEdit(draft)}
+                disabled={!planKnown || busy || !editSource}
+                busyLabel={composerBusy}
+                placeholder={composerPlaceholder}
+                textareaRef={textareaRef}
+              />
+            )}
+          </div>
+        </aside>
+
+        <section
+          aria-label="Preview"
+          className="vd-canvas order-1 grid gap-4 px-3.5 pb-4 pt-3 min-[900px]:order-2 min-[900px]:min-h-0 min-[900px]:grid-rows-[auto_minmax(0,1fr)_auto] min-[900px]:px-8 min-[900px]:pb-[22px] min-[900px]:pt-4 min-[1700px]:px-14 min-[1700px]:pb-7 min-[1700px]:pt-5"
+          style={{ "--ar": ratio } as CSSProperties}
+        >
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div
+              role="group"
+              aria-label="Versions"
+              className="inline-flex min-w-0 max-w-full gap-0.5 overflow-x-auto rounded-[10px] bg-[#0f0f12] p-[3px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.065)] [scrollbar-width:none]"
+            >
+              {versions.map((v, index) => {
+                const on = selected?.id === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={`Version ${index + 1}${v.status === "processing" ? ", rendering" : v.status === "expired" ? ", expired" : v.status === "failed" ? ", didn't finish" : ""}`}
+                    onClick={() => select(v.id)}
+                    className={cn(
+                      "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[7px] px-[11px] text-xs font-medium transition-colors",
+                      on
+                        ? "bg-[#1f1f24] text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_3px_rgba(0,0,0,0.5)]"
+                        : "text-zinc-500 hover:text-zinc-100",
+                      v.status === "expired" && !on && "text-zinc-600"
+                    )}
+                  >
+                    {v.status === "processing" ? <Spinner className="size-[11px] border-[1.5px]" /> : null}
+                    {v.status === "failed" ? <TriangleAlert className="size-3 text-[#f3958f]" aria-hidden /> : null}
+                    {versions.length === 1 ? `Version ${index + 1}` : `V${index + 1}`}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="shrink-0 font-mono text-xs font-medium text-zinc-600 max-[899px]:hidden">{spec}</span>
+          </div>
+          <div className="relative grid min-h-0 place-items-center min-[900px]:[container-type:size]">{previewMedia}</div>
+          {versions.length > 1 && selected ? (
+            <p className="flex min-w-0 items-center justify-center gap-2 text-[13px] text-zinc-500">
+              <b className="shrink-0 font-[550] text-zinc-100">Version {selectedIndex + 1}</b>
+              <span className="min-w-0 truncate">
+                · {selected.editMessage ? `“${selected.editMessage}”` : "Original"}
+              </span>
+              {latestReady?.id === selected.id ? (
+                <span className="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-[#3fd08f]/12 pl-2 pr-[9px] text-xs font-medium text-[#62dea6]">
+                  <i aria-hidden className="size-1.5 rounded-full bg-current" />
+                  Latest
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+        </section>
+      </div>
+
+      {deleting && selected ? (
+        <DeleteVideoDialog
+          video={{
+            id: selected.id,
+            title: versions.length > 1 ? `${title}, version ${selectedIndex + 1}` : title,
+            prompt: detail.originalPrompt,
+            date: madeAt(selected.createdAt, today),
+            duration: lengthText ?? "-",
+            status: selected.status,
+            videoUrl: selected.videoUrl,
+            timestamp: Date.parse(selected.createdAt) || 0,
+          }}
+          pending={deleting.pending}
+          failure={deleting.failure}
+          onCancel={() => {
+            if (!deleting.pending) setDeleting(null);
+          }}
+          onConfirm={() => void confirmDelete()}
+        />
+      ) : null}
     </div>
   );
 }

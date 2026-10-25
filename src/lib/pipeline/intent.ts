@@ -1,8 +1,8 @@
 import type { Intent } from "@/lib/types";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
-import { shouldRetryForLLM } from "@/lib/utils/retry";
-import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat, type ModelCandidate } from "@/lib/llm/chat";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 import {
   INTENT_DURATION_MAX,
@@ -13,7 +13,6 @@ import {
   type IntentTone,
 } from "@/lib/types";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const SYSTEM_PROMPT = `You are an intent interpreter for a video editing system. Given one sentence from the user, output a single JSON object with exactly these keys and types (no other keys, no markdown, no explanation):
@@ -159,71 +158,21 @@ export type InterpretIntentOptions = { model?: string; platform?: Platform };
 
 async function requestIntentFromModel(
   input: string,
-  apiKey: string,
-  model: string,
+  candidate: ModelCandidate,
   systemContent: string
 ): Promise<Intent> {
-  const url = `${OPENROUTER_BASE}/chat/completions`;
-  const body = {
-    model,
-    messages: [
-      { role: "system" as const, content: systemContent },
-      {
-        role: "user" as const,
-        content: `<user_topic>\n${input}\n</user_topic>`,
-      },
-    ],
-    temperature: 0,
-    max_tokens: 4096,
-    response_format: { type: "json_object" as const },
-  };
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error) {
-      if (err.name === "AbortError") {
-        throw new Error("Intent interpretation timed out. Try again.");
-      }
-      throw new Error(`Intent interpretation failed: ${err.message}`);
-    }
-    throw new Error("Intent interpretation failed: unknown error");
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Intent interpretation failed: API returned ${response.status}. ${response.status === 401 ? "Check your API key." : text || ""}`
-    );
-  }
-
-  let data: { choices?: Array<{ message?: { content?: string } }> };
-  try {
-    data = (await response.json()) as typeof data;
-  } catch {
-    throw new Error("Intent interpretation failed: invalid response from API");
-  }
-
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || content.trim() === "") {
-    throw new Error("Intent interpretation failed: empty response from model");
-  }
-
+  const content = await requestChat(
+    candidate,
+    {
+      system: systemContent,
+      user: `<user_topic>\n${input}\n</user_topic>`,
+      temperature: 0,
+      maxTokens: 4096,
+      json: true,
+      timeoutMs: 30_000,
+    },
+    "Intent interpretation"
+  );
   return parseAndValidateIntent(content.trim(), input);
 }
 
@@ -231,11 +180,10 @@ export async function interpretIntent(
   input: string,
   options?: InterpretIntentOptions
 ): Promise<Intent> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  const candidates = getProviderCandidates("intent", primaryModel, options?.model);
+  if (candidates.length === 0) {
+    throw new Error(NO_LLM_KEY_MESSAGE);
   }
 
   const platformSnippet =
@@ -243,25 +191,8 @@ export async function interpretIntent(
       ? getPlatformPromptSnippet(options.platform, "intent")
       : "";
   const systemContent = SYSTEM_PROMPT + platformSnippet;
-  const modelCandidates = getModelCandidates(primaryModel);
 
-  let lastError: unknown;
-  for (let i = 0; i < modelCandidates.length; i++) {
-    const model = modelCandidates[i]!;
-    try {
-      return await requestIntentFromModel(input, apiKey, model, systemContent);
-    } catch (err) {
-      lastError = err;
-      const shouldFallback = shouldRetryForLLM(err);
-      const hasNext = i < modelCandidates.length - 1;
-      if (!shouldFallback || !hasNext) {
-        throw err;
-      }
-      console.warn(
-        `[intent] Primary model failed (${model}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error("Intent interpretation failed");
+  return tryModelCandidates(candidates, "intent", (candidate) =>
+    requestIntentFromModel(input, candidate, systemContent)
+  );
 }

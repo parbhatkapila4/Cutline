@@ -104,12 +104,12 @@ const useSource = (jobData: Record<string, unknown>) => {
   mockFindRow.mockResolvedValue(completedRow(jobData));
 };
 
-const edit = () =>
+const edit = (message = "Make it punchier.") =>
   POST(
     new Request(`http://localhost/api/dashboard/videos/${JOB_ID}/edit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "Make it punchier." }),
+      body: JSON.stringify({ message }),
     }),
     { params: Promise.resolve({ jobId: JOB_ID }) },
   );
@@ -225,6 +225,68 @@ describe("POST /api/dashboard/videos/[jobId]/edit - the video_jobs row", () => {
     expect(res.status).toBe(500);
     const insertedId = (mockCreateVideoJob.mock.calls[0][0] as { queue_job_id: string }).queue_job_id;
     expect(mockDeleteOpenRow).toHaveBeenCalledWith(insertedId);
+  });
+});
+
+describe("POST /api/dashboard/videos/[jobId]/edit - the version history", () => {
+  it("records which video the edit came from, the first video of the chain, and what was asked", async () => {
+    useSource({ mode: "slideshow", durationSeconds: 30 });
+
+    const res = await edit("  Add a clear call to action at the end  ");
+
+    expect(res.status).toBe(200);
+    const lineage = {
+      editFromJobId: JOB_ID,
+      editRootJobId: JOB_ID,
+      editMessage: "Add a clear call to action at the end",
+    };
+    expect(mockAdd.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining(lineage));
+    expect(mockCreateVideoJob.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ job_data: expect.objectContaining(lineage) }),
+    );
+  });
+
+  it("keeps the first video of the chain when an edit is edited again, and drops the old request", async () => {
+    useSource({
+      mode: "slideshow",
+      durationSeconds: 30,
+      editFromJobId: "first-video",
+      editRootJobId: "first-video",
+      editMessage: "Make the tone more casual and friendly",
+    });
+
+    const res = await edit();
+
+    expect(res.status).toBe(200);
+    expect(mockAdd.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({
+        editFromJobId: JOB_ID,
+        editRootJobId: "first-video",
+        editMessage: "Make it punchier.",
+      }),
+    );
+  });
+
+  it("names the source by its queue id when the page was opened by row id", async () => {
+    mockFindRow.mockResolvedValue({ ...completedRow({ mode: "slideshow", durationSeconds: 30 }), queue_job_id: null });
+
+    const res = await edit();
+
+    expect(res.status).toBe(200);
+    expect(mockAdd.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({ editFromJobId: "source-row", editRootJobId: "source-row" }),
+    );
+  });
+
+  it("refuses a change longer than the edit box allows, before reserving anything", async () => {
+    useSource({ mode: "slideshow", durationSeconds: 30 });
+
+    const res = await edit("x".repeat(281));
+
+    expect(res.status).toBe(400);
+    expect(mockInterpretEdit).not.toHaveBeenCalled();
+    expect(mockAdd).not.toHaveBeenCalled();
+    expect(await getVideosUsedThisMonth(USER)).toBe(0);
   });
 });
 

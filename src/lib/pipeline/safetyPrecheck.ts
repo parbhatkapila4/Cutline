@@ -1,4 +1,6 @@
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+import { getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat } from "@/lib/llm/chat";
+
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 
@@ -47,40 +49,21 @@ export async function precheckChunksForSafety(
   const verdict = new Array<boolean>(chunks.length).fill(false);
   if (chunks.length === 0) return verdict;
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey?.trim()) return verdict;
   const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
+  const candidates = getProviderCandidates("safetyPrecheck", model, options?.model);
+  if (candidates.length === 0) return verdict;
 
   const numbered = chunks.map((c, i) => `${i}: ${c}`).join("\n");
   const userContent = `Screen these ${chunks.length} narration lines. Reply with the JSON object only.\n\n${numbered}`;
 
   try {
-    const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
-        ],
-        temperature: 0,
-        max_tokens: 200,
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) {
-      console.warn(`[safety-precheck] skipped: HTTP ${response.status}`);
-      return verdict;
-    }
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || !content.trim()) return verdict;
+    const content = await tryModelCandidates(candidates, "safety-precheck", (candidate) =>
+      requestChat(
+        candidate,
+        { system: SYSTEM_PROMPT, user: userContent, temperature: 0, maxTokens: 200, timeoutMs: 20_000 },
+        "Safety precheck"
+      )
+    );
     for (const i of parseFlagged(content, chunks.length)) verdict[i] = true;
     return verdict;
   } catch (e) {

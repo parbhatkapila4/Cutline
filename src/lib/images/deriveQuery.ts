@@ -3,8 +3,9 @@ import type { Shot } from "@/lib/types";
 import type { Script } from "@/lib/types";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 import { ConfigurationError } from "@/lib/utils/error";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat } from "@/lib/llm/chat";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 export type DeriveResult = {
@@ -25,13 +26,10 @@ export async function deriveImageQuery(
   intent: Intent,
   alreadyUsedForOtherShots?: AlreadyUsedForShots
 ): Promise<DeriveResult> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const model = process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey?.trim()) {
-    throw new ConfigurationError(
-      "OPENROUTER_API_KEY is not set. Add your key to .env.local"
-    );
+  const candidates = getProviderCandidates("imageQuery", model);
+  if (candidates.length === 0) {
+    throw new ConfigurationError(NO_LLM_KEY_MESSAGE);
   }
 
   const scriptText = getScriptTextForShot(script, shot.id);
@@ -52,49 +50,13 @@ export async function deriveImageQuery(
     userPrompt += ` Already used for other shots in this video (suggest a DIFFERENT scene, angle, or composition-do not repeat): ${usedList}. Return a NEW searchQuery and imagePrompt that are still about "${topic}" but visually different from the above.`;
   }
 
-  const body = {
-    model,
-    messages: [
-      { role: "system" as const, content: systemPrompt },
-      { role: "user" as const, content: userPrompt },
-    ],
-    temperature: 0,
-    max_tokens: 1024,
-    response_format: { type: "json_object" as const },
-  };
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15_000);
-
-  let response: Response;
-  try {
-    response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Query derivation failed: ${response.status}. ${response.status === 401 ? "Check your API key." : text || ""}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = data.choices?.[0]?.message?.content;
-  if (typeof raw !== "string" || !raw.trim()) {
-    throw new Error("Query derivation returned empty content");
-  }
+  const raw = await tryModelCandidates(candidates, "image-query", (candidate) =>
+    requestChat(
+      candidate,
+      { system: systemPrompt, user: userPrompt, temperature: 0, maxTokens: 1024, json: true, timeoutMs: 15_000 },
+      "Query derivation"
+    )
+  );
 
   let parsed: { searchQuery?: string; imagePrompt?: string };
   try {

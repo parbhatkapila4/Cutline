@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getVideoQueue, CLEANUP_JOB_NAME, type VideoJobData, type VideoJobResult } from "@/lib/queue/videoQueue";
 import { getClientIdentifier, checkRateLimit } from "@/lib/rate-limit";
 import { auth } from "@/lib/auth";
+import { videoTitleFromPrompt } from "@/lib/dashboard/videoTitle";
 
 export type DashboardVideoItem = {
   id: string;
@@ -35,13 +36,6 @@ function formatDuration(seconds: number | undefined): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function titleFromInput(input: string | undefined): string {
-  if (input == null || typeof input !== "string") return "";
-  const trimmed = input.trim();
-  if (trimmed.length <= 50) return trimmed;
-  return trimmed.slice(0, 50);
-}
-
 type DashboardOwner = { id: string; ownerType: "user" };
 
 async function resolveDashboardOwner(request: Request): Promise<DashboardOwner | null> {
@@ -71,7 +65,7 @@ async function loadPersistedItems(owner: DashboardOwner): Promise<DashboardVideo
           : "processing";
     return {
       id: row.queue_job_id ?? row.id,
-      title: titleFromInput(row.prompt),
+      title: videoTitleFromPrompt(row.prompt),
       prompt: row.prompt ?? "",
       date: formatDate(status === "completed" ? finishedTs : ts),
       duration: formatDuration(row.job_data?.durationSeconds),
@@ -133,7 +127,7 @@ export async function GET(request: Request) {
       const ts = job.finishedOn ?? job.processedOn ?? job.timestamp ?? 0;
       return {
         id: String(job.id ?? ""),
-        title: titleFromInput(input),
+        title: videoTitleFromPrompt(input),
         prompt: typeof input === "string" ? input : "",
         date: formatDate(ts),
         duration: formatDuration(data?.durationSeconds),

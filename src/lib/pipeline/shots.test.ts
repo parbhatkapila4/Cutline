@@ -59,6 +59,7 @@ describe("planShots on a 10 s video", () => {
       order: i + 1,
     }));
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: string, init: { body: string }) => {

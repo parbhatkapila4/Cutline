@@ -1,4 +1,6 @@
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat } from "@/lib/llm/chat";
+
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const SYSTEM_PROMPT = `You are an edit interpreter for a video generation system. You are given:
@@ -20,47 +22,20 @@ export async function interpretEdit(
   userMessage: string,
   options?: InterpretEditOptions
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const model = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey?.trim()) {
-    throw new Error("OPENROUTER_API_KEY is not set");
+  const candidates = getProviderCandidates("editInterpretation", model, options?.model);
+  if (candidates.length === 0) {
+    throw new Error(NO_LLM_KEY_MESSAGE);
   }
 
   const userContent = `Original prompt: ${originalInput}\n\nUser edit request: ${userMessage}\n\nOutput only the new, single prompt:`;
 
-  const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userContent },
-      ],
-      temperature: 0.4,
-      max_tokens: 400,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Edit interpreter failed: ${response.status}. ${response.status === 401 ? "Check API key." : text || ""}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content;
-
-  if (typeof content !== "string" || !content.trim()) {
-    throw new Error("Edit interpreter failed: empty response from model");
-  }
-
+  const content = await tryModelCandidates(candidates, "edit-interpreter", (candidate) =>
+    requestChat(
+      candidate,
+      { system: SYSTEM_PROMPT, user: userContent, temperature: 0.4, maxTokens: 400, timeoutMs: 30_000 },
+      "Edit interpreter"
+    )
+  );
   return content.trim().slice(0, 500);
 }

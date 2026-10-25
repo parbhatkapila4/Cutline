@@ -4,7 +4,10 @@ import { logPipelineEvent } from "@/lib/utils/pipelineLogger";
 import Redis from "ioredis";
 import { createManagedRedis } from "@/lib/redis/managedRedis";
 import { runPipeline } from "@/lib/pipeline/orchestrator";
-import { deletePublishedBlob, publishRenderedVideo } from "@/lib/storage/publish";
+import {
+  deletePublishedBlob,
+  publishRenderedVideo,
+} from "@/lib/storage/publish";
 import { CANCELLED_JOBS_KEY, isJobCancelled } from "./cancelCheck";
 import { isCancelledFailure } from "@/lib/jobs/jobStatus";
 import { getVideoQueueName } from "./queueName";
@@ -71,7 +74,7 @@ export type VideoJobData = {
   aspectRatio?: string;
   callbackUrl?: string;
   placeholders?: Record<string, string>;
-  brandBrain?: BrandBrainInput;
+  brandBrain?: BrandBrainInput;                         
   scriptFidelity?: ScriptFidelityMode;
   strictScript?: string;
   locale?: string;
@@ -82,6 +85,9 @@ export type VideoJobData = {
   regenerateShotIds?: string[];
   seriesId?: string;
   remixFromJobId?: string;
+  editFromJobId?: string;
+  editRootJobId?: string;
+  editMessage?: string;
 };
 
 export type VideoJobVariation = {
@@ -100,7 +106,9 @@ export type VideoJobResult = {
 
 export const CLEANUP_JOB_NAME = "cleanup";
 
-export async function cancelJob(jobId: string): Promise<{ ok: boolean; reason?: "not_found" | "already_finished" }> {
+export async function cancelJob(
+  jobId: string,
+): Promise<{ ok: boolean; reason?: "not_found" | "already_finished" }> {
   if (!jobId || typeof jobId !== "string") {
     return { ok: false, reason: "not_found" };
   }
@@ -161,10 +169,16 @@ export async function getQueueWaitMetrics(jobId: string): Promise<{
     if (state === "waiting") {
       const [waitingCount, head] = await Promise.all([
         queue.getWaitingCount(),
-        queue.getRanges(["waiting", "paused"], 0, QUEUE_POSITION_WINDOW - 1, true),
+        queue.getRanges(
+          ["waiting", "paused"],
+          0,
+          QUEUE_POSITION_WINDOW - 1,
+          true,
+        ),
       ]);
       const idx = head.indexOf(String(jobId));
-      const position = idx >= 0 ? idx + 1 : Math.max(QUEUE_POSITION_WINDOW + 1, waitingCount);
+      const position =
+        idx >= 0 ? idx + 1 : Math.max(QUEUE_POSITION_WINDOW + 1, waitingCount);
       return {
         queuePosition: position,
         queueEtaSeconds: Math.max(0, Math.round((position - 1) * avgSec)),
@@ -203,8 +217,12 @@ export type JobSummary = {
   error?: string;
 };
 
-function jobStateToStatus(state: JobState | "unknown" | "paused", failedReason?: string | null): string {
-  if (state === "failed" && isCancelledFailure(failedReason)) return "cancelled";
+function jobStateToStatus(
+  state: JobState | "unknown" | "paused",
+  failedReason?: string | null,
+): string {
+  if (state === "failed" && isCancelledFailure(failedReason))
+    return "cancelled";
   switch (state) {
     case "waiting":
     case "delayed":
@@ -231,7 +249,7 @@ export async function listRecentJobs(options: {
 }): Promise<JobSummary[]> {
   const limit = Math.min(
     LIST_JOBS_MAX_LIMIT,
-    Math.max(1, options.limit ?? LIST_JOBS_DEFAULT_LIMIT)
+    Math.max(1, options.limit ?? LIST_JOBS_DEFAULT_LIMIT),
   );
   try {
     const queue = getVideoQueue();
@@ -253,17 +271,17 @@ export async function listRecentJobs(options: {
         const data = job.data as VideoJobData;
         const result = job.returnvalue as VideoJobResult | undefined;
         const status = jobStateToStatus(state, job.failedReason ?? null);
-        const videoUrl =
-          result?.variations?.[0]?.videoUrl ?? result?.videoPath;
+        const videoUrl = result?.variations?.[0]?.videoUrl ?? result?.videoPath;
         return {
           jobId: String(job.id),
           status,
           createdAt: job.timestamp,
           videoUrl: videoUrl ?? undefined,
           topic: data?.input ?? undefined,
-          error: status === "failed" ? (job.failedReason ?? undefined) : undefined,
+          error:
+            status === "failed" ? (job.failedReason ?? undefined) : undefined,
         };
-      })
+      }),
     );
     withState.sort((a, b) => b.createdAt - a.createdAt);
     return withState;
@@ -274,7 +292,9 @@ export async function listRecentJobs(options: {
   }
 }
 
-export async function deleteStaleJobs(options: { retentionDays: number }): Promise<number> {
+export async function deleteStaleJobs(options: {
+  retentionDays: number;
+}): Promise<number> {
   const { retentionDays } = options;
   if (!retentionDays || retentionDays <= 0) return 0;
   const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
@@ -287,7 +307,15 @@ export async function deleteStaleJobs(options: { retentionDays: number }): Promi
     ]);
     const total = completedIds.length + failedIds.length;
     if (total > 0) {
-      console.log("[queue] deleteStaleJobs removed " + total + " jobs (completed=" + completedIds.length + " failed=" + failedIds.length + ")");
+      console.log(
+        "[queue] deleteStaleJobs removed " +
+          total +
+          " jobs (completed=" +
+          completedIds.length +
+          " failed=" +
+          failedIds.length +
+          ")",
+      );
     }
     return total;
   } catch (e) {
@@ -309,15 +337,14 @@ export async function removeLegacyCleanupJobs(): Promise<number> {
   const jobs = await queue.getJobs(
     ["waiting", "delayed", "completed", "failed"],
     0,
-    LEGACY_CLEANUP_SCAN_LIMIT - 1
+    LEGACY_CLEANUP_SCAN_LIMIT - 1,
   );
   for (const job of jobs) {
     if (job?.name !== CLEANUP_JOB_NAME) continue;
     try {
       await job.remove();
       removed += 1;
-    } catch {
-    }
+    } catch {}
   }
   return removed;
 }
@@ -337,15 +364,23 @@ async function writeJobRecord(write: () => Promise<unknown>): Promise<void> {
   }
 }
 
-async function persistCompletion(jobId: string, result: VideoJobResult): Promise<void> {
+async function persistCompletion(
+  jobId: string,
+  result: VideoJobResult,
+): Promise<void> {
   const finalUrl = result.videoPath || result.variations?.[0]?.videoUrl || null;
   try {
-    const { markVideoJobCompleted } = await import("@/lib/jobs/videoJobService");
-    await writeJobRecord(() => markVideoJobCompleted(jobId, { finalUrl, result }));
+    const { markVideoJobCompleted } =
+      await import("@/lib/jobs/videoJobService");
+    await writeJobRecord(() =>
+      markVideoJobCompleted(jobId, { finalUrl, result }),
+    );
   } catch (e) {
     console.error(
-      "[worker] jobId=" + jobId + " video_jobs completion write failed; the maintenance pass will settle it. error=" +
-      (e instanceof Error ? e.message : String(e))
+      "[worker] jobId=" +
+        jobId +
+        " video_jobs completion write failed; the maintenance pass will settle it. error=" +
+        (e instanceof Error ? e.message : String(e)),
     );
   }
 }
@@ -398,15 +433,22 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
       }
       activeJobIds.add(jobIdStr);
       try {
-        const { markVideoJobProcessing } = await import("@/lib/jobs/videoJobService");
+        const { markVideoJobProcessing } =
+          await import("@/lib/jobs/videoJobService");
         await markVideoJobProcessing(jobIdStr);
       } catch (e) {
         console.error(
-          "[worker] jobId=" + jobIdStr + " video_jobs processing write failed error=" +
-          (e instanceof Error ? e.message : String(e))
+          "[worker] jobId=" +
+            jobIdStr +
+            " video_jobs processing write failed error=" +
+            (e instanceof Error ? e.message : String(e)),
         );
       }
-      logPipelineEvent({ jobId: jobIdStr, event: "job_started", ...(requestId ? { requestId } : {}) });
+      logPipelineEvent({
+        jobId: jobIdStr,
+        event: "job_started",
+        ...(requestId ? { requestId } : {}),
+      });
       recordRenderEvent({
         jobId: jobIdStr,
         userId: typeof job.data?.userId === "string" ? job.data.userId : null,
@@ -485,7 +527,7 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
       lockRenewTime: 30_000,
 
       maxStalledCount: 0,
-    }
+    },
   );
 
   worker.on("completed", async (job) => {
@@ -501,25 +543,30 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
             jobId: String(job?.id ?? ""),
             status: "completed",
             videoUrl: result?.variations?.[0]?.videoUrl ?? result?.videoPath,
-            variations: result?.variations?.map((v) => ({ videoUrl: v.videoUrl })),
+            variations: result?.variations?.map((v) => ({
+              videoUrl: v.videoUrl,
+            })),
             completedAt: new Date().toISOString(),
             ...(result?.qualityReport
               ? {
-                qualityReport: {
-                  passed: result.qualityReport.passed,
-                  score: result.qualityReport.score,
-                  issues: result.qualityReport.issues,
-                },
-              }
+                  qualityReport: {
+                    passed: result.qualityReport.passed,
+                    score: result.qualityReport.score,
+                    issues: result.qualityReport.issues,
+                  },
+                }
               : {}),
           },
         });
       });
     }
     const vid = result?.videoPath ?? "";
-    const processedOn = typeof job?.processedOn === "number" ? job.processedOn : 0;
-    const finishedOn = typeof job?.finishedOn === "number" ? job.finishedOn : Date.now();
-    const durationMs = processedOn > 0 ? Math.round(finishedOn - processedOn) : undefined;
+    const processedOn =
+      typeof job?.processedOn === "number" ? job.processedOn : 0;
+    const finishedOn =
+      typeof job?.finishedOn === "number" ? job.finishedOn : Date.now();
+    const durationMs =
+      processedOn > 0 ? Math.round(finishedOn - processedOn) : undefined;
     recordRenderEvent({
       jobId: String(job?.id ?? ""),
       userId: typeof data?.userId === "string" ? data.userId : null,
@@ -537,19 +584,27 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
     if (clientId && typeof clientId === "string") {
       try {
         const { adjustSpendUsd } = await import("@/lib/cost/budget");
-        const unmetered = (c: { total?: number; video?: number } | undefined): number => {
+        const unmetered = (
+          c: { total?: number; video?: number } | undefined,
+        ): number => {
           if (!c || typeof c.total !== "number") return 0;
-          return Math.max(0, c.total - (typeof c.video === "number" ? c.video : 0));
+          return Math.max(
+            0,
+            c.total - (typeof c.video === "number" ? c.video : 0),
+          );
         };
         let actualUsd = unmetered(result?.cost);
         if (actualUsd === 0 && Array.isArray(result?.variations)) {
           actualUsd = result.variations.reduce(
             (sum: number, v: { cost?: { total?: number; video?: number } }) =>
               sum + unmetered(v?.cost),
-            0
+            0,
           );
         }
-        const reserved = typeof data?.reservedSpendUsd === "number" ? data.reservedSpendUsd : 0;
+        const reserved =
+          typeof data?.reservedSpendUsd === "number"
+            ? data.reservedSpendUsd
+            : 0;
         const delta = actualUsd - reserved;
         if (delta !== 0) {
           const spendKeyId =
@@ -560,27 +615,49 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         }
         if (actualUsd === 0 && reserved === 0) {
           console.warn(
-            "[worker] jobId=" + job?.id + " completed with no cost data; margin ledger unchanged"
+            "[worker] jobId=" +
+              job?.id +
+              " completed with no cost data; margin ledger unchanged",
           );
         }
       } catch (e) {
-        console.error("[worker] jobId=" + job?.id + " budget/credits error=" + (e instanceof Error ? e.message : String(e)));
+        console.error(
+          "[worker] jobId=" +
+            job?.id +
+            " budget/credits error=" +
+            (e instanceof Error ? e.message : String(e)),
+        );
       }
       if (!data?.reservedVideoMonth) {
         try {
-          const { incrementVideosCompletedThisMonth } = await import("@/lib/usage");
+          const { incrementVideosCompletedThisMonth } =
+            await import("@/lib/usage");
           await incrementVideosCompletedThisMonth(clientId);
         } catch (e) {
-          console.error("[worker] jobId=" + job?.id + " incrementVideosCompletedThisMonth error=" + (e instanceof Error ? e.message : String(e)));
+          console.error(
+            "[worker] jobId=" +
+              job?.id +
+              " incrementVideosCompletedThisMonth error=" +
+              (e instanceof Error ? e.message : String(e)),
+          );
         }
       }
     }
     if (result?.cost) {
       const c = result.cost;
       console.log(
-        "[worker] jobId=" + job?.id +
-        " cost llm=$" + c.llm + " tts=$" + c.tts + " video=$" + c.video +
-        " images=$" + c.images + " total=$" + c.total
+        "[worker] jobId=" +
+          job?.id +
+          " cost llm=$" +
+          c.llm +
+          " tts=$" +
+          c.tts +
+          " video=$" +
+          c.video +
+          " images=$" +
+          c.images +
+          " total=$" +
+          c.total,
       );
     }
   });
@@ -588,46 +665,70 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
   worker.on("failed", (job, err) => {
     const jid = job?.id ?? "?";
     if (job?.name === CLEANUP_JOB_NAME) {
-      console.error("[worker] jobId=cleanup failed error=" + (err?.message ?? String(err)).replace(/\s+/g, " "));
+      console.error(
+        "[worker] jobId=cleanup failed error=" +
+          (err?.message ?? String(err)).replace(/\s+/g, " "),
+      );
       return;
     }
     const data = job?.data as VideoJobData | undefined;
     const callbackUrl = data?.callbackUrl;
-    const msg = (err instanceof Error ? err.message : String(err)).replace(/\s+/g, " ");
+    const msg = (err instanceof Error ? err.message : String(err)).replace(
+      /\s+/g,
+      " ",
+    );
     const isCancelled = msg.includes("cancelled");
     {
-      const processedOn = typeof job?.processedOn === "number" ? job.processedOn : 0;
-      const finishedOn = typeof job?.finishedOn === "number" ? job.finishedOn : Date.now();
+      const processedOn =
+        typeof job?.processedOn === "number" ? job.processedOn : 0;
+      const finishedOn =
+        typeof job?.finishedOn === "number" ? job.finishedOn : Date.now();
       recordRenderEvent({
         jobId: String(jid),
         userId: typeof data?.userId === "string" ? data.userId : null,
         eventType: "job_failed",
         errorCode: mapFailedReasonToFailureCode(msg),
-        durationMs: processedOn > 0 ? Math.round(finishedOn - processedOn) : null,
+        durationMs:
+          processedOn > 0 ? Math.round(finishedOn - processedOn) : null,
         providerError: msg,
       });
     }
-    if (typeof data?.reservedSpendUsd === "number" && data.reservedSpendUsd > 0) {
+    if (
+      typeof data?.reservedSpendUsd === "number" &&
+      data.reservedSpendUsd > 0
+    ) {
       console.warn(
-        "[worker] jobId=" + jid + " failed; keeping $" + data.reservedSpendUsd.toFixed(3) +
-        " budget reservation (spend already incurred is unknown)"
+        "[worker] jobId=" +
+          jid +
+          " failed; keeping $" +
+          data.reservedSpendUsd.toFixed(3) +
+          " budget reservation (spend already incurred is unknown)",
       );
     }
     void (async () => {
       try {
         const { releaseJobVideo } = await import("@/lib/jobs/jobReservation");
         if (await releaseJobVideo(String(jid), data)) {
-          console.log("[worker] jobId=" + jid + " failed; gave its video back to the monthly count");
+          console.log(
+            "[worker] jobId=" +
+              jid +
+              " failed; gave its video back to the monthly count",
+          );
         }
       } catch (e) {
         console.error(
-          "[worker] jobId=" + jid + " video count release failed error=" +
-          (e instanceof Error ? e.message : String(e))
+          "[worker] jobId=" +
+            jid +
+            " video count release failed error=" +
+            (e instanceof Error ? e.message : String(e)),
         );
       }
     })();
     void (async () => {
-      const reserved = typeof data?.reservedCinematicSeconds === "number" ? data.reservedCinematicSeconds : 0;
+      const reserved =
+        typeof data?.reservedCinematicSeconds === "number"
+          ? data.reservedCinematicSeconds
+          : 0;
       if (reserved <= 0) return;
       const spendKeyId =
         typeof data?.spendIdentifier === "string" && data.spendIdentifier
@@ -637,34 +738,63 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
             : null;
       if (!spendKeyId) return;
       try {
-        const { releaseCinematicSecondsOnce } = await import("@/lib/cost/budget");
-        const split = data?.reservedCinematicSplit ?? { fromMonthly: reserved, fromTopup: 0 };
-        const released = await releaseCinematicSecondsOnce(spendKeyId, reserved, split, String(jid));
+        const { releaseCinematicSecondsOnce } =
+          await import("@/lib/cost/budget");
+        const split = data?.reservedCinematicSplit ?? {
+          fromMonthly: reserved,
+          fromTopup: 0,
+        };
+        const released = await releaseCinematicSecondsOnce(
+          spendKeyId,
+          reserved,
+          split,
+          String(jid),
+        );
         if (released) {
           console.log(
-            "[worker] jobId=" + jid + " failed; released the full " + reserved +
-            "s reservation (monthly " + (split.fromMonthly ?? 0) + ", purchased " + (split.fromTopup ?? 0) + ")"
+            "[worker] jobId=" +
+              jid +
+              " failed; released the full " +
+              reserved +
+              "s reservation (monthly " +
+              (split.fromMonthly ?? 0) +
+              ", purchased " +
+              (split.fromTopup ?? 0) +
+              ")",
           );
         } else {
           console.log(
-            "[worker] jobId=" + jid + " cinematic release skipped; " + reserved +
-            "s was already released for this job"
+            "[worker] jobId=" +
+              jid +
+              " cinematic release skipped; " +
+              reserved +
+              "s was already released for this job",
           );
         }
       } catch (e) {
         console.error(
-          "[worker] jobId=" + jid + " cinematic release failed error=" +
-          (e instanceof Error ? e.message : String(e))
+          "[worker] jobId=" +
+            jid +
+            " cinematic release failed error=" +
+            (e instanceof Error ? e.message : String(e)),
         );
       }
     })();
     void (async () => {
       try {
-        const { markVideoJobFailed } = await import("@/lib/jobs/videoJobService");
-        const reason = job?.failedReason || (err instanceof Error ? err.message : String(err));
+        const { markVideoJobFailed } =
+          await import("@/lib/jobs/videoJobService");
+        const reason =
+          job?.failedReason ||
+          (err instanceof Error ? err.message : String(err));
         await writeJobRecord(() => markVideoJobFailed(String(jid), reason));
       } catch (e) {
-        console.error("[worker] jobId=" + jid + " video_jobs fail-update error=" + (e instanceof Error ? e.message : String(e)));
+        console.error(
+          "[worker] jobId=" +
+            jid +
+            " video_jobs fail-update error=" +
+            (e instanceof Error ? e.message : String(e)),
+        );
       }
     })();
     if (callbackUrl && typeof callbackUrl === "string") {
@@ -680,8 +810,10 @@ export function startVideoWorker(): Worker<VideoJobData, VideoJobResult> {
         });
       });
     }
-    const processedOn = typeof job?.processedOn === "number" ? job.processedOn : 0;
-    const durationMs = processedOn > 0 ? Math.round(Date.now() - processedOn) : 0;
+    const processedOn =
+      typeof job?.processedOn === "number" ? job.processedOn : 0;
+    const durationMs =
+      processedOn > 0 ? Math.round(Date.now() - processedOn) : 0;
     logPipelineEvent({
       jobId: String(jid),
       event: "job_failed",

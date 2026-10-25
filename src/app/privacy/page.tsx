@@ -67,7 +67,7 @@ export default function PrivacyPage() {
               <h2 className="text-2xl font-semibold text-white mb-4">Summary</h2>
               <ul className="space-y-2 text-zinc-400 text-sm leading-relaxed list-disc pl-5">
                 <li>We collect the minimum needed to run the service: account info, the prompts and assets you submit, the videos we generate for you, and basic technical/operational logs.</li>
-                <li>We send your prompts and scripts to third-party AI providers (OpenRouter, ElevenLabs or PlayHT, OpenAI, optionally Google Veo) so they can run the pipeline. Your prompts leave our servers when this happens.</li>
+                <li>We send your prompts and scripts to third-party AI providers (Anthropic, OpenRouter, ElevenLabs or PlayHT, OpenAI, optionally Google Veo) so they can run the pipeline. Your prompts leave our servers when this happens.</li>
                 <li>Free renders are deleted after roughly 24 hours. Paid renders are kept for 90 days, then deleted. Uploaded assets are deleted after roughly 24 hours on every plan.</li>
                 <li>We use Google Analytics to measure site traffic. It loads on every page, but only when a measurement ID is configured for the deployment. We do not run ad-tracking or behavioural profiling.</li>
                 <li>Payments are processed by Dodo Payments. We never see or store your card number.</li>
@@ -120,7 +120,8 @@ export default function PrivacyPage() {
               <p className="text-zinc-400 text-sm leading-relaxed mb-5">To deliver the service we have to send some data to the following sub-processors. They each have their own privacy policies, which we recommend you read.</p>
               <div className="space-y-4">
                 {[
-                  { name: "OpenRouter", what: "The text of your prompt, intent, narrative, shot list, script, and any image-search queries we derive from them.", why: "Routes our LLM requests to the model you (or we) selected. Used in every text generation stage." },
+                  { name: "Anthropic", what: "The text of your prompt, intent, narrative, shot list, script, any image-search queries we derive from them, and images you upload for analysis.", why: "Runs the Claude models behind every text generation stage." },
+                  { name: "OpenRouter", what: "The same text and images, when a request goes to OpenRouter instead.", why: "Routes our LLM requests to the model you (or we) selected when Anthropic is unavailable, or when a video asks for a model Anthropic doesn't offer." },
                   { name: "ElevenLabs or PlayHT", what: "The script text we generate from your prompt.", why: "Converts the script into voiceover audio. You configure which provider via the TTS_PROVIDER setting." },
                   { name: "OpenAI", what: "Image prompts derived from your shot list. We never send your full prompt or account email.", why: "Generates fallback images via DALL·E 3 when no stock photo matches." },
                   { name: "Unsplash and Pexels", what: "Image search queries derived from your shot list.", why: "Returns stock photos used as the visual layer of each shot. Standard image-search API requests." },

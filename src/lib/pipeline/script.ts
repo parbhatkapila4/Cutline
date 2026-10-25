@@ -4,8 +4,8 @@ import { getVariationPromptSnippet } from "@/lib/variation/strategies";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
 import type { BrandBrainInput } from "@/lib/types/pipelineEnhancements";
-import { shouldRetryForLLM } from "@/lib/utils/retry";
-import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat, type ModelCandidate } from "@/lib/llm/chat";
 import { cleanSpokenText } from "@/lib/pipeline/spokenText";
 import {
   VEO_CHUNK_SECONDS,
@@ -17,7 +17,6 @@ import {
 } from "@/lib/pipeline/narrationLength";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 const BASE_SYSTEM_PROMPT = `You are a script writer for a short video. Structure (beats, shots) is already decided. You fill each shot with spoken text or silence.
@@ -259,70 +258,23 @@ export type GenerateScriptOptions = {
 
 async function requestScriptFromModel(
   shotList: ShotList,
-  apiKey: string,
-  model: string,
+  candidate: ModelCandidate,
   systemPrompt: string,
   userContent: string,
   isTalkingObject: boolean
 ): Promise<Script> {
-  const url = `${OPENROUTER_BASE}/chat/completions`;
-  const body = {
-    model,
-    messages: [
-      { role: "system" as const, content: systemPrompt },
-      { role: "user" as const, content: userContent },
-    ],
-    temperature: isTalkingObject ? 0.65 : 0,
-    max_tokens: 4096,
-    response_format: { type: "json_object" as const },
-  };
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45_000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error) {
-      if (err.name === "AbortError") {
-        throw new Error("Script generation timed out. Try again.");
-      }
-      throw new Error(`Script generation failed: ${err.message}`);
-    }
-    throw new Error("Script generation failed: unknown error");
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Script generation failed: API returned ${response.status}. ${response.status === 401 ? "Check your API key." : text || ""}`
-    );
-  }
-
-  let data: { choices?: Array<{ message?: { content?: string } }> };
-  try {
-    data = (await response.json()) as typeof data;
-  } catch {
-    throw new Error("Script generation failed: invalid response from API");
-  }
-
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || content.trim() === "") {
-    throw new Error("Script generation failed: empty response from model");
-  }
-
+  const content = await requestChat(
+    candidate,
+    {
+      system: systemPrompt,
+      user: userContent,
+      temperature: isTalkingObject ? 0.65 : 0,
+      maxTokens: 4096,
+      json: true,
+      timeoutMs: 45_000,
+    },
+    "Script generation"
+  );
   return parseAndValidateScript(content.trim(), shotList);
 }
 
@@ -332,11 +284,10 @@ export async function generateScript(
   shotList: ShotList,
   options?: GenerateScriptOptions
 ): Promise<Script> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  const candidates = getProviderCandidates("script", primaryModel, options?.model);
+  if (candidates.length === 0) {
+    throw new Error(NO_LLM_KEY_MESSAGE);
   }
 
   const durationSec = Number(options?.durationSeconds);
@@ -385,34 +336,10 @@ CREATIVE VARIATION (run seed: ${seed}):
   const userContent = `${JSON.stringify({ intent, plan, shotList: shotsForModel })}${variationDirective}
 
 CRITICAL: shotList.shots has exactly ${n} items. Your "entries" array MUST have exactly ${n} objects, in the same order as shots (order 1..${n}). Each entry.shotId must equal shotList.shots[i].id for that index. Do not merge shots, skip shots, or add extra entries.${wordBudget ? " Each entry's text must have no more words than its shot's maxWords." : ""}`;
-  const modelCandidates = getModelCandidates(primaryModel);
 
-  let lastError: unknown;
-  for (let i = 0; i < modelCandidates.length; i++) {
-    const model = modelCandidates[i]!;
-    try {
-      return await requestScriptFromModel(
-        shotList,
-        apiKey,
-        model,
-        systemPrompt,
-        userContent,
-        isTalkingObject
-      );
-    } catch (err) {
-      lastError = err;
-      const shouldFallback = shouldRetryForLLM(err);
-      const hasNext = i < modelCandidates.length - 1;
-      if (!shouldFallback || !hasNext) {
-        throw err;
-      }
-      console.warn(
-        `[script] Primary model failed (${model}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error("Script generation failed");
+  return tryModelCandidates(candidates, "script", (candidate) =>
+    requestScriptFromModel(shotList, candidate, systemPrompt, userContent, isTalkingObject)
+  );
 }
 
 const EXTEND_SCRIPT_SYSTEM_PROMPT = `You extend a video script with new dialogue. You will be given the current script, the video topic, tone, and how many more words to add.
@@ -432,10 +359,9 @@ export async function extendScript(
   additionalWords: number,
   options?: ExtendScriptOptions
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey || apiKey.trim() === "") {
+  const candidates = getProviderCandidates("scriptExtension", primaryModel, options?.model);
+  if (candidates.length === 0) {
     return "";
   }
 
@@ -452,52 +378,24 @@ ${currentScriptText.trim()}
 
 Write approximately ${targetWords} words of NEW dialogue on the same topic, same tone. Do not repeat any line from the current script. Output only the new sentences.`;
 
-  const modelCandidates = getModelCandidates(primaryModel);
-  for (let i = 0; i < modelCandidates.length; i++) {
-    const model = modelCandidates[i]!;
-    const url = `${OPENROUTER_BASE}/chat/completions`;
-    const body = {
-      model,
-      messages: [
-        { role: "system" as const, content: EXTEND_SCRIPT_SYSTEM_PROMPT },
-        { role: "user" as const, content: userContent },
-      ],
-      temperature: 0.3,
-      max_tokens: 512,
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30_000);
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+  try {
+    const content = await tryModelCandidates(candidates, "script-extend", (candidate) =>
+      requestChat(
+        candidate,
+        {
+          system: EXTEND_SCRIPT_SYSTEM_PROMPT,
+          user: userContent,
+          temperature: 0.3,
+          maxTokens: 512,
+          timeoutMs: 30_000,
         },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const err = new Error(`Script extension failed: API returned ${response.status}`);
-        const shouldFallback = shouldRetryForLLM(err) && i < modelCandidates.length - 1;
-        if (!shouldFallback) return "";
-        continue;
-      }
-
-      const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-      const content = data.choices?.[0]?.message?.content;
-      if (typeof content !== "string") return "";
-      return cleanSpokenText(content);
-    } catch (err) {
-      clearTimeout(timeoutId);
-      const shouldFallback = shouldRetryForLLM(err) && i < modelCandidates.length - 1;
-      if (!shouldFallback) return "";
-    }
+        "Script extension"
+      )
+    );
+    return cleanSpokenText(content);
+  } catch {
+    return "";
   }
-  return "";
 }
 export function insertBeforeClosingLine(script: Script, text: string): Script {
   const entries = [...script.entries].sort((a, b) => a.order - b.order).map((e) => ({ ...e }));

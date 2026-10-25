@@ -21,7 +21,8 @@ No fixes were required for wiring; tests were added to lock behavior.
 
 - [ ] **All env vars set** in production (Vercel / worker host). Copy from `.env.example`; no placeholder values left.
 - [ ] **REDIS_URL** correct and reachable from both Next.js and worker (e.g. Upstash ioredis URL).
-- [ ] **OPENROUTER_API_KEY** set and valid (LLM for Intent, Narrative, Shots, Script, image query, asset analysis).
+- [ ] **OPENROUTER_API_KEY** set and valid (LLM for Intent, Narrative, Shots, Script, image query, asset analysis; the fallback when Anthropic is set).
+- [ ] **ANTHROPIC_API_KEY** set on both the Vercel app and the worker if Anthropic should take the LLM stages first. Optional: without it everything runs on OpenRouter.
 - [ ] **TTS:** Either `ELEVENLABS_API_KEY` (and `TTS_PROVIDER=elevenlabs`) or `PLAYHT_API_KEY` + `PLAYHT_USER_ID` (and `TTS_PROVIDER=playht`) set and valid.
 - [ ] **Image sourcing:** At least one of `UNSPLASH_ACCESS_KEY` or `PEXELS_API_KEY` set and valid. `OPENAI_API_KEY` recommended for DALL·E fallback.
 - [ ] **Storage:** If `STORAGE_TYPE=s3`, all `AWS_*` vars set and bucket writable. If local, worker host disk writable for `uploads/` and `public/temp` (both fixed to the app working directory; the former `UPLOAD_DIR` override was removed because a dynamic path makes Turbopack over-bundle the server build).

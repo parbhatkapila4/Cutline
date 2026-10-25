@@ -84,6 +84,7 @@ import { mapFailedReasonToFailureCode } from "@/lib/utils/error";
 import { savePreviewArtifacts, loadPreviewArtifacts } from "@/lib/preview/artifacts";
 import { getCaptionsRenderOption } from "@/lib/pipeline/captionsRenderOption";
 import { createCostTracker, countPaidImageCalls } from "@/lib/cost/costEstimator";
+import { withLlmCostTracking } from "@/lib/llm/usage";
 import { talkingProviderFor } from "@/lib/cost/pricing";
 import type { CostBreakdown } from "@/lib/cost/types";
 import type { Job } from "bullmq";
@@ -96,16 +97,6 @@ import type {
   RegenSnapshotV1,
   ScriptFidelityMode,
 } from "@/lib/types/pipelineEnhancements";
-
-const TOKENS_ESTIMATE = {
-  intent: 400,
-  narrative: 600,
-  shots: 800,
-  script: 1000,
-  assetAnalysis: 500,
-  imageQueryPerShot: 300,
-  scriptExtend: 400,
-} as const;
 
 const LOCK_DURATION_MS = 1_800_000;
 function hashStringToInt(input: string): number {
@@ -487,7 +478,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
     if (count === 1) {
       const costTracker = createCostTracker();
-      const result = await runPipelineOnce(pipelineOptions, costTracker);
+      const result = await withLlmCostTracking(costTracker, () => runPipelineOnce(pipelineOptions, costTracker));
       if (jobId) {
         try {
           recordJobEnd(jobId, "completed");
@@ -506,7 +497,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
         outputSuffix: `-v${v + 1}`,
         variationStrategy: getVariationStrategy(v),
       };
-      const result = await runPipelineOnce(iterOpts, costTracker);
+      const result = await withLlmCostTracking(costTracker, () => runPipelineOnce(iterOpts, costTracker));
       results.push({ videoUrl: result.videoPath, cost: costTracker.getBreakdown() });
       if (v === 0) qualityReport = result.qualityReport;
       if (job?.token) await job.extendLock(job.token, LOCK_DURATION_MS);
@@ -714,10 +705,7 @@ async function runPipelineOnce(
     logEvent({ jobId, event: "stage_start", stage: "intent" });
     intent = await withStageTelemetry(jobId, "intent", () =>
       retry(
-        () => interpretIntent(input, { ...llmOptions, platform: resolvedPlatform }).then((r) => {
-          costTracker.recordLlmTokens(TOKENS_ESTIMATE.intent);
-          return r;
-        }),
+        () => interpretIntent(input, { ...llmOptions, platform: resolvedPlatform }),
         {
           maxRetries: retryConfig.llm.maxRetries,
           backoffMs: retryConfig.llm.backoffMs,
@@ -735,10 +723,7 @@ async function runPipelineOnce(
     await checkCancelledAndThrow();
     logEvent({ jobId, event: "stage_start", stage: "narrative" });
     plan = await withStageTelemetry(jobId, "narrative", () => retry(
-      () => planNarrative(intent, { ...llmOptions, variationStrategy, platform: resolvedPlatform }).then((r) => {
-        costTracker.recordLlmTokens(TOKENS_ESTIMATE.narrative);
-        return r;
-      }),
+      () => planNarrative(intent, { ...llmOptions, variationStrategy, platform: resolvedPlatform }),
       {
         maxRetries: retryConfig.llm.maxRetries,
         backoffMs: retryConfig.llm.backoffMs,
@@ -749,10 +734,7 @@ async function runPipelineOnce(
     await checkCancelledAndThrow();
     logEvent({ jobId, event: "stage_start", stage: "shots" });
     shotList = await withStageTelemetry(jobId, "shots", () => retry(
-      () => planShots(intent, plan, { ...llmOptions, platform: resolvedPlatform }).then((r) => {
-        costTracker.recordLlmTokens(TOKENS_ESTIMATE.shots);
-        return r;
-      }),
+      () => planShots(intent, plan, { ...llmOptions, platform: resolvedPlatform }),
       {
         maxRetries: retryConfig.llm.maxRetries,
         backoffMs: retryConfig.llm.backoffMs,
@@ -799,11 +781,7 @@ async function runPipelineOnce(
       }
       script = await withStageTelemetry(jobId, "script", () =>
         retry(
-          () =>
-            mapStrictScriptToShots(intent, plan, shotList, rawStrict, textModel).then((r) => {
-              costTracker.recordLlmTokens(TOKENS_ESTIMATE.script);
-              return r;
-            }),
+          () => mapStrictScriptToShots(intent, plan, shotList, rawStrict, textModel),
           {
             maxRetries: retryConfig.llm.maxRetries,
             backoffMs: retryConfig.llm.backoffMs,
@@ -819,9 +797,6 @@ async function runPipelineOnce(
             generateScript(intent, plan, shotList, {
               durationSeconds: scriptDurationSec,
               ...scriptOptions,
-            }).then((r) => {
-              costTracker.recordLlmTokens(TOKENS_ESTIMATE.script);
-              return r;
             }),
           {
             maxRetries: retryConfig.llm.maxRetries,
@@ -1199,7 +1174,6 @@ async function runPipelineOnce(
           if (wordsNeeded <= 0) break;
           const extendOptions = { ...(textModel ? { model: textModel } : {}), exactWords: true };
           const extension = await extendScript(combinedScript, intent, wordsNeeded, extendOptions);
-          costTracker.recordLlmTokens(TOKENS_ESTIMATE.scriptExtend);
           if (!extension || !extension.trim()) {
             console.log("[pipeline] jobId=" + jobId + " script extension returned empty; using current content");
             break;
@@ -1639,10 +1613,7 @@ async function runPipelineOnce(
       await checkCancelledAndThrow();
       logEvent({ jobId, event: "stage_start", stage: "asset_analysis" });
       return retry(
-        () => analyzeResolvedAssets(jobAssets, brandColors).then((r) => {
-          costTracker.recordLlmTokens(TOKENS_ESTIMATE.assetAnalysis);
-          return r;
-        }),
+        () => analyzeResolvedAssets(jobAssets, brandColors),
         {
           maxRetries: retryConfig.llm.maxRetries,
           backoffMs: retryConfig.llm.backoffMs,
@@ -1691,7 +1662,6 @@ async function runPipelineOnce(
       e instanceof Error ? e.message : "Could not obtain images for video.";
     throw new Error(message);
   });
-  costTracker.recordLlmTokens(shotList.shots.length * TOKENS_ESTIMATE.imageQueryPerShot);
   costTracker.recordImageCalls(countPaidImageCalls(imageSpec.entries));
 
   const normalizedImageSpec = normalizeImageSpecForRender(imageSpec, jobId, cwd);

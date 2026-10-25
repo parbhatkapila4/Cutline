@@ -11,6 +11,7 @@ import { interpretEdit } from "@/lib/edit/interpreter";
 import { auth } from "@/lib/auth";
 import { getUserPlan } from "@/lib/users/planService";
 import { isProPlan } from "@/lib/plans";
+import { MAX_EDIT_MESSAGE_CHARS } from "@/lib/dashboard/editQuickPrompts";
 import { isDatabaseConfigured } from "@/lib/db";
 import { apiError } from "@/lib/api/errors";
 import { randomUUID } from "crypto";
@@ -39,6 +40,9 @@ const NOT_CARRIED_OVER: ReadonlyArray<keyof VideoJobData> = [
   "reservedCinematicSeconds",
   "reservedCinematicSplit",
   "reservedVideoMonth",
+  "editFromJobId",
+  "editRootJobId",
+  "editMessage",
 ];
 
 function carriedSettings(data: VideoJobData): Omit<VideoJobData, "input"> {
@@ -56,7 +60,7 @@ function uploadsDeletedMessage(): string {
   );
 }
 
-type EditSource = { data: VideoJobData; clientId: string };
+type EditSource = { data: VideoJobData; clientId: string; sourceJobId: string };
 
 async function loadEditSource(request: Request, jobId: string): Promise<EditSource | null> {
   const ownerCandidates = await resolveOwnerCandidates(request);
@@ -64,7 +68,9 @@ async function loadEditSource(request: Request, jobId: string): Promise<EditSour
     const { findVideoJobForOwners } = await import("@/lib/jobs/videoJobService");
     const row = ownerCandidates.length > 0 ? await findVideoJobForOwners(jobId, ownerCandidates) : null;
     if (!row || row.status !== "completed") return null;
-    if (row.job_data) return { data: row.job_data, clientId: row.owner_id };
+    if (row.job_data) {
+      return { data: row.job_data, clientId: row.owner_id, sourceJobId: row.queue_job_id ?? row.id };
+    }
   }
 
   const job = await getVideoQueue().getJob(jobId);
@@ -73,7 +79,7 @@ async function loadEditSource(request: Request, jobId: string): Promise<EditSour
   const data = job.data as VideoJobData | undefined;
   const clientId = data?.clientId;
   if (!data || clientId == null || !ownerCandidates.includes(String(clientId))) return null;
-  return { data, clientId: String(clientId) };
+  return { data, clientId: String(clientId), sourceJobId: String(job.id ?? jobId) };
 }
 
 export async function POST(
@@ -117,6 +123,12 @@ export async function POST(
       { status: 400 }
     );
   }
+  if (message.length > MAX_EDIT_MESSAGE_CHARS) {
+    return NextResponse.json(
+      { error: `Describe the change in ${MAX_EDIT_MESSAGE_CHARS} characters or fewer.` },
+      { status: 400 }
+    );
+  }
 
   let reservation: Reservation | null = null;
   let queued = false;
@@ -129,7 +141,7 @@ export async function POST(
         { status: 404 }
       );
     }
-    const { data, clientId } = source;
+    const { data, clientId, sourceJobId } = source;
 
     const originalInput = typeof data?.input === "string" && data.input.trim() !== ""
       ? data.input.trim()
@@ -219,6 +231,9 @@ export async function POST(
       input: newInput,
       mode: admission.mode,
       ...reservationJobFields(reservation),
+      editFromJobId: sourceJobId,
+      editRootJobId: data.editRootJobId ?? sourceJobId,
+      editMessage: message,
     };
     const writeRow = isDatabaseConfigured();
     if (writeRow) {

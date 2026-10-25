@@ -34,11 +34,36 @@
           "verifiedPriceUsd": null,
           "TODO": "Get the per-1M input AND output price for anthropic/claude-haiku-4.5 from the OpenRouter model page, plus OpenRouter's routing fee. Split into two entries if input/output differ.",
           "codeAssumedPriceUsd": 0.00025,
-          "codeAssumptionSource": "src/lib/cost/pricing.ts:11 (LLM_PER_1K_TOKENS: 0.00025)",
-          "envOverride": "COST_PER_1K_TOKENS (src/lib/cost/costEstimator.ts:25)",
+          "codeAssumptionSource": "src/lib/cost/pricing.ts (SERVICE_COSTS.LLM_PER_1K_TOKENS: 0.00025). Since Anthropic became the primary provider this rate feeds only the pre-job admission estimate (estimateCostUsd x ESTIMATED_LLM_TOKENS 4800).",
+          "envOverride": "none. COST_PER_1K_TOKENS was read only by CostTracker.recordLlmTokens, which is gone.",
           "model": "anthropic/claude-haiku-4.5",
-          "modelSource": "src/lib/pipeline/modelFallback.ts:1 (DEFAULT_MODEL)",
-          "notes": "The tracker does NOT separate input from output tokens - recordLlmTokens takes one number (src/lib/cost/costEstimator.ts:17). Real billing separates them and output is normally the dearer side, so a single blended rate here will be wrong in both directions depending on the stage."
+          "modelSource": "src/lib/pipeline/modelFallback.ts (DEFAULT_MODEL); OpenRouter is now the fallback after Anthropic",
+          "notes": "The job's cost tracker no longer uses a blended rate. Each LLM call is booked from the usage the provider returns (src/lib/llm/chat.ts -> CostTracker.recordLlmCall): an OpenRouter call at OpenRouter's own usage.cost, an Anthropic call at the per-model input/output rates in src/lib/cost/llmPricing.ts. OpenRouter's fee on buying credits (about 5.5% by card) is not included."
+        }
+      }
+    },
+
+    "anthropic": {
+      "displayName": "Anthropic (Claude API, primary LLM provider)",
+      "units": {
+        "llm_input_per_1m_tokens": {
+          "unit": "1,000,000 input tokens",
+          "verifiedPriceUsd": null,
+          "TODO": "Confirm the claude-haiku-5-5 input rate (prompts up to 100,000 tokens) against the Anthropic Console's billing page or an invoice.",
+          "codeAssumedPriceUsd": 0.1,
+          "codeAssumptionSource": "src/lib/cost/llmPricing.ts (CLAUDE_RATES, claude-haiku-5-5), copied from platform.claude.com/docs/en/about-claude/pricing on 2026-10-25",
+          "model": "claude-haiku-5-5",
+          "modelSource": "src/lib/pipeline/modelFallback.ts (ANTHROPIC_STAGE_MODELS)"
+        },
+        "llm_output_per_1m_tokens": {
+          "unit": "1,000,000 output tokens",
+          "verifiedPriceUsd": null,
+          "TODO": "Same check as the input rate.",
+          "codeAssumedPriceUsd": 0.5,
+          "codeAssumptionSource": "src/lib/cost/llmPricing.ts (CLAUDE_RATES, claude-haiku-5-5), copied from platform.claude.com/docs/en/about-claude/pricing on 2026-10-25",
+          "model": "claude-haiku-5-5",
+          "modelSource": "src/lib/pipeline/modelFallback.ts (ANTHROPIC_STAGE_MODELS)",
+          "notes": "Booked per call from the input_tokens and output_tokens Anthropic returns. Prompts over 100,000 tokens pay $0.50 / $2.50. A model missing from CLAUDE_RATES is booked at $10 / $50 per million tokens, never $0, and logged once."
         }
       }
     },
@@ -95,18 +120,25 @@
         "video_per_second": {
           "unit": "1 second of generated video",
           "verifiedPriceUsd": null,
-          "TODO": "Get the per-second price for veo-3.1-generate-preview from Google's Vertex/Gemini API pricing. Confirm whether audio-on generation is priced differently.",
-          "codeAssumedPriceUsd": 0.4,
-          "codeAssumptionSource": "src/lib/cost/pricing.ts:3 (VEO_PER_SECOND: 0.40)",
-          "envOverride": "COST_PER_VIDEO_SECOND (src/lib/cost/costEstimator.ts:27)",
-          "model": "veo-3.1-generate-preview",
-          "modelSource": "src/lib/veo/index.ts:8 (VEO_MODEL)",
+          "TODO": "Confirm against the GCP billing console that calls bill under the Veo 3.1 Fast video + audio 720p SKU. Re-check whenever VEO_MODEL, resolution or generateAudio changes: each is a different SKU (the standard model is $0.40/s with audio).",
+          "codeAssumedPriceUsd": 0.1,
+          "codeAssumptionSource": "src/lib/cost/pricing.ts:2 (VEO_PER_SECOND: 0.10). Google's list price for Veo 3.1 Fast, video + audio, 720p, at cloud.google.com/vertex-ai/generative-ai/pricing, read 2026-10-25.",
+          "envOverride": "COST_PER_VIDEO_SECOND (src/lib/cost/costEstimator.ts:33)",
+          "model": "veo-3.1-fast-generate-001",
+          "modelSource": "src/lib/veo/index.ts:11 (VEO_MODEL default; the VEO_MODEL env var overrides it)",
+          "requestShape": {
+            "model": "veo-3.1-fast-generate-001",
+            "durationSeconds": 8,
+            "resolution": "not sent, so Veo's default of 720p",
+            "generateAudio": "not sent; audio is on, since the clips speak their lines",
+            "source": "src/lib/veo/index.ts:317-331"
+          },
           "billingGranularity": {
             "secondsPerCall": 8,
-            "source": "src/lib/veo/index.ts:125 (durationSeconds: 8)",
-            "notes": "Every Veo call buys a fixed 8 seconds. A 9-second requirement costs 16 seconds. The estimator models this via VEO_CHUNK_SECONDS = 8 (src/lib/cost/pricing.ts:16)."
+            "source": "src/lib/veo/index.ts:322 (durationSeconds: 8)",
+            "notes": "Every Veo call buys a fixed 8 seconds. A 9-second requirement costs 16 seconds. The estimator models this via VEO_CHUNK_SECONDS = 8 (src/lib/cost/pricing.ts:29)."
           },
-          "notes": "By far the largest single line item. At the code-assumed rate, 8 seconds costs $3.20."
+          "notes": "By far the largest single line item. At the code-assumed rate, 8 seconds costs $0.80. Until 2026-10-25 the code booked $0.40/s, the standard model's video + audio price, so Veo costs recorded on earlier jobs are 4x too high."
         }
       }
     },

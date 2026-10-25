@@ -78,6 +78,7 @@ describe("text the model adds after the script stage is cleaned the same way", (
 
   function respondWith(content: string): void {
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -110,6 +111,7 @@ describe("the script fits the chosen length without cutting a line", () => {
   function captureRequests(content: string): Array<{ messages: Array<{ role: string; content: string }> }> {
     const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = [];
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: string, init: { body: string }) => {
@@ -135,7 +137,6 @@ describe("the script fits the chosen length without cutting a line", () => {
     });
     const system = bodies[0]!.messages.find((m) => m.role === "system")!.content;
     const user = bodies[0]!.messages.find((m) => m.role === "user")!.content;
-    // A 10 s slideshow ends with a 0.5 s pause and a 1 s fade, so it has 8.5 s to speak.
     expect(system).toContain("must come to about 20 words");
     expect(system).not.toContain("2.5 words per second");
     const shots = (JSON.parse(user.slice(0, user.indexOf("\n\nCRITICAL"))) as { shotList: ShotList }).shotList.shots;

@@ -1,5 +1,6 @@
 import type { CostBreakdown } from "./types";
 import { SERVICE_COSTS, VEO_CHUNK_SECONDS, heygenRatePerSecond } from "./pricing";
+import { llmCallCostUsd, type LlmCall } from "./llmPricing";
 import type { ImageSpecEntry } from "@/lib/images/types";
 export function countPaidImageCalls(entries: readonly ImageSpecEntry[] | undefined | null): number {
   if (!Array.isArray(entries)) return 0;
@@ -19,7 +20,7 @@ function round(value: number, decimals = 4): number {
 }
 
 export interface CostTracker {
-  recordLlmTokens(approxTokens: number): void;
+  recordLlmCall(call: LlmCall): void;
   recordTtsSeconds(seconds: number): void;
   recordVeoChunks(count: number): void;
   recordHeygenSeconds(seconds: number): void;
@@ -28,20 +29,20 @@ export interface CostTracker {
 }
 
 export function createCostTracker(): CostTracker {
-  const costPer1kTokens = getRate("COST_PER_1K_TOKENS", SERVICE_COSTS.LLM_PER_1K_TOKENS);
   const costPerTtsSecond = getRate("COST_PER_TTS_SECOND", SERVICE_COSTS.TTS_PER_SECOND);
   const costPerVideoSecond = getRate("COST_PER_VIDEO_SECOND", SERVICE_COSTS.VEO_PER_SECOND);
   const costPerImageCall = getRate("COST_PER_IMAGE_CALL", SERVICE_COSTS.DALLE_PER_IMAGE);
 
-  let llmTokens = 0;
+  let llmUsd = 0;
   let ttsSeconds = 0;
   let veoChunks = 0;
   let heygenSeconds = 0;
   let imageCalls = 0;
 
   return {
-    recordLlmTokens(approxTokens: number) {
-      llmTokens += Math.max(0, approxTokens);
+    recordLlmCall(call: LlmCall) {
+      const usd = llmCallCostUsd(call);
+      if (Number.isFinite(usd) && usd > 0) llmUsd += usd;
     },
     recordTtsSeconds(seconds: number) {
       ttsSeconds += Math.max(0, seconds);
@@ -56,7 +57,7 @@ export function createCostTracker(): CostTracker {
       imageCalls += Math.max(0, Math.round(count));
     },
     getBreakdown(): CostBreakdown {
-      const llm = round((llmTokens / 1000) * costPer1kTokens);
+      const llm = round(llmUsd);
       const tts = round(ttsSeconds * costPerTtsSecond);
       const video = round(
         veoChunks * VEO_CHUNK_SECONDS * costPerVideoSecond +

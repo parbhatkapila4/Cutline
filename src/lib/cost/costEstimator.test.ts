@@ -98,7 +98,7 @@ describe("Veo is booked per generation attempt, not per delivered second", () =>
   it("books a whole 8-second block per call, including rerolls and dropped chunks", () => {
     const t = createCostTracker();
     for (let i = 0; i < 6; i++) t.recordVeoChunks(1);
-    expect(t.getBreakdown().video).toBeCloseTo(19.2, 4);
+    expect(t.getBreakdown().video).toBeCloseTo(6 * 8 * SERVICE_COSTS.VEO_PER_SECOND, 4);
   });
 
   it("no longer undercounts a job whose output is shorter than what it bought", () => {
@@ -132,7 +132,7 @@ describe("Veo is booked per generation attempt, not per delivered second", () =>
       const t = createCostTracker();
       t.recordVeoChunks(1);
       t.recordHeygenSeconds(10);
-      expect(t.getBreakdown().video).toBeCloseTo(8 * 0.4 + 10 * 0.05, 4);
+      expect(t.getBreakdown().video).toBeCloseTo(8 * SERVICE_COSTS.VEO_PER_SECOND + 10 * 0.05, 4);
     } finally {
       delete process.env.COST_PER_HEYGEN_SECOND;
     }

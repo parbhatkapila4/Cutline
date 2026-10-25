@@ -4,12 +4,11 @@ import { type BeatPacing } from "@/lib/types";
 import { getVariationPromptSnippet } from "@/lib/variation/strategies";
 import type { Platform } from "@/lib/platform/types";
 import { getPlatformPromptSnippet } from "@/lib/platform/platformStrategy";
-import { shouldRetryForLLM } from "@/lib/utils/retry";
-import { getModelCandidates } from "@/lib/pipeline/modelFallback";
+import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@/lib/pipeline/modelFallback";
+import { requestChat, type ModelCandidate } from "@/lib/llm/chat";
 import { MIN_SECONDS_PER_SHOT } from "@/lib/pipeline/narrationLength";
 import { extractJsonFromModelOutput } from "@/lib/utils/modelJson";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 const OUTRO_SECONDS = 2;
 const MIN_BEAT_SECONDS = 4;
@@ -35,69 +34,21 @@ export type PlanNarrativeOptions = {
 
 async function requestNarrativePlanFromModel(
   intent: Intent,
-  apiKey: string,
-  model: string,
+  candidate: ModelCandidate,
   systemContent: string
 ): Promise<NarrativePlan> {
-  const userContent = JSON.stringify(intent);
-  const url = `${OPENROUTER_BASE}/chat/completions`;
-  const body = {
-    model,
-    messages: [
-      { role: "system" as const, content: systemContent },
-      { role: "user" as const, content: userContent },
-    ],
-    temperature: 0,
-    max_tokens: 4096,
-    response_format: { type: "json_object" as const },
-  };
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error) {
-      if (err.name === "AbortError") {
-        throw new Error("Narrative planning timed out. Try again.");
-      }
-      throw new Error(`Narrative planning failed: ${err.message}`);
-    }
-    throw new Error("Narrative planning failed: unknown error");
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Narrative planning failed: API returned ${response.status}. ${response.status === 401 ? "Check your API key." : text || ""}`
-    );
-  }
-
-  let data: { choices?: Array<{ message?: { content?: string } }> };
-  try {
-    data = (await response.json()) as typeof data;
-  } catch {
-    throw new Error("Narrative planning failed: invalid response from API");
-  }
-
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || content.trim() === "") {
-    throw new Error("Narrative planning failed: empty response from model");
-  }
-
+  const content = await requestChat(
+    candidate,
+    {
+      system: systemContent,
+      user: JSON.stringify(intent),
+      temperature: 0,
+      maxTokens: 4096,
+      json: true,
+      timeoutMs: 30_000,
+    },
+    "Narrative planning"
+  );
   return parseAndValidatePlan(content.trim(), intent.durationSeconds);
 }
 
@@ -258,11 +209,10 @@ export async function planNarrative(
   intent: Intent,
   options?: PlanNarrativeOptions
 ): Promise<NarrativePlan> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const primaryModel = options?.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error("OPENROUTER_API_KEY is not set. Add your key to .env.local");
+  const candidates = getProviderCandidates("narrative", primaryModel, options?.model);
+  if (candidates.length === 0) {
+    throw new Error(NO_LLM_KEY_MESSAGE);
   }
 
   const variationSnippet = options?.variationStrategy
@@ -274,25 +224,8 @@ export async function planNarrative(
       : "";
   const systemContent =
     buildSystemPrompt(intent.durationSeconds) + variationSnippet + platformSnippet;
-  const modelCandidates = getModelCandidates(primaryModel);
 
-  let lastError: unknown;
-  for (let i = 0; i < modelCandidates.length; i++) {
-    const model = modelCandidates[i]!;
-    try {
-      return await requestNarrativePlanFromModel(intent, apiKey, model, systemContent);
-    } catch (err) {
-      lastError = err;
-      const shouldFallback = shouldRetryForLLM(err);
-      const hasNext = i < modelCandidates.length - 1;
-      if (!shouldFallback || !hasNext) {
-        throw err;
-      }
-      console.warn(
-        `[narrative] Primary model failed (${model}). Falling back to ${modelCandidates[i + 1]}. Error: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error("Narrative planning failed");
+  return tryModelCandidates(candidates, "narrative", (candidate) =>
+    requestNarrativePlanFromModel(intent, candidate, systemContent)
+  );
 }

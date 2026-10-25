@@ -72,8 +72,8 @@ describe("estimateCostUsd — regression guards", () => {
   it("a 60s cinematic render still dominates everything else", () => {
     const cinematic = estimateCostUsd({ mode: "talking_object", durationSeconds: 60 });
     const slideshow = estimateCostUsd({ durationSeconds: 60, stockImagesOnly: true });
-    expect(cinematic).toBeGreaterThan(20);
-    expect(cinematic / slideshow).toBeGreaterThan(50);
+    expect(cinematic).toBeGreaterThan(64 * SERVICE_COSTS.VEO_PER_SECOND);
+    expect(cinematic / slideshow).toBeGreaterThan(20);
   });
 
   it("multiplies by variationCount, capped at 5", () => {
@@ -156,7 +156,7 @@ describe("provider split: HeyGen must not charge Veo seconds", () => {
   it("does not price HeyGen at Veo's rate", () => {
     const heygen = { ...REAL_AVATAR, avatar: { mode: "upload", uploadAssetId: "a" } };
     const veo = { ...REAL_AVATAR, avatar: { mode: "default" } };
-    expect(estimateCostUsd(veo)).toBeGreaterThan(12);
+    expect(estimateCostUsd(veo)).toBeGreaterThan(32 * SERVICE_COSTS.VEO_PER_SECOND);
     expect(estimateCostUsd(heygen)).toBeLessThan(1);
   });
 
