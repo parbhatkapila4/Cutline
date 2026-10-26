@@ -33,7 +33,15 @@ import { useRenderStatus, type RenderStatus } from "@/components/dashboard/video
 import { VideoPageSkeleton } from "@/components/dashboard/video/VideoPageSkeleton";
 import { VideoPlayer, formatClock, type VideoDimensions } from "@/components/dashboard/video/VideoPlayer";
 import { PIPELINE_STEPS } from "@/components/generate/constants";
-import { isPlanId, isProPlan, videoRetentionHoursForPlan, type PlanId } from "@/lib/plans";
+import { absoluteVideoUrl } from "@/lib/dashboard/videoLink";
+import {
+  SHARE_LINKS_PLAN_NOTE,
+  canShareLinks,
+  isPlanId,
+  isProPlan,
+  videoRetentionHoursForPlan,
+  type PlanId,
+} from "@/lib/plans";
 import { cn } from "@/lib/utils";
 import { ASPECT_RATIOS } from "@/lib/validation/aspectRatio";
 
@@ -85,7 +93,7 @@ function retentionLine(plan: PlanId | null): string {
 }
 
 function absoluteUrl(url: string): string {
-  return /^https?:\/\//i.test(url) ? url : `${window.location.origin}${url}`;
+  return absoluteVideoUrl(url, window.location.origin);
 }
 
 function replaceUrl(jobId: string) {
@@ -239,6 +247,7 @@ export default function DashboardVideoPage() {
   const busy = renderingId !== null || sending !== null;
   const planKnown = plan !== null;
   const isPro = isProPlan(plan);
+  const canShare = canShareLinks(plan);
   const editSource = selected && isEditable(selected) ? selected : latest(versions, isEditable);
   const latestReady = latest(versions, (v) => v.status === "completed");
 
@@ -858,7 +867,7 @@ export default function DashboardVideoPage() {
               {copied === "prompt" ? <Check aria-hidden /> : <Copy aria-hidden />}
               {copied === "prompt" ? "Copied" : "Copy prompt"}
             </button>
-          ) : isPro ? (
+          ) : canShare ? (
             <button
               type="button"
               onClick={() => selected?.videoUrl && void copyText(absoluteUrl(selected.videoUrl), "link")}
@@ -870,7 +879,7 @@ export default function DashboardVideoPage() {
           ) : planKnown ? (
             <Link
               href="/pricing"
-              title="Share links are on Professional and Enterprise"
+              title={SHARE_LINKS_PLAN_NOTE}
               className={cn(BTN_SECONDARY, "max-[899px]:hidden")}
             >
               <Link2 aria-hidden />
@@ -894,7 +903,7 @@ export default function DashboardVideoPage() {
                 role="menu"
                 className="absolute right-0 top-[calc(100%+6px)] z-40 w-[220px] rounded-xl bg-[#16161a] p-[5px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_24px_60px_rgba(0,0,0,0.6)] [&_[role=menuitem]]:flex [&_[role=menuitem]]:w-full [&_[role=menuitem]]:items-center [&_[role=menuitem]]:gap-2.5 [&_[role=menuitem]]:rounded-lg [&_[role=menuitem]]:px-2.5 [&_[role=menuitem]]:py-2 [&_[role=menuitem]]:text-left [&_[role=menuitem]]:text-[13px] [&_[role=menuitem]]:text-zinc-100 [&_[role=menuitem]:hover]:bg-white/6 [&_[role=menuitem]_svg]:size-4 [&_[role=menuitem]_svg]:text-zinc-500"
               >
-                {selectedDownloadable && isPro ? (
+                {selectedDownloadable && canShare ? (
                   <button
                     type="button"
                     role="menuitem"

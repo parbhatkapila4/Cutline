@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { ASPECT_RATIOS } from "@/lib/validation/aspectRatio";
 import {
+  aspectRatiosFor,
   estimateCostUsd,
   cinematicSecondsFor,
   veoSecondsFor,
@@ -164,5 +166,49 @@ describe("provider split: HeyGen must not charge Veo seconds", () => {
     delete process.env.COST_PER_HEYGEN_SECOND;
     expect(heygenRatePerSecond()).toBe(0);
     expect(heygenRatePerSecond()).not.toBe(SERVICE_COSTS.VEO_PER_SECOND);
+  });
+});
+
+describe("shapes follow the renderer", () => {
+  const REAL = {
+    mode: "talking_object" as const,
+    talkingObjectStyle: "real" as const,
+    talkingRealMode: "studio",
+    durationSeconds: 30,
+  };
+  const VEO_SHAPES = ["16:9", "9:16"];
+
+  it("offers every shape for a slideshow", () => {
+    expect(aspectRatiosFor({ mode: "slideshow" })).toEqual(ASPECT_RATIOS);
+    expect(aspectRatiosFor({})).toEqual(ASPECT_RATIOS);
+  });
+
+  it("offers only 16:9 and 9:16 when Veo makes the talking character", () => {
+    expect(aspectRatiosFor({ mode: "talking_object", talkingObjectStyle: "cartoon" })).toEqual(VEO_SHAPES);
+    expect(aspectRatiosFor({ ...REAL, avatar: { mode: "default" } })).toEqual(VEO_SHAPES);
+    expect(
+      aspectRatiosFor({ ...REAL, talkingRealMode: "scenario", avatar: { mode: "preset", presetId: "presenter_female_1" } })
+    ).toEqual(VEO_SHAPES);
+  });
+
+  it("offers every shape when HeyGen makes it, because HeyGen is asked for the exact frame", () => {
+    expect(aspectRatiosFor({ ...REAL, avatar: { mode: "preset", presetId: "presenter_female_1" } })).toEqual(ASPECT_RATIOS);
+    expect(aspectRatiosFor({ ...REAL, avatar: { mode: "upload", uploadAssetId: "asset-1" } })).toEqual(ASPECT_RATIOS);
+  });
+
+  it("is narrowed exactly when the provider is Veo", () => {
+    const shapes = [
+      { mode: "slideshow" as const },
+      { mode: "talking_object" as const, talkingObjectStyle: "cartoon" as const },
+      { ...REAL, avatar: { mode: "default" } },
+      { ...REAL, avatar: { mode: "preset", presetId: "creator_male_1" } },
+      { ...REAL, avatar: { mode: "upload", uploadAssetId: "a" } },
+      { ...REAL, avatar: { mode: "upload" } },
+      { ...REAL, talkingRealMode: "scenario", avatar: { mode: "upload", uploadAssetId: "a" } },
+    ];
+    for (const shape of shapes) {
+      const narrowed = aspectRatiosFor(shape).length < ASPECT_RATIOS.length;
+      expect(narrowed).toBe(talkingProviderFor(shape) === "veo");
+    }
   });
 });

@@ -1,3 +1,5 @@
+import { ASPECT_RATIOS, VEO_ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
+
 export const SERVICE_COSTS = {
   VEO_PER_SECOND: 0.10,
   TTS_PER_SECOND: 0.004,
@@ -59,6 +61,10 @@ export function talkingProviderFor(params: TalkingShape): TalkingProvider | null
   }
   if (avatar?.mode === "upload" && avatar.uploadAssetId) return "heygen";
   return "veo";
+}
+
+export function aspectRatiosFor(params: TalkingShape): readonly AspectRatio[] {
+  return talkingProviderFor(params) === "veo" ? VEO_ASPECT_RATIOS : ASPECT_RATIOS;
 }
 
 export function veoSecondsFor(params: TalkingShape): number {

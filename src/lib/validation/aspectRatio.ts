@@ -46,3 +46,17 @@ export function getDimensionsForAspectRatio(
 export function isValidAspectRatio(value: unknown): value is AspectRatio {
   return typeof value === "string" && ASPECT_RATIOS.includes(value as AspectRatio);
 }
+
+export const VEO_ASPECT_RATIOS = ["16:9", "9:16"] as const satisfies readonly AspectRatio[];
+
+export type VeoAspectRatio = (typeof VEO_ASPECT_RATIOS)[number];
+
+export function veoAspectRatioFor(ratio: unknown): VeoAspectRatio {
+  return ratio === "9:16" || ratio === "4:5" ? "9:16" : "16:9";
+}
+
+const PREVIEW_RENDER_HEIGHT = 720;
+
+export function previewDimensionsForAspectRatio(ratio: unknown): { width: number; height: number } {
+  return getDimensionsForAspectRatio(isValidAspectRatio(ratio) ? ratio : "16:9", PREVIEW_RENDER_HEIGHT);
+}

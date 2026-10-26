@@ -13,7 +13,11 @@ import { compositionSecondsFor, fitShotsToLength } from "@/lib/pipeline/narratio
 import { runRemotionRender } from "@/lib/pipeline/renderVideo";
 import { ENDING_FADE_SECONDS } from "@/remotion/ending";
 import { getCaptionsRenderOption } from "@/lib/pipeline/captionsRenderOption";
-import { getDimensionsForAspectRatio, isValidAspectRatio } from "@/lib/validation/aspectRatio";
+import {
+  getDimensionsForAspectRatio,
+  isValidAspectRatio,
+  previewDimensionsForAspectRatio,
+} from "@/lib/validation/aspectRatio";
 import { getMaxOutputMb } from "@/lib/config/limits";
 import {
   retry,
@@ -235,7 +239,7 @@ export async function runSlideshowTailFromSubtitles(
     audioBase64,
     audioFormat: ttsResult.audioFormat,
     durationSeconds: compositionDurationSec + ENDING_FADE_SECONDS,
-    ...(isPreview ? { width: 1280, height: 720 } : aspectDimensions
+    ...(isPreview ? previewDimensionsForAspectRatio(aspectRatio) : aspectDimensions
       ? { width: aspectDimensions.width, height: aspectDimensions.height }
       : {}),
   };

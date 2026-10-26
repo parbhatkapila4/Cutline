@@ -221,3 +221,68 @@ describe("meter: HeyGen does not charge Veo seconds at admission", () => {
     expect(latestJobPayload()?.reservedCinematicSeconds).toBeUndefined();
   });
 });
+
+describe("shape: a talking character is only taken in the shapes its renderer makes", () => {
+  const veoBody = { mode: "talking_object", durationSeconds: 30 };
+  const heygenBody = {
+    mode: "talking_object",
+    talkingObjectStyle: "real",
+    talkingRealMode: "studio",
+    avatar: { mode: "preset", presetId: "presenter_female_1" },
+    durationSeconds: 30,
+  };
+
+  beforeEach(() => {
+    mockGetUserPlan.mockResolvedValue(PRO);
+  });
+
+  it.each(["4:5", "1:1", "3:2", "21:9"])("turns %s away for a Veo render before anything is queued", async (aspectRatio) => {
+    const res = await generate({ ...veoBody, aspectRatio });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_FAILED");
+    expect(body.details.errors).toEqual([expect.objectContaining({ field: "aspectRatio" })]);
+    expect(mockAdd).not.toHaveBeenCalled();
+  });
+
+  it("says which shapes it can make", async () => {
+    const res = await generate({ ...veoBody, aspectRatio: "4:5" });
+    expect((await res.json()).error).toContain("16:9 or 9:16");
+  });
+
+  it.each(["16:9", "9:16"])("takes %s for a Veo render and queues it as asked", async (aspectRatio) => {
+    const res = await generate({ ...veoBody, aspectRatio });
+    expect(res.status).toBe(200);
+    expect(latestJobPayload()?.aspectRatio).toBe(aspectRatio);
+  });
+
+  it("takes a Veo render that names no shape", async () => {
+    const res = await generate(veoBody);
+    expect(res.status).toBe(200);
+    expect(latestJobPayload()?.aspectRatio).toBeUndefined();
+  });
+
+  it("turns 4:5 away for a scenario render with a preset avatar, which Veo also makes", async () => {
+    const res = await generate({ ...heygenBody, talkingRealMode: "scenario", aspectRatio: "4:5" });
+    expect(res.status).toBe(400);
+    expect(mockAdd).not.toHaveBeenCalled();
+  });
+
+  it("takes every shape for a HeyGen render, which is asked for the exact frame", async () => {
+    for (const aspectRatio of ["4:5", "1:1", "3:2", "21:9"]) {
+      mockAdd.mockClear();
+      const res = await generate({ ...heygenBody, aspectRatio });
+      expect(res.status).toBe(200);
+      expect(latestJobPayload()?.aspectRatio).toBe(aspectRatio);
+    }
+  });
+
+  it("takes every shape for a slideshow", async () => {
+    for (const aspectRatio of ["4:5", "1:1", "3:2", "21:9"]) {
+      mockAdd.mockClear();
+      const res = await generate({ mode: "slideshow", durationSeconds: 30, aspectRatio });
+      expect(res.status).toBe(200);
+      expect(latestJobPayload()?.aspectRatio).toBe(aspectRatio);
+    }
+  });
+});

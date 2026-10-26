@@ -19,10 +19,19 @@ import {
   PIPELINE_STEPS,
 } from "@/components/generate/constants";
 import { runningPollDelay } from "@/components/generate/pollSchedule";
-import { ASPECT_RATIOS, type AspectRatio } from "@/lib/validation/aspectRatio";
+import { ASPECT_RATIOS, veoAspectRatioFor, type AspectRatio } from "@/lib/validation/aspectRatio";
 import type { AvatarPresetId } from "@/lib/types/avatar";
-import { isEnterprisePlan, isProPlan, isPlanId, PLAN_CONFIGS, type PlanId } from "@/lib/plans";
-import { cinematicSecondsFor } from "@/lib/cost/pricing";
+import {
+  SHARE_LINKS_PLAN_NOTE,
+  canShareLinks,
+  isEnterprisePlan,
+  isProPlan,
+  isPlanId,
+  PLAN_CONFIGS,
+  type PlanId,
+} from "@/lib/plans";
+import { absoluteVideoUrl } from "@/lib/dashboard/videoLink";
+import { aspectRatiosFor, cinematicSecondsFor, type TalkingShape } from "@/lib/cost/pricing";
 import {
   trackGenerateSubmit,
   trackGenerateComplete,
@@ -286,7 +295,7 @@ export default function CreatePage() {
   const untilPlanKnown = (copy: string) =>
     planKnown ? copy : <SkeletonInline>{copy}</SkeletonInline>;
   const isSlideshow = mode === "slideshow";
-  const secondsThisVideo = cinematicSecondsFor({
+  const talkingShape: TalkingShape = {
     mode,
     durationSeconds: Math.min(maxDur, Math.max(DURATION_MIN, dur)),
     talkingObjectStyle: objStyle,
@@ -297,7 +306,11 @@ export default function CreatePage() {
         : avatarMode === "upload"
           ? { mode: "upload", uploadAssetId: avatarFile ? "pending" : undefined }
           : { mode: "default" },
-  });
+  };
+  const secondsThisVideo = cinematicSecondsFor(talkingShape);
+  const offeredRatios = aspectRatiosFor(talkingShape);
+  const effectiveAspectRatio = offeredRatios.includes(aspectRatio) ? aspectRatio : veoAspectRatioFor(aspectRatio);
+  const canShare = canShareLinks(userPlan);
   const shortOnSeconds =
     secondsThisVideo > 0 &&
     secondsBalance != null &&
@@ -643,7 +656,7 @@ export default function CreatePage() {
         r = await fetch("/api/generate", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            input: prompt.trim(), mode, platform, aspectRatio,
+            input: prompt.trim(), mode, platform, aspectRatio: effectiveAspectRatio,
             durationSeconds: Math.min(maxDur, Math.max(DURATION_MIN, dur)),
             captions: cc ? "on" : "off",
             ...(assetIds.length ? { assetIds } : {}),
@@ -1124,7 +1137,7 @@ export default function CreatePage() {
                   </>
                 )}
                 <span className="text-white/15">·</span>
-                <span className="text-zinc-400">{aspectRatio.replace(":", "·")}</span>
+                <span className="text-zinc-400">{effectiveAspectRatio.replace(":", "·")}</span>
                 <span className="h-px flex-1 bg-white/[0.06] mx-1" aria-hidden />
                 <span className="text-zinc-600 tabular-nums hidden sm:inline">
                   Render {formatElapsed(elapsedSec)}
@@ -1151,7 +1164,10 @@ export default function CreatePage() {
                 transition={{ delay: 0.28, duration: 0.6 }}
                 className="text-[14px] text-zinc-400 leading-relaxed mb-8 max-w-[60ch]"
               >
-                Generated successfully and saved to your library. Download the MP4, share it with anyone, or refine the angle in your dashboard.
+                Generated successfully and saved to your library.{" "}
+                {canShare
+                  ? "Download the MP4, share it with anyone, or refine the angle in your dashboard."
+                  : "Download the MP4 or refine the angle in your dashboard."}
               </motion.p>
 
               {completionMessage ? (
@@ -1191,7 +1207,7 @@ export default function CreatePage() {
                   <div
                     className="relative bg-black z-1 contain-layout mx-auto w-full"
                     style={{
-                      aspectRatio: aspectRatio.replace(":", " / "),
+                      aspectRatio: effectiveAspectRatio.replace(":", " / "),
                       maxHeight: "78vh",
                       width: "auto",
                       maxWidth: "100%",
@@ -1240,65 +1256,81 @@ export default function CreatePage() {
                   </svg>
                 </a>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!videoUrl) return;
-                    navigator.clipboard.writeText(window.location.origin + videoUrl);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className={`group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border text-[13px] font-medium transition-colors ${copied
-                    ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                    : "border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22]"
-                    }`}
-                  aria-live="polite"
-                >
-                  {copied ? (
-                    <>
-                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                      </svg>
-                      Copy link
-                    </>
-                  )}
-                </button>
+                {canShare ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!videoUrl) return;
+                        navigator.clipboard.writeText(absoluteVideoUrl(videoUrl, window.location.origin));
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className={`group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border text-[13px] font-medium transition-colors ${copied
+                        ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                        : "border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22]"
+                        }`}
+                      aria-live="polite"
+                    >
+                      {copied ? (
+                        <>
+                          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4} aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                          </svg>
+                          Copy link
+                        </>
+                      )}
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!videoUrl) return;
-                    const shareUrl = window.location.origin + videoUrl;
-                    if (shareSupported) {
-                      try {
-                        await navigator.share({
-                          title: "My Cutline video",
-                          text: "Made with Cutline.",
-                          url: shareUrl,
-                        });
-                        return;
-                      } catch {
-                      }
-                    }
-                    navigator.clipboard.writeText(shareUrl);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22] text-[13px] font-medium transition-colors"
-                  title={shareSupported ? "Share via system" : "Copy share link"}
-                >
-                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-                  </svg>
-                  Share
-                </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!videoUrl) return;
+                        const shareUrl = absoluteVideoUrl(videoUrl, window.location.origin);
+                        if (shareSupported) {
+                          try {
+                            await navigator.share({
+                              title: "My Cutline video",
+                              text: "Made with Cutline.",
+                              url: shareUrl,
+                            });
+                            return;
+                          } catch {
+                          }
+                        }
+                        navigator.clipboard.writeText(shareUrl);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22] text-[13px] font-medium transition-colors"
+                      title={shareSupported ? "Share via system" : "Copy share link"}
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                      </svg>
+                      Share
+                    </button>
+                  </>
+                ) : planKnown ? (
+                  <Link
+                    href="/pricing"
+                    title={SHARE_LINKS_PLAN_NOTE}
+                    className="group inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border border-white/[0.10] bg-white/[0.02] backdrop-blur-md text-zinc-300 hover:text-white hover:bg-white/[0.05] hover:border-white/[0.22] text-[13px] font-medium transition-colors"
+                  >
+                    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                    </svg>
+                    Copy link
+                    <ProBadge plan={userPlan} withLock title={SHARE_LINKS_PLAN_NOTE} />
+                  </Link>
+                ) : null}
               </motion.div>
 
               <motion.div
@@ -1619,11 +1651,15 @@ export default function CreatePage() {
                       <div className="flex flex-col gap-2.5">
                         <div>
                           <h2 className="text-[13px] font-medium text-[#ededed] m-0 mb-1 tracking-[-0.005em]">Aspect ratio</h2>
-                          <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">Frame size for the output.</p>
+                          <p className="text-[12px] text-zinc-500 m-0 leading-[1.5]">
+                            {offeredRatios.length < ASPECT_RATIOS.length
+                              ? `Talking-character clips come in ${offeredRatios.join(" or ")}.`
+                              : "Frame size for the output."}
+                          </p>
                         </div>
-                        <div className="grid grid-cols-6 gap-1.5">
-                          {ASPECT_RATIOS.map((r) => {
-                            const selected = aspectRatio === r;
+                        <div className={`grid gap-1.5 ${offeredRatios.length < ASPECT_RATIOS.length ? "grid-cols-2" : "grid-cols-6"}`}>
+                          {offeredRatios.map((r) => {
+                            const selected = effectiveAspectRatio === r;
                             const [w, h] = r.split(":").map(Number);
                             const maxBox = 22;
                             const scale = Math.min(maxBox / w, maxBox / h);

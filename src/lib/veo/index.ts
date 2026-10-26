@@ -5,7 +5,7 @@ import path from "path";
 import { getDuration } from "@/lib/pipeline/concatMp4";
 import { recordRenderEvent } from "@/lib/telemetry/renderEvents";
 import { parseHttpStatus } from "@/lib/utils/retry";
-import { isValidAspectRatio, type AspectRatio } from "@/lib/validation/aspectRatio";
+import { veoAspectRatioFor } from "@/lib/validation/aspectRatio";
 import { ensureVertexCredentials } from "@/lib/veo/credentials";
 
 const VEO_MODEL = process.env.VEO_MODEL || "veo-3.1-fast-generate-001";
@@ -298,10 +298,11 @@ export interface GenerateTalkingVideoOptions {
 }
 
 function veoConfigAspectRatio(user?: string): "16:9" | "9:16" {
-  if (!user || !isValidAspectRatio(user)) return "16:9";
-  const portrait: AspectRatio[] = ["9:16", "4:5"];
-  if (portrait.includes(user)) return "9:16";
-  return "16:9";
+  const made = veoAspectRatioFor(user);
+  if (user && user !== made) {
+    console.warn(`[veo] Veo only makes 16:9 and 9:16, so a ${user} request is being generated as ${made}.`);
+  }
+  return made;
 }
 
 export async function generateTalkingVideoWithVeo(

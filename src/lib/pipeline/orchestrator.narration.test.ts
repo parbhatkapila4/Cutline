@@ -101,6 +101,10 @@ vi.mock("@/lib/queue/cancelCheck", () => ({
     run(new AbortController().signal),
 }));
 vi.mock("@/lib/regen/snapshotStore", () => ({ saveRegenSnapshot: async () => { } }));
+vi.mock("@/lib/preview/artifacts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/preview/artifacts")>()),
+  savePreviewArtifacts: async () => { },
+}));
 vi.mock("@/lib/storage/cleanup", () => ({ cleanupJobArtifacts: async () => { } }));
 vi.mock("@/lib/telemetry/renderEvents", () => ({ recordRenderEvent: () => { } }));
 vi.mock("@/lib/utils/pipelineLogger", () => ({ logPipelineEvent: () => { } }));
@@ -417,5 +421,55 @@ describe("a Veo video says every word of its script", () => {
       "Manual invoicing wastes hours every week. Automation sends and chases every invoice for you. Errors cost you money.",
       "It builds each invoice from your records and sends it the moment the job is finished. Switch today.",
     ]);
+  });
+});
+
+describe("a preview is rendered in the shape of the job it previews", () => {
+  beforeEach(resetMocks);
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const preview = (aspectRatio?: string) =>
+    runPipeline({
+      input: "Why small businesses should automate invoicing",
+      jobId: "preview-shape-test",
+      mode: "slideshow",
+      durationSeconds: 30,
+      captions: "on",
+      renderMode: "preview",
+      ...(aspectRatio ? { aspectRatio } : {}),
+      resolvedAssets: new Map(),
+    });
+
+  it("renders a 9:16 job's preview at 720x1280, where the caption sits 15% up as it does in the final", async () => {
+    const result = await preview("9:16");
+    expect(result.isPreview).toBe(true);
+    expect(mocks.renders[0]).toMatchObject({ width: 720, height: 1280 });
+  });
+
+  it("renders the other shapes with 720 on their short side", async () => {
+    const sizes: Record<string, [number, number]> = {
+      "16:9": [1280, 720],
+      "1:1": [720, 720],
+      "4:5": [576, 720],
+      "3:2": [1080, 720],
+      "21:9": [1680, 720],
+    };
+    for (const [ratio, [width, height]] of Object.entries(sizes)) {
+      mocks.renders.length = 0;
+      await preview(ratio);
+      expect(mocks.renders[0], ratio).toMatchObject({ width, height });
+    }
+  });
+
+  it("renders at 1280x720 when the job asked for no shape", async () => {
+    await preview();
+    expect(mocks.renders[0]).toMatchObject({ width: 1280, height: 720 });
+  });
+
+  it("still renders the final of the same job at its own full size", async () => {
+    await run(30);
+    expect(mocks.renders[0]).toMatchObject({ width: 1080, height: 1920 });
   });
 });

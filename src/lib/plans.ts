@@ -62,3 +62,9 @@ export function isProPlan(plan: string | undefined | null): boolean {
   return plan === "professional" || plan === "enterprise";
 }
 
+export const SHARE_LINKS_PLAN_NOTE = "Share links are on Professional and Enterprise";
+
+export function canShareLinks(plan: string | undefined | null): boolean {
+  return isProPlan(plan);
+}
+

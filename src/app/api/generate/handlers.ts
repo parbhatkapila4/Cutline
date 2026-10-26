@@ -23,6 +23,7 @@ import { requestOwnsResource, resolveOwnerCandidates } from "@/lib/jobs/jobOwner
 import { isCancelledFailure } from "@/lib/jobs/jobStatus";
 import { isDatabaseConfigured } from "@/lib/db";
 import { isProPlan } from "@/lib/plans";
+import { aspectRatiosFor } from "@/lib/cost/pricing";
 import { auth } from "@/lib/auth";
 import { ensureInProcessWorkerStarted } from "@/lib/queue/autoStartWorker";
 import { getVideoQueueName } from "@/lib/queue/queueName";
@@ -296,6 +297,24 @@ export async function handleGeneratePost(request: Request): Promise<NextResponse
           {
             field: "assetIds",
             message: "Only supported when mode is 'slideshow'.",
+          },
+        ],
+      },
+      headers,
+    });
+  }
+
+  const shapesForRenderer = aspectRatiosFor(data);
+  if (data.aspectRatio && !shapesForRenderer.includes(data.aspectRatio)) {
+    return apiError({
+      code: ErrorCode.VALIDATION_FAILED,
+      message: `This kind of talking-character video can only be made in ${shapesForRenderer.join(" or ")}.`,
+      status: 400,
+      details: {
+        errors: [
+          {
+            field: "aspectRatio",
+            message: `aspectRatio must be one of: ${shapesForRenderer.join(", ")} for this talking-character video.`,
           },
         ],
       },

@@ -67,7 +67,12 @@ import {
 import { validateVideoChunk } from "@/lib/pipeline/validateChunk";
 import { burnSubtitlesIntoVideo, type SubtitleEntry } from "@/lib/pipeline/burnSubtitles";
 import { DURATION_MIN } from "@/lib/validation/duration";
-import { getDimensionsForAspectRatio, isValidAspectRatio } from "@/lib/validation/aspectRatio";
+import {
+  getDimensionsForAspectRatio,
+  isValidAspectRatio,
+  previewDimensionsForAspectRatio,
+  veoAspectRatioFor,
+} from "@/lib/validation/aspectRatio";
 import { getMaxDurationSeconds, getMaxOutputMb } from "@/lib/config/limits";
 import { logPipelineEvent } from "@/lib/utils/pipelineLogger";
 import {
@@ -297,7 +302,7 @@ function buildCinematicBasePrompt(
 ): string {
   const subject = pickCinematicSubject(jobId, chunkIndex);
   const setting = pickCinematicSetting(jobId, chunkIndex);
-  const isPortrait = aspectRatio === "9:16" || aspectRatio === "4:5";
+  const isPortrait = veoAspectRatioFor(aspectRatio) === "9:16";
   const orientationHint = isPortrait
     ? "vertical phone-style framing"
     : "horizontal widescreen framing";
@@ -1738,7 +1743,7 @@ async function runPipelineOnce(
     audioBase64,
     audioFormat: ttsResult.audioFormat,
     durationSeconds: renderDurationSec,
-    ...(isPreview ? { width: 1280, height: 720 } : aspectDimensions ? { width: aspectDimensions.width, height: aspectDimensions.height } : {}),
+    ...(isPreview ? previewDimensionsForAspectRatio(aspectRatio) : aspectDimensions ? { width: aspectDimensions.width, height: aspectDimensions.height } : {}),
   };
 
   await checkCancelledAndThrow();
