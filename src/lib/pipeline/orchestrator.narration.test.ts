@@ -258,6 +258,24 @@ describe("slideshow length follows the narration", () => {
     ]);
   });
 
+  it("keeps the script as written when the top-up comes back empty, and does not ask again", async () => {
+    mocks.shotList = planOf([[6, 2], [6, 2], [3, 1]]);
+    mocks.script = scriptOf([
+      "Manual invoicing wastes hours.",
+      "Automation fixes that.",
+      "Switch to automated invoicing today and see the difference.",
+    ]);
+    mocks.extension = "";
+    mocks.tts = { audioBuffer: Buffer.from("mp3"), audioFormat: "mp3", durationMs: 14800, segmentDurationsMs: [5200, 6100, 3500] };
+    await run(15);
+    expect(mocks.extendCalls).toHaveLength(1);
+    expect(mocks.renders[0]!.script.entries.map((e) => e.text)).toEqual([
+      "Manual invoicing wastes hours.",
+      "Automation fixes that.",
+      "Switch to automated invoicing today and see the difference.",
+    ]);
+  });
+
   it("gives HeyGen the whole narration and keeps the video and its captions to the end", async () => {
     vi.stubEnv("HEYGEN_API_KEY", "test-key");
     const narration = Buffer.from("74 seconds of narration for a 60 second pick");

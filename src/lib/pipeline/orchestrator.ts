@@ -837,7 +837,10 @@ async function runPipelineOnce(
         ...(textModel ? { model: textModel } : {}),
         exactWords: true,
       });
-      if (!extension.trim()) break;
+      if (!extension.trim()) {
+        console.log("[pipeline] jobId=" + jobId + " script extension returned empty; using current content");
+        break;
+      }
       script = insertBeforeClosingLine(script, extension);
       console.log("[pipeline] jobId=" + jobId + " script extended (round " + (round + 1) + ") to meet " + scriptDurationSec + "s: reads ~" + readSec.toFixed(1) + "s of " + narrationSec.toFixed(1) + "s, added " + wordCount(extension) + " words");
     }

@@ -8,6 +8,7 @@ import { NO_LLM_KEY_MESSAGE, getProviderCandidates, tryModelCandidates } from "@
 import { requestChat, type ModelCandidate } from "@/lib/llm/chat";
 import { cleanSpokenText } from "@/lib/pipeline/spokenText";
 import {
+  EXTENSION_EXTRA_WORDS,
   VEO_CHUNK_SECONDS,
   VEO_WORDS_PER_CHUNK,
   endingSecondsFor,
@@ -352,6 +353,47 @@ Rules:
 - No dashes (— or –) as punctuation; use a comma or a period instead.
 - Plain text only. No JSON, no bullet points, no labels.`;
 export type ExtendScriptOptions = { model?: string; exactWords?: boolean };
+export type ExtensionCheck = { valid: true; text: string } | { valid: false; reason: string };
+
+const wordCount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
+
+const EXTENSION_MARKUP_RE = /^\s*(?:[-*\u{2022}]|\d{1,2}[.)]|#{1,6})\s|\*\*|`|^\s*[{[]/mu;
+const EXTENSION_COMMENTARY: Array<[what: string, pattern: RegExp]> = [
+  ["talks about the script", /\b(?:the|this|that|your|existing|current|original)\s+(?:(?:existing|current|original|video)\s+)?script\b/i],
+  ["talks about the premise", /\b(?:the|this|that)\s+(?:\w+\s+){0,2}premise\b/i],
+  ["announces its own reply", /\bhere(?:['\u{2019}]s|\s+is|\s+are)\b[^.!?:]{0,60}\b(?:continuation|extension|dialogue)\b/iu],
+  [
+    "talks about its task",
+    /\bI(?:['\u{2019}]ll|\s+will|\s+should|\s+must)\s+(?:flag|extend|correct|clarify)\b|\bI\s+(?:can['\u{2019}]t|cannot|won['\u{2019}]t|am\s+unable\s+to)\s+(?:help(?!\s+but)|assist|continue|extend|comply)\b/iu,
+  ],
+];
+const SENTENCE_END = String.raw`[.!?\u{2026}\u{0964}\u{0965}\u{3002}\u{FF01}\u{FF1F}\u{061F}\u{06D4}]["')\]\u{201D}\u{2019}]*`;
+const SENTENCE_GAP_RE = new RegExp(String.raw`(?<=${SENTENCE_END})\s+`, "u");
+const SENTENCE_END_RE = new RegExp(`${SENTENCE_END}$`, "u");
+
+export function checkExtension(raw: string, maxWords: number): ExtensionCheck {
+  if (EXTENSION_MARKUP_RE.test(raw)) {
+    return { valid: false, reason: "it is formatted text, not plain speech" };
+  }
+  const text = cleanSpokenText(raw);
+  if (!text) return { valid: false, reason: "nothing is left of it once cleaned" };
+  for (const [what, pattern] of EXTENSION_COMMENTARY) {
+    const hit = pattern.exec(text);
+    if (hit) return { valid: false, reason: `it ${what}: "${hit[0]}"` };
+  }
+  const kept: string[] = [];
+  let words = 0;
+  for (const sentence of text.split(SENTENCE_GAP_RE)) {
+    const count = wordCount(sentence);
+    if (!SENTENCE_END_RE.test(sentence) || words + count > maxWords) break;
+    kept.push(sentence);
+    words += count;
+  }
+  if (kept.length === 0) {
+    return { valid: false, reason: `no whole sentence of it fits in ${maxWords} words` };
+  }
+  return { valid: true, text: kept.join(" ") };
+}
 
 export async function extendScript(
   currentScriptText: string,
@@ -376,7 +418,7 @@ Current script (do not repeat any of this):
 ${currentScriptText.trim()}
 ---
 
-Write approximately ${targetWords} words of NEW dialogue on the same topic, same tone. Do not repeat any line from the current script. Output only the new sentences.`;
+Write NEW dialogue on the same topic, same tone, of no more than ${targetWords} words. Use whole sentences only, and stop after the last sentence that fits. Do not repeat any line from the current script. Output only the new sentences.`;
 
   try {
     const content = await tryModelCandidates(candidates, "script-extend", (candidate) =>
@@ -392,7 +434,14 @@ Write approximately ${targetWords} words of NEW dialogue on the same topic, same
         "Script extension"
       )
     );
-    return cleanSpokenText(content);
+    const checked = checkExtension(content, targetWords + EXTENSION_EXTRA_WORDS);
+    if (!checked.valid) {
+      console.warn(
+        `[script] dropped the extension the model wrote: ${checked.reason} (asked for ${targetWords} words, got ${wordCount(content)}).`
+      );
+      return "";
+    }
+    return checked.text;
   } catch {
     return "";
   }
