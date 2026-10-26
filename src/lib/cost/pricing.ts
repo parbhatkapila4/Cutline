@@ -18,8 +18,8 @@ export function heygenRatePerSecond(): number {
   if (!warnedMissingHeygenRate) {
     warnedMissingHeygenRate = true;
     console.error(
-      "[cost] HEYGEN RATE UNKNOWN. HeyGen avatar renders are being booked at $0.00 against the " +
-      "gross-margin ceiling, so real HeyGen spend is invisible to it. Fill verifiedPriceUsd for " +
+      "[cost] HEYGEN RATE UNKNOWN. HeyGen avatar renders are being booked at $0.00, so the cost shown " +
+      "for them (dashboard total, status API, worker log) leaves out what HeyGen charges. Fill verifiedPriceUsd for " +
       "heygen.avatar_video_per_second in config/vendor-prices.json and set COST_PER_HEYGEN_SECOND, " +
       "or set HEYGEN_PER_SECOND in src/lib/cost/pricing.ts."
     );

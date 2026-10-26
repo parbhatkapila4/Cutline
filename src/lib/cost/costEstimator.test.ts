@@ -101,6 +101,13 @@ describe("Veo is booked per generation attempt, not per delivered second", () =>
     expect(t.getBreakdown().video).toBeCloseTo(6 * 8 * SERVICE_COSTS.VEO_PER_SECOND, 4);
   });
 
+  it("books a clip at the Veo 3.1 Fast list price for video with audio at 720p, the SKU our default request is billed as", () => {
+    delete process.env.COST_PER_VIDEO_SECOND;
+    const t = createCostTracker();
+    t.recordVeoChunks(1);
+    expect(t.getBreakdown().video).toBeCloseTo(8 * 0.1, 4);
+  });
+
   it("no longer undercounts a job whose output is shorter than what it bought", () => {
     const bought = createCostTracker();
     bought.recordVeoChunks(4);

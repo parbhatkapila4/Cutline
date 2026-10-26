@@ -120,7 +120,7 @@
         "video_per_second": {
           "unit": "1 second of generated video",
           "verifiedPriceUsd": null,
-          "TODO": "Confirm against the GCP billing console that calls bill under the Veo 3.1 Fast video + audio 720p SKU. Re-check whenever VEO_MODEL, resolution or generateAudio changes: each is a different SKU (the standard model is $0.40/s with audio).",
+          "TODO": "Confirm against the GCP billing console that calls bill under the Veo 3.1 Fast video + audio 720p SKU. Re-check whenever VEO_MODEL, resolution or generateAudio changes: each is a different SKU (the standard model is $0.40/s with audio). Google's list for Fast at 720p, as the owner read it on 2026-10-26: $0.10/s with audio, $0.08/s video-only, so a mode that turns audio off must also book $0.08/s.",
           "codeAssumedPriceUsd": 0.1,
           "codeAssumptionSource": "src/lib/cost/pricing.ts:2 (VEO_PER_SECOND: 0.10). Google's list price for Veo 3.1 Fast, video + audio, 720p, at cloud.google.com/vertex-ai/generative-ai/pricing, read 2026-10-25.",
           "envOverride": "COST_PER_VIDEO_SECOND (src/lib/cost/costEstimator.ts:33)",
@@ -129,8 +129,8 @@
           "requestShape": {
             "model": "veo-3.1-fast-generate-001",
             "durationSeconds": 8,
-            "resolution": "not sent, so Veo's default of 720p",
-            "generateAudio": "not sent; audio is on, since the clips speak their lines",
+            "resolution": "not sent, so Veo's default of 720p (checked 2026-10-26: the output of job 7af16dbe-0ae3-441d-ba1d-8d206f963111 is 1280x720, and nothing after Veo rescales it)",
+            "generateAudio": "not sent; audio is on by default (checked 2026-10-26: the same output has a continuous AAC track, its cost has no TTS in it, and public/audio holds no music to mix in)",
             "source": "src/lib/veo/index.ts:317-331"
           },
           "billingGranularity": {
@@ -152,13 +152,13 @@
           "TODO": "Check the HeyGen plan in use. Determine (a) the billing unit, (b) whether stored Photo Avatars cost anything at rest, (c) whether a failed or discarded generation is still billed.",
           "codeAssumedPriceUsd": null,
           "codeAssumptionSource": "NONE. Superseded by avatar_video_per_second below, which is the unit the tracker now meters (CostTracker.recordHeygenSeconds).",
-          "notes": "CONSEQUENCE: every HeyGen avatar render books $0 against the margin ceiling. The only HeyGen limit the code knows about is a stored-avatar cap inferred from error code 401028 (the number 3 is NOT in the code; an earlier revision of this file asserted it) (src/lib/lipsync/heygen.ts:266)."
+          "notes": "CONSEQUENCE: every HeyGen avatar render books $0 in the job's cost breakdown. The only HeyGen limit the code knows about is a stored-avatar cap inferred from error code 401028 (the number 3 is NOT in the code; an earlier revision of this file asserted it) (src/lib/lipsync/heygen.ts:266)."
         },
 
         "avatar_video_per_second": {
           "unit": "1 second of produced avatar video",
           "verifiedPriceUsd": null,
-          "TODO": "THIS IS THE BLOCKING UNKNOWN for talking-character margin. HeyGen may not even sell per-second - check whether the plan bills per video, per credit, or per minute, and convert to $/second of output. Until this is a number, HeyGen renders are invisible to the gross-margin ceiling.",
+          "TODO": "THE UNKNOWN BEHIND HeyGen's COST. HeyGen measures API usage in US dollars and says its pricing varies by avatar engine and feature (help.heygen.com, 'HeyGen API Pricing Explained'). To get $/second, read these from the HeyGen account: (1) which billing track the API key is on: pay-as-you-go balance, a legacy API Pro/Scale plan, or an enterprise contract; (2) the price row for exactly what we call: POST /v2/video/generate with character.type talking_photo, super_resolution and matting on, 1920x1080 by default, voice from our own uploaded audio (src/lib/lipsync/heygen.ts:128-141 and 390-422); (3) whether super_resolution, matting or 1080p change that price; (4) any per-video minimum or rounding up to the minute, whether failed or cancelled generations are charged, and any per-avatar fee. To measure instead of read: note the balance, render two videos of different known lengths, note the balance after each; the slope is $/second and the intercept is any minimum charge. Compare the seconds HeyGen bills with the output duration the tracker books (src/lib/pipeline/orchestrator.ts:1008-1009). Until this is a number, a HeyGen job's cost.video is $0.00 in the dashboard total and the status API. The monthly USD ceiling is not affected: it leaves out Veo and HeyGen dollars alike, and cinematic work is capped in seconds (src/lib/queue/videoQueue.ts:596, src/lib/cost/budget.ts). That seconds cap counts a HeyGen second the same as a Veo second, so this rate is also what says whether the allowance and the top-up are safe on the HeyGen path. When it is known, scripts/cost-model.ts still maps HeyGen to the superseded avatar_video_generation unit and will not pick this entry up.",
           "codeAssumedPriceUsd": null,
           "codeAssumptionSource": "src/lib/cost/pricing.ts HEYGEN_PER_SECOND = null. DELIBERATELY null, not a guess.",
           "envOverride": "COST_PER_HEYGEN_SECOND (src/lib/cost/pricing.ts heygenRatePerSecond)",
