@@ -9,6 +9,7 @@ import {
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { GoogleAnalytics } from "@next/third-parties/google";
+import Script from "next/script";
 
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
 
@@ -71,6 +72,12 @@ export default function RootLayout({
       >
         {children}
         {gaMeasurementId ? <GoogleAnalytics gaId={gaMeasurementId} /> : null}
+        <Script
+          data-website-id="dfid_F252jtoQsPckLSPT8Ne0r"
+          data-domain="cutline.cloud"
+          src="https://datafa.st/js/script.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

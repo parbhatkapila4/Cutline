@@ -69,7 +69,7 @@ export default function PrivacyPage() {
                 <li>We collect the minimum needed to run the service: account info, the prompts and assets you submit, the videos we generate for you, and basic technical/operational logs.</li>
                 <li>We send your prompts and scripts to third-party AI providers (Anthropic, OpenRouter, ElevenLabs or PlayHT, OpenAI, optionally Google Veo) so they can run the pipeline. Your prompts leave our servers when this happens.</li>
                 <li>Free renders are deleted after roughly 24 hours. Paid renders are kept for 90 days, then deleted. Uploaded assets are deleted after roughly 24 hours on every plan.</li>
-                <li>We use Google Analytics to measure site traffic. It loads on every page, but only when a measurement ID is configured for the deployment. We do not run ad-tracking or behavioural profiling.</li>
+                <li>We use Google Analytics and DataFast to measure site traffic. Both load on every page; Google Analytics only when a measurement ID is configured for the deployment. We do not run ad-tracking or behavioural profiling.</li>
                 <li>Payments are processed by Dodo Payments. We never see or store your card number.</li>
                 <li>You can request access, export, or deletion of your data at any time by writing to {CONTACT_EMAIL}.</li>
               </ul>
@@ -128,6 +128,7 @@ export default function PrivacyPage() {
                   { name: "Google (Gemini / Veo)", what: "Used only if you select \"Talking object\" mode. The script text is sent to Google Veo to generate the talking character clip.", why: "Generates AI character video. Optional and only triggered when you explicitly choose this mode." },
                   { name: "Better Auth + Google OAuth", what: "If you sign in with Google: your Google email, name, and OAuth identifier.", why: "Authenticates you and creates your account record." },
                   { name: "Google Analytics", what: "Standard web-analytics data (page views, referrer, approximate location from IP, browser and device) plus a few product events: which mode you generated in, your plan name, and a failure code if a render fails. We do not send your email, account ID, or prompt text.", why: "Measures site traffic and how far people get through generation. Loads on every page, and only when a measurement ID is configured for the deployment." },
+                  { name: "DataFast", what: "Standard web-analytics data (page views, referrer, approximate location from IP, browser and device). We send it no product events, and we do not send your email, account ID, or prompt text.", why: "Measures site traffic and where visitors come from. Loads on every page." },
                   { name: "Dodo Payments", what: "Your email address and the plan you are purchasing. Card data goes directly to them, not to us.", why: "Processes subscriptions and one-time payments. PCI-DSS compliant; we are not in scope for cardholder data." },
                   { name: "Neon (Postgres)", what: "Account records, job metadata, subscription state.", why: "Database hosting." },
                   { name: "Redis", what: "Job queue entries, cancellation flags, rate-limit counters.", why: "Queue and ephemeral state. May be hosted by a managed Redis provider." },
@@ -172,6 +173,7 @@ export default function PrivacyPage() {
                 <li><span className="text-zinc-300 font-medium">Authentication session:</span> set after you sign in. Used to keep you signed in. Deleted when you sign out.</li>
                 <li><span className="text-zinc-300 font-medium">Idempotency / rate-limit:</span> short-lived cookies used to prevent duplicate submissions and enforce per-IP limits.</li>
                 <li><span className="text-zinc-300 font-medium">Google Analytics:</span> analytics cookies set by Google to count visits and distinguish browsers. Set only when a measurement ID is configured for the deployment.</li>
+                <li><span className="text-zinc-300 font-medium">DataFast:</span> analytics cookies set by DataFast to count visits and recognise returning visitors.</li>
               </ul>
             </section>
 
