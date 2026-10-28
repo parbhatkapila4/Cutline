@@ -1,16 +1,31 @@
-type GtagWindow = Window & {
+type AnalyticsWindow = Window & {
   gtag?: (command: "event", name: string, params?: Record<string, unknown>) => void;
+  datafast?: ((name: string, params?: Record<string, string>) => void) & { q?: unknown[] };
 };
 
 export type PlanParam = "free" | "beginner" | "professional" | "enterprise";
 export type ModeParam = "slideshow" | "talking_object";
 
+function sendToDatafast(w: AnalyticsWindow, name: string, params?: Record<string, string | number>): void {
+  if (typeof w.datafast !== "function") {
+    const queued = function (...args: unknown[]) {
+      (queued.q ??= []).push(args);
+    } as NonNullable<AnalyticsWindow["datafast"]>;
+    w.datafast = queued;
+  }
+  const values = params && Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]));
+  w.datafast(name, values);
+}
+
 function send(name: string, params?: Record<string, string | number>): void {
   if (typeof window === "undefined") return;
-  const gtag = (window as GtagWindow).gtag;
-  if (typeof gtag !== "function") return;
+  const w = window as AnalyticsWindow;
   try {
-    gtag("event", name, params);
+    if (typeof w.gtag === "function") w.gtag("event", name, params);
+  } catch {
+  }
+  try {
+    sendToDatafast(w, name, params);
   } catch {
   }
 }

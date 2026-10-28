@@ -1,8 +1,18 @@
+import { trackAICrawlerRequest } from "@datafast/ai-crawl";
 import { getSessionCookie } from "better-auth/cookies";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
+import { DATAFAST_WEBSITE_ID } from "@/lib/analytics/datafast";
 import { REQUEST_URL_HEADER } from "@/lib/http/requestUrl";
 
-export default function proxy(request: NextRequest) {
+function requiresSignIn(pathname: string): boolean {
+  return pathname === "/create" || pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+}
+
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  trackAICrawlerRequest(request, event, { websiteId: DATAFAST_WEBSITE_ID });
+
+  if (!requiresSignIn(request.nextUrl.pathname)) return NextResponse.next();
+
   const requestedPath = request.nextUrl.pathname + request.nextUrl.search;
 
   if (!getSessionCookie(request)) {
@@ -19,5 +29,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/create", "/dashboard/:path*"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

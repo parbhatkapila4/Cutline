@@ -58,5 +58,11 @@ export async function GET(req: NextRequest) {
   url.searchParams.set("metadata_userId", userId);
   if (email) url.searchParams.set("email", email);
 
+  url.searchParams.delete("metadata_datafast_visitor_id");
+  const visitorId = req.cookies.get("datafast_visitor_id")?.value;
+  if (visitorId && /^[\w-]{1,64}$/.test(visitorId)) {
+    url.searchParams.set("metadata_datafast_visitor_id", visitorId);
+  }
+
   return staticCheckout(new NextRequest(url, { headers: req.headers }));
 }

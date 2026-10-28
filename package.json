@@ -25,6 +25,7 @@
   "dependencies": {
     "@better-auth/passkey": "1.5.5",
     "@captchafox/react": "^1.11.0",
+    "@datafast/ai-crawl": "^1.0.9",
     "@daveyplate/better-auth-ui": "^3.3.15",
     "@dodopayments/nextjs": "^0.3.6",
     "@google/genai": "^1.39.0",
