@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import {
   getVideoQueue,
   cancelJob,
@@ -22,6 +22,8 @@ import {
 import { requestOwnsResource, resolveOwnerCandidates } from "@/lib/jobs/jobOwnership";
 import { isCancelledFailure } from "@/lib/jobs/jobStatus";
 import { isDatabaseConfigured } from "@/lib/db";
+import { recordVideoUsage } from "@/lib/db/videoUsage";
+import { isVideoUsageSurface, type VideoUsageSurface } from "@/lib/dashboard/videoUsageEvents";
 import { isProPlan } from "@/lib/plans";
 import { aspectRatiosFor } from "@/lib/cost/pricing";
 import { auth } from "@/lib/auth";
@@ -902,6 +904,21 @@ export function handleDownloadOptions(request: Request): NextResponse {
   });
 }
 
+function logDownload(
+  request: Request,
+  jobId: string,
+  userId: string | undefined,
+  surface: VideoUsageSurface | null
+): void {
+  if (!userId || request.method === "HEAD") return;
+  const write = () => recordVideoUsage({ jobId, userId, eventType: "download", surface });
+  try {
+    after(write);
+  } catch {
+    void write();
+  }
+}
+
 export async function handleDownloadGet(request: Request, jobId: string): Promise<NextResponse> {
   const origin = request.headers.get("Origin");
   const corsHeaders = getCorsHeaders(origin);
@@ -918,10 +935,12 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
   const { searchParams } = new URL(request.url);
   const variantParam = searchParams.get("variant");
   const variantIndex = variantParam != null ? Math.max(0, Math.floor(Number(variantParam))) : 0;
+  const surfaceParam = searchParams.get("surface");
+  const surface = isVideoUsageSurface(surfaceParam) ? surfaceParam : null;
 
+  let downloaderId: string | undefined;
   if (isDatabaseConfigured()) {
     const apiKeyUser = await validateApiKeyAndGetUserId(request.headers.get("x-api-key"));
-    let downloaderId: string | undefined;
     try {
       const session = await auth.api.getSession({ headers: request.headers });
       downloaderId = session?.user?.id != null ? String(session.user.id) : undefined;
@@ -1018,6 +1037,7 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
         });
       }
       const downloadUrl = videoPath + (videoPath.includes("?") ? "&" : "?") + "download=1";
+      logDownload(request, jobId, downloaderId, surface);
       return new NextResponse(null, {
         status: 302,
         headers: { ...corsHeaders, Location: downloadUrl },
@@ -1041,6 +1061,7 @@ export async function handleDownloadGet(request: Request, jobId: string): Promis
     const contentDisposition = `attachment; filename="${suggestedFilename}"`;
 
     const fileBuffer = fs.readFileSync(filePath);
+    logDownload(request, jobId, downloaderId, surface);
     return new NextResponse(fileBuffer, {
       status: 200,
       headers: {

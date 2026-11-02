@@ -23,6 +23,7 @@ type VideoPlayerProps = {
   className?: string;
   style?: CSSProperties;
   onDimensions?: (dims: VideoDimensions) => void;
+  onPlay?: () => void;
 };
 
 export function formatClock(seconds: number): string {
@@ -35,7 +36,7 @@ type FullscreenVideo = HTMLVideoElement & { webkitEnterFullscreen?: () => void }
 const CONTROL_BTN =
   "inline-grid h-8 min-w-8 place-items-center rounded-lg px-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-white/12 [&_svg]:size-[18px]";
 
-export function VideoPlayer({ src, ratio, label, className, style, onDimensions }: VideoPlayerProps) {
+export function VideoPlayer({ src, ratio, label, className, style, onDimensions, onPlay }: VideoPlayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -182,7 +183,10 @@ export function VideoPlayer({ src, ratio, label, className, style, onDimensions 
         playsInline
         className="absolute inset-0 size-full object-contain"
         onClick={toggle}
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          setPlaying(true);
+          onPlay?.();
+        }}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
         onSeeked={(e) => setTime(e.currentTarget.currentTime)}

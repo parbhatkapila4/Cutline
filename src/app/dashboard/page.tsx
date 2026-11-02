@@ -776,7 +776,7 @@ export default function DashboardPage() {
                     <div className="px-4 pb-4 flex gap-2 items-center">
                       <Link href={`/dashboard/videos/${video.id}`} className="flex-1 text-center text-sm font-medium text-white bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2 rounded-lg transition-colors">View</Link>
                       {video.status === "completed" && video.videoUrl ? (
-                        <a href={`/api/generate/${encodeURIComponent(video.id)}/download`} download className="flex-1 text-center text-sm font-medium text-black bg-white hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors">Download</a>
+                        <a href={`/api/generate/${encodeURIComponent(video.id)}/download?surface=dashboard`} download className="flex-1 text-center text-sm font-medium text-black bg-white hover:bg-zinc-200 px-3 py-2 rounded-lg transition-colors">Download</a>
                       ) : null}
                       <button
                         type="button"

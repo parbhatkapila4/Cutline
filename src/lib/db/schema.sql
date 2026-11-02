@@ -159,3 +159,13 @@ ALTER TABLE video_jobs
 ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_video_jobs_open ON video_jobs (created_at)
 WHERE status IN ('queued', 'processing');
+CREATE TABLE IF NOT EXISTS video_usage_events (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  surface TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_video_usage_events_job_type ON video_usage_events (job_id, event_type);
+CREATE INDEX IF NOT EXISTS idx_video_usage_events_user_created ON video_usage_events (user_id, created_at);

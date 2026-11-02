@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import fs from "fs";
+import path from "path";
 import { POST } from "./route";
 import { handleDownloadGet, handleJobGet, handleJobsGet } from "./handlers";
 import { PLAN_CONFIGS } from "@/lib/plans";
@@ -18,6 +20,7 @@ const {
   mockListRecentJobs,
   mockApiKeyUser,
   mockFetch,
+  mockRecordUsage,
 } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
   mockGetJob: vi.fn(),
@@ -31,6 +34,7 @@ const {
   mockListRecentJobs: vi.fn(async () => []),
   mockApiKeyUser: vi.fn(async (): Promise<{ userId: string; keyId: string } | null> => null),
   mockFetch: vi.fn(),
+  mockRecordUsage: vi.fn<(input: Record<string, unknown>) => Promise<string>>(async () => "recorded"),
 }));
 
 vi.mock("@/lib/queue/videoQueue", () => ({
@@ -62,6 +66,10 @@ vi.mock("@/lib/jobs/videoJobService", () => ({
   deleteOpenVideoJob: mockDeleteOpenRow,
   listVideoJobsForOwners: mockListRows,
   isTerminalVideoJobStatus: (status: string) => status === "completed" || status === "failed",
+}));
+
+vi.mock("@/lib/db/videoUsage", () => ({
+  recordVideoUsage: mockRecordUsage,
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -156,6 +164,8 @@ beforeEach(() => {
   mockApiKeyUser.mockResolvedValue(null);
   mockFetch.mockReset();
   mockFetch.mockResolvedValue(new Response(null, { status: 200 }));
+  mockRecordUsage.mockReset();
+  mockRecordUsage.mockResolvedValue("recorded");
   vi.stubGlobal("fetch", mockFetch);
 });
 
@@ -509,5 +519,122 @@ describe("POST /api/generate - finalising a preview reads the preview's row", ()
 
     expect(res.status).toBe(400);
     expect(mockAdd).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/generate/[jobId]/download - each successful download is logged", () => {
+  it("logs the download when it redirects to the stored file", async () => {
+    mockFindRow.mockResolvedValue(row());
+
+    const res = await download();
+
+    expect(res.status).toBe(302);
+    expect(mockRecordUsage).toHaveBeenCalledTimes(1);
+    expect(mockRecordUsage).toHaveBeenCalledWith({
+      jobId: JOB_ID,
+      userId: USER,
+      eventType: "download",
+      surface: null,
+    });
+  });
+
+  it("logs every repeat, not just the first", async () => {
+    mockFindRow.mockResolvedValue(row());
+
+    await download();
+    await download();
+    await download();
+
+    expect(mockRecordUsage).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(["dashboard", "video_page", "create_page"])(
+    "records the page a download came from (%s)",
+    async (surface) => {
+      mockFindRow.mockResolvedValue(row());
+
+      await download(`?surface=${surface}`);
+
+      expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({ surface }));
+    },
+  );
+
+  it.each(["homepage", "", "DASHBOARD", "dashboard%20"])(
+    "ignores a surface it does not know (%j) and still serves and logs the download",
+    async (surface) => {
+      mockFindRow.mockResolvedValue(row());
+
+      const res = await download(`?surface=${surface}`);
+
+      expect(res.status).toBe(302);
+      expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({ surface: null }));
+    },
+  );
+
+  it("does not log a HEAD request, which Next answers through the GET handler", async () => {
+    mockFindRow.mockResolvedValue(row());
+
+    const res = await handleDownloadGet(
+      new Request(`http://localhost/api/generate/${JOB_ID}/download`, { method: "HEAD" }),
+      JOB_ID,
+    );
+
+    expect(res.status).toBe(302);
+    expect(mockRecordUsage).not.toHaveBeenCalled();
+  });
+
+  it("does not wait for the usage write before answering", async () => {
+    mockFindRow.mockResolvedValue(row());
+    mockRecordUsage.mockImplementation(() => new Promise<string>(() => { }));
+
+    const res = await download();
+
+    expect(res.status).toBe(302);
+    expect(mockRecordUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs a download served from local disk, and nothing once that file is gone", async () => {
+    const name = `usage-log-${process.pid}-${Date.now()}.mp4`;
+    const dir = path.join(process.cwd(), "public", "temp");
+    const file = path.join(dir, name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, "not really a video");
+    mockFindRow.mockResolvedValue(row({ final_url: `/temp/${name}`, result: { videoPath: `/temp/${name}` } }));
+
+    try {
+      const res = await download("?surface=create_page");
+
+      expect(res.status).toBe(200);
+      expect(mockRecordUsage).toHaveBeenCalledTimes(1);
+      expect(mockRecordUsage).toHaveBeenCalledWith({
+        jobId: JOB_ID,
+        userId: USER,
+        eventType: "download",
+        surface: "create_page",
+      });
+    } finally {
+      fs.rmSync(file, { force: true });
+    }
+
+    mockRecordUsage.mockClear();
+    expect((await download()).status).toBe(404);
+    expect(mockRecordUsage).not.toHaveBeenCalled();
+  });
+
+  it("logs nothing when the file is gone, the job is unknown, or it is still rendering", async () => {
+    mockFindRow.mockResolvedValue(row({ final_url: null }));
+    expect((await download()).status).toBe(404);
+
+    mockFindRow.mockResolvedValue(row());
+    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    expect((await download()).status).toBe(404);
+
+    mockFindRow.mockResolvedValue(null);
+    expect((await download()).status).toBe(404);
+
+    mockGetJob.mockResolvedValue(queueJob("active"));
+    expect((await download()).status).toBe(404);
+
+    expect(mockRecordUsage).not.toHaveBeenCalled();
   });
 });

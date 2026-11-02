@@ -1,4 +1,9 @@
-import type { VideoJob, VideoJobInsert, VideoJobStatus, OwnerType } from "@/lib/db/types";
+import type {
+  VideoJob,
+  VideoJobInsert,
+  VideoJobStatus,
+  OwnerType,
+} from "@/lib/db/types";
 import type { VideoJobData, VideoJobResult } from "@/lib/queue/videoQueue";
 import { getSql, isDatabaseConfigured } from "@/lib/db/client";
 import { redactSecrets } from "@/lib/telemetry/renderEvents";
@@ -48,7 +53,10 @@ function mapRow(row: VideoJobRow): VideoJob {
     status: row.status as VideoJobStatus,
     preview_url: row.preview_url ?? null,
     final_url: row.final_url ?? null,
-    created_at: row.created_at instanceof Date ? row.created_at : new Date(row.created_at),
+    created_at:
+      row.created_at instanceof Date
+        ? row.created_at
+        : new Date(row.created_at),
     queue_job_id: row.queue_job_id ?? null,
     job_data: toJson<VideoJobData>(row.job_data),
     result: toJson<VideoJobResult>(row.result),
@@ -70,7 +78,9 @@ function storedJobData(data: VideoJobData | null | undefined): string | null {
   return JSON.stringify(stored);
 }
 
-export async function createVideoJob(insert: VideoJobInsert): Promise<{ id: string }> {
+export async function createVideoJob(
+  insert: VideoJobInsert,
+): Promise<{ id: string }> {
   const sql = getSql();
   const status = insert.status ?? "queued";
   const jobData = storedJobData(insert.job_data);
@@ -90,7 +100,11 @@ export async function createVideoJob(insert: VideoJobInsert): Promise<{ id: stri
     RETURNING id
   `) as { id: string }[];
   const row = rows[0];
-  if (!row || typeof row !== "object" || typeof (row as { id?: string }).id !== "string") {
+  if (
+    !row ||
+    typeof row !== "object" ||
+    typeof (row as { id?: string }).id !== "string"
+  ) {
     throw new Error("Failed to create video job");
   }
   return { id: (row as { id: string }).id };
@@ -125,7 +139,7 @@ export async function getVideoJobById(jobId: string): Promise<VideoJob | null> {
 
 export async function findVideoJobForOwners(
   jobId: string,
-  ownerIds: string[]
+  ownerIds: string[],
 ): Promise<VideoJob | null> {
   if (ownerIds.length === 0) return null;
   const sql = getSql();
@@ -147,7 +161,7 @@ export async function findVideoJobForOwners(
 export async function listVideoJobFamily(
   rootJobId: string,
   ownerIds: string[],
-  limit: number = 50
+  limit: number = 50,
 ): Promise<VideoJob[]> {
   if (ownerIds.length === 0) return [];
   const sql = getSql();
@@ -167,7 +181,7 @@ export async function listVideoJobFamily(
 export async function listVideoJobsByOwner(
   ownerType: OwnerType,
   ownerId: string,
-  limit: number = 50
+  limit: number = 50,
 ): Promise<VideoJob[]> {
   const sql = getSql();
   const rows = await sql`
@@ -183,7 +197,7 @@ export async function listVideoJobsByOwner(
 
 export async function listVideoJobsForOwners(
   ownerIds: string[],
-  limit: number
+  limit: number,
 ): Promise<VideoJob[]> {
   if (ownerIds.length === 0) return [];
   const sql = getSql();
@@ -200,7 +214,7 @@ export async function listVideoJobsForOwners(
 
 export async function listRecentFinishedVideoJobs(
   ownerId: string,
-  limit: number
+  limit: number,
 ): Promise<VideoJob[]> {
   const sql = getSql();
   const rows = await sql`
@@ -223,7 +237,10 @@ export type VideoJobOverview = {
   totalCostUsd: number;
 };
 
-export async function getVideoJobOverview(ownerId: string, weekStart: Date): Promise<VideoJobOverview> {
+export async function getVideoJobOverview(
+  ownerId: string,
+  weekStart: Date,
+): Promise<VideoJobOverview> {
   const sql = getSql();
   const rows = (await sql`
     SELECT
@@ -282,7 +299,7 @@ export async function listOpenVideoJobs(options: {
 
 export async function deleteVideoJobRelatedDbRows(
   bullJobId: string,
-  ownerIds: string[]
+  ownerIds: string[],
 ): Promise<void> {
   if (!isDatabaseConfigured()) return;
   const sql = getSql();
@@ -291,7 +308,7 @@ export async function deleteVideoJobRelatedDbRows(
   } catch (e) {
     console.warn(
       "[videoJobService] delete job_comments failed:",
-      e instanceof Error ? e.message : String(e)
+      e instanceof Error ? e.message : String(e),
     );
   }
   try {
@@ -299,7 +316,15 @@ export async function deleteVideoJobRelatedDbRows(
   } catch (e) {
     console.warn(
       "[videoJobService] delete job_approvals failed:",
-      e instanceof Error ? e.message : String(e)
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+  try {
+    await sql`DELETE FROM video_usage_events WHERE job_id = ${bullJobId}`;
+  } catch (e) {
+    console.warn(
+      "[videoJobService] delete video_usage_events failed:",
+      e instanceof Error ? e.message : String(e),
     );
   }
   await sql`
@@ -322,12 +347,16 @@ export async function deleteOpenVideoJob(queueJobId: string): Promise<boolean> {
 }
 
 export async function getPlanIdsForTakes(
-  takes: ReadonlyArray<{ url: string; queueJobId: string | null }>
+  takes: ReadonlyArray<{ url: string; queueJobId: string | null }>,
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (!isDatabaseConfigured() || takes.length === 0) return out;
   const urls = takes.map((take) => take.url);
-  const queueJobIds = [...new Set(takes.flatMap((take) => (take.queueJobId ? [take.queueJobId] : [])))];
+  const queueJobIds = [
+    ...new Set(
+      takes.flatMap((take) => (take.queueJobId ? [take.queueJobId] : [])),
+    ),
+  ];
   const sql = getSql();
   const rows = (await sql`
     SELECT vj.final_url AS final_url, vj.queue_job_id AS queue_job_id, upo.plan AS plan
@@ -335,16 +364,24 @@ export async function getPlanIdsForTakes(
     LEFT JOIN user_plan_overrides upo ON upo.user_id = vj.owner_id
     WHERE (vj.final_url = ANY(${urls}) OR vj.queue_job_id = ANY(${queueJobIds}))
       AND vj.owner_type = 'user'::video_job_owner_type
-  `) as Array<{ final_url: string | null; queue_job_id: string | null; plan: string | null }>;
+  `) as Array<{
+    final_url: string | null;
+    queue_job_id: string | null;
+    plan: string | null;
+  }>;
   const planByUrl = new Map<string, string>();
   const planByJob = new Map<string, string>();
   for (const row of Array.isArray(rows) ? rows : []) {
     if (typeof row?.plan !== "string") continue;
-    if (typeof row.final_url === "string") planByUrl.set(row.final_url, row.plan);
-    if (typeof row.queue_job_id === "string") planByJob.set(row.queue_job_id, row.plan);
+    if (typeof row.final_url === "string")
+      planByUrl.set(row.final_url, row.plan);
+    if (typeof row.queue_job_id === "string")
+      planByJob.set(row.queue_job_id, row.plan);
   }
   for (const take of takes) {
-    const plan = planByUrl.get(take.url) ?? (take.queueJobId ? planByJob.get(take.queueJobId) : undefined);
+    const plan =
+      planByUrl.get(take.url) ??
+      (take.queueJobId ? planByJob.get(take.queueJobId) : undefined);
     if (plan) out.set(take.url, plan);
   }
   return out;
@@ -362,7 +399,9 @@ export async function clearFinalUrls(urls: string[]): Promise<number> {
   return Array.isArray(rows) ? rows.length : 0;
 }
 
-export async function markVideoJobProcessing(queueJobId: string): Promise<boolean> {
+export async function markVideoJobProcessing(
+  queueJobId: string,
+): Promise<boolean> {
   if (!isDatabaseConfigured()) return false;
   const sql = getSql();
   const rows = await sql`
@@ -378,7 +417,7 @@ export async function markVideoJobProcessing(queueJobId: string): Promise<boolea
 
 export async function markVideoJobCompleted(
   queueJobId: string,
-  outcome: { finalUrl: string | null; result: VideoJobResult | null }
+  outcome: { finalUrl: string | null; result: VideoJobResult | null },
 ): Promise<boolean> {
   if (!isDatabaseConfigured()) return false;
   const sql = getSql();
@@ -400,11 +439,12 @@ export async function markVideoJobCompleted(
 
 export async function markVideoJobFailed(
   queueJobId: string,
-  error: string | null
+  error: string | null,
 ): Promise<boolean> {
   if (!isDatabaseConfigured()) return false;
   const sql = getSql();
-  const stored = error == null || error.trim() === "" ? null : redactSecrets(error);
+  const stored =
+    error == null || error.trim() === "" ? null : redactSecrets(error);
   const rows = await sql`
     UPDATE video_jobs
     SET status = 'failed'::video_job_status,
@@ -420,7 +460,7 @@ export async function markVideoJobFailed(
 export async function updateVideoJobStatus(
   jobId: string,
   status: VideoJobStatus,
-  options?: { preview_url?: string | null; final_url?: string | null }
+  options?: { preview_url?: string | null; final_url?: string | null },
 ): Promise<boolean> {
   const sql = getSql();
   if (options?.preview_url !== undefined || options?.final_url !== undefined) {

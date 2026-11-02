@@ -19,7 +19,7 @@ const SECTIONS = [
   { id: "contact", label: "Contact" },
 ];
 
-const EFFECTIVE_DATE = "10 May 2026";
+const EFFECTIVE_DATE = "1 November 2026";
 const CONTACT_EMAIL = "parbhat@parbhat.work";
 
 export default function PrivacyPage() {
@@ -66,10 +66,10 @@ export default function PrivacyPage() {
             <section id="summary" className="mb-16">
               <h2 className="text-2xl font-semibold text-white mb-4">Summary</h2>
               <ul className="space-y-2 text-zinc-400 text-sm leading-relaxed list-disc pl-5">
-                <li>We collect the minimum needed to run the service: account info, the prompts and assets you submit, the videos we generate for you, and basic technical/operational logs.</li>
+                <li>We collect the minimum needed to run the service: account info, the prompts and assets you submit, the videos we generate for you, records of whether you download, share or play those videos, and basic technical/operational logs.</li>
                 <li>We send your prompts and scripts to third-party AI providers (Anthropic, OpenRouter, ElevenLabs or PlayHT, OpenAI, optionally Google Veo) so they can run the pipeline. Your prompts leave our servers when this happens.</li>
                 <li>Free renders are deleted after roughly 24 hours. Paid renders are kept for 90 days, then deleted. Uploaded assets are deleted after roughly 24 hours on every plan.</li>
-                <li>We use Google Analytics and DataFast to measure site traffic. Both load on every page; Google Analytics only when a measurement ID is configured for the deployment. We do not run ad-tracking or behavioural profiling.</li>
+                <li>We use Google Analytics and DataFast to measure site traffic. Both load on every page; Google Analytics only when a measurement ID is configured for the deployment. We do not use your data to target ads, we do not sell it, and we do not track you across other websites.</li>
                 <li>Payments are processed by Dodo Payments. We never see or store your card number.</li>
                 <li>You can request access, export, or deletion of your data at any time by writing to {CONTACT_EMAIL}.</li>
               </ul>
@@ -95,6 +95,10 @@ export default function PrivacyPage() {
                   <p>Job identifiers, status (pending / processing / completed / failed), per-stage timings, error messages, your IP address (used for rate limiting and abuse prevention), browser user-agent. We do not log the contents of your prompts in our application logs.</p>
                 </div>
                 <div>
+                  <h3 className="font-semibold text-zinc-200 mb-1">Video usage events</h3>
+                  <p>When you download one of your finished videos, copy or share its link, or start playing it, we record that it happened: which video, your account ID, which of those three actions it was, the page of the app it happened on (when that is known), and the time. We store no IP address or browser user-agent with these events. We use them to see whether the videos we generate get used. They are deleted when you delete the video, or with your account.</p>
+                </div>
+                <div>
                   <h3 className="font-semibold text-zinc-200 mb-1">Billing data</h3>
                   <p>If you subscribe to a paid plan, our payment processor (Dodo Payments) handles your card data directly. They send us the plan you purchased, the status of your subscription, and a customer reference identifier. We do not see, store, or process your card number, CVV, or banking credentials.</p>
                 </div>
@@ -110,6 +114,7 @@ export default function PrivacyPage() {
                 <li>To enforce rate limits, detect abuse (for example, repeated requests from the same IP), and keep the service stable.</li>
                 <li>To process payments, manage subscriptions, and send transactional account emails (sign-in confirmations, payment receipts, important service notices).</li>
                 <li>To investigate and fix bugs, by inspecting job metadata and error logs.</li>
+                <li>To measure whether the videos we generate are downloaded, shared or played, using the video usage events described above.</li>
                 <li>To comply with our legal obligations and respond to lawful requests.</li>
               </ul>
               <p className="text-zinc-400 text-sm leading-relaxed mt-4">We do not sell your data. We do not share it with advertisers. We do not use your prompts or generated videos to train our own models.</p>
@@ -161,6 +166,7 @@ export default function PrivacyPage() {
                 <li><span className="text-zinc-300 font-medium">Uploaded assets (logos, product photos):</span> deleted approximately 24 hours after upload.</li>
                 <li><span className="text-zinc-300 font-medium">Per-job temp files:</span> deleted as soon as the job finishes, regardless of success or failure.</li>
                 <li><span className="text-zinc-300 font-medium">Job records (status, timing, error metadata):</span> kept while your account is active so you can see history; deleted with your account.</li>
+                <li><span className="text-zinc-300 font-medium">Video usage events:</span> deleted when you delete the video, or with your account.</li>
                 <li><span className="text-zinc-300 font-medium">Account data:</span> kept until you delete your account or close it. After deletion we retain only what is required for legal, tax, fraud-prevention, or accounting purposes.</li>
                 <li><span className="text-zinc-300 font-medium">Logs:</span> kept up to 90 days for operational and security purposes.</li>
               </ul>
@@ -204,7 +210,7 @@ export default function PrivacyPage() {
                   <h3 className="font-semibold text-zinc-200 mb-1">Legal bases (Art. 6 GDPR)</h3>
                   <ul className="space-y-1.5 list-disc pl-5 mt-2">
                     <li><span className="text-zinc-300 font-medium">Performance of a contract</span>: to create your account, run the pipeline you requested, deliver the generated MP4, and provide your dashboard.</li>
-                    <li><span className="text-zinc-300 font-medium">Legitimate interests</span>: to keep the service stable, prevent abuse, enforce rate limits, secure our infrastructure, debug errors, and communicate transactional notices. We have balanced these interests against your rights and freedoms.</li>
+                    <li><span className="text-zinc-300 font-medium">Legitimate interests</span>: to keep the service stable, prevent abuse, enforce rate limits, secure our infrastructure, debug errors, measure whether the videos we generate are downloaded, shared or played, and communicate transactional notices. We have balanced these interests against your rights and freedoms.</li>
                     <li><span className="text-zinc-300 font-medium">Legal obligation</span>: where we must retain or disclose data to comply with tax, accounting, or law-enforcement requirements.</li>
                     <li><span className="text-zinc-300 font-medium">Consent</span>: used only where we explicitly ask (for example, optional marketing emails, where applicable). You can withdraw consent at any time without affecting prior processing.</li>
                   </ul>

@@ -33,7 +33,9 @@ import { useRenderStatus, type RenderStatus } from "@/components/dashboard/video
 import { VideoPageSkeleton } from "@/components/dashboard/video/VideoPageSkeleton";
 import { VideoPlayer, formatClock, type VideoDimensions } from "@/components/dashboard/video/VideoPlayer";
 import { PIPELINE_STEPS } from "@/components/generate/constants";
+import { useVideoPlayReporter } from "@/hooks/useVideoPlayReporter";
 import { absoluteVideoUrl } from "@/lib/dashboard/videoLink";
+import { reportVideoUsage } from "@/lib/dashboard/videoUsageEvents";
 import {
   SHARE_LINKS_PLAN_NOTE,
   canShareLinks,
@@ -239,6 +241,7 @@ export default function DashboardVideoPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const upsellRef = useRef<HTMLDivElement>(null);
+  const reportPlay = useVideoPlayReporter("video_page");
 
   const versions = detail?.versions ?? [];
   const selected = versions.find((v) => v.id === selectedId) ?? versions[versions.length - 1] ?? null;
@@ -393,9 +396,11 @@ export default function DashboardVideoPage() {
   };
 
   const copyText = async (text: string, what: "link" | "prompt") => {
+    const sharedJobId = what === "link" && canShare ? selected?.id : null;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(what);
+      if (sharedJobId) reportVideoUsage(sharedJobId, "share_copied", "video_page");
     } catch {}
   };
 
@@ -776,6 +781,7 @@ export default function DashboardVideoPage() {
           label={`${title}, version ${selectedIndex + 1}`}
           className="mx-auto w-[min(100%,calc(60svh*var(--ar)))] min-[900px]:w-[min(100cqw,calc(100cqh*var(--ar)))]"
           onDimensions={(d) => setDims((prev) => ({ ...prev, [selected.id]: d }))}
+          onPlay={() => reportPlay(selected.id)}
         />
       );
     }
@@ -970,7 +976,7 @@ export default function DashboardVideoPage() {
             </Link>
           ) : selectedDownloadable ? (
             <a
-              href={`/api/generate/${encodeURIComponent(selected.id)}/download`}
+              href={`/api/generate/${encodeURIComponent(selected.id)}/download?surface=video_page`}
               download={`cutline-${selected.id}.mp4`}
               title="Download MP4"
               className={BTN_PRIMARY}

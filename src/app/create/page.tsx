@@ -31,6 +31,7 @@ import {
   type PlanId,
 } from "@/lib/plans";
 import { absoluteVideoUrl } from "@/lib/dashboard/videoLink";
+import { reportVideoUsage } from "@/lib/dashboard/videoUsageEvents";
 import { aspectRatiosFor, cinematicSecondsFor, type TalkingShape } from "@/lib/cost/pricing";
 import {
   trackGenerateSubmit,
@@ -1239,7 +1240,7 @@ export default function CreatePage() {
                 className="flex flex-col sm:flex-row gap-2 mb-10"
               >
                 <a
-                  href={`/api/generate/${jobId}/download`}
+                  href={`/api/generate/${jobId}/download?surface=create_page`}
                   download={`cutline-${jobId}.mp4`}
                   className="group relative flex-1 inline-flex items-center justify-center gap-3 px-5 py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-[14px] font-semibold tracking-[-0.005em] shadow-[0_14px_32px_-10px_rgba(251,191,36,0.55)] hover:shadow-[0_18px_38px_-10px_rgba(251,191,36,0.7)] transition-all overflow-hidden"
                 >
@@ -1262,7 +1263,9 @@ export default function CreatePage() {
                       type="button"
                       onClick={() => {
                         if (!videoUrl) return;
-                        navigator.clipboard.writeText(absoluteVideoUrl(videoUrl, window.location.origin));
+                        navigator.clipboard
+                          .writeText(absoluteVideoUrl(videoUrl, window.location.origin))
+                          .then(() => reportVideoUsage(jobId, "share_copied", "create_page"), () => {});
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       }}
@@ -1301,11 +1304,14 @@ export default function CreatePage() {
                               text: "Made with Cutline.",
                               url: shareUrl,
                             });
+                            reportVideoUsage(jobId, "share_copied", "create_page");
                             return;
                           } catch {
                           }
                         }
-                        navigator.clipboard.writeText(shareUrl);
+                        navigator.clipboard
+                          .writeText(shareUrl)
+                          .then(() => reportVideoUsage(jobId, "share_copied", "create_page"), () => {});
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       }}
